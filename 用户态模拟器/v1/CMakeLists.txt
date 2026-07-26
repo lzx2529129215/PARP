@@ -41,15 +41,20 @@ add_library(reclaim_core STATIC
     src/core/scan_pressure.c
     src/core/reclaim.c
     src/core/validator.c
+)
+target_include_directories(reclaim_core PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include)
+
+add_library(reclaim_userspace STATIC
     src/simulator/event_parser.c
     src/simulator/event_runner.c
     src/simulator/userspace_platform.c
     src/simulator/simulator_executor.c
 )
-target_include_directories(reclaim_core PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include)
+target_link_libraries(reclaim_userspace PUBLIC reclaim_core)
+target_include_directories(reclaim_userspace PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include)
 
 add_executable(reclaim_simulator src/simulator/main.c)
-target_link_libraries(reclaim_simulator PRIVATE reclaim_core)
+target_link_libraries(reclaim_simulator PRIVATE reclaim_userspace reclaim_core)
 
 if(RECLAIM_ENABLE_TESTS)
     enable_testing()
@@ -65,6 +70,6 @@ if(RECLAIM_ENABLE_TESTS)
         tests/integration/test_validation_corruption.c
         tests/scenarios/test_trace.c
     )
-    target_link_libraries(reclaim_tests PRIVATE reclaim_core)
+    target_link_libraries(reclaim_tests PRIVATE reclaim_userspace reclaim_core)
     add_test(NAME reclaim_tests COMMAND reclaim_tests)
 endif()
