@@ -14,6 +14,9 @@ static unsigned failures;
 
 void register_test_intrusive_list_order(void);
 void register_test_folio_order_pages(void);
+void register_test_page_domain_lifecycle(void);
+void register_test_duplicate_ids_and_missing_domain(void);
+void register_test_allocation_failure_preserves_state(void);
 
 void reclaim_test_register(const char *name, reclaim_test_fn fn)
 {
@@ -34,6 +37,9 @@ int reclaim_test_run_all(void)
     unsigned passed = 0U;
     register_test_intrusive_list_order();
     register_test_folio_order_pages();
+    register_test_page_domain_lifecycle();
+    register_test_duplicate_ids_and_missing_domain();
+    register_test_allocation_failure_preserves_state();
     for (i = 0U; i < case_count; i++) {
         if (cases[i].fn()) {
             passed++;
