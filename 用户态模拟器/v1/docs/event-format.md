@@ -1,15 +1,15 @@
-# Event format
+# 事件格式
 
-Each non-empty, non-comment line contains one command and whitespace-separated arguments. `#` starts a comment. Parsing is strict: an invalid line reports filename, line number, original text and a reason; the event is not applied and replay stops.
+每个非空、非注释行由一个命令和若干空白分隔的参数组成。`#` 表示注释开始。解析采用严格模式：非法行必须报告文件名、行号、原始文本和原因；该事件不会执行，回放随即停止。
 
-## Commands
+## 命令
 
 ```text
 GROUP_CREATE <cgroup_id>
 GROUP_DESTROY <cgroup_id>
 GROUP_SET_SWAPPINESS <cgroup_id> <0..200|INHERIT>
 GROUP_SET_SWAP_ENABLED <cgroup_id> <0|1|INHERIT>
-GROUP_SET_SWAP <cgroup_id> <ON|OFF|INHERIT>       # compatibility alias
+GROUP_SET_SWAP <cgroup_id> <ON|OFF|INHERIT>       # 兼容别名
 PAGE_ADD <page_id> <cgroup_id> <ANON|FILE> <order 0..63>
 PAGE_ACCESS <page_id> <access_cgroup_id>
 PAGE_REMOVE <page_id>
@@ -24,7 +24,7 @@ VALIDATE
 DUMP
 ```
 
-Scenario assertions are:
+场景断言为：
 
 ```text
 ASSERT_PAGE_MISSING <page_id>
@@ -34,9 +34,9 @@ ASSERT_DOMAIN_PAGES <cgroup_id> <base_pages>
 ASSERT_LAST_STOP_REASON <TARGET_REACHED|NO_SCANNABLE_PAGES|NO_PROGRESS|PRIORITY_EXHAUSTED|EXECUTOR_ERROR|ROUND_LIMIT>
 ```
 
-`GROUP_SET_SWAP` is accepted as a compatibility alias for the design document spelling. `PAGE_RECHARGE` requires a non-isolated page and changes Shadow owner/list; cross-cgroup access does not. `PAGE_REMOVE` rejects isolated pages. Destroying a nonempty domain is an error.
+`GROUP_SET_SWAP` 是设计文档中另一种拼写的兼容别名。`PAGE_RECHARGE` 要求页面不是 isolated 状态，并会改变 Shadow owner 和链归属；跨 cgroup 访问不会改变 owner。`PAGE_REMOVE` 拒绝 isolated 页面。销毁非空 domain 会返回错误。
 
-## Complete example
+## 完整示例
 
 ```text
 GROUP_CREATE 10

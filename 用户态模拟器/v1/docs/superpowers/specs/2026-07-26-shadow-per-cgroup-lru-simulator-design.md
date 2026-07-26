@@ -1,80 +1,73 @@
-# Shadow per-cgroup LRU Simulator Design
+# Shadow per-cgroup LRU 模拟器设计规格
 
-**Project:** `myself-kswapd`
-**Date:** 2026-07-26
-**Status:** Approved design, implementation not started
-**Primary language:** C11
-**Build system:** CMake + CTest
+**项目：** `myself-kswapd`
+**日期：** 2026-07-26
+**状态：** 已批准设计，尚未开始实现
+**主要语言：** C11
 
-## 1. Purpose
+## 1. 目的
 
-This project builds a portable, deterministic, single-threaded C simulator for a prediction-driven memory-reclaim engine. The first version validates the data structures and state transitions required to maintain a **Shadow per-cgroup LRU** beside a kernel that may only expose a global LRU.
+本项目构建一个可移植、确定性、单线程的 C 模拟器，用于验证预测驱动的内存回收引擎。第一阶段重点验证：当内核只提供全局 LRU 时，如何维护按 cgroup 组织的 **Shadow per-cgroup LRU**。
 
-The simulator does **not** reclaim real physical memory. It models page/folio metadata, cgroup ownership, active/inactive LRU state, aging, reclaim pressure, candidate isolation, execution outcomes, putback, statistics, and consistency checking.
+模拟器不回收真实物理内存。它只模拟页面/folio 元数据、cgroup 所有权、active/inactive LRU 状态、老化、回收压力、候选隔离、执行结果、putback、统计和一致性检查。
 
-The long-term integration path is:
+长期集成路径如下：
 
-1. Validate the portable core in user space.
-2. Integrate the same decision logic into Linux as a real-kernel validation platform.
-3. Adapt the platform and executor layers to OpenHarmony.
-4. Add prediction-driven cgroup protection and reclaim weighting.
+1. 在用户态验证可移植核心。
+2. 将同一套决策逻辑集成到 Linux，作为真实内核验证平台。
+3. 将 platform 和 executor 层适配到 OpenHarmony。
+4. 增加基于预测的 cgroup 保护和回收加权。
 
-## 2. Core Architectural Principle
+## 2. 核心架构原则
 
-The design separates three roles:
+系统明确区分三个角色：
 
-- **Kernel global LRU:** authoritative source of real folio state and the execution structure used by the kernel reclaim path.
-- **Shadow per-cgroup LRU:** auxiliary cgroup-indexed policy view used to classify, protect, rank, and recommend reclaim candidates.
-- **Kernel reclaim executor:** existing kernel mechanisms that isolate, unmap, write back, swap out, remove mappings, update accounting, and free real memory.
+- **内核全局 LRU：** 真实 folio 状态的权威来源，也是内核回收路径实际使用的执行结构。
+- **Shadow per-cgroup LRU：** 按 cgroup 建立的辅助策略视图，用于分类、保护、排序和推荐回收候选。
+- **内核回收执行器：** 使用现有内核机制执行隔离、解除映射、writeback、swap、映射删除、计费更新和真实内存释放。
 
-The Shadow LRU does not own real folio lifetime and must never be treated as authoritative over the kernel. In the first conservative kernel integration, the kernel follows its original global-LRU scan order and queries Shadow metadata to allow, defer, protect, or lower the priority of the current folio.
+Shadow LRU 不拥有真实 folio 生命周期，也不能被当作权威状态。在第一阶段之后的保守内核集成中，内核仍按原有全局 LRU 顺序扫描，并查询 Shadow 元数据来允许、延迟、保护或降低当前 folio 的优先级。
 
-## 3. Scope
+## 3. 范围
 
-### 3.1 First implementation phase
+### 3.1 第一阶段实现内容
 
-The first phase implements:
+- C11 可移植核心。
+- CMake 和 CTest。
+- 单线程、确定性的事件执行。
+- 动态页面和 cgroup 元数据。
+- 每个 engine 实例独立的 platform 操作表。
+- 页面和 cgroup 哈希索引。
+- 每个 cgroup 四条 Shadow LRU 链：inactive anon、active anon、inactive file、active file。
+- 简化的 G1 老化策略。
+- `AGE_GROUP` 和 `AGE_ALL`。
+- `RECLAIM_GROUP` 和 `RECLAIM_ALL`。
+- Linux 风格的 priority 递增压力基线。
+- 可配置的 `swappiness` 和 `swap_enabled`。
+- folio `order`、基础页统计和 overshoot 统计。
+- 两阶段隔离、执行、putback 流程。
+- 默认 SUCCESS、支持单次 outcome 注入的用户态模拟 executor。
+- 测试模式下的逐事件验证。
+- 文本 trace 回放和直接 C 测试 API。
+- 单元、集成、场景、失败注入和确定性测试。
 
-- C11 portable core.
-- CMake and CTest.
-- Single-threaded deterministic event execution.
-- Dynamic page and cgroup metadata.
-- Instance-level platform operation tables.
-- Page and cgroup hash indexes.
-- Four Shadow LRU lists per cgroup:
-  - inactive anonymous,
-  - active anonymous,
-  - inactive file,
-  - active file.
-- Simplified G1 aging policy.
-- `AGE_GROUP` and `AGE_ALL`.
-- `RECLAIM_GROUP` and `RECLAIM_ALL`.
-- Linux-like priority-based scan pressure baseline.
-- Configurable `swappiness` and `swap_enabled`.
-- Folio `order`, base-page accounting, and overshoot accounting.
-- Two-phase isolate/execute/putback flow.
-- User-space simulator executor with default success and one-shot outcome injection.
-- Per-event validation in test mode.
-- Text trace replay and direct C test APIs.
-- Unit, integration, scenario, failure-injection, and determinism tests.
+### 3.2 明确排除内容
 
-### 3.2 Explicitly excluded from the first phase
+第一阶段不实现：
 
-The first phase does not implement:
+- 真实物理内存回收。
+- Linux 内核模块或内核补丁。
+- OpenHarmony 内核修改。
+- 真实 swap、writeback、反向映射、页表更新或 unmap。
+- 多线程或并发访问。
+- 完整 Linux active/inactive 老化行为。
+- MGLRU。
+- LSTM、Markov 或预测逻辑。
+- `memory.min` 或 `memory.low` 传播。
+- NUMA node 或 zone。
+- Shadow 到内核的生命周期同步 hook。
 
-- Real physical memory reclamation.
-- Linux kernel modules or kernel patches.
-- OpenHarmony kernel modifications.
-- Real swap, writeback, reverse mapping, page-table updates, or unmapping.
-- Multithreaded or concurrent access.
-- Full Linux active/inactive aging behavior.
-- MGLRU.
-- LSTM, Markov, or prediction logic.
-- `memory.min` or `memory.low` propagation.
-- NUMA nodes or zones.
-- Shadow-to-kernel lifecycle synchronization hooks.
-
-## 4. Repository Layout
+## 4. 仓库布局
 
 ```text
 myself-kswapd/
@@ -130,29 +123,30 @@ myself-kswapd/
         └── plans/
 ```
 
-## 5. Build and Execution Model
+## 5. 构建与执行模型
 
-### 5.1 Build outputs
+### 5.1 构建产物
 
-CMake creates:
+CMake 生成：
 
-- `reclaim_core`: portable static library.
-- `reclaim_simulator`: text-trace replay executable.
-- `reclaim_tests`: CTest-registered test targets.
+- `reclaim_core`：平台无关静态库。
+- `reclaim_userspace`：用户态 platform、executor 和事件回放支持库。
+- `reclaim_simulator`：文本 trace 回放程序。
+- `reclaim_tests`：由 CTest 注册的测试程序。
 
-The project has no third-party runtime dependency.
+项目不依赖第三方运行时库。
 
-### 5.2 Concurrency model
+### 5.2 并发模型
 
-Version 1 is single-threaded and deterministic. All events are processed sequentially. The core contains no mutable global state. Every public operation receives a `reclaim_engine *`.
+v1 是单线程、确定性的。所有事件顺序执行。核心不包含可变全局状态，每个公开操作都接收 `reclaim_engine *`。
 
-Lock operations are abstracted but implemented as no-ops in the user-space simulator. A later kernel or concurrent version may map the same lock interface to spinlocks, mutexes, or another synchronization mechanism.
+锁操作已抽象，但用户态模拟器使用空实现。后续内核或并发版本可以将同一接口映射到 spinlock、mutex 或其他同步机制。
 
-## 6. Platform Abstraction
+## 6. 平台抽象
 
-The portable core never directly calls `malloc`, `free`, `printf`, platform clocks, pthread primitives, or kernel functions. Platform dependencies are injected into each engine instance through operation tables.
+可移植核心不直接调用 `malloc`、`free`、`printf`、平台时钟、pthread 原语或内核函数。平台依赖通过每个 engine 实例注入的操作表提供。
 
-Representative interfaces:
+代表性接口：
 
 ```c
 struct reclaim_allocator_ops {
@@ -177,9 +171,9 @@ struct reclaim_lock_ops {
 };
 ```
 
-The user-space platform maps these operations to the C runtime. Linux and OpenHarmony adapters will later provide kernel implementations. Operation tables are stored per engine instance rather than in a mutable global registry.
+用户态适配器将这些操作映射到 C 运行时、确定性逻辑时间、日志包装和空锁。Linux/OpenHarmony 适配器将在后续提供各自实现。操作表存储在 engine 实例中，不使用可变全局注册表。
 
-## 7. Main Data Structures
+## 7. 主要数据结构
 
 ### 7.1 Engine
 
@@ -200,11 +194,11 @@ struct reclaim_engine {
 };
 ```
 
-The engine coordinates modules but does not contain all policy logic.
+Engine 负责协调模块，但不承载全部策略逻辑。
 
 ### 7.2 Domain
 
-Each cgroup has one domain:
+每个 cgroup 对应一个 domain：
 
 ```c
 struct reclaim_domain {
@@ -222,11 +216,11 @@ struct reclaim_domain {
 };
 ```
 
-Each domain contains exactly four ordinary reclaim lists. Unevictable folios are tracked by lifecycle state and accounting but are not placed back into the ordinary four-list set. The domain table maintains both a hash index for lookup and a secondary intrusive list sorted by `cgroup_id`; global aging and reclaim traverse the sorted list rather than hash buckets.
+每个 domain 恰好包含四条普通回收链。不可回收 folio 通过生命周期状态和统计跟踪，但不能放回四条普通链。domain table 同时维护哈希索引和按 `cgroup_id` 排序的辅助 intrusive 链；全局老化和回收只遍历排序链，不遍历哈希桶顺序。
 
-### 7.3 Folio metadata
+### 7.3 Folio 元数据
 
-One `reclaim_page` object represents one indivisible folio:
+一个 `reclaim_page` 对象表示一个不可拆分的 folio：
 
 ```c
 struct reclaim_page {
@@ -256,33 +250,31 @@ struct reclaim_page {
 };
 ```
 
-The number of 4 KiB base pages represented by a folio is:
+一个 folio 表示的 4 KiB 基础页数为：
 
 ```c
 1ULL << order
 ```
 
-The first version never splits a folio.
+第一阶段绝不拆分 folio。
 
-## 8. Ownership Semantics
+## 8. 所有权语义
 
-Each folio has exactly one memory-accounting owner:
+每个 folio 只有一个内存计费 owner：
 
 ```text
 charge_cgroup_id
 ```
 
-The cgroup that creates or charges the folio owns its Shadow LRU membership. Later access by another cgroup updates:
+创建或 charge folio 的 cgroup 拥有其 Shadow LRU。其他 cgroup 访问该 folio 时，只更新：
 
-- `last_access_cgroup_id`,
-- `shared`,
-- access statistics,
+- `last_access_cgroup_id`；
+- `shared`；
+- 访问统计。
 
-but does not change `charge_cgroup_id` and does not move the folio to another domain.
+访问不会改变 `charge_cgroup_id`，也不会将 folio 移到另一个 domain。只有显式 recharge 操作可以迁移 owner。
 
-Only an explicit recharge operation may move a folio from one cgroup's Shadow LRU to another. A physical page migration is distinct from a cgroup recharge and preserves ownership.
-
-## 9. Page Lifecycle
+## 9. 页面生命周期
 
 ```c
 enum reclaim_page_state {
@@ -293,107 +285,105 @@ enum reclaim_page_state {
 };
 ```
 
-Legal transitions:
+合法转换：
 
 ```text
 PAGE_ADD:
 NEW -> ON_LRU
 
-candidate isolation:
+候选隔离：
 ON_LRU -> ISOLATED
 
-putback:
+putback：
 ISOLATED -> ON_LRU
 
-activation after execution:
-ISOLATED -> ON_LRU, placed on the active list
+执行后重新激活：
+ISOLATED -> ON_LRU，并进入 active 链
 
-unevictable outcome:
+不可回收结果：
 ISOLATED -> UNEVICTABLE
 
-successful reclaim:
-ISOLATED -> removed from indexes and metadata freed
+成功回收：
+ISOLATED -> 从索引删除并释放元数据
 ```
 
-A reclaimed object is not retained in a long-lived `RECLAIMED` state.
+成功回收的对象不会保留长期 `RECLAIMED` 状态。
 
-## 10. Aging Policy
+## 10. 老化策略
 
-Version 1 implements `G1`, a deterministic simulator policy, not a full reproduction of Linux page aging.
+v1 实现确定性的 `G1` 模拟策略，不宣称完整复现 Linux 页面老化。
 
-### 10.1 Access
+### 10.1 访问
 
-`PAGE_ACCESS` performs:
+`PAGE_ACCESS` 执行：
 
 ```text
 referenced = true
 last_access_seq = current event sequence
 last_access_cgroup_id = accessing cgroup
 access_count += 1
-shared = true when accessing cgroup differs from charge cgroup
 ```
 
-The access event does not immediately modify LRU membership.
+当访问者不同于 charge owner 时设置 `shared=true`。访问事件本身不立即修改 LRU 链。
 
-### 10.2 Aging
+### 10.2 老化
 
-Supported scopes:
+支持：
 
-- `AGE_GROUP <cgroup_id>`
-- `AGE_ALL`
+- `AGE_GROUP <cgroup_id>`；
+- `AGE_ALL`。
 
-`AGE_ALL` processes domains in ascending `cgroup_id` order.
+`AGE_ALL` 按升序 `cgroup_id` 处理 domain。
 
-G1 transitions:
+G1 转换如下：
 
-| Current list | `referenced` | Result |
+| 当前链 | `referenced` | 结果 |
 |---|---:|---|
-| inactive | true | move to active tail |
-| inactive | false | remain in place |
-| active | true | move to active tail |
-| active | false | move to inactive tail |
+| inactive | true | 移到 active 尾部 |
+| inactive | false | 保持原位置 |
+| active | true | 刷新到 active 尾部 |
+| active | false | 移到 inactive 尾部 |
 
-After aging, `referenced` is cleared and `last_age_seq` is updated.
+处理结束后清除 `referenced`，并更新 `last_age_seq`。
 
-The aging logic is accessed through `reclaim_aging_ops` so a more Linux-like policy or MGLRU can replace it later without changing engine, hash, domain, executor, or parser code.
+老化逻辑通过 `reclaim_aging_ops` 访问，以便后续替换为更接近 Linux 的策略或 MGLRU，而不改变 engine、索引、domain、executor 和 parser 层。
 
-## 11. Reclaim Requests
+## 11. 回收请求
 
-Supported requests:
+支持：
 
 ```text
 RECLAIM_GROUP <cgroup_id> <target_pages>
 RECLAIM_ALL <target_pages>
 ```
 
-`target_pages` always means 4 KiB base pages.
+`target_pages` 始终表示 4 KiB 基础页。
 
-### 11.1 Directed reclaim
+### 11.1 定向回收
 
-`RECLAIM_GROUP` scans only the requested domain.
+`RECLAIM_GROUP` 只能扫描指定 domain，不能修改其他 domain 的页面或统计。
 
-### 11.2 Global reclaim
+### 11.2 全局回收
 
-`RECLAIM_ALL` uses a Linux-inspired dynamic pressure baseline rather than a precomputed static cgroup quota table.
+`RECLAIM_ALL` 使用简化的 Linux 风格动态压力，而不是预先分配的静态 cgroup 配额表。
 
-For each priority level:
+每个 priority 执行：
 
-1. Traverse domains in ascending `cgroup_id` order.
-2. Compute effective reclaimable LRU size.
-3. Compute scan pressure using:
+1. 按升序 `cgroup_id` 遍历 domain。
+2. 现场计算有效可回收 LRU 大小。
+3. 根据以下公式计算扫描压力：
 
    ```c
    scan_pages = effective_lru_pages >> priority;
    ```
 
-4. If reclaimable pages exist but the result is zero, attempt at least one base page.
-5. Split the scan budget between anonymous and file folios.
-6. Scan in bounded batches.
-7. Accumulate scanned, isolated, reclaimed, activated, and putback statistics.
-8. Stop immediately when the target is reached.
-9. Otherwise decrease priority and repeat.
+4. 若存在可扫描页但结果为 0，则至少尝试 1 个基础页。
+5. 将扫描预算拆分到 anonymous 和 file folio。
+6. 按有限批次扫描。
+7. 累计 scanned、isolated、reclaimed、activated 和 putback 统计。
+8. 达到目标后立即停止。
 
-Default pressure configuration:
+默认压力配置：
 
 ```c
 struct reclaim_pressure_config {
@@ -404,56 +394,52 @@ struct reclaim_pressure_config {
 };
 ```
 
-Tests may use smaller values for compact scenarios.
+测试可以使用更小的配置。
 
-## 12. Anonymous/File Scan Split
+## 12. Anonymous/File 扫描拆分
 
-Version 1 uses a simplified swappiness model.
+v1 使用简化的 swappiness 模型。
 
-Configuration is global by default, with optional per-domain overrides. The initial simulator defaults are `default_swappiness = 60` and `default_swap_enabled = true`; callers and traces may override them.
+默认配置为 `default_swappiness = 60`、`default_swap_enabled = true`，domain 可以覆盖这两个值。
 
-When swap is disabled:
+swap 关闭时：
 
 ```text
 anonymous scan budget = 0
 file scan budget = total scan budget
 ```
 
-When swap is enabled:
+swap 开启时：
 
 ```c
 anon_weight = swappiness;
 file_weight = 200 - swappiness;
 ```
 
-Unused budget from a list with insufficient candidates is reassigned to the other list type.
+某一类候选不足时，未使用预算转交另一类。第一阶段不模拟动态回收成本、refault 反馈、dirty/writeback 比例或 swap I/O 压力。
 
-The first version does not model dynamic reclaim cost, refault feedback, dirty/writeback ratios, or swap I/O pressure. These are future policy inputs.
+## 13. 候选隔离与 folio overshoot
 
-## 13. Candidate Isolation and Folio Overshoot
+回收分为两阶段：
 
-Reclaim is two-phase:
+1. 从 Shadow inactive 链选择并隔离候选。
+2. 将 isolated batch 交给 executor。
 
-1. Select and isolate candidates from the Shadow inactive lists.
-2. Pass an isolated batch to the executor.
-
-Isolation changes:
+隔离转换：
 
 ```text
 ON_LRU -> ISOLATED
 ```
 
-The candidate records the source LRU so it can be safely put back if batch construction or execution fails.
+候选保存来源 LRU，以便批次构建失败或执行失败时安全放回。
 
-A folio is indivisible. If the next folio contains more base pages than the remaining target, the entire folio is selected. The result records overshoot:
+folio 不可拆分。如果下一个 folio 的基础页数超过剩余目标，则选择整个 folio，并记录：
 
 ```text
 nr_overshoot_pages = nr_reclaimed_pages - target_pages
 ```
 
-when the actual reclaimed amount exceeds the request.
-
-## 14. Executor Model
+## 14. Executor 模型
 
 ```c
 struct reclaim_executor_ops {
@@ -464,43 +450,39 @@ struct reclaim_executor_ops {
 };
 ```
 
-### 14.1 User-space simulator executor
+### 14.1 用户态模拟 executor
 
-The simulator does not emulate Linux swap, writeback, unmapping, or freeing. Every folio defaults to one-shot `SUCCESS`. Tests may inject one of:
+模拟器不伪造 Linux swap、writeback、unmap 或真实内存释放。每个 folio 默认得到一次 `SUCCESS`。测试可注入：
 
-- `SUCCESS`
-- `PUTBACK`
-- `ACTIVATE`
-- `BUSY`
-- `DIRTY`
-- `WRITEBACK`
-- `UNEVICTABLE`
+- `SUCCESS`；
+- `PUTBACK`；
+- `ACTIVATE`；
+- `BUSY`；
+- `DIRTY`；
+- `WRITEBACK`；
+- `UNEVICTABLE`。
 
-An injected result is consumed once and then resets to `SUCCESS`.
+注入结果只消费一次，之后恢复为 `SUCCESS`。
 
-Outcome handling:
-
-| Outcome | State update |
+| 结果 | 状态更新 |
 |---|---|
-| `SUCCESS` | remove from hash table and free metadata |
-| `PUTBACK` | place on original inactive list tail |
-| `BUSY` | inactive putback and increment busy count |
-| `DIRTY` | inactive putback and increment dirty count |
-| `WRITEBACK` | inactive putback and increment writeback count |
-| `ACTIVATE` | place on corresponding active list tail |
-| `UNEVICTABLE` | set lifecycle state to unevictable |
+| `SUCCESS` | 从哈希表删除并释放元数据 |
+| `PUTBACK` | 放回原 inactive 链尾 |
+| `BUSY` | 放回 inactive 链尾并增加 busy 统计 |
+| `DIRTY` | 放回 inactive 链尾并增加 dirty 统计 |
+| `WRITEBACK` | 放回 inactive 链尾并增加 writeback 统计 |
+| `ACTIVATE` | 放入对应 active 链尾 |
+| `UNEVICTABLE` | 移出普通四链并设为不可回收 |
 
-### 14.2 Kernel executor
+### 14.2 内核 executor
 
-A later Linux or OpenHarmony adapter will replace the simulator executor. It will connect selected policy information to existing kernel isolation and reclaim mechanisms. It will not reimplement reverse mapping, swap, writeback, mapping removal, accounting, or physical page freeing.
+后续 Linux/OpenHarmony 适配器将替换模拟 executor，把策略候选连接到现有内核隔离和回收机制。它不能重新实现反向映射、swap、writeback、映射删除、计费或真实物理页释放。
 
-The generic result is batch-oriented rather than requiring a precise error code for each real folio.
+## 15. 结果与停止语义
 
-## 15. Result and Stop Semantics
+程序错误和回收结果必须分离。
 
-Program errors and reclaim outcomes are separate.
-
-Representative result:
+代表性结果结构：
 
 ```c
 struct reclaim_result {
@@ -521,58 +503,56 @@ struct reclaim_result {
 };
 ```
 
-Stop reasons:
+停止原因包括：
 
-- target reached,
-- no scannable pages,
-- no progress,
-- priority exhausted,
-- executor error,
-- round limit reached.
+- target reached；
+- no scannable pages；
+- no progress；
+- priority exhausted；
+- executor error；
+- round limit reached。
 
-A request that reclaims fewer pages than requested can still return `RECLAIM_OK` when the engine operated correctly.
+请求少于目标页数并不一定是错误；只要 engine 正常运行，就可以返回正常结果。
 
-Each priority gets one complete domain traversal. Reclaim stops immediately on target completion. It also stops when the minimum priority has completed without useful progress, when no candidates exist, or when the configured round bound is reached.
+每个 priority 完成一次 domain 遍历。当达到目标、没有候选、没有进展、耗尽 priority 或达到配置的轮数上限时停止。
 
-## 16. Error Handling and Recovery
+## 16. 错误处理与恢复
 
-Representative errors:
+错误码至少包括：
 
 ```c
-enum reclaim_error {
-    RECLAIM_OK = 0,
-    RECLAIM_ERR_INVALID_ARGUMENT,
-    RECLAIM_ERR_NO_MEMORY,
-    RECLAIM_ERR_DOMAIN_NOT_FOUND,
-    RECLAIM_ERR_DOMAIN_ALREADY_EXISTS,
-    RECLAIM_ERR_DOMAIN_NOT_EMPTY,
-    RECLAIM_ERR_PAGE_NOT_FOUND,
-    RECLAIM_ERR_PAGE_ALREADY_EXISTS,
-    RECLAIM_ERR_PAGE_STATE,
-    RECLAIM_ERR_PAGE_TYPE,
-    RECLAIM_ERR_PARSE,
-    RECLAIM_ERR_EXECUTOR,
-    RECLAIM_ERR_VALIDATION,
-    RECLAIM_ERR_NOT_SUPPORTED,
-    RECLAIM_ERR_INTERNAL,
-};
+RECLAIM_OK
+RECLAIM_ERR_INVALID_ARGUMENT
+RECLAIM_ERR_NO_MEMORY
+RECLAIM_ERR_DOMAIN_NOT_FOUND
+RECLAIM_ERR_DOMAIN_ALREADY_EXISTS
+RECLAIM_ERR_DOMAIN_NOT_EMPTY
+RECLAIM_ERR_PAGE_NOT_FOUND
+RECLAIM_ERR_PAGE_ALREADY_EXISTS
+RECLAIM_ERR_PAGE_STATE
+RECLAIM_ERR_PAGE_TYPE
+RECLAIM_ERR_PARSE
+RECLAIM_ERR_EXECUTOR
+RECLAIM_ERR_VALIDATION
+RECLAIM_ERR_NOT_SUPPORTED
+RECLAIM_ERR_INTERNAL
 ```
 
-Required error discipline:
+要求：
 
-- Validate before mutation.
-- Allocate before committing structural changes.
-- A failed event leaves prior state unchanged.
-- A partially built candidate batch is rolled back.
-- Executor failure puts back every unresolved isolated folio.
-- Partial reclaim is a normal result, not an engine error.
-- Validation failure terminates the run and reports an internal bug.
-- Destroying a nonempty domain is rejected.
-- Destroying an engine releases every remaining object.
+- 输入必须先验证再修改状态。
+- 分配资源必须先完成，提交结构变化前不得留下半成品。
+- 事件失败后保持之前状态不变。
+- 部分构建的 candidate batch 必须回滚。
+- executor 失败时所有未完成 isolated folio 必须 putback。
+- 部分回收是正常结果，不是程序错误。
+- validator 失败表示内部 bug，必须终止并报告。
+- 销毁非空 domain 返回 `DOMAIN_NOT_EMPTY`。
+- 销毁 engine 时释放所有剩余对象。
 
-Putback after an internal rollback returns the folio to the correct list tail. Exact previous list position is not restored in version 1.
+内部回滚的 putback 将页面放回正确类别的链尾；v1 不要求恢复到精确的原链位置。
 
-## 17. Validation
+## 17. 一致性验证
 
 ```c
 int reclaim_engine_validate(
@@ -580,175 +560,180 @@ int reclaim_engine_validate(
     struct reclaim_validation_report *report);
 ```
 
-Test-mode trace replay validates after each successful event. Performance runs may validate only at the end or disable validation explicitly.
+必须检查：
 
-Required invariants include:
+1. folio 至多挂在一条 LRU 链上。
+2. 每个 `ON_LRU` folio 属于有效 domain。
+3. LRU 所属 domain 等于 `charge_cgroup_id`。
+4. `ISOLATED` folio 不在任何普通 LRU 上。
+5. `UNEVICTABLE` folio 不在任何普通 LRU 上。
+6. anonymous/file 类型与 LRU 类型匹配。
+7. active/inactive 元数据与链类型匹配。
+8. 哈希索引、LRU 和生命周期状态一致。
+9. 每条 LRU 的 folio 数和基础页数与遍历结果一致。
+10. domain 汇总等于 engine 全局统计。
+11. 已删除页面不在任何索引中。
+12. 不存在重复链表节点。
 
-1. A folio is linked into at most one LRU list.
-2. Every `ON_LRU` folio belongs to an existing domain.
-3. LRU domain matches `charge_cgroup_id`.
-4. An `ISOLATED` folio is not on any LRU.
-5. A reclaimed folio is absent from indexes.
-6. Anonymous folios only occupy anonymous lists.
-7. File folios only occupy file lists.
-8. Active/inactive metadata matches list membership.
-9. Recorded folio and base-page totals match list traversal.
-10. Global totals equal the sum of domain totals.
-11. Every hash-indexed folio occupies exactly one legal lifecycle state.
+验证报告包含 event sequence、page ID、cgroup ID、违反的规则、期望值和观测值。
 
-Validation reports include event sequence, page ID, cgroup ID, violated invariant, expected value, and observed value where available.
+## 18. 事件层
 
-## 18. Event Layer
+直接 C 测试和文本 trace 必须调用同一套公开核心 API。
 
-Both direct C tests and text traces call the same public core APIs.
-
-Initial events include:
+初始事件包括：
 
 ```text
 GROUP_CREATE <cgroup_id>
 GROUP_DESTROY <cgroup_id>
+GROUP_SET_SWAPPINESS <cgroup_id> <INHERIT|0..200>
+GROUP_SET_SWAP_ENABLED <cgroup_id> <INHERIT|0|1>
+GROUP_SET_SWAP <cgroup_id> <INHERIT|ON|OFF>
 PAGE_ADD <page_id> <cgroup_id> <ANON|FILE> <order>
 PAGE_REMOVE <page_id>
 PAGE_ACCESS <page_id> <access_cgroup_id>
 PAGE_RECHARGE <page_id> <new_cgroup_id>
 PAGE_MIGRATE <old_page_id> <new_page_id>
-GROUP_SET_SWAPPINESS <cgroup_id> <INHERIT|0..200>
-GROUP_SET_SWAP <cgroup_id> <INHERIT|ON|OFF>
 AGE_GROUP <cgroup_id>
 AGE_ALL
 RECLAIM_GROUP <cgroup_id> <target_pages>
 RECLAIM_ALL <target_pages>
 PAGE_EXEC_OUTCOME <page_id> <outcome>
+VALIDATE
+DUMP
 ```
 
-`PAGE_RECHARGE` is legal only for a non-isolated folio and preserves page type, age metadata, and current active/inactive class while moving ownership and list membership to the new domain. `PAGE_MIGRATE` changes the simulated page identity while preserving charge ownership, lifecycle state, type, and LRU class; the destination ID must not already exist. `PAGE_REMOVE` is rejected for isolated folios.
+`PAGE_RECHARGE` 只允许作用于非 isolated folio，并保留页面类型、老化元数据和 active/inactive 类别，同时迁移 owner 与链归属。`PAGE_MIGRATE` 更改模拟页面 ID，但保留 owner、生命周期、类型和 LRU 类别；目标 ID 不得已存在。`PAGE_REMOVE` 拒绝 isolated folio。
 
-Assertion events may be included for scenario tests, such as page absence, lifecycle state, LRU membership, ownership, configuration inheritance, and counter values.
+场景测试可以增加断言事件，例如页面缺失、生命周期状态、LRU、owner、继承配置和计数器。
 
-A parse error reports filename, line number, original text, and reason. The invalid event is not executed, replay stops by default, and final validation still runs.
+解析错误必须报告文件名、行号、原始文本和原因；非法事件不执行，默认停止回放，最后仍执行结束验证。
 
-## 19. Determinism
+## 19. 确定性
 
-Version 1 output must not depend on wall-clock time, thread scheduling, pointer values, random hash seeds, or hash-bucket traversal order.
+v1 输出不得依赖墙钟时间、线程调度、指针地址、随机哈希种子或哈希桶遍历顺序。
 
-Deterministic rules:
+确定性规则：
 
-- `event_seq` is the logical clock.
-- Domains are processed through the sorted domain list in ascending `cgroup_id`.
-- Stable diagnostic dumps sort folios by `page_id`; they never expose hash-bucket or pointer order.
-- LRU head and tail semantics are fixed.
-- Any rounding remainder uses stable ID order.
-- Trace output excludes unstable pointer values.
+- `event_seq` 作为逻辑时钟。
+- domain 通过按 `cgroup_id` 排序的链按升序处理。
+- 稳定 DUMP 按 `page_id` 排序，不能输出哈希桶顺序或指针地址。
+- LRU 头尾语义固定。
+- 预算余数按固定顺序分配。
+- trace 输出排除所有不稳定地址信息。
 
-The same trace and configuration must produce byte-identical output across repeated runs on the same supported platform.
+同一 trace 和配置在同一支持平台上重复运行时，输出必须逐字节一致。
 
-## 20. Testing
+## 20. 测试
 
-CTest test groups:
+CTest 测试覆盖：
 
-- unit tests,
-- integration tests,
-- trace scenarios,
-- allocation-failure tests,
-- executor-outcome tests,
-- validator corruption tests,
-- long deterministic event sequences.
+- intrusive list；
+- page/domain 哈希索引；
+- allocator ops；
+- 分配失败注入；
+- LRU 插入、删除和移动；
+- folio order 到基础页换算；
+- swappiness 预算；
+- priority 扫描量；
+- 统计累计和 overshoot；
+- 基础生命周期；
+- 四链转换；
+- 跨 cgroup 访问不迁移 owner；
+- `AGE_GROUP` 隔离性；
+- `AGE_ALL` 稳定顺序；
+- `RECLAIM_GROUP` 隔离性；
+- `RECLAIM_ALL` priority 递减；
+- swap disabled 不扫描 anon；
+- swappiness 0/60/200；
+- 大 folio 不拆分并记录 overshoot；
+- 所有模拟执行结果；
+- 所有页面 BUSY 时的 no-progress 终止；
+- executor 异常安全回滚；
+- 非法事件无部分修改；
+- 重复 trace 输出一致；
+- engine 销毁后分配计数归零；
+- validator 对故意破坏状态的检测。
 
-Required scenarios include:
-
-- basic lifecycle,
-- all four LRU transitions,
-- cross-cgroup access without ownership transfer,
-- directed reclaim isolation,
-- global priority escalation,
-- `swap_enabled = false`,
-- `swappiness = 0`,
-- `swappiness = 200`,
-- folio order accounting,
-- overshoot,
-- every simulated execution outcome,
-- no-progress termination,
-- allocation failure with intact prior state,
-- parser errors,
-- engine destruction with remaining objects.
-
-Debug configuration enables:
-
-- `-Wall`
-- `-Wextra`
-- `-Wpedantic`
-- `-Werror`
-- AddressSanitizer
-- UndefinedBehaviorSanitizer
-
-ThreadSanitizer is deferred until the concurrent phase.
-
-Acceptance criteria:
-
-- all CTest tests pass,
-- zero compiler warnings,
-- no ASan leak, bounds, or use-after-free findings,
-- no UBSan finding,
-- validation passes after every successful test event,
-- repeated traces produce identical output,
-- no unresolved folio remains isolated after an error,
-- tracked allocations return to zero after engine destruction.
-
-## 21. Kernel Integration Direction
-
-### 21.1 Linux validation phase
-
-The first kernel integration is intentionally conservative:
+Debug 配置至少启用：
 
 ```text
-kernel global-LRU scan order
-        -> query Shadow policy metadata
-        -> allow, defer, protect, or lower priority
-        -> use existing kernel isolation and reclaim
-        -> report real scan/reclaim feedback
-        -> synchronize or repair Shadow metadata
+-Wall
+-Wextra
+-Wpedantic
+-Werror
+AddressSanitizer
+UndefinedBehaviorSanitizer
 ```
 
-The Shadow layer does not directly manipulate raw kernel LRU list nodes or replace vmscan.
+ThreadSanitizer 延后到并发阶段。
 
-### 21.2 OpenHarmony phase
+验收标准：
 
-The OpenHarmony adapter must first establish:
+- 所有 CTest 通过；
+- 编译零 warning；
+- 无 ASan 泄漏、越界或 use-after-free；
+- 无 UBSan 报告；
+- 每个成功事件后的验证通过；
+- 重复 trace 输出一致；
+- 错误路径无 isolated folio 残留；
+- engine 销毁后 tracked allocation 为零。
 
-- actual kernel version,
-- page or folio structures,
-- global LRU implementation,
-- cgroup v1 memory accounting behavior,
-- existing reclaim call graph,
-- accessible lifecycle hook points,
-- safe isolation and putback interfaces.
+## 21. 内核集成方向
 
-Only after these facts are known will the adapter map platform operations, page identity, synchronization hooks, and executor feedback to the target kernel.
+### 21.1 Linux 验证阶段
 
-## 22. Prediction Extension Direction
+第一阶段 Linux 集成必须保持保守：
 
-Prediction is not part of version 1. Later prediction inputs may include:
+```text
+内核全局 LRU 扫描顺序
+        -> 查询 Shadow 策略元数据
+        -> 允许、延迟、保护或降低当前 folio 优先级
+        -> 使用现有内核隔离与回收
+        -> 回报真实扫描/回收反馈
+        -> 同步或修复 Shadow 元数据
+```
 
-- next-application probability,
-- foreground/background state,
-- CONTINUE and REENTRY hints,
-- workload state,
-- TTL,
-- confidence,
-- Markov transitions.
+Shadow 层不得直接操作原始内核 LRU 节点，也不得替换 vmscan。
 
-Prediction may modify only policy quantities such as:
+### 21.2 OpenHarmony 阶段
 
-- cgroup protection weight,
-- cgroup reclaim weight,
-- scan budget,
-- candidate filtering,
-- candidate priority.
+OpenHarmony 适配器必须先确认：
 
-Prediction does not replace kernel page-state validation or bottom-level reclaim mechanisms.
+- 实际内核版本；
+- page 或 folio 结构；
+- 全局 LRU 实现；
+- cgroup v1 memory accounting 行为；
+- 现有回收调用图；
+- 可访问的生命周期 hook 点；
+- 安全的隔离和 putback 接口。
 
-## 23. Final Design Summary
+只有事实确认后，才能映射 platform 操作、页面身份、同步 hook 和 executor 反馈。
 
-The first implementation is a platform-independent, deterministic simulator that proves the correctness of a Shadow per-cgroup LRU policy engine. It provides cgroup-level organization, aging, pressure escalation, anonymous/file selection, folio-aware accounting, two-phase reclaim, rollback, explicit test outcomes, and rigorous validation.
+## 22. 预测扩展方向
 
-The real global LRU remains the authoritative state and execution structure in future kernel integrations. Shadow metadata provides policy advice only, and real reclaim success is determined by the existing kernel memory-management path.
+预测不属于 v1。后续预测输入可以包括：
+
+- 下一个应用概率；
+- 前台/后台状态；
+- CONTINUE 和 REENTRY 提示；
+- workload 状态；
+- TTL；
+- confidence；
+- Markov transition。
+
+预测只能修改策略量，例如：
+
+- cgroup 保护权重；
+- cgroup 回收权重；
+- 扫描预算；
+- 候选过滤；
+- 候选优先级。
+
+预测不能替代内核页面状态验证或底层回收机制。
+
+## 23. 设计总结
+
+第一阶段是一个平台无关、确定性的模拟器，用于证明 Shadow per-cgroup LRU 策略引擎的数据结构和状态转换正确。它提供 cgroup 组织、老化、压力递增、anonymous/file 选择、folio 统计、两阶段回收、回滚、显式测试结果和严格验证。
+
+未来内核集成中，真实全局 LRU 仍是权威状态和执行结构。Shadow 元数据只提供策略建议，真实回收成功与否由现有内核内存管理路径决定。

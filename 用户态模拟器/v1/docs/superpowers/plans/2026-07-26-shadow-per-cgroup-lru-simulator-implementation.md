@@ -1,4 +1,4 @@
-# Shadow per-cgroup LRU Simulator 实施计划
+# Shadow per-cgroup LRU 模拟器实施计划
 
 ## 目标与边界
 

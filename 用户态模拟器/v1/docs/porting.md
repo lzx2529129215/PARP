@@ -1,19 +1,19 @@
-# Porting boundary
+# 适配边界
 
-The portable core depends on per-engine operation tables:
+可移植核心依赖每个 engine 实例中的操作表：
 
-- allocator: alloc/calloc/dealloc;
-- clock: a monotonic or logical time source;
-- logger: a caller-owned logging sink;
-- lock: init/destroy/lock/unlock;
-- executor: batch execution feedback.
+- allocator：`alloc/calloc/dealloc`；
+- clock：单调时钟或逻辑时间源；
+- logger：由调用方拥有的日志出口；
+- lock：`init/destroy/lock/unlock`；
+- executor：批次执行反馈。
 
-The v1 user-space adapter uses the C allocator, deterministic logical time, a quiet logger and no-op locks. The executor is a simulator and does not perform real memory-management work.
+v1 用户态适配器使用 C 分配器、确定性的逻辑时间、安静日志器和空锁。Executor 只是模拟器，不执行真实内存管理操作。
 
 ## Linux
 
-The future Linux adapter must first connect policy queries to the existing global-LRU vmscan path. It must preserve kernel page/folio state as the authority and use existing isolation, putback, reverse mapping, writeback, swap and physical-freeing mechanisms. This project does not provide a kernel module or a replacement reclaim path.
+未来 Linux 适配器必须先将策略查询接入现有全局 LRU 的 vmscan 路径。它必须保持内核 page/folio 状态为权威，并使用已有的隔离、putback、反向映射、writeback、swap 和物理释放机制。本项目不提供内核模块，也不替换内核回收路径。
 
 ## OpenHarmony
 
-The future OpenHarmony adapter must establish the target kernel version, folio/page structures, cgroup accounting, global LRU call graph and safe lifecycle hook points before mapping ops. It must use platform-native reclaim execution and must not reimplement swap, writeback or unmap in this simulator.
+未来 OpenHarmony 适配器必须在映射操作之前确认目标内核版本、folio/page 结构、cgroup 计费、全局 LRU 调用图和安全的生命周期 hook 点。它必须使用平台原生回收执行机制，不能在本模拟器中重新实现 swap、writeback 或 unmap。
