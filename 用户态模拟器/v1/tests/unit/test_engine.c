@@ -99,6 +99,28 @@ static bool test_allocation_failure_preserves_state(void)
     return true;
 }
 
+static bool test_recharge_and_migrate_preserve_class(void)
+{
+    struct reclaim_userspace_platform platform;
+    struct reclaim_simulator_executor executor;
+    struct reclaim_engine *engine = NULL;
+    const struct reclaim_page *page;
+
+    TEST_ASSERT(create_test_engine(&platform, &executor, &engine));
+    TEST_ASSERT(reclaim_engine_create_domain(engine, 42U) == RECLAIM_OK);
+    TEST_ASSERT(reclaim_engine_create_domain(engine, 9U) == RECLAIM_OK);
+    TEST_ASSERT(reclaim_engine_add_page(engine, 8U, 42U, RECLAIM_PAGE_FILE, 1U) == RECLAIM_OK);
+    TEST_ASSERT(reclaim_engine_recharge_page(engine, 8U, 9U) == RECLAIM_OK);
+    page = reclaim_engine_get_page(engine, 8U);
+    TEST_ASSERT(page->charge_cgroup_id == 9U);
+    TEST_ASSERT(page->lru_kind == RECLAIM_LRU_INACTIVE_FILE);
+    TEST_ASSERT(reclaim_engine_migrate_page(engine, 8U, 18U) == RECLAIM_OK);
+    TEST_ASSERT(reclaim_engine_get_page(engine, 8U) == NULL);
+    TEST_ASSERT(reclaim_engine_get_page(engine, 18U) != NULL);
+    reclaim_engine_destroy(engine);
+    return true;
+}
+
 void register_test_page_domain_lifecycle(void)
 {
     reclaim_test_register("page domain lifecycle", test_page_domain_lifecycle);
@@ -112,4 +134,10 @@ void register_test_duplicate_ids_and_missing_domain(void)
 void register_test_allocation_failure_preserves_state(void)
 {
     reclaim_test_register("allocation failure preserves state", test_allocation_failure_preserves_state);
+}
+
+void register_test_recharge_and_migrate_preserve_class(void)
+{
+    reclaim_test_register("recharge and migrate preserve class",
+                          test_recharge_and_migrate_preserve_class);
 }

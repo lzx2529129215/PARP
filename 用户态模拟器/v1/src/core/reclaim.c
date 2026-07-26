@@ -130,6 +130,10 @@ static int select_domain(struct reclaim_engine *engine,
 
     if (effective == 0U || target_remaining == 0U) return RECLAIM_OK;
     if (scan_budget > target_remaining) scan_budget = target_remaining;
+    if (engine->config.pressure.scan_batch_pages > 0U &&
+        scan_budget > engine->config.pressure.scan_batch_pages) {
+        scan_budget = engine->config.pressure.scan_batch_pages;
+    }
     reclaim_split_scan_budget(scan_budget,
                               domain->config.swappiness,
                               domain->config.swap_enabled,

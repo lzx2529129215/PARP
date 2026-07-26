@@ -1,6 +1,8 @@
 cmake_minimum_required(VERSION 3.16)
 project(myself_kswapd_simulator VERSION 1.0 LANGUAGES C)
 
+set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
+
 option(RECLAIM_ENABLE_TESTS "Build CTest tests" ON)
 option(RECLAIM_ENABLE_SANITIZERS "Enable AddressSanitizer and UndefinedBehaviorSanitizer" OFF)
 
@@ -11,8 +13,12 @@ set(CMAKE_C_EXTENSIONS OFF)
 add_compile_options(-Wall -Wextra -Wpedantic -Werror)
 
 if(RECLAIM_ENABLE_SANITIZERS)
-    include(CheckCCompilerFlag)
-    check_c_compiler_flag("-fsanitize=address,undefined" RECLAIM_HAS_SANITIZERS)
+    include(CheckCSourceCompiles)
+    set(CMAKE_REQUIRED_FLAGS "-fsanitize=address,undefined")
+    set(CMAKE_REQUIRED_LINK_OPTIONS "-fsanitize=address,undefined")
+    check_c_source_compiles("int main(void) { return 0; }" RECLAIM_HAS_SANITIZERS)
+    unset(CMAKE_REQUIRED_FLAGS)
+    unset(CMAKE_REQUIRED_LINK_OPTIONS)
     if(NOT RECLAIM_HAS_SANITIZERS)
         message(FATAL_ERROR "Compiler does not support AddressSanitizer and UndefinedBehaviorSanitizer")
     endif()

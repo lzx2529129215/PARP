@@ -13,6 +13,7 @@ int reclaim_event_apply(struct reclaim_engine *engine,
                         const struct reclaim_event *event,
                         struct reclaim_trace_state *state)
 {
+    struct reclaim_result local_result;
     struct reclaim_domain_stats domain_stats;
     const struct reclaim_page *page;
     struct reclaim_validation_report report;
@@ -57,12 +58,12 @@ int reclaim_event_apply(struct reclaim_engine *engine,
     case RECLAIM_EVENT_RECLAIM_GROUP:
         error = reclaim_engine_reclaim_group(engine, event->args.reclaim_group.cgroup_id,
                                              event->args.reclaim_group.target_pages,
-                                             state == NULL ? NULL : &state->last_result);
+                                             state == NULL ? &local_result : &state->last_result);
         if (state != NULL && error == RECLAIM_OK) state->has_last_result = true;
         return error;
     case RECLAIM_EVENT_RECLAIM_ALL:
         error = reclaim_engine_reclaim_all(engine, event->args.reclaim_all.target_pages,
-                                           state == NULL ? NULL : &state->last_result);
+                                           state == NULL ? &local_result : &state->last_result);
         if (state != NULL && error == RECLAIM_OK) state->has_last_result = true;
         return error;
     case RECLAIM_EVENT_VALIDATE:
@@ -125,6 +126,7 @@ int reclaim_trace_run(struct reclaim_engine *engine,
         if (error != RECLAIM_OK) {
             if (output != NULL) output(output_context, diagnostic);
             if (failed_line != NULL) *failed_line = line_number;
+            if (validate_at_end) (void)validate_now(engine);
             return error;
         }
         error = reclaim_event_apply(engine, &event, &state);
@@ -134,6 +136,7 @@ int reclaim_trace_run(struct reclaim_engine *engine,
                            event.raw, reclaim_error_name((enum reclaim_error)error));
             if (output != NULL) output(output_context, diagnostic);
             if (failed_line != NULL) *failed_line = line_number;
+            if (validate_at_end) (void)validate_now(engine);
             return error;
         }
         if (event.type == RECLAIM_EVENT_DUMP && output != NULL) {

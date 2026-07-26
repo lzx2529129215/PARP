@@ -125,6 +125,7 @@ int reclaim_event_parse(const char *filename,
                            error_message, error_message_size);
     }
     (void)snprintf(raw, sizeof(raw), "%s", text);
+    raw[strcspn(raw, "\r\n")] = '\0';
     (void)snprintf(work, sizeof(work), "%s", text);
     token = strchr(work, '#');
     if (token != NULL) *token = '\0';

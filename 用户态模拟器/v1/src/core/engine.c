@@ -64,6 +64,7 @@ int reclaim_engine_create(const struct reclaim_platform *platform,
     if (!platform_valid(platform) || executor_ops == NULL || out_engine == NULL) {
         return RECLAIM_ERR_INVALID_ARGUMENT;
     }
+    *out_engine = NULL;
     selected = config == NULL ? default_config : *config;
     if (selected.default_swappiness > 200U || selected.page_hash_buckets == 0U ||
         selected.domain_hash_buckets == 0U ||

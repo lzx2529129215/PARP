@@ -73,6 +73,32 @@ static bool test_all_busy_stops_without_isolated_pages(void)
     return true;
 }
 
+static bool test_global_reclaim_and_swap_disabled(void)
+{
+    struct reclaim_userspace_platform platform;
+    struct reclaim_simulator_executor executor;
+    struct reclaim_engine *engine = NULL;
+    struct reclaim_result result;
+    const struct reclaim_page *page;
+
+    TEST_ASSERT(new_reclaim_engine(&platform, &executor, &engine));
+    TEST_ASSERT(reclaim_engine_add_page(engine, 1U, 1U, RECLAIM_PAGE_ANON, 0U) == RECLAIM_OK);
+    TEST_ASSERT(reclaim_engine_add_page(engine, 2U, 1U, RECLAIM_PAGE_FILE, 0U) == RECLAIM_OK);
+    TEST_ASSERT(reclaim_engine_set_swap_enabled(engine, 1U, 0, false) == RECLAIM_OK);
+    TEST_ASSERT(reclaim_engine_reclaim_group(engine, 1U, 1U, &result) == RECLAIM_OK);
+    TEST_ASSERT(reclaim_engine_get_page(engine, 2U) == NULL);
+    TEST_ASSERT(reclaim_engine_get_page(engine, 1U) != NULL);
+    TEST_ASSERT(reclaim_engine_add_page(engine, 3U, 1U, RECLAIM_PAGE_FILE, 0U) == RECLAIM_OK);
+    TEST_ASSERT(reclaim_engine_add_page(engine, 4U, 2U, RECLAIM_PAGE_FILE, 0U) == RECLAIM_OK);
+    TEST_ASSERT(reclaim_engine_reclaim_all(engine, 3U, &result) == RECLAIM_OK);
+    TEST_ASSERT(result.final_priority == 1U);
+    TEST_ASSERT_EQ_U64(2U, result.nr_pages_reclaimed);
+    page = reclaim_engine_get_page(engine, 1U);
+    TEST_ASSERT(page != NULL && page->type == RECLAIM_PAGE_ANON);
+    reclaim_engine_destroy(engine);
+    return true;
+}
+
 void register_test_directed_reclaim_and_overshoot(void)
 {
     reclaim_test_register("directed reclaim and overshoot", test_directed_reclaim_and_overshoot);
@@ -82,4 +108,9 @@ void register_test_all_busy_stops_without_isolated_pages(void)
 {
     reclaim_test_register("all busy stops without isolated pages",
                           test_all_busy_stops_without_isolated_pages);
+}
+
+void register_test_global_reclaim_and_swap_disabled(void)
+{
+    reclaim_test_register("global reclaim and swap disabled", test_global_reclaim_and_swap_disabled);
 }
