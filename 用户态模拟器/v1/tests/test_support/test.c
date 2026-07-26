@@ -23,6 +23,8 @@ void register_test_directed_reclaim_and_overshoot(void);
 void register_test_all_busy_stops_without_isolated_pages(void);
 void register_test_executor_outcomes_restore_state(void);
 void register_test_executor_error_puts_back_batch(void);
+void register_test_validator_detects_corruption(void);
+void register_test_event_parser_and_apply(void);
 
 void reclaim_test_register(const char *name, reclaim_test_fn fn)
 {
@@ -52,6 +54,8 @@ int reclaim_test_run_all(void)
     register_test_all_busy_stops_without_isolated_pages();
     register_test_executor_outcomes_restore_state();
     register_test_executor_error_puts_back_batch();
+    register_test_validator_detects_corruption();
+    register_test_event_parser_and_apply();
     for (i = 0U; i < case_count; i++) {
         if (cases[i].fn()) {
             passed++;

@@ -2,6 +2,7 @@
 
 #include "myself_kswapd/error.h"
 
+#include <stdio.h>
 #include <string.h>
 
 static const struct reclaim_engine_config default_config = {
@@ -223,4 +224,55 @@ void reclaim_engine_get_stats(const struct reclaim_engine *engine,
 uint64_t reclaim_engine_event_seq(const struct reclaim_engine *engine)
 {
     return engine == NULL ? 0U : engine->event_seq;
+}
+
+int reclaim_engine_dump(const struct reclaim_engine *engine,
+                        reclaim_dump_line_fn output,
+                        void *output_context)
+{
+    const struct reclaim_domain *domain;
+    uint64_t last_page_id = 0U;
+    bool have_last = false;
+    char line[320];
+
+    if (engine == NULL || output == NULL) return RECLAIM_ERR_INVALID_ARGUMENT;
+    for (domain = engine->domains.sorted_head; domain != NULL; domain = domain->sorted_next) {
+        (void)snprintf(line, sizeof(line),
+                       "DOMAIN cgroup_id=%llu folios=%llu base_pages=%llu active_folios=%llu "
+                       "inactive_folios=%llu unevictable_folios=%llu",
+                       (unsigned long long)domain->cgroup_id,
+                       (unsigned long long)domain->stats.nr_folios,
+                       (unsigned long long)domain->stats.nr_base_pages,
+                       (unsigned long long)domain->stats.nr_active_folios,
+                       (unsigned long long)domain->stats.nr_inactive_folios,
+                       (unsigned long long)domain->stats.nr_unevictable_folios);
+        output(output_context, line);
+    }
+    for (;;) {
+        const struct reclaim_page *best = NULL;
+        size_t i;
+        for (i = 0U; i < engine->pages.bucket_count; i++) {
+            const struct reclaim_page *page;
+            for (page = engine->pages.buckets[i]; page != NULL; page = page->hash_next) {
+                if ((!have_last || page->page_id > last_page_id) &&
+                    (best == NULL || page->page_id < best->page_id)) {
+                    best = page;
+                }
+            }
+        }
+        if (best == NULL) break;
+        (void)snprintf(line, sizeof(line),
+                       "PAGE page_id=%llu charge_cgroup_id=%llu type=%s state=%s lru=%s "
+                       "order=%u access_count=%u referenced=%u shared=%u",
+                       (unsigned long long)best->page_id,
+                       (unsigned long long)best->charge_cgroup_id,
+                       reclaim_page_type_name(best->type),
+                       reclaim_page_state_name(best->state),
+                       reclaim_lru_kind_name(best->lru_kind), best->order,
+                       best->access_count, best->referenced ? 1U : 0U, best->shared ? 1U : 0U);
+        output(output_context, line);
+        last_page_id = best->page_id;
+        have_last = true;
+    }
+    return RECLAIM_OK;
 }

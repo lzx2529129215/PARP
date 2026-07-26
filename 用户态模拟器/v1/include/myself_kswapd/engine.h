@@ -107,5 +107,9 @@ int reclaim_engine_get_domain_stats(const struct reclaim_engine *engine,
 void reclaim_engine_get_stats(const struct reclaim_engine *engine,
                               struct reclaim_engine_stats *stats);
 uint64_t reclaim_engine_event_seq(const struct reclaim_engine *engine);
+typedef void (*reclaim_dump_line_fn)(void *context, const char *line);
+int reclaim_engine_dump(const struct reclaim_engine *engine,
+                        reclaim_dump_line_fn output,
+                        void *output_context);
 
 #endif
