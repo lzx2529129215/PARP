@@ -19,6 +19,10 @@ void register_test_duplicate_ids_and_missing_domain(void);
 void register_test_allocation_failure_preserves_state(void);
 void register_test_scan_pressure_and_budget(void);
 void register_test_access_aging_and_scope(void);
+void register_test_directed_reclaim_and_overshoot(void);
+void register_test_all_busy_stops_without_isolated_pages(void);
+void register_test_executor_outcomes_restore_state(void);
+void register_test_executor_error_puts_back_batch(void);
 
 void reclaim_test_register(const char *name, reclaim_test_fn fn)
 {
@@ -44,6 +48,10 @@ int reclaim_test_run_all(void)
     register_test_allocation_failure_preserves_state();
     register_test_scan_pressure_and_budget();
     register_test_access_aging_and_scope();
+    register_test_directed_reclaim_and_overshoot();
+    register_test_all_busy_stops_without_isolated_pages();
+    register_test_executor_outcomes_restore_state();
+    register_test_executor_error_puts_back_batch();
     for (i = 0U; i < case_count; i++) {
         if (cases[i].fn()) {
             passed++;

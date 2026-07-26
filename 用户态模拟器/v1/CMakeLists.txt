@@ -33,6 +33,7 @@ add_library(reclaim_core STATIC
     src/core/stats.c
     src/core/aging_g1.c
     src/core/scan_pressure.c
+    src/core/reclaim.c
     src/simulator/userspace_platform.c
     src/simulator/simulator_executor.c
 )
@@ -49,6 +50,9 @@ if(RECLAIM_ENABLE_TESTS)
         tests/unit/test_types.c
         tests/unit/test_engine.c
         tests/unit/test_policy.c
+        tests/integration/test_reclaim.c
+        tests/integration/test_executor_outcomes.c
+        tests/integration/test_reclaim_failures.c
     )
     target_link_libraries(reclaim_tests PRIVATE reclaim_core)
     add_test(NAME reclaim_tests COMMAND reclaim_tests)
