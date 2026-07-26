@@ -50,7 +50,16 @@ int reclaim_engine_remove_page(struct reclaim_engine *engine, uint64_t page_id)
     if (page->state == RECLAIM_PAGE_ISOLATED) return RECLAIM_ERR_PAGE_STATE;
     domain = reclaim_find_domain(engine, page->charge_cgroup_id);
     if (domain == NULL) return RECLAIM_ERR_INTERNAL;
-    if (page->state == RECLAIM_PAGE_ON_LRU) reclaim_unlink_page(engine, page, domain);
+    if (page->state == RECLAIM_PAGE_ON_LRU) {
+        reclaim_unlink_page(engine, page, domain);
+    } else if (page->state == RECLAIM_PAGE_UNEVICTABLE) {
+        uint64_t pages = 0U;
+        (void)reclaim_folio_base_pages(page->order, &pages);
+        if (domain->stats.nr_unevictable_folios > 0U) domain->stats.nr_unevictable_folios--;
+        if (domain->stats.nr_unevictable_pages >= pages) domain->stats.nr_unevictable_pages -= pages;
+        if (engine->stats.nr_unevictable_folios > 0U) engine->stats.nr_unevictable_folios--;
+        if (engine->stats.nr_unevictable_pages >= pages) engine->stats.nr_unevictable_pages -= pages;
+    }
     reclaim_page_hash_remove(engine, page);
     reclaim_free(engine, page);
     engine->event_seq++;
