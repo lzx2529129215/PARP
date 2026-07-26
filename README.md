@@ -1,2 +1,424 @@
 # myself-kswapd
 实现一个类似 kswapd 的预测驱动后台内存回收引擎，不是简单复制 Linux 的 kswapd 函数
+
+对，可以这样理解，但更准确地说，你要在鸿蒙内核中实现的是一个：
+> **类似 `kswapd` 的预测驱动后台内存回收引擎，而不是简单复制 Linux 的 `kswapd` 函数。**
+
+建议命名为：
+```text
+predict_reclaimd
+```
+或：
+```text
+app_reclaimd
+```
+
+它与 Linux `kswapd` 的共同点是：
+- 都是内核后台线程；
+- 都由内存压力唤醒；
+- 都维护回收状态；
+- 都选择待回收页面；
+- 都执行或驱动页面回收；
+- 压力解除后进入睡眠。
+
+区别在于，你的引擎还会引入：
+- 应用 cgroup 身份；
+- LSTM 下一应用概率；
+- 前台 CONTINUE；
+- 后台 REENTRY；
+- 每个 cgroup 的 Shadow LRU/MGLRU；
+- 应用级保护预算；
+- 预测错误回退。
+---
+
+# 一、推荐的总体架构
+
+```text
+鸿蒙内存分配器
+        │
+        │ 内存低于水位
+        ▼
+唤醒 predict_reclaimd
+        │
+        ├── 获取当前内存压力
+        ├── 获取目标回收页数
+        ├── 读取应用预测状态
+        ├── 遍历各 cgroup 回收域
+        ├── 从 Shadow LRU/MGLRU 选候选页
+        ├── 计算页面回收优先级
+        └── 调用鸿蒙原有页面回收执行接口
+                    │
+                    ▼
+          unmap / writeback / swap / free
+```
+
+其中必须区分两个部分：
+
+## 你的引擎负责
+```text
+什么时候回收
+回收多少
+先扫描哪个cgroup
+每个cgroup扫描多少
+候选页面的顺序
+哪些页建议保护
+哪些页建议优先回收
+```
+
+## 鸿蒙原有内核负责
+```text
+页面锁
+页表解除映射
+脏页回写
+匿名页换出
+文件页失效
+页面引用计数
+最终释放物理页
+```
+
+也就是说：
+> 你重新实现的是回收策略和候选选择，不应该重新实现底层 `free page`、文件系统回写和页表拆除。
+
+---
+
+# 二、它与 Linux `kswapd` 的对应关系
+
+| Linux机制              | 你的鸿蒙引擎                      |
+| -------------------- | --------------------------- |
+| `kswapd`             | `predict_reclaimd`          |
+| `pgdat` / zone水位     | 鸿蒙node/zone或全局水位            |
+| `balance_pgdat()`    | `predict_reclaim_balance()` |
+| `shrink_node()`      | `predict_reclaim_node()`    |
+| `shrink_lruvec()`    | `predict_reclaim_group()`   |
+| `lruvec`             | 自己维护的`per-cgroup`回收域        |
+| active/inactive LRU  | Shadow per-cgroup LRU       |
+| MGLRU generations    | 可选Shadow per-cgroup MGLRU   |
+| `shrink_page_list()` | 调用鸿蒙原始页面回收执行函数              |
+| memcg遍历              | 遍历你维护的应用/cgroup域            |
+| reclaim priority     | 压力等级和扫描优先级                  |
+| swappiness           | anon/file扫描比例               |
+| refault反馈            | 页面重访和预测准确性反馈                |
+
+# 三、第一版建议实现Shadow LRU
+
+不要一开始就让页面脱离鸿蒙原始全局LRU。
+
+第一版维护：
+```c
+struct predict_lruvec {
+	spinlock_t lock;
+
+	struct list_head active_anon;
+	struct list_head inactive_anon;
+
+	struct list_head active_file;
+	struct list_head inactive_file;
+
+	unsigned long nr_pages[4];
+};
+```
+
+页面同时存在于：
+```text
+鸿蒙真实全局LRU
++
+你的Shadow per-cgroup LRU
+```
+
+Shadow LRU负责：
+- 记录页面属于哪个应用；
+- 记录访问冷热；
+- 提供预测候选排序；
+- 统计每个应用工作集；
+- 生成保护或回收建议。
+
+鸿蒙真实LRU仍负责系统正确性。
+
+---
+
+# 四、为什么Shadow模式更适合第一阶段
+
+如果直接让你的引擎成为真实LRU，必须完整处理：
+
+- 页面重复入链；
+- 页面释放时出链；
+- 页面迁移；
+- 大页拆分合并；
+- swap cache；
+- 文件页失效；
+- 页面回写；
+- 内存热插拔；
+- NUMA迁移；
+- cgroup销毁；
+- 锁顺序；
+- 与原回收线程并发。
+    
+任何一个事件遗漏，都可能出现：
+```text
+链表损坏
+use-after-free
+页面重复回收
+统计不守恒
+内核死锁
+```
+
+Shadow模式出错时可以直接旁路：
+```c
+if (!predict_engine_enabled())
+	return harmony_original_reclaim(...);
+```
+
+因此更适合你去现场先完成复现。
+
+---
+
+# 五、引擎需要鸿蒙提供哪些接口
+
+## 1. 内存压力和水位
+
+```c
+bool harmony_reclaim_needed(u32 node_id);
+
+unsigned long harmony_reclaim_target_pages(
+	u32 node_id,
+	u32 pressure_level);
+```
+
+需要的信息包括：
+
+- 当前空闲页；
+- low/high/min水位；
+- direct reclaim还是后台回收；
+- 目标node和zone；
+- 目标回收页数。
+
+---
+
+## 2. cgroup信息
+
+```c
+u64 harmony_task_cgroup_id(struct task_struct *task);
+
+u64 harmony_page_charge_cgroup_id(
+	struct harmony_page *page);
+```
+
+需要稳定的：
+
+```text
+memory cgroup ID
+```
+
+不是仅使用PID。
+
+---
+
+## 3. 页面生命周期
+
+```c
+void predict_page_add(...);
+void predict_page_remove(...);
+void predict_page_access(...);
+void predict_page_migrate(...);
+void predict_page_recharge(...);
+```
+
+没有这些事件，就无法可靠维护自己的LRU。
+
+---
+
+## 4. 页面属性查询
+
+```c
+int harmony_get_page_info(
+	page_handle_t page,
+	struct predict_page_info *info);
+```
+
+至少提供：
+
+```text
+page ID
+order
+node
+zone
+anon/file/shmem
+dirty
+writeback
+referenced
+mapped
+unevictable
+swap-backed
+charge cgroup
+inode + offset
+```
+
+---
+
+## 5. 页面回收执行
+
+```c
+enum predict_reclaim_result
+harmony_reclaim_page(
+	page_handle_t page,
+	const struct predict_reclaim_request *request);
+```
+
+鸿蒙原有代码负责：
+- 再次检查页面状态；
+- 页面隔离；
+- unmap；
+- 回写；
+- swap；
+- 释放；
+- 返回实际结果。
+
+---
+
+# 六、预测如何参与回收
+
+可以先计算应用级分数：
+```text
+应用保护分数
+=
+下一应用概率
+× CONTINUE/REENTRY置信度
+× 前后台权重
+× TTL有效性
+```
+
+再计算页面级分数：
+```text
+页面保护分数
+=
+应用保护分数
+× 页面最近访问权重
+× workload匹配度
+× 页面身份置信度
+```
+
+然后决定：
+```text
+低分页面：优先回收
+中分页面：正常LRU顺序
+高分页面：建议DEFER_ONCE
+```
+
+第一版不要永久保护，只允许：
+```text
+DEFER_ONCE
+```
+
+并且必须有预算：
+```text
+每个应用最大保护页数
+每轮最大跳过页数
+全局最大保护内存
+CRITICAL压力下保护预算归零
+```
+
+---
+
+# 七、建议划分为三个运行模式
+
+## 1. Disabled
+
+```text
+不记录
+不参与
+完全走鸿蒙原逻辑
+```
+
+## 2. Observe
+
+```text
+维护Shadow LRU
+运行预测
+生成候选和DEFER建议
+但实际仍按鸿蒙原逻辑回收
+```
+
+验收：
+
+```text
+proposed可能不同
+applied必须等于original
+```
+
+## 3. Apply
+
+```text
+允许在预算内DEFER_ONCE
+```
+
+当前阶段只实现前两个模式。
+
+---
+
+# 八、它不能完全脱离鸿蒙原始回收线程
+
+你可以编写独立的 `predict_reclaimd`，但要避免它与鸿蒙原有后台回收线程同时争抢页面。
+
+有三种集成方式。
+
+## 方案A：旁路观察
+
+```text
+鸿蒙原回收线程运行
+→ 调用预测引擎Observe hook
+→ 原路径继续执行
+```
+
+最安全，适合第一阶段。
+
+## 方案B：预测线程触发原回收执行器
+
+```text
+predict_reclaimd选择候选
+→ 调用鸿蒙原有页面执行接口
+```
+
+适合第二阶段。
+
+## 方案C：完全替换原后台回收线程
+
+```text
+关闭原后台回收
+→ predict_reclaimd完全接管
+```
+
+风险最高，最后才考虑。
+
+当前推荐顺序是：
+
+```text
+方案A
+→ 方案B
+→ 根据结果决定是否需要方案C
+```
+
+---
+
+# 九、现在应怎样定义你的目标
+
+你的第一阶段目标不应写成：
+
+> 在鸿蒙中重新实现完整memcg和MGLRU。
+
+应写成：
+
+> 在鸿蒙内核中实现一个预测驱动的应用级后台回收引擎。该引擎基于cgroup v1获得应用身份，维护Shadow per-cgroup LRU，接收页面生命周期和访问事件，结合下一应用、CONTINUE和REENTRY预测生成页面回收建议，并在Observe模式下接入鸿蒙原有全局页面回收路径。
+
+后续再逐步扩展：
+
+```text
+Shadow LRU
+→ 可控DEFER_ONCE
+→ 引擎主动选择候选
+→ Shadow MGLRU
+→ 必要时接管真实LRU
+```
+
+# 十、最准确的一句话
+
+> **你要实现的是一个“应用感知、预测驱动、可插拔的鸿蒙内核回收守护线程”，它在角色上类似Linux `kswapd`，但内部维护虚拟的per-cgroup LRU/MGLRU，并把真正的页面解除映射、回写、换出和释放继续交给鸿蒙原有VM子系统。**
