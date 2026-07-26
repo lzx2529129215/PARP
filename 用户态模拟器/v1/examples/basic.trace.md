@@ -69,7 +69,7 @@ page 30 -> 不受定向回收影响，仍属于 cgroup 2
 在 `v1` 根目录执行：
 
 ```sh
-./build-debug/bin/reclaim_simulator \
+./output/build-debug/bin/reclaim_simulator \
   --validate-each-event \
   --validate-at-end \
   examples/basic.trace
@@ -78,7 +78,7 @@ page 30 -> 不受定向回收影响，仍属于 cgroup 2
 也可以使用标准输入：
 
 ```sh
-./build-debug/bin/reclaim_simulator --validate-each-event \
+./output/build-debug/bin/reclaim_simulator --validate-each-event \
   < examples/basic.trace
 ```
 

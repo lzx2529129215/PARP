@@ -40,9 +40,9 @@
 
 ### TDD 与验证
 
-1. 先写 list/types 测试并运行 `cmake -S . -B build -DRECLAIM_ENABLE_TESTS=ON && cmake --build build`，预期因实现缺失而失败。
-2. 写最小 list/types 实现，运行 `ctest --test-dir build --output-on-failure`，预期通过。
-3. 运行 `cmake --build build --verbose` 检查无警告；运行 sanitizer 构建。
+1. 先写 list/types 测试并运行 `cmake -S . -B output/build -DRECLAIM_ENABLE_TESTS=ON && cmake --build output/build`，预期因实现缺失而失败。
+2. 写最小 list/types 实现，运行 `ctest --test-dir output/build --output-on-failure`，预期通过。
+3. 运行 `cmake --build output/build --verbose` 检查无警告；运行 sanitizer 构建。
 
 ### 提交点
 
@@ -160,15 +160,15 @@
 在独立 worktree 的 `用户态模拟器/v1` 执行：
 
 ```sh
-cmake -S . -B build-debug -DCMAKE_BUILD_TYPE=Debug -DRECLAIM_ENABLE_TESTS=ON -DRECLAIM_ENABLE_SANITIZERS=ON
-cmake --build build-debug --parallel
-ctest --test-dir build-debug --output-on-failure
-cmake -S . -B build-release -DCMAKE_BUILD_TYPE=Release -DRECLAIM_ENABLE_TESTS=ON -DRECLAIM_ENABLE_SANITIZERS=OFF
-cmake --build build-release --parallel
-ctest --test-dir build-release --output-on-failure
-./build-debug/reclaim_simulator --validate-each-event --validate-at-end < representative.trace > run-1.out
-./build-debug/reclaim_simulator --validate-each-event --validate-at-end < representative.trace > run-2.out
-cmp run-1.out run-2.out
+cmake -S . -B output/build-debug -DCMAKE_BUILD_TYPE=Debug -DRECLAIM_ENABLE_TESTS=ON -DRECLAIM_ENABLE_SANITIZERS=ON
+cmake --build output/build-debug --parallel
+ctest --test-dir output/build-debug --output-on-failure
+cmake -S . -B output/build-release -DCMAKE_BUILD_TYPE=Release -DRECLAIM_ENABLE_TESTS=ON -DRECLAIM_ENABLE_SANITIZERS=OFF
+cmake --build output/build-release --parallel
+ctest --test-dir output/build-release --output-on-failure
+./output/build-debug/bin/reclaim_simulator --validate-each-event --validate-at-end < representative.trace > output/run-1.out
+./output/build-debug/bin/reclaim_simulator --validate-each-event --validate-at-end < representative.trace > output/run-2.out
+cmp output/run-1.out output/run-2.out
 rg -n 'pthread|linux/|openharmony' include src tests CMakeLists.txt docs README.md adapters
 git diff --check
 git status --short

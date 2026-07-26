@@ -729,13 +729,13 @@ CLI 支持：
 CMake 必须支持：
 
 ```bash
-cmake -S . -B build \
+cmake -S . -B output/build \
   -DCMAKE_BUILD_TYPE=Debug \
   -DRECLAIM_ENABLE_TESTS=ON \
   -DRECLAIM_ENABLE_SANITIZERS=ON
 
-cmake --build build --parallel
-ctest --test-dir build --output-on-failure
+cmake --build output/build --parallel
+ctest --test-dir output/build --output-on-failure
 ```
 
 Debug 构建至少启用：

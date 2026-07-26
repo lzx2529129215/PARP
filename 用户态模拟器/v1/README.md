@@ -7,20 +7,20 @@
 ## 构建和测试
 
 ```sh
-cmake -S . -B build-debug \
+cmake -S . -B output/build-debug \
   -DCMAKE_BUILD_TYPE=Debug \
   -DRECLAIM_ENABLE_TESTS=ON \
   -DRECLAIM_ENABLE_SANITIZERS=ON
-cmake --build build-debug --parallel
-ctest --test-dir build-debug --output-on-failure
+cmake --build output/build-debug --parallel
+ctest --test-dir output/build-debug --output-on-failure
 ```
 
 也可以构建 Release 版本：
 
 ```sh
-cmake -S . -B build-release -DCMAKE_BUILD_TYPE=Release -DRECLAIM_ENABLE_TESTS=ON
-cmake --build build-release --parallel
-ctest --test-dir build-release --output-on-failure
+cmake -S . -B output/build-release -DCMAKE_BUILD_TYPE=Release -DRECLAIM_ENABLE_TESTS=ON
+cmake --build output/build-release --parallel
+ctest --test-dir output/build-release --output-on-failure
 ```
 
 构建生成 `reclaim_core`、`reclaim_simulator` 和 `reclaim_tests`。Debug 编译启用 `-Wall -Wextra -Wpedantic -Werror`；sanitizer 配置会检测 AddressSanitizer 和 UndefinedBehaviorSanitizer 支持，不能静默降级。
@@ -28,8 +28,8 @@ ctest --test-dir build-release --output-on-failure
 ## 运行
 
 ```sh
-./build-debug/reclaim_simulator --validate-each-event --validate-at-end examples/basic.trace
-./build-debug/reclaim_simulator --no-validate examples/basic.trace
+./output/build-debug/bin/reclaim_simulator --validate-each-event --validate-at-end examples/basic.trace
+./output/build-debug/bin/reclaim_simulator --no-validate examples/basic.trace
 ```
 
 未提供文件时从标准输入读取。默认逐事件及结束时验证；`--no-validate` 关闭验证。`DUMP` 输出按 cgroup_id、page_id 固定排序，不包含地址或时间信息。
