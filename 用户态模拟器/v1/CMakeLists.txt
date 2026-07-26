@@ -25,6 +25,14 @@ include_directories(${CMAKE_CURRENT_SOURCE_DIR}/include)
 add_library(reclaim_core STATIC
     src/core/list.c
     src/core/types.c
+    src/core/engine.c
+    src/core/domain.c
+    src/core/page.c
+    src/core/lru.c
+    src/core/hash.c
+    src/core/stats.c
+    src/simulator/userspace_platform.c
+    src/simulator/simulator_executor.c
 )
 target_include_directories(reclaim_core PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include)
 
@@ -37,6 +45,7 @@ if(RECLAIM_ENABLE_TESTS)
         tests/test_support/test.c
         tests/unit/test_list.c
         tests/unit/test_types.c
+        tests/unit/test_engine.c
     )
     target_link_libraries(reclaim_tests PRIVATE reclaim_core)
     add_test(NAME reclaim_tests COMMAND reclaim_tests)
