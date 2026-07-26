@@ -1,9 +1,9 @@
 # Shadow per-cgroup LRU Simulator Design
 
-**Project:** `myself-kswapd`  
-**Date:** 2026-07-26  
-**Status:** Approved design, implementation not started  
-**Primary language:** C11  
+**Project:** `myself-kswapd`
+**Date:** 2026-07-26
+**Status:** Approved design, implementation not started
+**Primary language:** C11
 **Build system:** CMake + CTest
 
 ## 1. Purpose
