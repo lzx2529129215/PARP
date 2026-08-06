@@ -1,0 +1,28 @@
+From 4f110b9d041f725b064071b04d9c60a2be1cbbf8 Mon Sep 17 00:00:00 2001
+From: Codex PARP Reproduction <codex@localhost>
+Date: Mon, 3 Aug 2026 18:30:03 +0800
+Subject: [PATCH 080/123] test: cover nonblocking phase210 scope cleanup
+
+---
+ tools/parp/phase210/tests/test_phase210_contracts.py | 5 +++++
+ 1 file changed, 5 insertions(+)
+
+diff --git a/tools/parp/phase210/tests/test_phase210_contracts.py b/tools/parp/phase210/tests/test_phase210_contracts.py
+index 0781a1d1f..7b8771b29 100644
+--- a/tools/parp/phase210/tests/test_phase210_contracts.py
++++ b/tools/parp/phase210/tests/test_phase210_contracts.py
+@@ -267,6 +267,11 @@ class Phase210Contracts(unittest.TestCase):
+         self.assertIn('if bool(action.get("ensure_visible_geometry")):', source)
+         self.assertIn('["xdotool", "windowraise", window_id]', source)
+ 
++    def test_50_cgroup_stop_is_nonblocking(self):
++        automation_path = Path(__file__).resolve().parents[8] / "automation" / "app_automation.py"
++        source = automation_path.read_text()
++        self.assertIn('["systemctl", "--user", "stop", "--no-block", unit]', source)
++
+ 
+ if __name__ == "__main__":
+     unittest.main()
+-- 
+2.25.1
+

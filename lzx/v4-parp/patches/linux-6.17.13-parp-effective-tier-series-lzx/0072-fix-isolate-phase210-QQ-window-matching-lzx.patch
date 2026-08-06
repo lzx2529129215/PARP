@@ -1,0 +1,90 @@
+From 0333b74c38d0a8273903b7e03505d40bbb58b6ed Mon Sep 17 00:00:00 2001
+From: Codex PARP Reproduction <codex@localhost>
+Date: Mon, 3 Aug 2026 17:29:39 +0800
+Subject: [PATCH 072/123] fix: isolate phase210 QQ window matching
+
+---
+ tools/parp/phase210/build_qq_collection.py    |  3 ++
+ .../phase210/tests/test_phase210_contracts.py | 46 +++++++++++++++++++
+ 2 files changed, 49 insertions(+)
+
+diff --git a/tools/parp/phase210/build_qq_collection.py b/tools/parp/phase210/build_qq_collection.py
+index aab706fe2..beebe7504 100644
+--- a/tools/parp/phase210/build_qq_collection.py
++++ b/tools/parp/phase210/build_qq_collection.py
+@@ -97,6 +97,9 @@ def scenario(session, seed):
+         {"type": "close", "name": "qq_phase210", "wait_after_window_close": 2,
+          "force_after_seconds": 2, "label": "CLOSE_ONLY_TRACKED_QQ_SCOPE"},
+     ])
++    for action in actions:
++        if action.get("class") == QQ_CLASS:
++            action["strict_window_match"] = True
+     return {
+         "schema_version": 1, "scenario_id": "phase210_%s" % session,
+         "seed": seed, "privacy_mode": "TEST_ACCOUNT_FIXTURE_ONLY_READ_ONLY",
+diff --git a/tools/parp/phase210/tests/test_phase210_contracts.py b/tools/parp/phase210/tests/test_phase210_contracts.py
+index 851d0edc8..c07564d91 100644
+--- a/tools/parp/phase210/tests/test_phase210_contracts.py
++++ b/tools/parp/phase210/tests/test_phase210_contracts.py
+@@ -1,5 +1,9 @@
+ import math
++import importlib.util
++import sys
+ import unittest
++from pathlib import Path
++from unittest import mock
+ 
+ from phase210 import contracts as c
+ 
+@@ -131,6 +135,48 @@ class Phase210Contracts(unittest.TestCase):
+     def test_40_equal_not_better(self):
+         self.assertFalse(c.strictly_better(1.0, 1.0, lower_is_better=True))
+ 
++    def test_41_phase210_qq_actions_require_strict_window_match(self):
++        builder_path = Path(__file__).resolve().parents[1] / "build_qq_collection.py"
++        spec = importlib.util.spec_from_file_location("phase210_qq_builder", builder_path)
++        self.assertIsNotNone(spec)
++        self.assertIsNotNone(spec.loader)
++        module = importlib.util.module_from_spec(spec)
++        sys.modules[spec.name] = module
++        try:
++            spec.loader.exec_module(module)
++        finally:
++            sys.modules.pop(spec.name, None)
++        actions = module.scenario("qq_train_01", 21001)["actions"]
++        window_actions = [action for action in actions if action.get("class") == module.QQ_CLASS]
++        self.assertTrue(window_actions)
++        self.assertTrue(all(action.get("strict_window_match") is True for action in window_actions))
++
++    def test_42_strict_qq_match_has_no_generic_fallback(self):
++        automation_path = Path(__file__).resolve().parents[8] / "automation" / "app_automation.py"
++        spec = importlib.util.spec_from_file_location("phase210_app_automation", automation_path)
++        self.assertIsNotNone(spec)
++        self.assertIsNotNone(spec.loader)
++        module = importlib.util.module_from_spec(spec)
++        sys.modules[spec.name] = module
++        try:
++            spec.loader.exec_module(module)
++        finally:
++            sys.modules.pop(spec.name, None)
++        calls = []
++
++        def fake_run(command, **kwargs):
++            calls.append(command)
++            return mock.Mock(returncode=1, stdout="")
++
++        with mock.patch.object(module.shutil, "which", return_value="/usr/bin/xdotool"), \
++             mock.patch.object(module.subprocess, "run", side_effect=fake_run):
++            self.assertEqual(module.list_window_candidates({
++                "class": "^parp-phase210-qq$", "strict_window_match": True,
++            }, "QQ"), [])
++        self.assertEqual(calls, [[
++            "xdotool", "search", "--onlyvisible", "--class", "^parp-phase210-qq$",
++        ]])
++
+ 
+ if __name__ == "__main__":
+     unittest.main()
+-- 
+2.25.1
+

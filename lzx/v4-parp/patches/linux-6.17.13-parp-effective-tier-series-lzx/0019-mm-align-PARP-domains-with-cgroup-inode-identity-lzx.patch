@@ -1,0 +1,138 @@
+From 619e7341ac44c5b890f27f10df7eb2e5b858aac8 Mon Sep 17 00:00:00 2001
+From: Codex PARP Reproduction <codex@localhost>
+Date: Sat, 1 Aug 2026 01:09:13 +0800
+Subject: [PATCH 019/123] mm: align PARP domains with cgroup inode identity
+
+---
+ mm/parp/adapter/adapter.h             |  3 +++
+ mm/parp/adapter/damon_adapter.c       |  3 ++-
+ mm/parp/adapter/memcg_adapter.c       | 11 ++++++++++-
+ mm/parp/adapter/mglru_adapter.c       |  2 +-
+ mm/parp/adapter/scan_budget_adapter.c |  3 ++-
+ mm/parp/tests/parp_test.c             |  7 +++++++
+ 6 files changed, 25 insertions(+), 4 deletions(-)
+
+diff --git a/mm/parp/adapter/adapter.h b/mm/parp/adapter/adapter.h
+index 220eb23d0..0d5fc5059 100644
+--- a/mm/parp/adapter/adapter.h
++++ b/mm/parp/adapter/adapter.h
+@@ -5,8 +5,11 @@
+ #include "../internal.h"
+ 
+ struct folio;
++struct mem_cgroup;
+ struct parp_reclaim_ctx;
+ 
++u64 parp_memcg_domain_id(struct mem_cgroup *memcg);
++
+ bool parp_file_sample_from_folio(struct parp_reclaim_ctx *ctx,
+ 				 struct folio *folio,
+ 				 struct parp_page_sample *sample);
+diff --git a/mm/parp/adapter/damon_adapter.c b/mm/parp/adapter/damon_adapter.c
+index a3405a09f..fc6d5d20d 100644
+--- a/mm/parp/adapter/damon_adapter.c
++++ b/mm/parp/adapter/damon_adapter.c
+@@ -13,6 +13,7 @@
+ #include <linux/workqueue.h>
+ #include <trace/events/parp.h>
+ #include "../internal.h"
++#include "adapter.h"
+ 
+ struct parp_damon_work {
+ 	struct work_struct work;
+@@ -66,7 +67,7 @@ static bool parp_task_context(struct task_struct *task, u64 now_ns,
+ 		rcu_read_unlock();
+ 		return false;
+ 	}
+-	domain_id = mem_cgroup_id(memcg);
++	domain_id = parp_memcg_domain_id(memcg);
+ 	rcu_read_unlock();
+ 	atomic64_inc(&parp_evidence_stats.mm_to_domain_ok);
+ 	if (!parp_context_lookup(domain_id, now_ns, context))
+diff --git a/mm/parp/adapter/memcg_adapter.c b/mm/parp/adapter/memcg_adapter.c
+index e5b646e4f..13777b09d 100644
+--- a/mm/parp/adapter/memcg_adapter.c
++++ b/mm/parp/adapter/memcg_adapter.c
+@@ -1,3 +1,12 @@
+ // SPDX-License-Identifier: GPL-2.0
++#include <linux/cgroup.h>
++#include <linux/memcontrol.h>
+ #include "../internal.h"
+-/* Domain identity conversion lives in mglru_adapter.c. */
++#include "adapter.h"
++
++u64 parp_memcg_domain_id(struct mem_cgroup *memcg)
++{
++	if (!memcg || mem_cgroup_is_root(memcg))
++		return 0;
++	return cgroup_ino(memcg->css.cgroup);
++}
+diff --git a/mm/parp/adapter/mglru_adapter.c b/mm/parp/adapter/mglru_adapter.c
+index af54684f6..1a11efb7c 100644
+--- a/mm/parp/adapter/mglru_adapter.c
++++ b/mm/parp/adapter/mglru_adapter.c
+@@ -18,7 +18,7 @@ void parp_adapter_prepare(struct parp_reclaim_ctx *ctx,
+ 	atomic64_inc(&parp_stats.prepare);
+ 	if (ctx->mode == PARP_MODE_DISABLED)
+ 		return;
+-	ctx->domain_id = mem_cgroup_id(memcg);
++	ctx->domain_id = parp_memcg_domain_id(memcg);
+ 	ctx->snapshot = parp_snapshot_acquire();
+ 	ctx->rcu_held = true;
+ }
+diff --git a/mm/parp/adapter/scan_budget_adapter.c b/mm/parp/adapter/scan_budget_adapter.c
+index aa22df1f8..9697a4280 100644
+--- a/mm/parp/adapter/scan_budget_adapter.c
++++ b/mm/parp/adapter/scan_budget_adapter.c
+@@ -4,6 +4,7 @@
+ #include <linux/parp.h>
+ #include <trace/events/parp.h>
+ #include "../internal.h"
++#include "adapter.h"
+ 
+ static atomic64_t parp_budget_sequence = ATOMIC64_INIT(0);
+ 
+@@ -50,7 +51,7 @@ bool parp_adapter_prepare_scan_budget(struct lruvec *lruvec,
+ 	u64 prediction_age_ms = 0;
+ 
+ 	if (target_memcg && !mem_cgroup_is_root(target_memcg))
+-		input.domain_id = mem_cgroup_id(target_memcg);
++		input.domain_id = parp_memcg_domain_id(target_memcg);
+ 	parp_snapshot_fill_scan_budget_input(input.domain_id, input.now_ns,
+ 					     &input);
+ 	context_valid = (input.flags & (PARP_SCAN_INPUT_BIND_VALID |
+diff --git a/mm/parp/tests/parp_test.c b/mm/parp/tests/parp_test.c
+index 892f4aa5f..a5af6349c 100644
+--- a/mm/parp/tests/parp_test.c
++++ b/mm/parp/tests/parp_test.c
+@@ -1,6 +1,7 @@
+ // SPDX-License-Identifier: GPL-2.0
+ #include <kunit/test.h>
+ #include "../internal.h"
++#include "../adapter/adapter.h"
+ 
+ static void parp_q15_test(struct kunit *test)
+ {
+@@ -418,6 +419,11 @@ static void parp_observe_test(struct kunit *test)
+ 			PARP_ACTION_NATIVE);
+ }
+ 
++static void parp_memcg_domain_identity_test(struct kunit *test)
++{
++	KUNIT_EXPECT_EQ(test, parp_memcg_domain_id(NULL), 0ULL);
++}
++
+ static struct parp_scan_budget_input parp_budget_input(void)
+ {
+ 	return (struct parp_scan_budget_input) {
+@@ -689,6 +695,7 @@ static struct kunit_case parp_cases[] = {
+ 	KUNIT_CASE(parp_fallback_test),
+ 	KUNIT_CASE(parp_snapshot_test),
+ 	KUNIT_CASE(parp_observe_test),
++	KUNIT_CASE(parp_memcg_domain_identity_test),
+ 	KUNIT_CASE(parp_scan_budget_gate_matrix_test),
+ 	KUNIT_CASE(parp_scan_budget_monotonic_repeat_test),
+ 	KUNIT_CASE(parp_scan_budget_basic_test),
+-- 
+2.25.1
+

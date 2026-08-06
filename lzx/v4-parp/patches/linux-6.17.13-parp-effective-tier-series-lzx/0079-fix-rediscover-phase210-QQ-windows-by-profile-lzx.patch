@@ -1,0 +1,80 @@
+From 7ceac03720b7f45d0f7deb92ecaa6965d0d5b923 Mon Sep 17 00:00:00 2001
+From: Codex PARP Reproduction <codex@localhost>
+Date: Mon, 3 Aug 2026 18:25:52 +0800
+Subject: [PATCH 079/123] fix: rediscover phase210 QQ windows by profile
+
+---
+ tools/parp/phase210/build_qq_collection.py    |  9 ++++++++
+ tools/parp/phase210/qq_collection_root.sh     |  1 +
+ .../phase210/tests/test_phase210_contracts.py | 23 +++++++++++++++++++
+ 3 files changed, 33 insertions(+)
+
+diff --git a/tools/parp/phase210/build_qq_collection.py b/tools/parp/phase210/build_qq_collection.py
+index ea8b4531b..3b24d99aa 100644
+--- a/tools/parp/phase210/build_qq_collection.py
++++ b/tools/parp/phase210/build_qq_collection.py
+@@ -106,6 +106,15 @@ def scenario(session, seed):
+     for action in actions:
+         if action.get("class") == QQ_CLASS:
+             action["strict_window_match"] = True
++            action["include_hidden"] = True
++            action["pid_cmdline_contains"] = "${QQ_PROFILE}/chromium"
++            action["retag_class"] = "parp-phase210-qq"
++            if action.get("type") == "focus":
++                action.update({
++                    "ensure_visible_geometry": True,
++                    "window_x": 120, "window_y": 80,
++                    "window_width": 900, "window_height": 700,
++                })
+     return {
+         "schema_version": 1, "scenario_id": "phase210_%s" % session,
+         "seed": seed, "privacy_mode": "TEST_ACCOUNT_FIXTURE_ONLY_READ_ONLY",
+diff --git a/tools/parp/phase210/qq_collection_root.sh b/tools/parp/phase210/qq_collection_root.sh
+index 070081aad..0afc11cdc 100644
+--- a/tools/parp/phase210/qq_collection_root.sh
++++ b/tools/parp/phase210/qq_collection_root.sh
+@@ -463,6 +463,7 @@ collect_session()
+ 		[[ -e $automation_done ]] && break
+ 		kill -0 "$automation_pid" || { log "ERROR: automation exited session=$session"; exit 89; }
+ 		if ((elapsed % 5 == 0)); then
++			[[ -r $cgroup_path/cgroup.procs ]] || { log "ERROR: automation cgroup exited session=$session"; exit 89; }
+ 			mapfile -t discovered_pids < <(list_phase210_qq_pids "$profile" "$automation_pgid")
+ 			for pid in "${discovered_pids[@]}"; do
+ 				[[ -r /proc/$pid/cgroup ]] || continue
+diff --git a/tools/parp/phase210/tests/test_phase210_contracts.py b/tools/parp/phase210/tests/test_phase210_contracts.py
+index 443854090..0781a1d1f 100644
+--- a/tools/parp/phase210/tests/test_phase210_contracts.py
++++ b/tools/parp/phase210/tests/test_phase210_contracts.py
+@@ -244,6 +244,29 @@ class Phase210Contracts(unittest.TestCase):
+         self.assertIn('xdotool windowmove \\"$wid\\" 120 80', builder)
+         self.assertIn('xdotool windowactivate --sync \\"$wid\\"', builder)
+ 
++    def test_48_all_test_qq_actions_rediscover_isolated_profile(self):
++        builder_path = Path(__file__).resolve().parents[1] / "build_qq_collection.py"
++        spec = importlib.util.spec_from_file_location("phase210_qq_builder_rediscovery", builder_path)
++        self.assertIsNotNone(spec)
++        self.assertIsNotNone(spec.loader)
++        module = importlib.util.module_from_spec(spec)
++        spec.loader.exec_module(module)
++        actions = module.scenario("qq_train_01", 21001)["actions"]
++        window_actions = [action for action in actions if action.get("class") == module.QQ_CLASS]
++        self.assertTrue(all(action.get("include_hidden") is True for action in window_actions))
++        self.assertTrue(all(action.get("pid_cmdline_contains") == "${QQ_PROFILE}/chromium" for action in window_actions))
++        focus_actions = [action for action in window_actions if action.get("type") == "focus"]
++        self.assertTrue(focus_actions)
++        self.assertTrue(all(action.get("ensure_visible_geometry") is True for action in focus_actions))
++
++    def test_49_focus_maps_and_places_rediscovered_window(self):
++        automation_path = Path(__file__).resolve().parents[8] / "automation" / "app_automation.py"
++        source = automation_path.read_text()
++        self.assertIn('pid_cmdline_contains = get_str(action, "pid_cmdline_contains")', source)
++        self.assertIn('["xdotool", "search", *visibility, "--pid", str(pid)]', source)
++        self.assertIn('if bool(action.get("ensure_visible_geometry")):', source)
++        self.assertIn('["xdotool", "windowraise", window_id]', source)
++
+ 
+ if __name__ == "__main__":
+     unittest.main()
+-- 
+2.25.1
+

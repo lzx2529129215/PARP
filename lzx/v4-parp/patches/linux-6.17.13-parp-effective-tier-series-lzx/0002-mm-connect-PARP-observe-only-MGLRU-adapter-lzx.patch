@@ -1,0 +1,362 @@
+From af43d4a7bde8025f425eae1fd5f0192bb1d88a2a Mon Sep 17 00:00:00 2001
+From: Codex PARP Reproduction <codex@localhost>
+Date: Fri, 31 Jul 2026 17:29:12 +0800
+Subject: [PATCH 002/123] mm: connect PARP observe-only MGLRU adapter
+
+---
+ mm/parp/adapter/anon_adapter.c     |   3 +
+ mm/parp/adapter/damon_adapter.c    |   3 +
+ mm/parp/adapter/feedback_adapter.c |   3 +
+ mm/parp/adapter/file_adapter.c     |   3 +
+ mm/parp/adapter/memcg_adapter.c    |   3 +
+ mm/parp/adapter/mglru_adapter.c    |  79 +++++++++++++++++++++
+ mm/parp/control/debugfs.c          | 108 +++++++++++++++++++++++++++++
+ mm/parp/control/genl.c             |   7 ++
+ mm/parp/control/sysfs.c            |   3 +
+ mm/parp/control/trace.c            |   3 +
+ mm/vmscan.c                        |   9 +++
+ 11 files changed, 224 insertions(+)
+ create mode 100644 mm/parp/adapter/anon_adapter.c
+ create mode 100644 mm/parp/adapter/damon_adapter.c
+ create mode 100644 mm/parp/adapter/feedback_adapter.c
+ create mode 100644 mm/parp/adapter/file_adapter.c
+ create mode 100644 mm/parp/adapter/memcg_adapter.c
+ create mode 100644 mm/parp/adapter/mglru_adapter.c
+ create mode 100644 mm/parp/control/debugfs.c
+ create mode 100644 mm/parp/control/genl.c
+ create mode 100644 mm/parp/control/sysfs.c
+ create mode 100644 mm/parp/control/trace.c
+
+diff --git a/mm/parp/adapter/anon_adapter.c b/mm/parp/adapter/anon_adapter.c
+new file mode 100644
+index 000000000..4f4ca1fb8
+--- /dev/null
++++ b/mm/parp/adapter/anon_adapter.c
+@@ -0,0 +1,3 @@
++// SPDX-License-Identifier: GPL-2.0
++#include "../internal.h"
++/* Anonymous region matching is side-table only; no hot-path rmap walk. */
+diff --git a/mm/parp/adapter/damon_adapter.c b/mm/parp/adapter/damon_adapter.c
+new file mode 100644
+index 000000000..cf7640d9a
+--- /dev/null
++++ b/mm/parp/adapter/damon_adapter.c
+@@ -0,0 +1,3 @@
++// SPDX-License-Identifier: GPL-2.0
++#include "../internal.h"
++/* DAMON samples will populate bounded side tables asynchronously. */
+diff --git a/mm/parp/adapter/feedback_adapter.c b/mm/parp/adapter/feedback_adapter.c
+new file mode 100644
+index 000000000..fd1b436d0
+--- /dev/null
++++ b/mm/parp/adapter/feedback_adapter.c
+@@ -0,0 +1,3 @@
++// SPDX-License-Identifier: GPL-2.0
++#include "../internal.h"
++/* Existing workingset signals are consumed asynchronously without a hook. */
+diff --git a/mm/parp/adapter/file_adapter.c b/mm/parp/adapter/file_adapter.c
+new file mode 100644
+index 000000000..cefe9a89b
+--- /dev/null
++++ b/mm/parp/adapter/file_adapter.c
+@@ -0,0 +1,3 @@
++// SPDX-License-Identifier: GPL-2.0
++#include "../internal.h"
++/* File identity extraction is isolated from the neutral predictor. */
+diff --git a/mm/parp/adapter/memcg_adapter.c b/mm/parp/adapter/memcg_adapter.c
+new file mode 100644
+index 000000000..e5b646e4f
+--- /dev/null
++++ b/mm/parp/adapter/memcg_adapter.c
+@@ -0,0 +1,3 @@
++// SPDX-License-Identifier: GPL-2.0
++#include "../internal.h"
++/* Domain identity conversion lives in mglru_adapter.c. */
+diff --git a/mm/parp/adapter/mglru_adapter.c b/mm/parp/adapter/mglru_adapter.c
+new file mode 100644
+index 000000000..5ebacaad0
+--- /dev/null
++++ b/mm/parp/adapter/mglru_adapter.c
+@@ -0,0 +1,79 @@
++// SPDX-License-Identifier: GPL-2.0
++#include <linux/mm.h>
++#include <linux/memcontrol.h>
++#include <linux/parp.h>
++#include <linux/swap.h>
++#include <trace/events/parp.h>
++#include "../../internal.h"
++#include "../internal.h"
++
++void parp_adapter_prepare(struct parp_reclaim_ctx *ctx,
++			  struct lruvec *lruvec, struct scan_control *sc)
++{
++	struct mem_cgroup *memcg = lruvec_memcg(lruvec);
++
++	memset(ctx, 0, sizeof(*ctx));
++	ctx->mode = parp_get_mode();
++	atomic64_inc(&parp_stats.prepare);
++	if (ctx->mode == PARP_MODE_DISABLED)
++		return;
++	ctx->domain_id = mem_cgroup_id(memcg);
++	ctx->snapshot = parp_snapshot_acquire();
++	ctx->rcu_held = true;
++}
++
++struct parp_decision
++parp_adapter_score_folio(struct parp_reclaim_ctx *ctx, struct folio *folio,
++			 int type, int generation)
++{
++	struct parp_page_sample sample = {
++		.type = type ? PARP_PAGE_FILE : PARP_PAGE_ANON,
++		.domain_id = ctx->domain_id,
++		.generation = generation,
++		.resident = true,
++		.dirty = folio_test_dirty(folio),
++		.writeback = folio_test_writeback(folio),
++		.unevictable = !folio_evictable(folio),
++		/*
++		 * Access windows are filled asynchronously by the DAMON adapter.
++		 * Until a matching side-table entry exists, native fallback is
++		 * mandatory.
++		 */
++		.evidence_valid = false,
++	};
++	struct parp_decision decision;
++
++	if (ctx->mode == PARP_MODE_DISABLED) {
++		decision = (struct parp_decision) {
++			.original_action = PARP_ACTION_NATIVE,
++			.proposed_action = PARP_ACTION_NATIVE,
++			.applied_action = PARP_ACTION_NATIVE,
++			.fallback = PARP_FALLBACK_DISABLED,
++		};
++	} else {
++		decision = parp_engine_score(ctx->snapshot, &sample);
++	}
++	parp_stats_account(&decision);
++	trace_parp_decision(ctx->domain_id, ctx->mode, sample.type,
++			    decision.original_action, decision.proposed_action,
++			    decision.applied_action, decision.fallback,
++			    decision.score_q15);
++	return decision;
++}
++
++void parp_adapter_apply_decision(struct parp_reclaim_ctx *ctx,
++				 struct folio *folio,
++				 struct parp_decision *decision)
++{
++	/* Observe-only and the initial APPLY placeholder both remain native. */
++	decision->applied_action = decision->original_action;
++}
++
++void parp_adapter_finish(struct parp_reclaim_ctx *ctx,
++			 unsigned long scanned, unsigned long isolated)
++{
++	if (ctx->rcu_held)
++		parp_snapshot_release();
++	ctx->rcu_held = false;
++	atomic64_inc(&parp_stats.finish);
++}
+diff --git a/mm/parp/control/debugfs.c b/mm/parp/control/debugfs.c
+new file mode 100644
+index 000000000..3754119da
+--- /dev/null
++++ b/mm/parp/control/debugfs.c
+@@ -0,0 +1,108 @@
++// SPDX-License-Identifier: GPL-2.0
++#include <linux/debugfs.h>
++#include <linux/fs.h>
++#include <linux/init.h>
++#include <linux/module.h>
++#include <linux/uaccess.h>
++#include "../internal.h"
++
++static struct dentry *parp_dir;
++
++static ssize_t mode_read(struct file *file, char __user *buf, size_t len,
++			 loff_t *ppos)
++{
++	char text[16];
++	int size = scnprintf(text, sizeof(text), "%u\n", parp_get_mode());
++
++	return simple_read_from_buffer(buf, len, ppos, text, size);
++}
++
++static ssize_t mode_write(struct file *file, const char __user *buf,
++			  size_t len, loff_t *ppos)
++{
++	char text[16];
++	unsigned int mode;
++
++	if (!len || len >= sizeof(text) || copy_from_user(text, buf, len))
++		return -EINVAL;
++	text[len] = '\0';
++	if (kstrtouint(strim(text), 0, &mode) || parp_set_mode(mode))
++		return -EINVAL;
++	return len;
++}
++
++static const struct file_operations mode_fops = {
++	.owner = THIS_MODULE,
++	.read = mode_read,
++	.write = mode_write,
++	.llseek = default_llseek,
++};
++
++static ssize_t bind_write(struct file *file, const char __user *buf,
++			  size_t len, loff_t *ppos)
++{
++	struct parp_binding binding = { .active = true };
++	char text[128];
++	unsigned long ttl_ms;
++	u64 now = ktime_get_mono_fast_ns();
++
++	if (!len || len >= sizeof(text) || copy_from_user(text, buf, len))
++		return -EINVAL;
++	text[len] = '\0';
++	if (sscanf(text, "%llu %u %lu %llu %llu",
++		   &binding.domain_id, &binding.app_id, &ttl_ms,
++		   &binding.epoch_id, &binding.model_version) != 5)
++		return -EINVAL;
++	binding.updated_ns = now;
++	binding.expires_ns = now + ttl_ms * NSEC_PER_MSEC;
++	binding.bind_generation = lower_32_bits(now);
++	if (parp_snapshot_update_binding(&binding))
++		return -ENOMEM;
++	return len;
++}
++
++static ssize_t prior_write(struct file *file, const char __user *buf,
++			   size_t len, loff_t *ppos)
++{
++	struct parp_app_prior prior = { .valid = true };
++	char text[128];
++	unsigned long ttl_ms;
++	u64 now = ktime_get_mono_fast_ns();
++
++	if (!len || len >= sizeof(text) || copy_from_user(text, buf, len))
++		return -EINVAL;
++	text[len] = '\0';
++	if (sscanf(text, "%u %hu %hu %u %lu %llu", &prior.app_id,
++		   &prior.use_score_q15, &prior.rank, &prior.horizon_ms,
++		   &ttl_ms, &prior.model_version) != 6)
++		return -EINVAL;
++	if (prior.use_score_q15 > PARP_Q15_ONE)
++		return -ERANGE;
++	prior.updated_ns = now;
++	prior.expires_ns = now + ttl_ms * NSEC_PER_MSEC;
++	if (parp_snapshot_update_prior(&prior))
++		return -ENOMEM;
++	return len;
++}
++
++static const struct file_operations bind_fops = {
++	.owner = THIS_MODULE,
++	.write = bind_write,
++	.llseek = noop_llseek,
++};
++
++static const struct file_operations prior_fops = {
++	.owner = THIS_MODULE,
++	.write = prior_write,
++	.llseek = noop_llseek,
++};
++
++static int __init parp_init(void)
++{
++	parp_dir = debugfs_create_dir("parp", NULL);
++	debugfs_create_file("mode", 0600, parp_dir, NULL, &mode_fops);
++	debugfs_create_file("app_bind", 0200, parp_dir, NULL, &bind_fops);
++	debugfs_create_file("app_prior", 0200, parp_dir, NULL, &prior_fops);
++	return 0;
++}
++subsys_initcall(parp_init);
+diff --git a/mm/parp/control/genl.c b/mm/parp/control/genl.c
+new file mode 100644
+index 000000000..40504ecfb
+--- /dev/null
++++ b/mm/parp/control/genl.c
+@@ -0,0 +1,7 @@
++// SPDX-License-Identifier: GPL-2.0
++#include "../internal.h"
++/*
++ * Versioned Generic Netlink transport is intentionally a safe stub in this
++ * observe-only reproduction. parpctl can validate and pack its v1 schema,
++ * while no hot-path message is ever emitted.
++ */
+diff --git a/mm/parp/control/sysfs.c b/mm/parp/control/sysfs.c
+new file mode 100644
+index 000000000..3b54be44f
+--- /dev/null
++++ b/mm/parp/control/sysfs.c
+@@ -0,0 +1,3 @@
++// SPDX-License-Identifier: GPL-2.0
++#include "../internal.h"
++/* Debugfs is the only enabled control surface in the safe first stage. */
+diff --git a/mm/parp/control/trace.c b/mm/parp/control/trace.c
+new file mode 100644
+index 000000000..505f68d73
+--- /dev/null
++++ b/mm/parp/control/trace.c
+@@ -0,0 +1,3 @@
++// SPDX-License-Identifier: GPL-2.0
++#define CREATE_TRACE_POINTS
++#include <trace/events/parp.h>
+diff --git a/mm/vmscan.c b/mm/vmscan.c
+index 674999999..702901c20 100644
+--- a/mm/vmscan.c
++++ b/mm/vmscan.c
+@@ -58,6 +58,7 @@
+ #include <linux/random.h>
+ #include <linux/mmu_notifier.h>
+ #include <linux/parser.h>
++#include <linux/parp.h>
+ 
+ #include <asm/tlbflush.h>
+ #include <asm/div64.h>
+@@ -4568,6 +4569,7 @@ static int scan_folios(unsigned long nr_to_scan, struct lruvec *lruvec,
+ 		       struct scan_control *sc, int type, int tier,
+ 		       struct list_head *list)
+ {
++	struct parp_reclaim_ctx parp_ctx;
+ 	int i;
+ 	int gen;
+ 	enum vm_event_item item;
+@@ -4585,6 +4587,7 @@ static int scan_folios(unsigned long nr_to_scan, struct lruvec *lruvec,
+ 		return 0;
+ 
+ 	gen = lru_gen_from_seq(lrugen->min_seq[type]);
++	parp_adapter_prepare(&parp_ctx, lruvec, sc);
+ 
+ 	for (i = MAX_NR_ZONES; i > 0; i--) {
+ 		LIST_HEAD(moved);
+@@ -4594,6 +4597,7 @@ static int scan_folios(unsigned long nr_to_scan, struct lruvec *lruvec,
+ 
+ 		while (!list_empty(head)) {
+ 			struct folio *folio = lru_to_folio(head);
++			struct parp_decision parp_decision;
+ 			int delta = folio_nr_pages(folio);
+ 
+ 			VM_WARN_ON_ONCE_FOLIO(folio_test_unevictable(folio), folio);
+@@ -4602,6 +4606,10 @@ static int scan_folios(unsigned long nr_to_scan, struct lruvec *lruvec,
+ 			VM_WARN_ON_ONCE_FOLIO(folio_zonenum(folio) != zone, folio);
+ 
+ 			scanned += delta;
++			parp_decision = parp_adapter_score_folio(&parp_ctx, folio,
++								type, gen);
++			parp_adapter_apply_decision(&parp_ctx, folio,
++						   &parp_decision);
+ 
+ 			if (sort_folio(lruvec, folio, sc, tier))
+ 				sorted += delta;
+@@ -4640,6 +4648,7 @@ static int scan_folios(unsigned long nr_to_scan, struct lruvec *lruvec,
+ 				type ? LRU_INACTIVE_FILE : LRU_INACTIVE_ANON);
+ 	if (type == LRU_GEN_FILE)
+ 		sc->nr.file_taken += isolated;
++	parp_adapter_finish(&parp_ctx, scanned, isolated);
+ 	/*
+ 	 * There might not be eligible folios due to reclaim_idx. Check the
+ 	 * remaining to prevent livelock if it's not making progress.
+-- 
+2.25.1
+

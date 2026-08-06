@@ -1,0 +1,794 @@
+From 6af7414ec072ee72b38c01363743bc464a94bd85 Mon Sep 17 00:00:00 2001
+From: Codex PARP Reproduction <codex@localhost>
+Date: Sun, 2 Aug 2026 15:44:17 +0800
+Subject: [PATCH 039/123] feat: add dataset builder and feature pipeline
+
+---
+ tools/parp/intra_app_prediction/config.py     |  14 +
+ .../intra_app_prediction/dataset_builder.py   | 423 ++++++++++++++++++
+ tools/parp/intra_app_prediction/evaluate.py   |  80 ++++
+ .../intra_app_prediction/feature_encoder.py   |  73 +++
+ .../intra_app_prediction/state_cluster.py     |  75 ++++
+ .../tests/test_model_pipeline.py              |  70 +++
+ 6 files changed, 735 insertions(+)
+ create mode 100644 tools/parp/intra_app_prediction/config.py
+ create mode 100644 tools/parp/intra_app_prediction/dataset_builder.py
+ create mode 100644 tools/parp/intra_app_prediction/evaluate.py
+ create mode 100644 tools/parp/intra_app_prediction/feature_encoder.py
+ create mode 100644 tools/parp/intra_app_prediction/state_cluster.py
+ create mode 100644 tools/parp/intra_app_prediction/tests/test_model_pipeline.py
+
+diff --git a/tools/parp/intra_app_prediction/config.py b/tools/parp/intra_app_prediction/config.py
+new file mode 100644
+index 000000000..50881de6b
+--- /dev/null
++++ b/tools/parp/intra_app_prediction/config.py
+@@ -0,0 +1,14 @@
++"""Central Phase2.7 dataset/model configuration."""
++
++WINDOW_NS = 10_000_000_000
++HORIZONS_SECONDS = (10, 30, 60)
++RESOLUTIONS = (10, 100, 1000)
++ACTIVE_THRESHOLDS = (0.50, 0.80)
++PURGE_GAP_NS = 60_000_000_000
++PAGE_SIZE = 4096
++TOP_K_FILES = 16
++TOP_K_SEGMENTS = 128
++K_CANDIDATES = (8, 16, 32)
++SOURCE_FRESH = "RUNTIME_LEVEL3B_DATASET_FRESH"
++SOURCE_REPLAY = "RUNTIME_LEVEL3A_REPLAY_FIXTURE"
++
+diff --git a/tools/parp/intra_app_prediction/dataset_builder.py b/tools/parp/intra_app_prediction/dataset_builder.py
+new file mode 100644
+index 000000000..5c3e2d621
+--- /dev/null
++++ b/tools/parp/intra_app_prediction/dataset_builder.py
+@@ -0,0 +1,423 @@
++#!/usr/bin/env python3
++"""Build reproducible multi-resolution file/ANON/operation datasets."""
++
++import argparse
++from collections import defaultdict
++import csv
++import hashlib
++import json
++from pathlib import Path
++import time
++from typing import Any, Dict, Iterable, List
++
++from .anon_features import summarize_anon
++from .config import PAGE_SIZE, PURGE_GAP_NS, RESOLUTIONS, WINDOW_NS
++from .file_identity import FileIdentity, PartitionTracker
++from .future_labels import attach_future_labels
++from .operation_alignment import OperationEvent, align_operations
++from .segmenter import all_segments
++from .splitter import chronological_split
++from .weighted_coverage import IntervalEvidence, coverage_summary
++from .window_builder import window_bounds
++
++
++FILE_SEGMENT_FIELDS = [
++    "window_id", "file_id", "requested_bins", "effective_bins",
++    "segment_id", "segment_start_page", "segment_end_page_exclusive",
++    "segment_page_count", "observed_unique_pages", "accessed_unique_pages",
++    "coverage_ratio", "weighted_access_pages", "weighted_coverage_ratio",
++    "access_intensity", "active_state", "active_50", "active_80",
++    "weighted_active_50", "weighted_active_80", "last_seen_ns", "mean_age",
++    "max_age", "sample_count", "region_count", "observation_state",
++    "window_start_ns", "window_end_ns", "session_id", "app_id", "domain_id",
++    "partition_generation", "label_available_10s", "label_next_10s_access",
++    "label_next_10s_max_coverage", "label_next_10s_weighted_coverage",
++    "future_active_50_10s", "future_active_80_10s", "label_available_30s",
++    "label_next_30s_access", "label_next_30s_max_coverage",
++    "label_next_30s_weighted_coverage", "future_active_50_30s",
++    "future_active_80_30s", "label_available_60s", "label_next_60s_access",
++    "label_next_60s_max_coverage", "label_next_60s_weighted_coverage",
++    "future_active_50_60s", "future_active_80_60s",
++]
++
++
++def load_jsonl(path: Path):
++    if not path or not path.exists():
++        return []
++    return [json.loads(line) for line in path.read_text().splitlines()
++            if line.strip()]
++
++
++def write_csv(path: Path, rows: List[Dict[str, Any]], fields=None):
++    fields = fields or sorted({key for row in rows for key in row})
++    path.parent.mkdir(parents=True, exist_ok=True)
++    with path.open("w", newline="", encoding="utf-8") as stream:
++        writer = csv.DictWriter(stream, fieldnames=fields,
++                                extrasaction="ignore")
++        writer.writeheader()
++        writer.writerows(rows)
++
++
++def active_state(coverage):
++    if coverage == 0:
++        return "NONE"
++    if coverage < .2:
++        return "SPARSE"
++    if coverage < .5:
++        return "MEDIUM"
++    if coverage < .8:
++        return "DENSE"
++    return "VERY_DENSE"
++
++
++def stable_id(*parts):
++    return hashlib.sha256("|".join(str(part) for part in parts).encode()).hexdigest()[:24]
++
++
++def event_time(row):
++    return int(row.get("event_time_ns", row.get("sample_timestamp_ns",
++                                                row.get("timestamp_ns", 0))))
++
++
++def require_file_schema(rows):
++    required = {
++        "dev_major", "dev_minor", "inode", "file_version",
++        "file_size_bytes", "file_page_count", "logical_start", "nr_pages",
++        "domain_id", "app_id", "session_id", "boot_id", "nr_accesses",
++        "sample_interval_us", "aggregation_interval_us",
++    }
++    missing = sorted({field for field in required
++                      if any(field not in row for row in rows)})
++    if missing:
++        raise ValueError("mandatory file trace fields missing: " + ",".join(missing))
++
++
++def operation_rows(path):
++    events = []
++    for row in load_jsonl(path):
++        events.append(OperationEvent(
++            str(row["operation_id"]), str(row["app_id"]), int(row["start_ns"]),
++            int(row["end_ns"]), str(row["operation_type"]),
++            str(row.get("source", "automation")),
++            float(row.get("confidence", 1.0)), str(row["session_id"])))
++    return events
++
++
++class DatasetBuilder:
++    def __init__(self, output: Path, run_id: str, source: str,
++                 timezone: str = "Asia/Shanghai"):
++        self.output = Path(output)
++        self.run_id = run_id
++        self.source = source
++        self.timezone = timezone
++        self.partition_tracker = PartitionTracker()
++
++    def build(self, file_rows, anon_rows, operations):
++        started = time.monotonic_ns()
++        require_file_schema(file_rows)
++        self.output.mkdir(parents=True, exist_ok=True)
++        file_groups = defaultdict(list)
++        window_identity = {}
++        dictionary = {}
++        for row in file_rows:
++            timestamp = event_time(row)
++            start, end = window_bounds(timestamp, WINDOW_NS)
++            identity = FileIdentity(int(row["dev_major"]), int(row["dev_minor"]),
++                                    int(row["inode"]), int(row["file_version"]))
++            pages = int(row["file_page_count"])
++            size = int(row["file_size_bytes"])
++            generation = self.partition_tracker.observe(identity, pages, size)
++            file_id = stable_id(identity.stable_key)
++            session = str(row["session_id"])
++            app = str(row["app_id"])
++            domain = int(row["domain_id"])
++            window_id = stable_id(row["boot_id"], session, app, start)
++            key = (window_id, file_id, identity, generation, pages, size)
++            max_access = max(1, (int(row["aggregation_interval_us"]) +
++                                 int(row["sample_interval_us"]) - 1) //
++                             int(row["sample_interval_us"]))
++            interval = IntervalEvidence(
++                int(row["logical_start"]),
++                min(pages, int(row["logical_start"]) + int(row["nr_pages"])),
++                min(1.0, int(row["nr_accesses"]) / max_access),
++                int(row.get("age", 0)))
++            file_groups[key].append((timestamp, interval, row))
++            window_identity[window_id] = {
++                "window_id": window_id, "run_id": self.run_id,
++                "session_id": session, "app_id": app, "domain_id": domain,
++                "window_start_ns": start, "window_end_ns": end,
++                "foreground_epoch": int(row.get("foreground_epoch", 0)),
++                "foreground_state": str(row.get("foreground_state", "UNKNOWN")),
++                "rss_bytes": int(row.get("rss_bytes", 0)),
++                "pss_bytes": int(row.get("pss_bytes", 0)),
++                "referenced_bytes": int(row.get("referenced_bytes", 0)),
++                "swap_bytes": int(row.get("swap_bytes", 0)),
++            }
++            item = dictionary.setdefault(file_id, {
++                "file_id": file_id, "dev_major": identity.dev_major,
++                "dev_minor": identity.dev_minor, "inode": identity.inode,
++                "file_version": identity.file_version,
++                "path_hash": row.get("path_hash", ""),
++                "basename_optional": row.get("basename_optional", ""),
++                "file_size_bytes": size, "file_page_count": pages,
++                "partition_generation": generation,
++                "first_seen_ns": timestamp, "last_seen_ns": timestamp,
++                "observed_domains": set(), "shared_mapping_seen": False,
++                "file_class": row.get("file_class", "UNKNOWN")})
++            item["first_seen_ns"] = min(item["first_seen_ns"], timestamp)
++            item["last_seen_ns"] = max(item["last_seen_ns"], timestamp)
++            item["observed_domains"].add(domain)
++
++        dense = {10: [], 100: []}
++        sparse1000 = []
++        active_counts = defaultdict(lambda: {10: 0, 100: 0, 1000: 0})
++        files_by_window = defaultdict(set)
++        for (window_id, file_id, identity, generation, pages, _), samples in sorted(
++                file_groups.items(), key=lambda item: (item[0][0], item[0][1])):
++            intervals = [item[1] for item in samples]
++            timestamps = [item[0] for item in samples]
++            base_window = window_identity[window_id]
++            files_by_window[window_id].add(file_id)
++            for resolution in RESOLUTIONS:
++                segment_rows = []
++                for spec in all_segments(pages, resolution, generation):
++                    summary = coverage_summary(spec.start_page,
++                                               spec.end_page_exclusive,
++                                               intervals)
++                    observation = ("NOT_OBSERVED" if not summary.observed_unique_pages
++                                   else ("OBSERVED_ACTIVE" if summary.accessed_unique_pages
++                                         else "OBSERVED_INACTIVE"))
++                    row = {
++                        "window_id": window_id, "file_id": file_id,
++                        "requested_bins": resolution,
++                        "effective_bins": spec.effective_bins,
++                        "segment_id": spec.segment_id,
++                        "segment_start_page": spec.start_page,
++                        "segment_end_page_exclusive": spec.end_page_exclusive,
++                        "segment_page_count": summary.segment_page_count,
++                        "observed_unique_pages": summary.observed_unique_pages,
++                        "accessed_unique_pages": summary.accessed_unique_pages,
++                        "coverage_ratio": summary.coverage_ratio,
++                        "weighted_access_pages": summary.weighted_access_pages,
++                        "weighted_coverage_ratio": summary.weighted_coverage_ratio,
++                        "access_intensity": summary.access_intensity,
++                        "active_state": active_state(summary.coverage_ratio),
++                        "active_50": summary.coverage_ratio >= .5,
++                        "active_80": summary.coverage_ratio >= .8,
++                        "weighted_active_50": summary.weighted_coverage_ratio >= .5,
++                        "weighted_active_80": summary.weighted_coverage_ratio >= .8,
++                        "last_seen_ns": max(timestamps),
++                        "mean_age": summary.mean_age, "max_age": summary.max_age,
++                        "sample_count": len({item[2].get("sample_id") for item in samples}),
++                        "region_count": summary.region_count,
++                        "observation_state": observation,
++                        "window_start_ns": base_window["window_start_ns"],
++                        "window_end_ns": base_window["window_end_ns"],
++                        "session_id": base_window["session_id"],
++                        "app_id": base_window["app_id"],
++                        "domain_id": base_window["domain_id"],
++                        "partition_generation": generation,
++                    }
++                    segment_rows.append(row)
++                    if observation == "OBSERVED_ACTIVE":
++                        active_counts[window_id][resolution] += 1
++                if resolution in dense:
++                    dense[resolution].extend(segment_rows)
++                else:
++                    active = [row for row in segment_rows
++                              if row["coverage_ratio"] > 0 or
++                              row["weighted_coverage_ratio"] > 0]
++                    sparse1000.append({
++                        "window_id": window_id, "file_id": file_id,
++                        "requested_bins": 1000,
++                        "effective_bins": segment_rows[0]["effective_bins"],
++                        "active_segment_ids": [row["segment_id"] for row in active],
++                        "coverage_values": [row["coverage_ratio"] for row in active],
++                        "weighted_coverage_values": [row["weighted_coverage_ratio"] for row in active],
++                        "negative_candidate_count": len(segment_rows) - len(active),
++                        "observation_semantics": "missing sparse entry is NOT_OBSERVED_OR_INACTIVE",
++                        "session_id": base_window["session_id"],
++                        "window_start_ns": base_window["window_start_ns"],
++                    })
++
++        dense[10] = attach_future_labels(dense[10])
++        dense[100] = attach_future_labels(dense[100])
++        anon_dataset = self._build_anon(anon_rows, window_identity)
++        anon_by_window = {row["window_id"]: row for row in anon_dataset}
++        operations_by_session = defaultdict(list)
++        for event in operations:
++            operations_by_session[event.session_id].append(event)
++        alignment_rows = []
++        window_rows = []
++        ordered_windows = sorted(window_identity.values(),
++                                 key=lambda row: (row["session_id"], row["window_start_ns"]))
++        for index, row in enumerate(ordered_windows):
++            session_events = operations_by_session[row["session_id"]]
++            next_op = "UNKNOWN"
++            later = sorted((event for event in session_events
++                            if event.start_ns >= row["window_end_ns"]),
++                           key=lambda event: event.start_ns)
++            if later:
++                next_op = later[0].operation_type
++            aligned = align_operations(row["window_start_ns"],
++                                       row["window_end_ns"], session_events,
++                                       next_op)
++            alignment = {"window_id": row["window_id"], **aligned.__dict__}
++            alignment_rows.append(alignment)
++            anon = anon_by_window.get(row["window_id"], {})
++            file_ids = files_by_window[row["window_id"]]
++            window_rows.append({
++                **row, "current_operation": aligned.operation_at_start,
++                "dominant_operation": aligned.dominant_operation,
++                "next_operation": aligned.next_operation,
++                "operation_coverage_ratio": aligned.operation_coverage_ratio,
++                "label_quality": aligned.label_quality,
++                "file_count": len(file_ids),
++                "active_file_count": sum(any(
++                    item["file_id"] == file_id and item["window_id"] == row["window_id"] and
++                    item["coverage_ratio"] > 0 for item in dense[10])
++                    for file_id in file_ids),
++                "active_segment_count_l10": active_counts[row["window_id"]][10],
++                "active_segment_count_l100": active_counts[row["window_id"]][100],
++                "active_segment_count_l1000": active_counts[row["window_id"]][1000],
++                "anon_total_bytes": anon.get("anon_total_bytes", 0),
++                "anon_hot_bytes": anon.get("anon_hot_bytes", 0),
++                "anon_cold_bytes": anon.get("anon_cold_bytes", 0),
++            })
++
++        dictionary_rows = []
++        for item in dictionary.values():
++            domains = item.pop("observed_domains")
++            item["observed_domain_count"] = len(domains)
++            item["shared_mapping_seen"] = len(domains) > 1
++            dictionary_rows.append(item)
++        write_csv(self.output / "windows_10s.csv", window_rows)
++        write_csv(self.output / "file_dictionary.csv", dictionary_rows)
++        write_csv(self.output / "file_segments_l10.csv", dense[10], FILE_SEGMENT_FIELDS)
++        write_csv(self.output / "file_segments_l100.csv", dense[100], FILE_SEGMENT_FIELDS)
++        with (self.output / "file_segments_l1000.jsonl").open("w") as stream:
++            for row in sparse1000:
++                stream.write(json.dumps(row, sort_keys=True) + "\n")
++        write_csv(self.output / "anon_windows_10s.csv", anon_dataset)
++        write_csv(self.output / "window_operation_alignment.csv", alignment_rows)
++        with (self.output / "operation_events.jsonl").open("w") as stream:
++            for event in operations:
++                stream.write(json.dumps(event.__dict__, sort_keys=True) + "\n")
++
++        (self.output / "splits").mkdir(exist_ok=True)
++        split_audit = {"status": "GATED", "reason": "fewer than three sessions"}
++        if len({row["session_id"] for row in window_rows}) >= 3:
++            split = chronological_split(window_rows, PURGE_GAP_NS)
++            for name in ("train", "val", "test"):
++                sessions = sorted({row["session_id"] for row in split[name]})
++                (self.output / "splits" / f"{name}_sessions.txt").write_text(
++                    "\n".join(sessions) + "\n")
++            split_audit = split["audit"]
++            split_audit["status"] = "PASS"
++        (self.output / "splits/split_audit.json").write_text(
++            json.dumps(split_audit, indent=2, sort_keys=True) + "\n")
++        metadata = {
++            "schema_version": 1, "source": self.source,
++            "run_id": self.run_id, "window_ns": WINDOW_NS,
++            "timezone": self.timezone, "file_regions": len(file_rows),
++            "anon_regions": len(anon_rows), "windows": len(window_rows),
++            "files": len(dictionary_rows), "level10_entries": len(dense[10]),
++            "level100_entries": len(dense[100]),
++            "level1000_sparse_entries": sum(len(row["active_segment_ids"])
++                                             for row in sparse1000),
++            "builder_elapsed_ns": time.monotonic_ns() - started,
++            "future_features_used": False,
++            "absolute_paths_in_public_tables": False,
++        }
++        (self.output / "dataset_metadata.json").write_text(
++            json.dumps(metadata, indent=2, sort_keys=True) + "\n")
++        schema = self.schema()
++        (self.output / "schema.json").write_text(
++            json.dumps(schema, indent=2, sort_keys=True) + "\n")
++        return metadata
++
++    def _build_anon(self, rows, window_identity):
++        groups = defaultdict(list)
++        for row in rows:
++            timestamp = event_time(row)
++            start, _ = window_bounds(timestamp)
++            candidates = [window for window in window_identity.values()
++                          if window["session_id"] == str(row["session_id"]) and
++                          window["app_id"] == str(row["app_id"]) and
++                          window["window_start_ns"] == start]
++            if not candidates:
++                continue
++            window_id = candidates[0]["window_id"]
++            key = (window_id, row["domain_id"], row.get("foreground_epoch", 0),
++                   row["mm_cookie"], row["boot_id"])
++            groups[key].append(row)
++        by_window = defaultdict(list)
++        for (window_id, domain, epoch, mm_cookie, boot_id), items in groups.items():
++            max_access = max(1, max((int(item.get("aggregation_interval_us", 1000000)) +
++                                     int(item.get("sample_interval_us", 5000)) - 1) //
++                                    int(item.get("sample_interval_us", 5000))
++                                    for item in items))
++            normalized = [{**item, "foreground_epoch": epoch,
++                           "mm_cookie": mm_cookie, "boot_id": boot_id}
++                          for item in items]
++            by_window[window_id].append(summarize_anon(normalized, max_access))
++        output = []
++        for window_id, summaries in by_window.items():
++            total = sum(row["anon_total_bytes"] for row in summaries)
++            combined = {"window_id": window_id}
++            sum_fields = ("anon_total_bytes", "anon_observed_bytes", "anon_hot_bytes",
++                          "anon_warm_bytes", "anon_cold_bytes",
++                          "anon_active_region_count", "anon_region_count",
++                          "unresolved_anon_bytes")
++            for field in sum_fields:
++                combined[field] = sum(row[field] for row in summaries)
++            for field in ("anon_mean_access_ratio", "anon_mean_age"):
++                combined[field] = sum(row[field] * row["anon_total_bytes"]
++                                      for row in summaries) / total if total else 0.0
++            combined["anon_max_access_ratio"] = max(row["anon_max_access_ratio"] for row in summaries)
++            combined["anon_max_age"] = max(row["anon_max_age"] for row in summaries)
++            combined["anon_working_set_delta"] = sum(row["anon_working_set_delta"] for row in summaries)
++            combined["anon_recently_active_ratio"] = (
++                (combined["anon_hot_bytes"] + combined["anon_warm_bytes"]) / total
++                if total else 0.0)
++            combined["anon_cooling_ratio"] = combined["anon_cold_bytes"] / total if total else 0.0
++            combined["unresolved_anon_ratio"] = combined["unresolved_anon_bytes"] / (
++                total + combined["unresolved_anon_bytes"]) if total + combined["unresolved_anon_bytes"] else 0.0
++            output.append(combined)
++        return output
++
++    @staticmethod
++    def schema():
++        return {
++            "$schema": "https://json-schema.org/draft/2020-12/schema",
++            "title": "PARP Phase2.7 dataset metadata",
++            "type": "object",
++            "required": ["schema_version", "source", "run_id", "window_ns",
++                         "file_regions", "anon_regions", "windows"],
++            "properties": {
++                "schema_version": {"const": 1}, "source": {"type": "string"},
++                "run_id": {"type": "string"}, "window_ns": {"const": WINDOW_NS},
++                "file_regions": {"type": "integer", "minimum": 0},
++                "anon_regions": {"type": "integer", "minimum": 0},
++                "windows": {"type": "integer", "minimum": 0},
++            },
++        }
++
++
++def main():
++    parser = argparse.ArgumentParser()
++    parser.add_argument("--file-regions", type=Path, required=True)
++    parser.add_argument("--anon-regions", type=Path, required=True)
++    parser.add_argument("--operation-events", type=Path, required=True)
++    parser.add_argument("--output", type=Path, required=True)
++    parser.add_argument("--run-id", required=True)
++    parser.add_argument("--source", required=True)
++    args = parser.parse_args()
++    metadata = DatasetBuilder(args.output, args.run_id, args.source).build(
++        load_jsonl(args.file_regions), load_jsonl(args.anon_regions),
++        operation_rows(args.operation_events))
++    print(json.dumps(metadata, sort_keys=True))
++
++
++if __name__ == "__main__":
++    main()
+diff --git a/tools/parp/intra_app_prediction/evaluate.py b/tools/parp/intra_app_prediction/evaluate.py
+new file mode 100644
+index 000000000..737debd6a
+--- /dev/null
++++ b/tools/parp/intra_app_prediction/evaluate.py
+@@ -0,0 +1,80 @@
++"""Dependency-free multi-label metrics for page segment prediction."""
++
++
++def _safe(numerator, denominator):
++    return numerator / denominator if denominator else 0.0
++
++
++def _average_precision(actual, scores):
++    if not actual:
++        return 1.0 if not scores else 0.0
++    hits = 0
++    total = 0.0
++    for rank, (key, _) in enumerate(sorted(scores.items(),
++                                           key=lambda item: (-item[1], item[0])), 1):
++        if key in actual:
++            hits += 1
++            total += hits / rank
++    return total / len(actual)
++
++
++def multilabel_metrics(actual_rows, score_rows, top_k=10,
++                       cold_threshold=.1, hot_threshold=.9):
++    if len(actual_rows) != len(score_rows):
++        raise ValueError("actual and score row counts differ")
++    tp = fp = fn = hit = false_cold = false_hot = 0
++    cold_candidates = hot_candidates = 0
++    precision_rows = []
++    recall_rows = []
++    f1_rows = []
++    jaccard_rows = []
++    average_precision_rows = []
++    universe = set()
++    predicted_union = set()
++    for actual, scores in zip(actual_rows, score_rows):
++        actual = set(actual)
++        ranked = sorted(scores, key=lambda key: (-scores[key], key))[:top_k]
++        predicted = set(ranked)
++        common = len(actual & predicted)
++        row_precision = _safe(common, len(predicted))
++        row_recall = _safe(common, len(actual))
++        precision_rows.append(row_precision)
++        recall_rows.append(row_recall)
++        f1_rows.append(_safe(2 * row_precision * row_recall,
++                             row_precision + row_recall))
++        jaccard_rows.append(_safe(common, len(actual | predicted)))
++        average_precision_rows.append(_average_precision(actual, scores))
++        tp += common
++        fp += len(predicted - actual)
++        fn += len(actual - predicted)
++        hit += bool(common)
++        false_cold += sum(scores.get(key, 0.0) <= cold_threshold
++                          for key in actual)
++        cold_candidates += len(actual)
++        false_hot += sum(value >= hot_threshold and key not in actual
++                         for key, value in scores.items())
++        hot_candidates += sum(value >= hot_threshold for value in scores.values())
++        universe.update(actual)
++        universe.update(scores)
++        predicted_union.update(predicted)
++    count = len(actual_rows)
++    micro_precision = _safe(tp, tp + fp)
++    micro_recall = _safe(tp, tp + fn)
++    return {
++        "precision_at_k": _safe(sum(precision_rows), count),
++        "recall_at_k": _safe(sum(recall_rows), count),
++        "f1_at_k": _safe(sum(f1_rows), count),
++        "jaccard": _safe(sum(jaccard_rows), count),
++        "micro_precision": micro_precision,
++        "micro_recall": micro_recall,
++        "micro_f1": _safe(2 * micro_precision * micro_recall,
++                           micro_precision + micro_recall),
++        "macro_f1": _safe(sum(f1_rows), count),
++        "average_precision": _safe(sum(average_precision_rows), count),
++        "hit_rate": _safe(hit, count),
++        "coverage": _safe(len(predicted_union), len(universe)),
++        "false_protection_rate": _safe(fp, tp + fp),
++        "false_reclaim_risk": _safe(fn, tp + fn),
++        "false_cold": _safe(false_cold, cold_candidates),
++        "false_hot": _safe(false_hot, hot_candidates),
++    }
+diff --git a/tools/parp/intra_app_prediction/feature_encoder.py b/tools/parp/intra_app_prediction/feature_encoder.py
+new file mode 100644
+index 000000000..789fcbd12
+--- /dev/null
++++ b/tools/parp/intra_app_prediction/feature_encoder.py
+@@ -0,0 +1,73 @@
++"""Bounded page-state feature encoding with a train-only vocabulary."""
++
++from collections import Counter
++import math
++
++
++OPERATIONS = ("IDLE", "OPEN", "READ", "SCROLL", "EDIT", "SAVE",
++              "SEARCH", "MINIMIZE", "RESTORE", "CLOSE", "MIXED")
++
++
++def _fixed(values, length):
++    values = [float(value) for value in (values or ())[:length]]
++    return values + [0.0] * (length - len(values))
++
++
++class FeatureEncoder:
++    """Encode one file/window row without learning from validation or test."""
++
++    def __init__(self, top_k_files=16, top_k_l1000=16):
++        self.top_k_files = int(top_k_files)
++        self.top_k_l1000 = int(top_k_l1000)
++        self.file_vocabulary = []
++        self.operation_vocabulary = list(OPERATIONS)
++        self.fitted = False
++
++    def fit(self, rows):
++        rows = list(rows)
++        counts = Counter(str(row.get("file_id", "")) for row in rows
++                         if row.get("file_id"))
++        self.file_vocabulary = [key for key, _ in sorted(
++            counts.items(), key=lambda item: (-item[1], item[0]))
++            [:self.top_k_files]]
++        self.fitted = True
++        return self
++
++    def transform_one(self, row):
++        if not self.fitted:
++            raise RuntimeError("encoder must be fitted on training data")
++        file_id = str(row.get("file_id", ""))
++        known = file_id in self.file_vocabulary
++        file_one_hot = [1.0 if file_id == candidate else 0.0
++                        for candidate in self.file_vocabulary]
++        file_one_hot += [0.0] * (self.top_k_files - len(file_one_hot))
++        operation = str(row.get("operation", "")).upper()
++        operation_one_hot = [1.0 if operation == item else 0.0
++                             for item in self.operation_vocabulary]
++        return [float(known), float(not known)] + file_one_hot + (
++            _fixed(row.get("coverage_l10"), 10) +
++            _fixed(row.get("coverage_l100_summary"), 4) +
++            _fixed(row.get("l1000_topk"), self.top_k_l1000) +
++            [float(row.get("file_count", 0)),
++             float(row.get("active_file_count", 0)),
++             float(row.get("anon_hot_ratio", 0)),
++             float(row.get("anon_cooling_ratio", 0)),
++             float(bool(row.get("foreground", 0))),
++             math.log1p(max(0.0, float(row.get("rss_bytes", 0)))),
++             math.log1p(max(0.0, float(row.get("pss_bytes", 0)))),
++             math.log1p(max(0.0, float(row.get("swap_bytes", 0))))] +
++            operation_one_hot)
++
++    def transform(self, rows):
++        return [self.transform_one(row) for row in rows]
++
++    def schema(self):
++        return {
++            "schema_version": 1,
++            "file_vocabulary": list(self.file_vocabulary),
++            "unknown_file_bucket": "UNK_FILE",
++            "operation_vocabulary": list(self.operation_vocabulary),
++            "feature_count": len(self.transform_one({"file_id": ""})),
++            "fit_source": "train_only",
++        }
++
+diff --git a/tools/parp/intra_app_prediction/state_cluster.py b/tools/parp/intra_app_prediction/state_cluster.py
+new file mode 100644
+index 000000000..1452e7054
+--- /dev/null
++++ b/tools/parp/intra_app_prediction/state_cluster.py
+@@ -0,0 +1,75 @@
++"""Small deterministic KMeans used when scikit-learn is unavailable."""
++
++
++def _distance_squared(left, right):
++    return sum((float(a) - float(b)) ** 2 for a, b in zip(left, right))
++
++
++class LightweightKMeans:
++    def __init__(self, clusters=8, max_iter=100):
++        if clusters <= 0 or max_iter <= 0:
++            raise ValueError("clusters and max_iter must be positive")
++        self.clusters = int(clusters)
++        self.max_iter = int(max_iter)
++        self.centroids = []
++
++    def _initialize(self, rows):
++        centroids = [list(rows[0])]
++        while len(centroids) < self.clusters:
++            candidate = max(rows, key=lambda row: min(
++                _distance_squared(row, center) for center in centroids))
++            centroids.append(list(candidate))
++        return centroids
++
++    def fit(self, rows):
++        rows = [list(map(float, row)) for row in rows]
++        if len(rows) < self.clusters:
++            raise ValueError("clusters cannot exceed training row count")
++        if not rows or not rows[0] or any(len(row) != len(rows[0]) for row in rows):
++            raise ValueError("training rows must be a nonempty rectangular matrix")
++        centroids = self._initialize(rows)
++        for _ in range(self.max_iter):
++            assignments = [min(range(self.clusters), key=lambda index:
++                               (_distance_squared(row, centroids[index]), index))
++                           for row in rows]
++            updated = []
++            for index in range(self.clusters):
++                members = [row for row, assigned in zip(rows, assignments)
++                           if assigned == index]
++                if not members:
++                    updated.append(list(centroids[index]))
++                    continue
++                updated.append([sum(column) / len(members)
++                                for column in zip(*members)])
++            if updated == centroids:
++                break
++            centroids = updated
++        self.centroids = centroids
++        return self
++
++    def predict_one(self, row):
++        if not self.centroids:
++            raise RuntimeError("cluster model is not fitted")
++        if len(row) != len(self.centroids[0]):
++            raise ValueError("feature length mismatch")
++        return min(range(len(self.centroids)), key=lambda index:
++                   (_distance_squared(row, self.centroids[index]), index))
++
++    def predict(self, rows):
++        return [self.predict_one(row) for row in rows]
++
++    def inertia(self, rows):
++        return sum(_distance_squared(row, self.centroids[self.predict_one(row)])
++                   for row in rows)
++
++    def to_dict(self):
++        return {"schema_version": 1, "algorithm": "lightweight_kmeans",
++                "clusters": self.clusters, "max_iter": self.max_iter,
++                "centroids": self.centroids, "fit_source": "train_only"}
++
++    @classmethod
++    def from_dict(cls, payload):
++        result = cls(int(payload["clusters"]), int(payload.get("max_iter", 100)))
++        result.centroids = [list(map(float, row)) for row in payload["centroids"]]
++        return result
++
+diff --git a/tools/parp/intra_app_prediction/tests/test_model_pipeline.py b/tools/parp/intra_app_prediction/tests/test_model_pipeline.py
+new file mode 100644
+index 000000000..7ec1c115b
+--- /dev/null
++++ b/tools/parp/intra_app_prediction/tests/test_model_pipeline.py
+@@ -0,0 +1,70 @@
++import tempfile
++import unittest
++from pathlib import Path
++
++from intra_app_prediction.evaluate import multilabel_metrics
++from intra_app_prediction.feature_encoder import FeatureEncoder
++from intra_app_prediction.state_cluster import LightweightKMeans
++
++
++class FeatureEncoderTests(unittest.TestCase):
++    def test_vocabulary_is_fitted_from_training_only(self):
++        encoder = FeatureEncoder(top_k_files=1).fit([
++            {"file_id": "train", "coverage_l10": [1.0, 0.0]},
++        ])
++        self.assertEqual(encoder.file_vocabulary, ["train"])
++        encoded = encoder.transform_one({
++            "file_id": "test-only", "coverage_l10": [0.5, 0.5],
++            "coverage_l100_summary": [0.5, 0.5, 0.5, 0.0],
++            "l1000_topk": [0.5], "file_count": 1,
++            "active_file_count": 1, "anon_hot_ratio": 0.25,
++            "foreground": 1, "rss_bytes": 4096,
++            "operation": "EDIT",
++        })
++        self.assertEqual(encoded[0], 0.0)  # known-file indicator
++        self.assertEqual(encoded[1], 1.0)  # UNK_FILE indicator
++
++    def test_feature_length_is_stable(self):
++        train = [{"file_id": "a", "coverage_l10": [1.0] * 10,
++                  "operation": "EDIT"}]
++        encoder = FeatureEncoder(top_k_files=2).fit(train)
++        self.assertEqual(len(encoder.transform_one(train[0])),
++                         len(encoder.transform_one({"file_id": "b"})))
++
++
++class ClusterTests(unittest.TestCase):
++    def test_kmeans_is_deterministic_and_serializable(self):
++        points = [[0.0, 0.0], [0.1, 0.1], [9.9, 10.0], [10.0, 9.9]]
++        first = LightweightKMeans(2, max_iter=20).fit(points)
++        second = LightweightKMeans(2, max_iter=20).fit(points)
++        self.assertEqual(first.centroids, second.centroids)
++        self.assertNotEqual(first.predict_one(points[0]),
++                            first.predict_one(points[-1]))
++        restored = LightweightKMeans.from_dict(first.to_dict())
++        self.assertEqual(restored.predict(points), first.predict(points))
++
++    def test_invalid_k_is_rejected(self):
++        with self.assertRaises(ValueError):
++            LightweightKMeans(3).fit([[0.0], [1.0]])
++
++
++class EvaluationTests(unittest.TestCase):
++    def test_multilabel_metrics_are_bounded(self):
++        metrics = multilabel_metrics(
++            [{"a", "b"}, {"c"}],
++            [{"a": .9, "x": .8, "b": .1}, {"c": .7}], top_k=2)
++        for value in metrics.values():
++            self.assertGreaterEqual(value, 0.0)
++            self.assertLessEqual(value, 1.0)
++        self.assertEqual(metrics["hit_rate"], 1.0)
++
++    def test_false_cold_and_hot_are_explicit(self):
++        metrics = multilabel_metrics(
++            [{"hot"}], [{"hot": .05, "cold": .95}], top_k=1,
++            cold_threshold=.1, hot_threshold=.9)
++        self.assertEqual(metrics["false_cold"], 1.0)
++        self.assertEqual(metrics["false_hot"], 1.0)
++
++
++if __name__ == "__main__":
++    unittest.main()
+-- 
+2.25.1
+

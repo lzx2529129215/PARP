@@ -52,7 +52,7 @@ command -v wpspdf
 授予脚本执行权限：
 
 ```bash
-cd /home/lzxxxxxx/桌面/huawei/huawei_mem/lzx
+cd /home/lzxxxxxx/桌面/huawei/myself-kswapd/lzx
 chmod +x automation/run_automation.sh automation/run_wps_case.sh automation/test.sh
 ```
 
@@ -90,7 +90,7 @@ xdotool search --onlyvisible --class 'wps|wpp|et|wpspdf'
 查看统一入口帮助：
 
 ```bash
-cd /home/lzxxxxxx/桌面/huawei/huawei_mem/lzx
+cd /home/lzxxxxxx/桌面/huawei/myself-kswapd/lzx
 automation/run_wps_case.sh --help
 ```
 
@@ -99,7 +99,7 @@ automation/run_wps_case.sh --help
 dry-run 只检查场景和输出动作，不会启动 WPS，也不会要求样本文件实际存在：
 
 ```bash
-cd /home/lzxxxxxx/桌面/huawei/huawei_mem/lzx
+cd /home/lzxxxxxx/桌面/huawei/myself-kswapd/lzx
 automation/run_wps_case.sh 0010 --dry-run
 automation/run_wps_case.sh 0040 --dry-run
 ```
@@ -118,7 +118,7 @@ mkdir -p "outputs/wps"
 Word 用例示例：
 
 ```bash
-cd /home/lzxxxxxx/桌面/huawei/huawei_mem/lzx
+cd /home/lzxxxxxx/桌面/huawei/myself-kswapd/lzx
 automation/run_wps_case.sh 0040 \
   --var WPS_WORD_FILE="$HOME/wps-samples/word_200m.docx" \
   --var WPS_IMAGE_FILE="$HOME/wps-samples/image_1m.png" \

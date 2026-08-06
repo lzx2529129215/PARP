@@ -1,0 +1,1041 @@
+From 6b91ca206796c3e9990eff6b01d95e9353a10f39 Mon Sep 17 00:00:00 2001
+From: Codex PARP Reproduction <codex@localhost>
+Date: Wed, 5 Aug 2026 11:30:55 +0800
+Subject: [PATCH 116/123] parp: label effective-tier changes for lzx audit
+
+---
+ ...p_effective_tier_live_shadow_audit-lzx.md} |  4 +-
+ include/linux/parp.h                          | 32 ++++++------
+ include/trace/events/parp.h                   | 35 ++++++-------
+ mm/parp/core/effective_tier.c                 | 49 ++++++++++---------
+ mm/parp/core/scan_budget.c                    |  2 +-
+ mm/parp/tests/parp_test.c                     | 14 +++---
+ mm/vmscan.c                                   | 20 ++++----
+ tools/parp/effective_tier/README.md           |  4 +-
+ tools/parp/effective_tier/README.phase_e.md   | 10 ++--
+ tools/parp/effective_tier/collector.py        | 12 ++---
+ ...flight.py => live_shadow_preflight-lzx.py} |  2 +-
+ .../{pressure.py => pressure-lzx.py}          |  7 ++-
+ ...e_analysis.py => pressure_analysis-lzx.py} |  9 ++--
+ .../parp/effective_tier/raw_event.schema.json |  1 +
+ .../parp/effective_tier/tests/test_phase_e.py | 22 +++++++--
+ ...{test_pressure.py => test_pressure-lzx.py} | 20 ++++----
+ 16 files changed, 134 insertions(+), 109 deletions(-)
+ rename docs/{parp_effective_tier_live_shadow_audit.md => parp_effective_tier_live_shadow_audit-lzx.md} (95%)
+ rename tools/parp/effective_tier/{live_shadow_preflight.py => live_shadow_preflight-lzx.py} (99%)
+ rename tools/parp/effective_tier/{pressure.py => pressure-lzx.py} (98%)
+ rename tools/parp/effective_tier/{pressure_analysis.py => pressure_analysis-lzx.py} (84%)
+ rename tools/parp/effective_tier/tests/{test_pressure.py => test_pressure-lzx.py} (89%)
+
+diff --git a/docs/parp_effective_tier_live_shadow_audit.md b/docs/parp_effective_tier_live_shadow_audit-lzx.md
+similarity index 95%
+rename from docs/parp_effective_tier_live_shadow_audit.md
+rename to docs/parp_effective_tier_live_shadow_audit-lzx.md
+index 619cf17ef..e3217f448 100644
+--- a/docs/parp_effective_tier_live_shadow_audit.md
++++ b/docs/parp_effective_tier_live_shadow_audit-lzx.md
+@@ -1,4 +1,4 @@
+-# PARP effective-tier live-shadow audit
++# PARP effective-tier live-shadow audit <!-- #lzx -->
+ 
+ This branch begins at `aa39d99696392c0bfaba5df2e6152e24a9f88a6d` and is
+ limited to Phase-F observability and offline counterfactuals.  It does not
+@@ -64,7 +64,7 @@ lock events with cookie/lifetime/session linkage.
+ 
+ ## Live boundary
+ 
+-`tools/parp/effective_tier/live_shadow_preflight.py` is read-only. It records
++`tools/parp/effective_tier/live_shadow_preflight-lzx.py` is read-only. It records
+ kernel, boot, debugfs, sudo, and test-scope facts into an output skeleton but
+ cannot install a kernel, toggle mode, write a cgroup, launch pressure, or
+ reboot. The root-only collection phase must stop if its preflight detects an
+diff --git a/include/linux/parp.h b/include/linux/parp.h
+index 83b10ef3c..8654ae11c 100644
+--- a/include/linux/parp.h
++++ b/include/linux/parp.h
+@@ -83,7 +83,7 @@ struct parp_frontier_scan_ctx {
+ #define PARP_TIER_PRESSURE_POLICY_VERSION	1U
+ #define PARP_TIER_PRESSURE_PROVENANCE \
+ 	"ENGINEERING_PRESSURE_POLICY_UNVALIDATED"
+-#define PARP_TIER_TRACE_PRESSURE_PROVENANCE_LEN	48
++#define PARP_TIER_TRACE_PRESSURE_PROVENANCE_LEN	48 /* #lzx */
+ #define PARP_TIER_RUNTIME_PAIRWISE_COMPARISON	0
+ #define PARP_TIER_RUNTIME_CANDIDATE_SORTING	0
+ #define PARP_TIER_RUNTIME_SIGMOID		0
+@@ -151,7 +151,7 @@ enum parp_tier_reclaim_context {
+ 	PARP_TIER_RECLAIM_DIRECT,
+ 	PARP_TIER_RECLAIM_MEMCG,
+ 	PARP_TIER_RECLAIM_PROACTIVE_MEMCG,
+-};
++}; /* #lzx */
+ 
+ enum parp_tier_outcome {
+ 	PARP_TIER_OUTCOME_RECLAIMED,
+@@ -207,7 +207,7 @@ struct parp_tier_decision {
+ 	s32 delta_tier_q8;
+ 	s32 fixed_delta_q8;
+ 	s32 binary_bypass_delta_q8;
+-	s32 pressure_aware_delta_q8;
++	s32 pressure_aware_delta_q8; /* #lzx */
+ 	s32 effective_tier_q8;
+ 	s32 cold_threshold;
+ 	s32 hot_threshold_1;
+@@ -234,7 +234,7 @@ struct parp_tier_decision {
+ 	bool native_protect;
+ 	bool effective_protect;
+ 	bool fixed_effective_protect;
+-	bool pressure_aware_effective_protect;
++	bool pressure_aware_effective_protect; /* #lzx */
+ 	bool special_native_protect;
+ 	bool actual_tier_protect;
+ 	bool reservation_active;
+@@ -250,14 +250,14 @@ struct parp_tier_scan_ctx {
+ 	u64 model_time_ns;
+ 	u64 nr_to_reclaim;
+ 	u64 nr_reclaimed_before;
+-	u64 epoch_reclaimed_pages;
++	u64 epoch_reclaimed_pages; /* #lzx */
+ 	unsigned long source_seq;
+ 	unsigned long candidate_pages;
+ 	unsigned long upgrade_pages;
+ 	unsigned long downgrade_pages;
+ 	unsigned long batch_scanned_pages;
+ 	unsigned long batch_isolated_pages;
+-	unsigned long batch_reclaimed_pages;
++	unsigned long batch_reclaimed_pages; /* #lzx */
+ 	u32 nid;
+ 	u32 config_sequence;
+ 	s32 reclaim_priority;
+@@ -268,7 +268,7 @@ struct parp_tier_scan_ctx {
+ 	u8 pressure_level_kernel;
+ 	u8 reclaim_context;
+ 	u8 pressure_bypass_reason;
+-	u16 consecutive_no_progress_batches;
++	u16 consecutive_no_progress_batches; /* #lzx */
+ 	bool enabled;
+ 	bool severe_pressure;
+ 	bool no_progress;
+@@ -311,7 +311,7 @@ void __parp_effective_tier_mglru_state_change(void);
+ void __parp_effective_tier_prepare(struct parp_tier_scan_ctx *ctx,
+ 		struct lruvec *lruvec, int type, int reclaim_priority,
+ 		unsigned long nr_to_reclaim, unsigned long nr_reclaimed,
+-		bool is_kswapd, bool is_memcg_reclaim, bool proactive_reclaim);
++		bool is_kswapd, bool is_memcg_reclaim, bool proactive_reclaim); /* #lzx */
+ void __parp_effective_tier_decide(struct parp_tier_scan_ctx *ctx,
+ 		struct lruvec *lruvec, struct folio *folio, int native_tier,
+ 		int tier_idx, bool special_native_protect,
+@@ -323,7 +323,7 @@ void __parp_effective_tier_finish(struct parp_tier_scan_ctx *ctx,
+ void __parp_effective_tier_batch_finish(struct parp_tier_scan_ctx *ctx,
+ 		unsigned long isolated);
+ void __parp_effective_tier_batch_reclaim(struct parp_tier_scan_ctx *ctx,
+-		unsigned long reclaimed);
++		unsigned long reclaimed); /* #lzx */
+ void __parp_effective_tier_feedback(struct lruvec *lruvec, int type,
+ 		u8 run_epoch, unsigned long isolated, unsigned long reclaimed);
+ void __parp_effective_tier_outcome(struct folio *folio,
+@@ -342,7 +342,7 @@ void __parp_effective_tier_lock_finish(
+ 
+ enum parp_effective_tier_mode parp_effective_tier_get_mode(void);
+ int parp_effective_tier_set_mode(enum parp_effective_tier_mode mode);
+-bool parp_effective_tier_metadata_ready(void);
++bool parp_effective_tier_metadata_ready(void); /* #lzx */
+ ssize_t parp_effective_tier_format_stats(char *buf, size_t size);
+ ssize_t parp_effective_tier_format_config(char *buf, size_t size);
+ int parp_effective_tier_set_config(const char *buf);
+@@ -374,7 +374,7 @@ u8 parp_effective_tier_pressure_level(int reclaim_priority,
+ 		bool no_progress, unsigned long nr_to_reclaim,
+ 		unsigned long nr_reclaimed);
+ s32 parp_effective_tier_pressure_delta_q8(s32 delta_q8,
+-		u8 pressure_level_kernel);
++		u8 pressure_level_kernel); /* #lzx */
+ s32 parp_effective_tier_recency_score(u32 access_age_ms,
+ 		const struct parp_tier_policy *policy);
+ int parp_effective_tier_next_generation(int generation);
+@@ -422,7 +422,7 @@ static inline void parp_effective_tier_prepare(
+ 	if (static_branch_unlikely(&parp_effective_tier_enabled))
+ 		__parp_effective_tier_prepare(ctx, lruvec, type,
+ 				reclaim_priority, nr_to_reclaim, nr_reclaimed,
+-				is_kswapd, is_memcg_reclaim, proactive_reclaim);
++		is_kswapd, is_memcg_reclaim, proactive_reclaim); /* #lzx */
+ 	else
+ 		ctx->enabled = false;
+ }
+@@ -469,7 +469,7 @@ static inline void parp_effective_tier_batch_reclaim(
+ 		struct parp_tier_scan_ctx *ctx, unsigned long reclaimed)
+ {
+ 	if (ctx->enabled)
+-		__parp_effective_tier_batch_reclaim(ctx, reclaimed);
++		__parp_effective_tier_batch_reclaim(ctx, reclaimed); /* #lzx */
+ }
+ 
+ static inline void parp_effective_tier_outcome(struct folio *folio,
+@@ -550,7 +550,7 @@ static inline void parp_effective_tier_prepare(
+ 		struct parp_tier_scan_ctx *ctx, struct lruvec *lruvec,
+ 		int type, int reclaim_priority, unsigned long nr_to_reclaim,
+ 		unsigned long nr_reclaimed, bool is_kswapd,
+-		bool is_memcg_reclaim, bool proactive_reclaim)
++		bool is_memcg_reclaim, bool proactive_reclaim) /* #lzx */
+ {
+ 	ctx->enabled = false;
+ }
+@@ -579,7 +579,7 @@ static inline void parp_effective_tier_batch_finish(
+ static inline void parp_effective_tier_batch_reclaim(
+ 		struct parp_tier_scan_ctx *ctx, unsigned long reclaimed)
+ {
+-}
++} /* #lzx */
+ static inline void parp_effective_tier_outcome(struct folio *folio,
+ 		enum parp_tier_outcome outcome)
+ {
+@@ -673,7 +673,7 @@ enum parp_pressure_level {
+ 	PARP_PRESSURE_NORMAL = PARP_PRESSURE_LOW,
+ 	PARP_PRESSURE_ELEVATED = PARP_PRESSURE_MEDIUM,
+ 	PARP_PRESSURE_EMERGENCY = PARP_PRESSURE_CRITICAL,
+-};
++}; /* #lzx */
+ 
+ enum parp_scan_budget_reason {
+ 	PARP_SCAN_REASON_NATIVE,
+diff --git a/include/trace/events/parp.h b/include/trace/events/parp.h
+index 8f9fe6760..fb79924e0 100644
+--- a/include/trace/events/parp.h
++++ b/include/trace/events/parp.h
+@@ -116,7 +116,7 @@ struct parp_effective_tier_trace {
+ 	s32 delta_tier_q8;
+ 	s32 fixed_delta_q8;
+ 	s32 binary_bypass_delta_q8;
+-	s32 pressure_aware_delta_q8;
++	s32 pressure_aware_delta_q8; /* #lzx */
+ 	s32 effective_tier_q8;
+ 	s32 priority;
+ 	u64 nr_to_reclaim;
+@@ -124,7 +124,7 @@ struct parp_effective_tier_trace {
+ 	u64 epoch_reclaimed_pages;
+ 	u64 batch_scanned_pages;
+ 	u64 batch_isolated_pages;
+-	u64 batch_reclaimed_pages;
++	u64 batch_reclaimed_pages; /* #lzx */
+ 	u64 folio_nr_pages;
+ 	u32 lifetime_epoch;
+ 	u32 nid;
+@@ -136,7 +136,7 @@ struct parp_effective_tier_trace {
+ 	char model_checksum[PARP_TIER_TRACE_CHECKSUM_LEN];
+ 	char model_provenance[PARP_TIER_TRACE_PROVENANCE_LEN];
+ 	char pressure_policy_provenance[PARP_TIER_TRACE_PRESSURE_PROVENANCE_LEN];
+-	u16 consecutive_no_progress_batches;
++	u16 consecutive_no_progress_batches; /* #lzx */
+ 	u8 generation_index;
+ 	u8 native_tier;
+ 	u8 native_tier_idx;
+@@ -154,7 +154,7 @@ struct parp_effective_tier_trace {
+ 	bool native_protect;
+ 	bool effective_protect;
+ 	bool fixed_effective_protect;
+-	bool pressure_aware_effective_protect;
++	bool pressure_aware_effective_protect; /* #lzx */
+ 	bool actual_tier_protect;
+ 	bool sort_result;
+ 	bool isolate_attempted;
+@@ -211,7 +211,7 @@ struct parp_effective_tier_batch_trace {
+ 	u8 pressure_level_kernel;
+ 	u8 reclaim_context;
+ 	u8 pressure_bypass_reason;
+-	bool reclaim_result;
++	bool reclaim_result; /* #lzx */
+ };
+ 
+ struct parp_effective_tier_lock_trace {
+@@ -362,7 +362,7 @@ TRACE_EVENT(parp_effective_tier_decision,
+ 		__field(s32, delta_tier_q8)
+ 		__field(s32, fixed_delta_q8)
+ 		__field(s32, binary_bypass_delta_q8)
+-		__field(s32, pressure_aware_delta_q8)
++		__field(s32, pressure_aware_delta_q8) /* #lzx */
+ 		__field(s32, effective_tier_q8)
+ 		__field(s32, priority)
+ 		__field(u64, nr_to_reclaim)
+@@ -370,7 +370,7 @@ TRACE_EVENT(parp_effective_tier_decision,
+ 		__field(u64, epoch_reclaimed_pages)
+ 		__field(u64, batch_scanned_pages)
+ 		__field(u64, batch_isolated_pages)
+-		__field(u64, batch_reclaimed_pages)
++		__field(u64, batch_reclaimed_pages) /* #lzx */
+ 		__field(u64, folio_nr_pages)
+ 		__field(u32, lifetime_epoch)
+ 		__field(u32, nid)
+@@ -383,7 +383,7 @@ TRACE_EVENT(parp_effective_tier_decision,
+ 		__array(char, model_provenance, PARP_TIER_TRACE_PROVENANCE_LEN)
+ 		__array(char, pressure_policy_provenance,
+ 			PARP_TIER_TRACE_PRESSURE_PROVENANCE_LEN)
+-		__field(u16, consecutive_no_progress_batches)
++		__field(u16, consecutive_no_progress_batches) /* #lzx */
+ 		__field(u8, generation_index)
+ 		__field(u8, native_tier)
+ 		__field(u8, native_tier_idx)
+@@ -401,7 +401,7 @@ TRACE_EVENT(parp_effective_tier_decision,
+ 		__field(bool, native_protect)
+ 		__field(bool, effective_protect)
+ 		__field(bool, fixed_effective_protect)
+-		__field(bool, pressure_aware_effective_protect)
++		__field(bool, pressure_aware_effective_protect) /* #lzx */
+ 		__field(bool, actual_tier_protect)
+ 		__field(bool, sort_result)
+ 		__field(bool, isolate_attempted)
+@@ -430,6 +430,7 @@ TRACE_EVENT(parp_effective_tier_decision,
+ 		__entry->fixed_delta_q8 = event->fixed_delta_q8;
+ 		__entry->binary_bypass_delta_q8 = event->binary_bypass_delta_q8;
+ 		__entry->pressure_aware_delta_q8 = event->pressure_aware_delta_q8;
++		/* #lzx */
+ 		__entry->effective_tier_q8 = event->effective_tier_q8;
+ 		__entry->priority = event->priority;
+ 		__entry->nr_to_reclaim = event->nr_to_reclaim;
+@@ -437,7 +438,7 @@ TRACE_EVENT(parp_effective_tier_decision,
+ 		__entry->epoch_reclaimed_pages = event->epoch_reclaimed_pages;
+ 		__entry->batch_scanned_pages = event->batch_scanned_pages;
+ 		__entry->batch_isolated_pages = event->batch_isolated_pages;
+-		__entry->batch_reclaimed_pages = event->batch_reclaimed_pages;
++		__entry->batch_reclaimed_pages = event->batch_reclaimed_pages; /* #lzx */
+ 		__entry->folio_nr_pages = event->folio_nr_pages;
+ 		__entry->lifetime_epoch = event->lifetime_epoch;
+ 		__entry->nid = event->nid;
+@@ -455,7 +456,7 @@ TRACE_EVENT(parp_effective_tier_decision,
+ 		       event->pressure_policy_provenance,
+ 		       sizeof(__entry->pressure_policy_provenance));
+ 		__entry->consecutive_no_progress_batches =
+-			event->consecutive_no_progress_batches;
++			event->consecutive_no_progress_batches; /* #lzx */
+ 		__entry->generation_index = event->generation_index;
+ 		__entry->native_tier = event->native_tier;
+ 		__entry->native_tier_idx = event->native_tier_idx;
+@@ -474,7 +475,7 @@ TRACE_EVENT(parp_effective_tier_decision,
+ 		__entry->effective_protect = event->effective_protect;
+ 		__entry->fixed_effective_protect = event->fixed_effective_protect;
+ 		__entry->pressure_aware_effective_protect =
+-			event->pressure_aware_effective_protect;
++			event->pressure_aware_effective_protect; /* #lzx */
+ 		__entry->actual_tier_protect = event->actual_tier_protect;
+ 		__entry->sort_result = event->sort_result;
+ 		__entry->isolate_attempted = event->isolate_attempted;
+@@ -519,7 +520,7 @@ TRACE_EVENT(parp_effective_tier_decision,
+ 		  __entry->pressure_aware_effective_protect,
+ 		  __entry->pressure_policy_version,
+ 		  __entry->pressure_policy_provenance,
+-		  __entry->pressure_bypass_reason)
++		  __entry->pressure_bypass_reason) /* #lzx */
+ );
+ 
+ TRACE_EVENT(parp_effective_tier_access,
+@@ -618,7 +619,7 @@ TRACE_EVENT(parp_effective_tier_batch,
+ 		__field(u8, pressure_level_kernel)
+ 		__field(u8, reclaim_context)
+ 		__field(u8, pressure_bypass_reason)
+-		__field(bool, reclaim_result)
++		__field(bool, reclaim_result) /* #lzx */
+ 	),
+ 	TP_fast_assign(
+ 		__entry->timestamp_ns = event->timestamp_ns;
+@@ -640,13 +641,13 @@ TRACE_EVENT(parp_effective_tier_batch,
+ 		__entry->batch_reclaimed_pages = event->batch_reclaimed_pages;
+ 		__entry->pressure_policy_version = event->pressure_policy_version;
+ 		__entry->consecutive_no_progress_batches =
+-			event->consecutive_no_progress_batches;
++			event->consecutive_no_progress_batches; /* #lzx */
+ 		__entry->page_type = event->page_type;
+ 		__entry->mode = event->mode;
+ 		__entry->pressure_level_kernel = event->pressure_level_kernel;
+ 		__entry->reclaim_context = event->reclaim_context;
+ 		__entry->pressure_bypass_reason = event->pressure_bypass_reason;
+-		__entry->reclaim_result = event->reclaim_result;
++		__entry->reclaim_result = event->reclaim_result; /* #lzx */
+ 	),
+ 	TP_printk("time=%llu trace_seq=%llu experiment=%llu session=%llu batch=%llu epoch=%llu type=%u mode=%u candidates=%llu upgrades=%llu downgrades=%llu isolated=%llu model_ns=%llu nr_to_reclaim=%llu nr_reclaimed_before=%llu epoch_reclaimed_pages=%llu batch_scanned_pages=%llu batch_isolated_pages=%llu batch_reclaimed_pages=%llu pressure_policy_version=%u consecutive_no_progress_batches=%u pressure_level_kernel=%u reclaim_context=%u pressure_bypass_reason=%u reclaim_result=%d",
+ 		  __entry->timestamp_ns, __entry->trace_sequence,
+@@ -662,7 +663,7 @@ TRACE_EVENT(parp_effective_tier_batch,
+ 		  __entry->pressure_policy_version,
+ 		  __entry->consecutive_no_progress_batches,
+ 		  __entry->pressure_level_kernel, __entry->reclaim_context,
+-		  __entry->pressure_bypass_reason, __entry->reclaim_result)
++		  __entry->pressure_bypass_reason, __entry->reclaim_result) /* #lzx */
+ );
+ 
+ TRACE_EVENT(parp_effective_tier_lock,
+diff --git a/mm/parp/core/effective_tier.c b/mm/parp/core/effective_tier.c
+index 5ed52345c..bfae35169 100644
+--- a/mm/parp/core/effective_tier.c
++++ b/mm/parp/core/effective_tier.c
+@@ -161,7 +161,7 @@ static siphash_key_t parp_tier_cookie_key __read_mostly;
+ static u8 parp_tier_state_epoch __read_mostly;
+ static atomic_t parp_tier_state_fault = ATOMIC_INIT(0);
+ static bool parp_tier_metadata_requested;
+-static bool parp_tier_metadata_ready;
++static bool parp_tier_metadata_ready; /* #lzx */
+ 
+ static int __init parp_effective_tier_reserve_setup(char *str)
+ {
+@@ -172,23 +172,23 @@ static int __init parp_effective_tier_reserve_setup(char *str)
+ 		return 0;
+ 	WRITE_ONCE(parp_tier_metadata_requested, reserve);
+ 	return 0;
+-}
++} /* #lzx */
+ early_param("parp_effective_tier_reserve", parp_effective_tier_reserve_setup);
+ 
+ static bool __init parp_effective_tier_page_ext_needed(void)
+ {
+-	return READ_ONCE(parp_tier_metadata_requested);
++	return READ_ONCE(parp_tier_metadata_requested); /* #lzx */
+ }
+ 
+ static void __init parp_effective_tier_page_ext_init(void)
+ {
+ 	WRITE_ONCE(parp_tier_metadata_ready, true);
+-}
++} /* #lzx */
+ 
+ struct page_ext_operations parp_effective_tier_page_ext_ops = {
+ 	.size = sizeof(struct parp_reuse_page_ext),
+ 	.need = parp_effective_tier_page_ext_needed,
+-	.init = parp_effective_tier_page_ext_init,
++	.init = parp_effective_tier_page_ext_init, /* #lzx */
+ };
+ 
+ static int __init parp_effective_tier_init(void)
+@@ -691,7 +691,7 @@ u8 parp_effective_tier_pressure_level(int reclaim_priority,
+ 	if (reclaim_priority <= 8 || nr_to_reclaim > nr_reclaimed)
+ 		return PARP_PRESSURE_MEDIUM;
+ 	return PARP_PRESSURE_LOW;
+-}
++} /* #lzx */
+ 
+ static enum parp_tier_reclaim_context
+ parp_tier_reclaim_context(bool is_kswapd, bool is_memcg_reclaim,
+@@ -704,7 +704,7 @@ parp_tier_reclaim_context(bool is_kswapd, bool is_memcg_reclaim,
+ 	if (is_memcg_reclaim)
+ 		return PARP_TIER_RECLAIM_MEMCG;
+ 	return PARP_TIER_RECLAIM_DIRECT;
+-}
++} /* #lzx */
+ 
+ static void parp_pressure_policy_scales(enum parp_pressure_level level,
+ 					u16 *up_q8, u16 *down_q8)
+@@ -729,12 +729,12 @@ static void parp_pressure_policy_scales(enum parp_pressure_level level,
+ 		*down_q8 = 0;
+ 		break;
+ 	}
+-}
++} /* #lzx */
+ 
+ static s32 parp_pressure_scale_delta_q8(s32 delta_q8, u16 scale_q8)
+ {
+ 	return div_s64((s64)delta_q8 * scale_q8, PARP_TIER_SCALE);
+-}
++} /* #lzx */
+ 
+ s32 parp_effective_tier_pressure_delta_q8(s32 delta_q8,
+ 		u8 pressure_level_kernel)
+@@ -745,7 +745,7 @@ s32 parp_effective_tier_pressure_delta_q8(s32 delta_q8,
+ 	parp_pressure_policy_scales(pressure_level_kernel, &up_q8, &down_q8);
+ 	return parp_pressure_scale_delta_q8(delta_q8,
+ 		delta_q8 < 0 ? down_q8 : up_q8);
+-}
++} /* #lzx */
+ 
+ static void parp_effective_tier_pressure_counterfactuals(
+ 		const struct parp_tier_scan_ctx *ctx,
+@@ -778,7 +778,7 @@ static void parp_effective_tier_pressure_counterfactuals(
+ 	decision->pressure_aware_effective_protect = parp_effective_tier_q8(
+ 		decision->native_tier, pressure_delta) >
+ 		decision->native_tier_idx * PARP_TIER_SCALE;
+-}
++} /* #lzx */
+ 
+ s32 parp_score_to_delta_q8(s32 score,
+ 		const struct parp_tier_policy *policy)
+@@ -1263,7 +1263,7 @@ void __parp_effective_tier_prepare(struct parp_tier_scan_ctx *ctx,
+ 	ctx->nr_reclaimed_before = nr_reclaimed;
+ 	ctx->epoch_reclaimed_pages = nr_reclaimed;
+ 	ctx->reclaim_context = parp_tier_reclaim_context(is_kswapd,
+-			is_memcg_reclaim, proactive_reclaim);
++			is_memcg_reclaim, proactive_reclaim); /* #lzx */
+ 	ctx->source_seq = lrugen->min_seq[type];
+ 	ctx->batch_id = atomic64_inc_return(&parp_tier_batch_id);
+ 	ctx->experiment_id = config.experiment_id;
+@@ -1295,10 +1295,11 @@ void __parp_effective_tier_prepare(struct parp_tier_scan_ctx *ctx,
+ 	ctx->epoch_tag = tag;
+ 	ctx->pressure_level_kernel = parp_effective_tier_pressure_level(
+ 		reclaim_priority, ctx->no_progress, nr_to_reclaim, nr_reclaimed);
++	/* #lzx */
+ 	ctx->pressure_bypass_reason =
+ 		ctx->pressure_level_kernel == PARP_PRESSURE_CRITICAL ?
+ 		(ctx->no_progress ? PARP_TIER_BYPASS_NO_PROGRESS :
+-		 PARP_TIER_BYPASS_PRESSURE) : PARP_TIER_BYPASS_NONE;
++		 PARP_TIER_BYPASS_PRESSURE) : PARP_TIER_BYPASS_NONE; /* #lzx */
+ }
+ 
+ s32 parp_effective_tier_recency_score(u32 access_age_ms,
+@@ -1550,7 +1551,7 @@ void __parp_effective_tier_decide(struct parp_tier_scan_ctx *ctx,
+ 		}
+ 	}
+ copy_features:
+-	parp_effective_tier_pressure_counterfactuals(ctx, decision);
++	parp_effective_tier_pressure_counterfactuals(ctx, decision); /* #lzx */
+ 	if (ctx->mode == PARP_EFFECTIVE_TIER_RECENCY_BASELINE)
+ 		decision->scorer_kind = PARP_TIER_SCORER_RECENCY_BASELINE;
+ 	else if (ctx->mode == PARP_EFFECTIVE_TIER_RANDOM_MATCHED)
+@@ -1646,7 +1647,7 @@ void __parp_effective_tier_finish(struct parp_tier_scan_ctx *ctx,
+ 		trace.pressure_policy_version = decision->pressure_policy_version;
+ 		strscpy(trace.pressure_policy_provenance,
+ 			PARP_TIER_PRESSURE_PROVENANCE,
+-			sizeof(trace.pressure_policy_provenance));
++			sizeof(trace.pressure_policy_provenance)); /* #lzx */
+ 		trace.consecutive_no_progress_batches =
+ 			ctx->consecutive_no_progress_batches;
+ 		if (decision->scorer_kind == PARP_TIER_SCORER_PAIRWISE_LINEAR) {
+@@ -1691,7 +1692,7 @@ void __parp_effective_tier_finish(struct parp_tier_scan_ctx *ctx,
+ 		trace.effective_protect = decision->effective_protect;
+ 		trace.fixed_effective_protect = decision->fixed_effective_protect;
+ 		trace.pressure_aware_effective_protect =
+-			decision->pressure_aware_effective_protect;
++			decision->pressure_aware_effective_protect; /* #lzx */
+ 		trace.actual_tier_protect = decision->actual_tier_protect;
+ 		trace.sort_result = sort_result;
+ 		trace.isolate_attempted = isolate_attempted;
+@@ -1701,7 +1702,7 @@ void __parp_effective_tier_finish(struct parp_tier_scan_ctx *ctx,
+ 		atomic64_inc(&parp_tier_stats.trace_decisions);
+ 		trace_parp_effective_tier_decision(&trace);
+ 	}
+-}
++} /* #lzx */
+ 
+ static void parp_effective_tier_trace_batch(
+ 		struct parp_tier_scan_ctx *ctx, unsigned long isolated,
+@@ -1742,12 +1743,12 @@ static void parp_effective_tier_trace_batch(
+ 		atomic64_inc(&parp_tier_stats.trace_batches);
+ 		trace_parp_effective_tier_batch(&trace);
+ 	}
+-}
++} /* #lzx */
+ 
+ void __parp_effective_tier_batch_finish(struct parp_tier_scan_ctx *ctx,
+ 		unsigned long isolated)
+ {
+-	parp_effective_tier_trace_batch(ctx, isolated, false);
++	parp_effective_tier_trace_batch(ctx, isolated, false); /* #lzx */
+ 	if (ctx->rcu_held) {
+ 		ctx->rcu_held = false;
+ 		rcu_read_unlock();
+@@ -1762,7 +1763,7 @@ void __parp_effective_tier_batch_reclaim(struct parp_tier_scan_ctx *ctx,
+ 	ctx->epoch_reclaimed_pages = parp_saturating_add(
+ 		ctx->nr_reclaimed_before, ctx->batch_reclaimed_pages);
+ 	parp_effective_tier_trace_batch(ctx, ctx->batch_isolated_pages, true);
+-}
++} /* #lzx */
+ 
+ void __parp_effective_tier_feedback(struct lruvec *lruvec, int type,
+ 		u8 run_epoch, unsigned long isolated, unsigned long reclaimed)
+@@ -1932,7 +1933,7 @@ enum parp_effective_tier_mode parp_effective_tier_get_mode(void)
+ bool parp_effective_tier_metadata_ready(void)
+ {
+ 	return READ_ONCE(parp_tier_metadata_ready);
+-}
++} /* #lzx */
+ 
+ int parp_effective_tier_set_mode(enum parp_effective_tier_mode mode)
+ {
+@@ -1947,7 +1948,7 @@ int parp_effective_tier_set_mode(enum parp_effective_tier_mode mode)
+ 		return -EOPNOTSUPP;
+ 	if (mode == PARP_EFFECTIVE_TIER_SHADOW &&
+ 	    !parp_effective_tier_metadata_ready())
+-		return -EOPNOTSUPP;
++		return -EOPNOTSUPP; /* #lzx */
+ 	mutex_lock(&parp_tier_mode_lock);
+ 	if (mode >= PARP_EFFECTIVE_TIER_PROTECT_ONLY &&
+ 	    (!parp_runtime_config_read(&config) ||
+@@ -2008,7 +2009,7 @@ ssize_t parp_effective_tier_format_config(char *buf, size_t size)
+ 		PARP_TIER_SCHEMA_VERSION,
+ 		config.sequence, READ_ONCE(parp_tier_metadata_requested),
+ 		READ_ONCE(parp_tier_metadata_ready),
+-		parp_effective_tier_metadata_size(), config.policy.cold_threshold,
++		parp_effective_tier_metadata_size(), config.policy.cold_threshold, /* #lzx */
+ 		config.policy.hot_threshold_1,
+ 		config.policy.hot_threshold_2,
+ 		config.policy.hot_threshold_3,
+@@ -2124,7 +2125,7 @@ ssize_t parp_effective_tier_format_stats(char *buf, size_t size)
+ 		IS_ENABLED(CONFIG_PARP_EFFECTIVE_TIER_EXPERIMENTAL_APPLY),
+ 		parp_effective_tier_metadata_size(),
+ 		READ_ONCE(parp_tier_state_epoch),
+-		atomic64_read(&parp_tier_stats.candidates),
++		atomic64_read(&parp_tier_stats.candidates), /* #lzx */
+ 		/* Explicit coverage alias: same counter, never a sampled estimate. */
+ 		atomic64_read(&parp_tier_stats.candidates),
+ 		atomic64_read(&parp_tier_stats.candidate_pages),
+diff --git a/mm/parp/core/scan_budget.c b/mm/parp/core/scan_budget.c
+index 69785e57f..6be3cc4b4 100644
+--- a/mm/parp/core/scan_budget.c
++++ b/mm/parp/core/scan_budget.c
+@@ -95,7 +95,7 @@ static u64 parp_scale_scan_units(u64 native, u32 multiplier)
+ 	/* mul_u64_u32_div() requires its quotient to fit in u64. */
+ 	if (multiplier > PARP_Q15_SCALE &&
+ 	    native > mul_u64_u32_div(U64_MAX, PARP_Q15_SCALE, multiplier))
+-		return U64_MAX;
++		return U64_MAX; /* #lzx */
+ 	scaled = mul_u64_u32_div(native, multiplier, PARP_Q15_SCALE);
+ 	remainder = ((native & (PARP_Q15_SCALE - 1)) * multiplier) &
+ 		(PARP_Q15_SCALE - 1);
+diff --git a/mm/parp/tests/parp_test.c b/mm/parp/tests/parp_test.c
+index 267e10f57..76c4bb311 100644
+--- a/mm/parp/tests/parp_test.c
++++ b/mm/parp/tests/parp_test.c
+@@ -135,7 +135,7 @@ static void parp_region_alignment_test(struct kunit *test)
+ 
+ static void parp_evidence_window_test(struct kunit *test)
+ {
+-	u64 now = max_t(u64, ktime_get_mono_fast_ns(), 60 * NSEC_PER_SEC);
++	u64 now = max_t(u64, ktime_get_mono_fast_ns(), 60 * NSEC_PER_SEC); /* #lzx */
+ 	struct parp_app_prior prior = {
+ 		.app_id = 2,
+ 		.use_score_q15 = 20000,
+@@ -634,7 +634,7 @@ static void parp_scan_budget_bounds_mode_test(struct kunit *test)
+ 			  BIT(PARP_SCAN_REASON_CLAMP_MAX));
+ 	input.native_nr_to_scan = U64_MAX;
+ 	KUNIT_ASSERT_EQ(test, parp_compute_scan_budget(&input, &decision), 0);
+-	KUNIT_EXPECT_EQ(test, decision.proposed_nr_to_scan, U64_MAX);
++	KUNIT_EXPECT_EQ(test, decision.proposed_nr_to_scan, U64_MAX); /* #lzx */
+ 	input.native_nr_to_scan = 1000;
+ 	input.app_use_score_q15 = 30000;
+ 	parp_set_scan_budget_apply_domain(input.domain_id);
+@@ -1041,7 +1041,7 @@ static void parp_effective_tier_pressure_policy_test(struct kunit *test)
+ 		-PARP_TIER_SCALE, PARP_PRESSURE_HIGH), -PARP_TIER_SCALE);
+ 	KUNIT_EXPECT_EQ(test, parp_effective_tier_pressure_delta_q8(
+ 		-PARP_TIER_SCALE, PARP_PRESSURE_CRITICAL), 0);
+-}
++} /* #lzx */
+ 
+ static void parp_effective_random_matched_test(struct kunit *test)
+ {
+@@ -1091,7 +1091,7 @@ static void parp_effective_access_lifetime_test(struct kunit *test)
+ 	if (!parp_effective_tier_metadata_ready()) {
+ 		kunit_skip(test, "effective-tier metadata was not boot-reserved");
+ 		return;
+-	}
++	} /* #lzx */
+ 
+ 	page = alloc_page(GFP_KERNEL);
+ 	KUNIT_ASSERT_NOT_NULL(test, page);
+@@ -1137,7 +1137,7 @@ static void parp_effective_epoch_limit_test(struct kunit *test)
+ 	if (!parp_effective_tier_metadata_ready()) {
+ 		kunit_skip(test, "effective-tier metadata was not boot-reserved");
+ 		return;
+-	}
++	} /* #lzx */
+ 
+ 	page = alloc_page(GFP_KERNEL);
+ 	KUNIT_ASSERT_NOT_NULL(test, page);
+@@ -1193,7 +1193,7 @@ static void parp_effective_config_safety_test(struct kunit *test)
+ 	if (!parp_effective_tier_metadata_ready())
+ 		KUNIT_EXPECT_EQ(test,
+ 				parp_effective_tier_set_mode(PARP_EFFECTIVE_TIER_SHADOW),
+-				-EOPNOTSUPP);
++				-EOPNOTSUPP); /* #lzx */
+ 	if (!IS_ENABLED(CONFIG_PARP_EFFECTIVE_TIER_EXPERIMENTAL_APPLY))
+ 		KUNIT_EXPECT_EQ(test, parp_effective_tier_set_mode(
+ 			PARP_EFFECTIVE_TIER_BIDIRECTIONAL), -EOPNOTSUPP);
+@@ -1314,7 +1314,7 @@ static struct kunit_case parp_cases[] = {
+ 	KUNIT_CASE(parp_effective_policy_flags_test),
+ 	KUNIT_CASE(parp_effective_budget_test),
+ 	KUNIT_CASE(parp_effective_upgrade_gate_test),
+-	KUNIT_CASE(parp_effective_tier_pressure_policy_test),
++	KUNIT_CASE(parp_effective_tier_pressure_policy_test), /* #lzx */
+ 	KUNIT_CASE(parp_effective_random_matched_test),
+ 	KUNIT_CASE(parp_effective_recency_time_test),
+ 	KUNIT_CASE(parp_effective_access_lifetime_test),
+diff --git a/mm/vmscan.c b/mm/vmscan.c
+index 9b3250f3c..06ce78a37 100644
+--- a/mm/vmscan.c
++++ b/mm/vmscan.c
+@@ -4557,7 +4557,7 @@ parp_tier_reclaim_context(struct scan_control *sc)
+ 	if (cgroup_reclaim(sc))
+ 		return PARP_TIER_RECLAIM_MEMCG;
+ 	return PARP_TIER_RECLAIM_DIRECT;
+-}
++} /* #lzx */
+ 
+ static bool sort_folio(struct lruvec *lruvec, struct folio *folio,
+ 		       struct scan_control *sc, int tier_idx,
+@@ -4811,7 +4811,7 @@ static bool isolate_folio(struct lruvec *lruvec, struct folio *folio, struct sca
+ static int scan_folios(unsigned long nr_to_scan, struct lruvec *lruvec,
+ 		       struct scan_control *sc, int type, int tier,
+ 		       struct list_head *list, u8 *parp_run_epoch,
+-		       struct parp_tier_scan_ctx *tier_ctx)
++		       struct parp_tier_scan_ctx *tier_ctx) /* #lzx */
+ {
+ 	struct parp_reclaim_ctx parp_ctx;
+ 	struct parp_frontier_scan_ctx frontier_ctx;
+@@ -4840,7 +4840,7 @@ static int scan_folios(unsigned long nr_to_scan, struct lruvec *lruvec,
+ 			      sc->nr_to_reclaim - sc->nr_reclaimed : 0);
+ 	parp_effective_tier_prepare(tier_ctx, lruvec, type, sc->priority,
+ 		sc->nr_to_reclaim, sc->nr_reclaimed, current_is_kswapd(),
+-		cgroup_reclaim(sc), sc->proactive);
++		cgroup_reclaim(sc), sc->proactive); /* #lzx */
+ 	if (tier_ctx->enabled)
+ 		tier_ctx->reclaim_context = parp_tier_reclaim_context(sc);
+ 	if (tier_ctx->enabled)
+@@ -4865,7 +4865,7 @@ static int scan_folios(unsigned long nr_to_scan, struct lruvec *lruvec,
+ 			VM_WARN_ON_ONCE_FOLIO(folio_zonenum(folio) != zone, folio);
+ 
+ 			scanned += delta;
+-			tier_ctx->batch_scanned_pages += delta;
++				tier_ctx->batch_scanned_pages += delta; /* #lzx */
+ 			parp_decision = parp_adapter_score_folio(&parp_ctx, folio,
+ 								type, gen);
+ 			parp_adapter_apply_decision(&parp_ctx, folio,
+@@ -4890,7 +4890,7 @@ static int scan_folios(unsigned long nr_to_scan, struct lruvec *lruvec,
+ 				if (isolated_folio) {
+ 					list_add(&folio->lru, list);
+ 					isolated += delta;
+-					tier_ctx->batch_isolated_pages += delta;
++					tier_ctx->batch_isolated_pages += delta; /* #lzx */
+ 				} else {
+ 					list_move(&folio->lru, &moved);
+ 					skipped_zone += delta;
+@@ -4924,7 +4924,7 @@ static int scan_folios(unsigned long nr_to_scan, struct lruvec *lruvec,
+ 				type ? LRU_INACTIVE_FILE : LRU_INACTIVE_ANON);
+ 	if (type == LRU_GEN_FILE)
+ 		sc->nr.file_taken += isolated;
+-	parp_effective_tier_batch_finish(tier_ctx, isolated);
++	parp_effective_tier_batch_finish(tier_ctx, isolated); /* #lzx */
+ 	parp_adapter_finish(&parp_ctx, scanned, isolated);
+ 	/*
+ 	 * There might not be eligible folios due to reclaim_idx. Check the
+@@ -4976,7 +4976,7 @@ static int isolate_folios(unsigned long nr_to_scan, struct lruvec *lruvec,
+ 			  struct scan_control *sc, int swappiness,
+ 			  int *type_scanned, struct list_head *list,
+ 			  u8 *parp_run_epoch,
+-			  struct parp_tier_scan_ctx *tier_ctx)
++			  struct parp_tier_scan_ctx *tier_ctx) /* #lzx */
+ {
+ 	int i;
+ 	int type = get_type_to_scan(lruvec, swappiness);
+@@ -5033,7 +5033,7 @@ static int evict_folios(unsigned long nr_to_scan, struct lruvec *lruvec,
+ 			struct scan_control *sc, int swappiness)
+ {
+ 	struct parp_tier_lock_measurement parp_lock;
+-	struct parp_tier_scan_ctx parp_tier_ctx = { };
++	struct parp_tier_scan_ctx parp_tier_ctx = { }; /* #lzx */
+ 	u8 parp_run_epoch = 0;
+ 	int type;
+ 	int scanned;
+@@ -5054,7 +5054,7 @@ static int evict_folios(unsigned long nr_to_scan, struct lruvec *lruvec,
+ 	parp_lru_lock_irq(&lruvec->lru_lock, &parp_lock);
+ 
+ 	scanned = isolate_folios(nr_to_scan, lruvec, sc, swappiness, &type,
+-				 &list, &parp_run_epoch, &parp_tier_ctx);
++				 &list, &parp_run_epoch, &parp_tier_ctx); /* #lzx */
+ 
+ 	scanned += try_to_inc_min_seq(lruvec, swappiness);
+ 
+@@ -5074,7 +5074,7 @@ static int evict_folios(unsigned long nr_to_scan, struct lruvec *lruvec,
+ 	reclaimed = shrink_folio_list(&list, pgdat, sc, &stat, false, memcg);
+ 	sc->nr.unqueued_dirty += stat.nr_unqueued_dirty;
+ 	sc->nr_reclaimed += reclaimed;
+-	parp_effective_tier_batch_reclaim(&parp_tier_ctx, reclaimed);
++	parp_effective_tier_batch_reclaim(&parp_tier_ctx, reclaimed); /* #lzx */
+ 	trace_mm_vmscan_lru_shrink_inactive(pgdat->node_id,
+ 			scanned, reclaimed, &stat, sc->priority,
+ 			type ? LRU_INACTIVE_FILE : LRU_INACTIVE_ANON);
+diff --git a/tools/parp/effective_tier/README.md b/tools/parp/effective_tier/README.md
+index cfcaf114d..8566c36b2 100644
+--- a/tools/parp/effective_tier/README.md
++++ b/tools/parp/effective_tier/README.md
+@@ -48,7 +48,7 @@ non-overridable protection. Large folios are counted in base pages; scoring
+ does not multiply their influence by treating one folio as one page. Compressed
+ timestamps use modulo-2^32 subtraction via `u32_elapsed()`.
+ 
+-## Live SHADOW metadata reservation
++## Live SHADOW metadata reservation <!-- #lzx -->
+ 
+ The kernel defaults to OFF without allocating per-page reuse metadata. A live
+ SHADOW boot must explicitly include `parp_effective_tier_reserve=1` on its
+@@ -60,7 +60,7 @@ and the SHADOW mode write fails closed with `-EOPNOTSUPP`. The same file
+ reports `metadata_payload_bytes`; on this host the payload is 24B/page (about
+ 94 MiB at 16 GiB RAM, roughly 125 MiB including page-extension headers). The
+ read-only live preflight treats missing boot reservation as a blocker and never
+-changes the mode itself.
++changes the mode itself. <!-- #lzx -->
+ 
+ Run from the kernel tree root:
+ 
+diff --git a/tools/parp/effective_tier/README.phase_e.md b/tools/parp/effective_tier/README.phase_e.md
+index 52ffee4bb..877570e83 100644
+--- a/tools/parp/effective_tier/README.phase_e.md
++++ b/tools/parp/effective_tier/README.phase_e.md
+@@ -68,8 +68,8 @@ python3 tools/parp/effective_tier/analyze.py \
+   --telemetry offline-dataset/observability.jsonl \
+   --output-dir offline-analysis
+ 
+-# Phase-F only: requires exported rows with the pressure trace fields.
+-python3 tools/parp/effective_tier/pressure_analysis.py \
++# Phase-F only: requires exported rows with the pressure trace fields. #lzx
++python3 tools/parp/effective_tier/pressure_analysis-lzx.py \
+   --samples offline-dataset/labeled_candidates.jsonl \
+   --output offline-analysis/pressure_policy_ablation.json
+ 
+@@ -197,12 +197,12 @@ python3 -m unittest -v tools.parp.effective_tier.tests.test_phase_e
+ python3 -m compileall -q tools/parp/effective_tier
+ ```
+ 
+-## Phase-F pressure-policy replay
++## Phase-F pressure-policy replay <!-- #lzx -->
+ 
+-`pressure_analysis.py` consumes only already-exported JSONL. It requires the
++`pressure_analysis-lzx.py` consumes only already-exported JSONL. It requires the
+ Phase-F fixed/binary/graded delta and local-pressure fields and replays the
+ fixed, binary-bypass, pressure-aware, recency-only, and rate-matched random
+ counterfactuals. The random arm is explicitly not exact-count matched. Future
+ trusted access remains a label for post-hoc evaluation, never a refault. Scan
+ amplification and reclaimable-candidate changes remain null unless the live
+-harness measured them independently.
++harness measured them independently. <!-- #lzx -->
+diff --git a/tools/parp/effective_tier/collector.py b/tools/parp/effective_tier/collector.py
+index 957ca8959..695d10633 100644
+--- a/tools/parp/effective_tier/collector.py
++++ b/tools/parp/effective_tier/collector.py
+@@ -147,7 +147,7 @@ def _trace_optional_int(fields: Mapping[str, str], name: str,
+                         context: str) -> Optional[int]:
+     if name not in fields:
+         return None
+-    return _trace_int(fields, name, context)
++    return _trace_int(fields, name, context)  #lzx
+ 
+ 
+ def _trace_enum(table: Mapping[int, str], value: int, name: str) -> str:
+@@ -305,7 +305,7 @@ def _trace_decision(fields: Mapping[str, str]) -> Dict[str, object]:
+         "pressure_bypass_reason": (
+             None if "pressure_bypass_reason" not in fields else _trace_enum(
+                 TRACE_BYPASS, _trace_int(fields, "pressure_bypass_reason",
+-                                          context), "pressure bypass")),
++                                          context), "pressure bypass")),  #lzx
+     }
+     if "mode" in fields:
+         result["mode"] = _trace_enum(
+@@ -380,7 +380,7 @@ def parse_exported_trace(paths: Sequence[Path]) -> Tuple[List[Dict[str, object]]
+                             "batch_isolated_pages": _trace_optional_int(
+                                 fields, "batch_isolated_pages", context),
+                             "batch_reclaimed_pages": _trace_optional_int(
+-                                fields, "batch_reclaimed_pages", context),
++                                fields, "batch_reclaimed_pages", context),  #lzx
+                         })
+                     elif kind == "lock":
+                         context = "effective-tier lock"
+@@ -489,7 +489,7 @@ def parse_exported_trace(paths: Sequence[Path]) -> Tuple[List[Dict[str, object]]
+     # trace for the same batch is emitted after shrink_folio_list() has the
+     # real reclaimed-page count.  Resolve that result only by the exported
+     # experiment/session/batch identity; never infer it from future access or
+-    # candidate outcomes.
++    # candidate outcomes.  #lzx
+     batch_results: Dict[Tuple[str, str, str], Mapping[str, object]] = {}
+     for raw in batches:
+         if not raw["reclaim_result"]:
+@@ -523,14 +523,14 @@ def parse_exported_trace(paths: Sequence[Path]) -> Tuple[List[Dict[str, object]]
+             if value is not None:
+                 decision[field] = int(value)
+         decision["batch_reclaim_result_observed"] = True
+-        stats["decisions_with_batch_reclaim_result"] += 1
++        stats["decisions_with_batch_reclaim_result"] += 1  #lzx
+ 
+     # Batch model time is directly measured.  Do not invent lock wait/IRQ or
+     # whole-reclaim counters that the trace does not contain.
+     for raw in batches:
+         if raw["reclaim_result"]:
+             stats["batch_reclaim_result_events"] += 1
+-            continue
++            continue  #lzx
+         if raw["experiment_id"] is not None and raw["session_id"] is not None:
+             experiment_id = str(raw["experiment_id"])
+             session_id = str(raw["session_id"])
+diff --git a/tools/parp/effective_tier/live_shadow_preflight.py b/tools/parp/effective_tier/live_shadow_preflight-lzx.py
+similarity index 99%
+rename from tools/parp/effective_tier/live_shadow_preflight.py
+rename to tools/parp/effective_tier/live_shadow_preflight-lzx.py
+index 08e0a187f..ad31a8bd9 100644
+--- a/tools/parp/effective_tier/live_shadow_preflight.py
++++ b/tools/parp/effective_tier/live_shadow_preflight-lzx.py
+@@ -1,5 +1,5 @@
+ #!/usr/bin/env python3
+-# SPDX-License-Identifier: GPL-2.0
++# SPDX-License-Identifier: GPL-2.0  #lzx
+ """Create a read-only, fail-closed Phase-F live-shadow preflight record.
+ 
+ This tool deliberately does not install a kernel, write a cgroup, toggle a
+diff --git a/tools/parp/effective_tier/pressure.py b/tools/parp/effective_tier/pressure-lzx.py
+similarity index 98%
+rename from tools/parp/effective_tier/pressure.py
+rename to tools/parp/effective_tier/pressure-lzx.py
+index 06047b918..4a2aaabbe 100644
+--- a/tools/parp/effective_tier/pressure.py
++++ b/tools/parp/effective_tier/pressure-lzx.py
+@@ -1,5 +1,5 @@
+ #!/usr/bin/env python3
+-# SPDX-License-Identifier: GPL-2.0
++# SPDX-License-Identifier: GPL-2.0  #lzx
+ """Pure Phase-F pressure-aware SHADOW counterfactuals.
+ 
+ The module intentionally accepts already-exported candidate rows only.  It
+@@ -16,7 +16,10 @@ from dataclasses import dataclass
+ from enum import IntEnum
+ from typing import Dict, Iterable, List, Mapping, Optional, Tuple
+ 
+-from .reference import MAX_TIER, TIER_SCALE, effective_tier_q8
++try:
++    from .reference import MAX_TIER, TIER_SCALE, effective_tier_q8
++except ImportError:  # Direct execution through a -lzx tool entry point.
++    from reference import MAX_TIER, TIER_SCALE, effective_tier_q8  # type: ignore
+ 
+ 
+ PRESSURE_POLICY_VERSION = 1
+diff --git a/tools/parp/effective_tier/pressure_analysis.py b/tools/parp/effective_tier/pressure_analysis-lzx.py
+similarity index 84%
+rename from tools/parp/effective_tier/pressure_analysis.py
+rename to tools/parp/effective_tier/pressure_analysis-lzx.py
+index cea1c723b..3d31d05cc 100644
+--- a/tools/parp/effective_tier/pressure_analysis.py
++++ b/tools/parp/effective_tier/pressure_analysis-lzx.py
+@@ -1,20 +1,23 @@
+ #!/usr/bin/env python3
+-# SPDX-License-Identifier: GPL-2.0
++# SPDX-License-Identifier: GPL-2.0  #lzx
+ """Offline Phase-F pressure-policy replay over exported SHADOW candidates."""
+ 
+ from __future__ import annotations
+ 
+ import argparse
++from importlib import import_module
+ import sys
+ from pathlib import Path
+ from typing import Optional, Sequence
+ 
+ try:
+     from .contracts import ContractError, read_jsonl, reject_live_path, write_json
+-    from .pressure import pressure_policy_ablation
++    pressure_policy_ablation = import_module(
++        ".pressure-lzx", __package__).pressure_policy_ablation
+ except ImportError:  # Direct execution from this directory.
+     from contracts import ContractError, read_jsonl, reject_live_path, write_json  # type: ignore
+-    from pressure import pressure_policy_ablation  # type: ignore
++    pressure_policy_ablation = import_module(
++        "pressure-lzx").pressure_policy_ablation
+ 
+ 
+ def parse_args(argv: Optional[Sequence[str]] = None) -> argparse.Namespace:
+diff --git a/tools/parp/effective_tier/raw_event.schema.json b/tools/parp/effective_tier/raw_event.schema.json
+index 14697a6fa..43cef5d84 100644
+--- a/tools/parp/effective_tier/raw_event.schema.json
++++ b/tools/parp/effective_tier/raw_event.schema.json
+@@ -74,6 +74,7 @@
+         "actual_native_behavior", "isolate_result", "reclaimed", "putback",
+         "activated", "gate_reached", "candidate_scope"
+       ],
++      "$comment": "#lzx: pressure-aware trace fields below",
+       "properties": {
+         "schema_version": { "const": 2 },
+         "event_kind": { "const": "tier_gate_candidate" },
+diff --git a/tools/parp/effective_tier/tests/test_phase_e.py b/tools/parp/effective_tier/tests/test_phase_e.py
+index fcf360767..5e35d15eb 100644
+--- a/tools/parp/effective_tier/tests/test_phase_e.py
++++ b/tools/parp/effective_tier/tests/test_phase_e.py
+@@ -6,6 +6,7 @@ import json
+ import tempfile
+ import unittest
+ from copy import deepcopy
++from importlib.util import module_from_spec, spec_from_file_location
+ from pathlib import Path
+ from unittest.mock import patch
+ 
+@@ -36,6 +37,21 @@ from tools.parp.effective_tier.ranking import validate_model_document
+ HERE = Path(__file__).resolve().parents[1]
+ 
+ 
++def load_tests(loader: unittest.TestLoader, tests: unittest.TestSuite,
++               pattern: str | None) -> unittest.TestSuite:
++    """Load the explicitly named -lzx pressure test module.  #lzx"""
++
++    path = Path(__file__).with_name("test_pressure-lzx.py")
++    spec = spec_from_file_location("parp_effective_tier_pressure_lzx_tests",
++                                   path)
++    if spec is None or spec.loader is None:
++        raise RuntimeError("cannot load test_pressure-lzx.py")
++    module = module_from_spec(spec)
++    spec.loader.exec_module(module)
++    tests.addTests(loader.loadTestsFromModule(module))
++    return tests  #lzx
++
++
+ def candidate(session: str, cookie: str, action: str, timestamp_ns: int,
+               pages: int = 1, source_seq: int = 1) -> dict:
+     decisions = {
+@@ -226,7 +242,7 @@ class PhaseECollectorTests(unittest.TestCase):
+             "fixed_effective_protect=1 pressure_aware_effective_protect=1 "
+             "pressure_policy_version=1 "
+             "pressure_policy_provenance=ENGINEERING_PRESSURE_POLICY_UNVALIDATED "
+-            "pressure_bypass_reason=0",
++            "pressure_bypass_reason=0",  #lzx
+             "task: parp_effective_tier_access: time=1050000000 trace_seq=8 "
+             "experiment=1 session=2 cookie=99 "
+             "lifetime=7 gen=0 type=1 event=0 real=1",
+@@ -260,7 +276,7 @@ class PhaseECollectorTests(unittest.TestCase):
+         self.assertEqual(labeled[0]["pressure_level_kernel"], 1)
+         self.assertEqual(labeled[0]["pressure_aware_delta_q8"], 192)
+         self.assertEqual(labeled[0]["pressure_policy_provenance"],
+-                         "ENGINEERING_PRESSURE_POLICY_UNVALIDATED")
++                         "ENGINEERING_PRESSURE_POLICY_UNVALIDATED")  #lzx
+         self.assertEqual(stats["policy_move_access_events_ignored"], 1)
+         self.assertEqual(stats["trace_sequence_missing"], 0)
+         self.assertEqual(stats["trace_sequence_events"], 7)
+@@ -352,7 +368,7 @@ class PhaseECollectorTests(unittest.TestCase):
+                              if row["event_kind"] == "tier_gate_candidate")
+         self.assertTrue(candidate_row["batch_reclaim_result_observed"])
+         self.assertEqual(candidate_row["batch_reclaimed_pages"], 4)
+-        self.assertEqual(stats["decisions_with_batch_reclaim_result"], 1)
++        self.assertEqual(stats["decisions_with_batch_reclaim_result"], 1)  #lzx
+ 
+     def test_valid_scorer_identity_cannot_claim_version_drift(self):
+         row = candidate("s", "f", "KEEP_RECLAIM", 1_000_000_000)
+diff --git a/tools/parp/effective_tier/tests/test_pressure.py b/tools/parp/effective_tier/tests/test_pressure-lzx.py
+similarity index 89%
+rename from tools/parp/effective_tier/tests/test_pressure.py
+rename to tools/parp/effective_tier/tests/test_pressure-lzx.py
+index 90486b1dc..6395e676d 100644
+--- a/tools/parp/effective_tier/tests/test_pressure.py
++++ b/tools/parp/effective_tier/tests/test_pressure-lzx.py
+@@ -1,18 +1,18 @@
+ #!/usr/bin/env python3
+-# SPDX-License-Identifier: GPL-2.0
++# SPDX-License-Identifier: GPL-2.0  #lzx
+ from __future__ import annotations
+ 
+ import unittest
++from importlib import import_module
+ 
+-from tools.parp.effective_tier.pressure import (
+-    PRESSURE_POLICY_PROVENANCE,
+-    PRESSURE_POLICY_VERSION,
+-    PressureLevel,
+-    counterfactual_deltas,
+-    pressure_policy_ablation,
+-    pressure_level_from_local_signals,
+-    validate_engineering_policy,
+-)
++pressure_lzx = import_module("tools.parp.effective_tier.pressure-lzx")
++PRESSURE_POLICY_PROVENANCE = pressure_lzx.PRESSURE_POLICY_PROVENANCE
++PRESSURE_POLICY_VERSION = pressure_lzx.PRESSURE_POLICY_VERSION
++PressureLevel = pressure_lzx.PressureLevel
++counterfactual_deltas = pressure_lzx.counterfactual_deltas
++pressure_policy_ablation = pressure_lzx.pressure_policy_ablation
++pressure_level_from_local_signals = pressure_lzx.pressure_level_from_local_signals
++validate_engineering_policy = pressure_lzx.validate_engineering_policy
+ from tools.parp.effective_tier.reference import TIER_SCALE
+ 
+ 
+-- 
+2.25.1
+

@@ -1,0 +1,53 @@
+From 1b3632a14e19e178e8a2f76e14771120a654aded Mon Sep 17 00:00:00 2001
+From: Codex PARP Reproduction <codex@localhost>
+Date: Mon, 3 Aug 2026 16:20:56 +0800
+Subject: [PATCH 067/123] fix: tolerate unreadable parp debugfs audit
+
+---
+ tools/parp/phase210/finalize.py | 16 ++++++++++++++--
+ 1 file changed, 14 insertions(+), 2 deletions(-)
+
+diff --git a/tools/parp/phase210/finalize.py b/tools/parp/phase210/finalize.py
+index 59a47ead9..8b7500573 100644
+--- a/tools/parp/phase210/finalize.py
++++ b/tools/parp/phase210/finalize.py
+@@ -78,6 +78,17 @@ def read_first(path, default="UNAVAILABLE"):
+         return default
+ 
+ 
++def path_access(path):
++    """Return existence/readability without leaking permission exceptions."""
++    try:
++        exists = path.exists()
++        readable = exists and os.access(str(path), os.R_OK)
++    except (OSError, PermissionError):
++        exists = False
++        readable = False
++    return exists, readable
++
++
+ def write_csv(path, columns, rows):
+     path.parent.mkdir(parents=True, exist_ok=True)
+     with path.open("w", newline="") as stream:
+@@ -113,6 +124,7 @@ def environment_audit(project):
+     if trace_root.is_dir():
+         tracepoints = sorted(x.name for x in trace_root.iterdir() if x.is_dir())
+     debug_path = Path("/sys/kernel/debug/sched/parp")
++    debug_exists, debug_readable = path_access(debug_path)
+     return {
+         "kernel_release": platform.release(),
+         "kernel_identity": platform.uname()._asdict(),
+@@ -124,8 +136,8 @@ def environment_audit(project):
+         "cgroup2_subtree_control": subtree.split() if subtree != "UNAVAILABLE" else [],
+         "memory_controller_visible": "memory" in controllers.split(),
+         "parp_debugfs": {
+-            "path": str(debug_path), "exists": debug_path.exists(),
+-            "readable": os.access(str(debug_path), os.R_OK),
++            "path": str(debug_path), "exists": debug_exists,
++            "readable": debug_readable,
+             "note": "read-only audit; no interface was written",
+         },
+         "parp_tracepoints": tracepoints,
+-- 
+2.25.1
+

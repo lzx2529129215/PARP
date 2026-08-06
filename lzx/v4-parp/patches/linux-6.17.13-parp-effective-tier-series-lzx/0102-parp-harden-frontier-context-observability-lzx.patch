@@ -1,0 +1,540 @@
+From 02f38bfcb233736b6842de8832231793c502f7ea Mon Sep 17 00:00:00 2001
+From: Codex PARP Reproduction <codex@localhost>
+Date: Tue, 4 Aug 2026 12:56:48 +0800
+Subject: [PATCH 102/123] parp: harden frontier context observability
+
+---
+ include/linux/mmzone.h        |   4 ++
+ include/linux/parp.h          |   5 ++
+ include/trace/events/parp.h   |  29 ++++++--
+ mm/parp/core/frontier_score.c | 129 ++++++++++++++++++++++++++++++----
+ mm/parp/internal.h            |  11 +++
+ mm/parp/tests/parp_test.c     |   3 +
+ 6 files changed, 164 insertions(+), 17 deletions(-)
+
+diff --git a/include/linux/mmzone.h b/include/linux/mmzone.h
+index 0c02661c5..a38f520bb 100644
+--- a/include/linux/mmzone.h
++++ b/include/linux/mmzone.h
+@@ -497,8 +497,12 @@ struct lru_gen_folio {
+ 	struct {
+ 		u64 epoch_id;
+ 		u64 foreground_epoch_id;
++		u64 valid_until_ns;
+ 		unsigned long source_seq;
++		unsigned long frontier_seq;
++		unsigned long frontier_headroom;
+ 		unsigned long epoch_pages;
++		u32 model_version;
+ 		u32 efficiency_q15;
+ 		u32 efficiency_samples;
+ 	} parp_frontier[ANON_AND_FILE];
+diff --git a/include/linux/parp.h b/include/linux/parp.h
+index 5123d1899..461e9321f 100644
+--- a/include/linux/parp.h
++++ b/include/linux/parp.h
+@@ -35,6 +35,7 @@ enum parp_frontier_reason {
+ 	PARP_FRONTIER_BELOW_THRESHOLD,
+ 	PARP_FRONTIER_BUDGET,
+ 	PARP_FRONTIER_REPEAT_EPOCH,
++	PARP_FRONTIER_EXPIRED,
+ };
+ 
+ struct parp_frontier_scan_ctx {
+@@ -47,9 +48,13 @@ struct parp_frontier_scan_ctx {
+ 	u32 efficiency_q15;
+ 	u32 app_reentry_q15;
+ 	u32 app_id;
++	u32 nid;
++	u32 source_generation;
+ 	u64 domain_id;
+ 	u64 epoch_id;
++	u64 batch_id;
+ 	u64 foreground_epoch_id;
++	u64 valid_until_ns;
+ 	unsigned long source_seq;
+ 	unsigned long frontier_seq;
+ 	unsigned long remaining_demand;
+diff --git a/include/trace/events/parp.h b/include/trace/events/parp.h
+index e26256cea..e0a4b5eb4 100644
+--- a/include/trace/events/parp.h
++++ b/include/trace/events/parp.h
+@@ -67,7 +67,9 @@ struct parp_frontier_trace {
+ 	u64 timestamp_ns;
+ 	u64 domain_id;
+ 	u64 epoch_id;
++	u64 batch_id;
+ 	u64 foreground_epoch_id;
++	u64 folio_cookie;
+ 	u64 source_seq;
+ 	u64 frontier_seq;
+ 	u64 remaining_demand;
+@@ -76,11 +78,15 @@ struct parp_frontier_trace {
+ 	u64 batch_budget;
+ 	u64 epoch_budget;
+ 	u64 folio_pages;
++	u64 score_duration_ns;
+ 	s32 score;
+ 	u32 threshold;
+ 	u32 model_version;
+ 	u32 efficiency_q15;
+ 	u32 app_id;
++	u32 nid;
++	u32 source_generation;
++	u32 feature_schema_version;
+ 	u8 page_type;
+ 	u8 mode;
+ 	u8 reason;
+@@ -127,7 +133,9 @@ TRACE_EVENT(parp_frontier_decision,
+ 		__field(u64, timestamp_ns)
+ 		__field(u64, domain_id)
+ 		__field(u64, epoch_id)
++		__field(u64, batch_id)
+ 		__field(u64, foreground_epoch_id)
++		__field(u64, folio_cookie)
+ 		__field(u64, source_seq)
+ 		__field(u64, frontier_seq)
+ 		__field(u64, remaining_demand)
+@@ -136,11 +144,15 @@ TRACE_EVENT(parp_frontier_decision,
+ 		__field(u64, batch_budget)
+ 		__field(u64, epoch_budget)
+ 		__field(u64, folio_pages)
++		__field(u64, score_duration_ns)
+ 		__field(s32, score)
+ 		__field(u32, threshold)
+ 		__field(u32, model_version)
+ 		__field(u32, efficiency_q15)
+ 		__field(u32, app_id)
++		__field(u32, nid)
++		__field(u32, source_generation)
++		__field(u32, feature_schema_version)
+ 		__field(u8, page_type)
+ 		__field(u8, mode)
+ 		__field(u8, reason)
+@@ -151,7 +163,9 @@ TRACE_EVENT(parp_frontier_decision,
+ 		__entry->timestamp_ns = event->timestamp_ns;
+ 		__entry->domain_id = event->domain_id;
+ 		__entry->epoch_id = event->epoch_id;
++		__entry->batch_id = event->batch_id;
+ 		__entry->foreground_epoch_id = event->foreground_epoch_id;
++		__entry->folio_cookie = event->folio_cookie;
+ 		__entry->source_seq = event->source_seq;
+ 		__entry->frontier_seq = event->frontier_seq;
+ 		__entry->remaining_demand = event->remaining_demand;
+@@ -160,26 +174,33 @@ TRACE_EVENT(parp_frontier_decision,
+ 		__entry->batch_budget = event->batch_budget;
+ 		__entry->epoch_budget = event->epoch_budget;
+ 		__entry->folio_pages = event->folio_pages;
++		__entry->score_duration_ns = event->score_duration_ns;
+ 		__entry->score = event->score;
+ 		__entry->threshold = event->threshold;
+ 		__entry->model_version = event->model_version;
+ 		__entry->efficiency_q15 = event->efficiency_q15;
+ 		__entry->app_id = event->app_id;
++		__entry->nid = event->nid;
++		__entry->source_generation = event->source_generation;
++		__entry->feature_schema_version = event->feature_schema_version;
+ 		__entry->page_type = event->page_type;
+ 		__entry->mode = event->mode;
+ 		__entry->reason = event->reason;
+ 		__entry->would_promote = event->would_promote;
+ 		__entry->applied = event->applied;
+ 	),
+-	TP_printk("time=%llu domain=%llu app=%u type=%u mode=%u epoch=%llu foreground_epoch=%llu source_seq=%llu frontier_seq=%llu remaining=%llu headroom=%llu app_budget=%llu batch_budget=%llu epoch_budget=%llu folio_pages=%llu score=%d threshold=%u model=%u efficiency_q15=%u reason=%u would_promote=%d applied=%d",
++	TP_printk("time=%llu domain=%llu app=%u nid=%u type=%u mode=%u epoch=%llu batch=%llu foreground_epoch=%llu folio_cookie=%llu source_seq=%llu source_gen=%u frontier_seq=%llu remaining=%llu headroom=%llu app_budget=%llu batch_budget=%llu epoch_budget=%llu folio_pages=%llu score=%d threshold=%u model=%u schema=%u efficiency_q15=%u score_duration_ns=%llu reason=%u would_promote=%d applied=%d",
+ 		  __entry->timestamp_ns, __entry->domain_id, __entry->app_id,
+-		  __entry->page_type, __entry->mode, __entry->epoch_id,
+-		  __entry->foreground_epoch_id, __entry->source_seq,
++		  __entry->nid, __entry->page_type, __entry->mode,
++		  __entry->epoch_id, __entry->batch_id,
++		  __entry->foreground_epoch_id, __entry->folio_cookie,
++		  __entry->source_seq, __entry->source_generation,
+ 		  __entry->frontier_seq, __entry->remaining_demand,
+ 		  __entry->frontier_headroom, __entry->app_budget,
+ 		  __entry->batch_budget, __entry->epoch_budget,
+ 		  __entry->folio_pages, __entry->score, __entry->threshold,
+-		  __entry->model_version, __entry->efficiency_q15,
++		  __entry->model_version, __entry->feature_schema_version,
++		  __entry->efficiency_q15, __entry->score_duration_ns,
+ 		  __entry->reason, __entry->would_promote, __entry->applied)
+ );
+ 
+diff --git a/mm/parp/core/frontier_score.c b/mm/parp/core/frontier_score.c
+index 09bb795c8..0de68e14a 100644
+--- a/mm/parp/core/frontier_score.c
++++ b/mm/parp/core/frontier_score.c
+@@ -8,6 +8,8 @@
+ #include <linux/page_ext.h>
+ #include <linux/parp.h>
+ #include <linux/rcupdate.h>
++#include <linux/random.h>
++#include <linux/siphash.h>
+ #include <linux/swap.h>
+ #include <trace/events/parp.h>
+ 
+@@ -18,6 +20,7 @@
+ #define PARP_FRONTIER_BATCH_PAGES 128UL
+ #define PARP_FRONTIER_EPOCH_PAGES 512UL
+ #define PARP_FRONTIER_PRESSURE_PRIORITY 2
++#define PARP_FRONTIER_TTL_NS	(50ULL * NSEC_PER_MSEC)
+ 
+ struct parp_folio_ext {
+ 	atomic64_t last_access_ns;
+@@ -35,6 +38,8 @@ DEFINE_STATIC_KEY_FALSE(parp_frontier_enabled);
+ 
+ static DEFINE_MUTEX(parp_frontier_mode_lock);
+ static enum parp_frontier_mode parp_frontier_mode;
++static atomic64_t parp_frontier_batch_id = ATOMIC64_INIT(0);
++static siphash_key_t parp_frontier_cookie_key __read_mostly;
+ 
+ #define PARP_COMMON_EDGES { \
+ 	{ 10, 100, 500, 2000, 10000 }, \
+@@ -130,6 +135,14 @@ static bool __init parp_frontier_page_ext_needed(void)
+ 	return true;
+ }
+ 
++static int __init parp_frontier_init(void)
++{
++	get_random_bytes(&parp_frontier_cookie_key,
++			 sizeof(parp_frontier_cookie_key));
++	return 0;
++}
++subsys_initcall(parp_frontier_init);
++
+ struct page_ext_operations parp_frontier_page_ext_ops = {
+ 	.size = sizeof(struct parp_folio_ext),
+ 	.need = parp_frontier_page_ext_needed,
+@@ -176,6 +189,21 @@ static u32 parp_atomic_ema(atomic_t *value, u32 sample)
+ 	return new;
+ }
+ 
++static void parp_frontier_account_score_time(u64 duration_ns)
++{
++	s64 old = atomic64_read(&parp_frontier_stats.score_time_ns_max);
++
++	atomic64_add(duration_ns, &parp_frontier_stats.score_time_ns_total);
++	while (duration_ns > old) {
++		s64 observed = atomic64_cmpxchg(
++			&parp_frontier_stats.score_time_ns_max, old, duration_ns);
++
++		if (observed == old)
++			break;
++		old = observed;
++	}
++}
++
+ void __parp_frontier_note_access(struct folio *folio, int generation)
+ {
+ 	struct parp_folio_ext *ext;
+@@ -286,6 +314,13 @@ unsigned long parp_frontier_budget_min(unsigned long headroom,
+ 		   min(batch_remaining, epoch_remaining));
+ }
+ 
++bool parp_frontier_context_valid(u64 now_ns, u64 valid_until_ns,
++		unsigned long source_seq, unsigned long expected_source_seq)
++{
++	return valid_until_ns && now_ns < valid_until_ns &&
++	       source_seq == expected_source_seq;
++}
++
+ static bool parp_choose_frontier(struct lru_gen_folio *lrugen, int type,
+ 				 int reclaim_idx, unsigned long demand,
+ 				 u32 eta_q15, unsigned long *frontier,
+@@ -350,12 +385,16 @@ void __parp_frontier_prepare(struct parp_frontier_scan_ctx *ctx,
+ 	memset(ctx, 0, sizeof(*ctx));
+ 	ctx->mode = READ_ONCE(parp_frontier_mode);
+ 	ctx->type = type;
++	ctx->batch_id = atomic64_inc_return(&parp_frontier_batch_id);
+ 	ctx->reason = PARP_FRONTIER_DISABLED;
+ 	atomic64_inc(&parp_frontier_stats.prepare);
+ 	if (!target_memcg) {
+ 		ctx->reason = PARP_FRONTIER_NOT_TARGET_MEMCG;
+ 		return;
+ 	}
++	domain_id = parp_memcg_domain_id(lruvec_memcg(lruvec));
++	ctx->domain_id = domain_id;
++	ctx->nid = lruvec_pgdat(lruvec)->node_id;
+ 	if (reclaim_priority <= PARP_FRONTIER_PRESSURE_PRIORITY) {
+ 		ctx->reason = PARP_FRONTIER_PRESSURE_BYPASS;
+ 		goto bypass;
+@@ -364,7 +403,6 @@ void __parp_frontier_prepare(struct parp_frontier_scan_ctx *ctx,
+ 		ctx->reason = PARP_FRONTIER_NO_DEMAND;
+ 		return;
+ 	}
+-	domain_id = parp_memcg_domain_id(lruvec_memcg(lruvec));
+ 	if (!domain_id || !parp_context_lookup(domain_id, now, &app)) {
+ 		ctx->reason = PARP_FRONTIER_NO_APP_CONTEXT;
+ 		goto bypass;
+@@ -383,11 +421,11 @@ void __parp_frontier_prepare(struct parp_frontier_scan_ctx *ctx,
+ 	ctx->threshold = model->threshold;
+ 	ctx->model_version = model->model_version;
+ 	rcu_read_unlock();
+-	ctx->domain_id = domain_id;
+ 	ctx->app_id = app.app_id;
+ 	ctx->app_reentry_q15 = app.app_prior_q15;
+ 	ctx->foreground_epoch_id = app.foreground_epoch_id;
+ 	ctx->source_seq = lrugen->min_seq[type];
++	ctx->source_generation = lru_gen_from_seq(ctx->source_seq);
+ 	ctx->remaining_demand = remaining_demand;
+ 	ctx->efficiency_q15 = state->efficiency_q15;
+ 	if (!parp_choose_frontier(lrugen, type, reclaim_idx, remaining_demand,
+@@ -397,14 +435,20 @@ void __parp_frontier_prepare(struct parp_frontier_scan_ctx *ctx,
+ 		goto bypass;
+ 	}
+ 	if (!state->epoch_id || state->source_seq != ctx->source_seq ||
+-	    state->foreground_epoch_id != app.foreground_epoch_id) {
++	    state->foreground_epoch_id != app.foreground_epoch_id ||
++	    state->model_version != ctx->model_version) {
+ 		state->source_seq = ctx->source_seq;
+ 		state->foreground_epoch_id = app.foreground_epoch_id;
++		state->model_version = ctx->model_version;
+ 		state->epoch_pages = 0;
+ 		if (!++state->epoch_id)
+ 			state->epoch_id++;
+ 	}
+ 	ctx->epoch_id = state->epoch_id;
++	ctx->valid_until_ns = now + PARP_FRONTIER_TTL_NS;
++	state->valid_until_ns = ctx->valid_until_ns;
++	state->frontier_seq = ctx->frontier_seq;
++	state->frontier_headroom = ctx->frontier_headroom;
+ 	ctx->batch_budget = PARP_FRONTIER_BATCH_PAGES;
+ 	ctx->epoch_budget = PARP_FRONTIER_EPOCH_PAGES;
+ 	ctx->app_budget = max_t(unsigned long, 1,
+@@ -417,14 +461,18 @@ void __parp_frontier_prepare(struct parp_frontier_scan_ctx *ctx,
+ }
+ 
+ static void parp_frontier_emit(const struct parp_frontier_scan_ctx *ctx,
+-		unsigned long pages, s32 score, enum parp_frontier_reason reason,
++		struct folio *folio, unsigned long pages, s32 score,
++		u64 score_duration_ns, enum parp_frontier_reason reason,
+ 		bool would_promote)
+ {
+ 	struct parp_frontier_trace event = {
+ 		.timestamp_ns = ktime_get_mono_fast_ns(),
+ 		.domain_id = ctx->domain_id,
+ 		.epoch_id = ctx->epoch_id,
++		.batch_id = ctx->batch_id,
+ 		.foreground_epoch_id = ctx->foreground_epoch_id,
++		.folio_cookie = siphash_2u64(folio_pfn(folio), ctx->epoch_id,
++					     &parp_frontier_cookie_key),
+ 		.source_seq = ctx->source_seq,
+ 		.frontier_seq = ctx->frontier_seq,
+ 		.remaining_demand = ctx->remaining_demand,
+@@ -433,11 +481,15 @@ static void parp_frontier_emit(const struct parp_frontier_scan_ctx *ctx,
+ 		.batch_budget = ctx->batch_budget,
+ 		.epoch_budget = ctx->epoch_budget,
+ 		.folio_pages = pages,
++		.score_duration_ns = score_duration_ns,
+ 		.score = score,
+ 		.threshold = ctx->threshold,
+ 		.model_version = ctx->model_version,
+ 		.efficiency_q15 = ctx->efficiency_q15,
+ 		.app_id = ctx->app_id,
++		.nid = ctx->nid,
++		.source_generation = ctx->source_generation,
++		.feature_schema_version = PARP_FRONTIER_SCHEMA_VERSION,
+ 		.page_type = ctx->type,
+ 		.mode = ctx->mode,
+ 		.reason = reason,
+@@ -498,40 +550,73 @@ void __parp_frontier_consider(struct parp_frontier_scan_ctx *ctx,
+ 	unsigned long pages = folio_nr_pages(folio);
+ 	unsigned long allowed;
+ 	s32 score = 0;
++	u64 score_duration_ns = 0;
++	u64 score_started_ns;
++	u64 now;
+ 	enum parp_frontier_reason reason;
+ 	bool would_promote = false;
+ 
+ 	atomic64_inc(&parp_frontier_stats.candidates);
+-	if (!ctx->valid)
++	if (!ctx->valid) {
++		atomic64_add(pages, &parp_frontier_stats.native_bypass_pages);
++		if (ctx->reason == PARP_FRONTIER_NO_CAPACITY)
++			atomic64_add(pages,
++				     &parp_frontier_stats.frontier_bypass_pages);
++		else if (ctx->reason == PARP_FRONTIER_MODEL_INVALID)
++			atomic64_add(pages,
++				     &parp_frontier_stats.invalid_model_pages);
++		parp_frontier_emit(ctx, folio, pages, 0, 0, ctx->reason, false);
+ 		return;
++	}
++	now = ktime_get_mono_fast_ns();
++	if (!parp_frontier_context_valid(now, ctx->valid_until_ns,
++					 ctx->source_seq,
++					 lrugen->min_seq[ctx->type])) {
++		atomic64_inc(&parp_frontier_stats.expired);
++		atomic64_add(pages, &parp_frontier_stats.native_bypass_pages);
++		atomic64_add(pages, &parp_frontier_stats.frontier_bypass_pages);
++		parp_frontier_emit(ctx, folio, pages, score, 0,
++				   PARP_FRONTIER_EXPIRED, false);
++		return;
++	}
+ 	if (ctx->source_seq != ctx->frontier_seq) {
+ 		atomic64_inc(&parp_frontier_stats.not_frontier);
+-		parp_frontier_emit(ctx, pages, score, PARP_FRONTIER_NOT_FRONTIER,
+-				   false);
++		atomic64_add(pages, &parp_frontier_stats.native_bypass_pages);
++		atomic64_add(pages, &parp_frontier_stats.frontier_bypass_pages);
++		parp_frontier_emit(ctx, folio, pages, score, 0,
++				   PARP_FRONTIER_NOT_FRONTIER, false);
+ 		return;
+ 	}
+ 	if (!parp_frontier_features(ctx, lruvec, folio, values, &ext,
+ 				    &page_ext)) {
+ 		atomic64_inc(&parp_frontier_stats.metadata_missing);
+-		parp_frontier_emit(ctx, pages, score,
++		atomic64_add(pages, &parp_frontier_stats.native_bypass_pages);
++		parp_frontier_emit(ctx, folio, pages, score, 0,
+ 				   PARP_FRONTIER_METADATA_MISSING, false);
+ 		return;
+ 	}
+ 	rcu_read_lock();
++	score_started_ns = ktime_get_mono_fast_ns();
+ 	model = parp_frontier_model(ctx->app_id);
+ 	if (!parp_frontier_model_valid(model)) {
++		atomic64_add(pages, &parp_frontier_stats.invalid_model_pages);
++		atomic64_add(pages, &parp_frontier_stats.native_bypass_pages);
+ 		reason = PARP_FRONTIER_MODEL_INVALID;
+ 		goto unlock;
+ 	}
+ 	score = parp_frontier_score(model, values);
++	score_duration_ns = ktime_get_mono_fast_ns() - score_started_ns;
++	parp_frontier_account_score_time(score_duration_ns);
+ 	atomic64_inc(&parp_frontier_stats.scores);
+ 	if (score < model->threshold) {
+ 		atomic64_inc(&parp_frontier_stats.below_threshold);
++		atomic64_add(pages, &parp_frontier_stats.native_bypass_pages);
+ 		reason = PARP_FRONTIER_BELOW_THRESHOLD;
+ 		goto unlock;
+ 	}
+ 	if (atomic64_read(&ext->last_selected_epoch) == ctx->epoch_id) {
+ 		atomic64_inc(&parp_frontier_stats.repeat_epoch);
++		atomic64_add(pages, &parp_frontier_stats.native_bypass_pages);
+ 		reason = PARP_FRONTIER_REPEAT_EPOCH;
+ 		goto unlock;
+ 	}
+@@ -541,6 +626,8 @@ void __parp_frontier_consider(struct parp_frontier_scan_ctx *ctx,
+ 		ctx->epoch_budget - min(state->epoch_pages, ctx->epoch_budget));
+ 	if (pages > allowed) {
+ 		atomic64_inc(&parp_frontier_stats.budget_reject);
++		atomic64_add(pages, &parp_frontier_stats.native_bypass_pages);
++		atomic64_add(pages, &parp_frontier_stats.budget_bypass_pages);
+ 		reason = PARP_FRONTIER_BUDGET;
+ 		goto unlock;
+ 	}
+@@ -550,12 +637,14 @@ void __parp_frontier_consider(struct parp_frontier_scan_ctx *ctx,
+ 	ctx->app_used += pages;
+ 	state->epoch_pages += pages;
+ 	atomic64_inc(&parp_frontier_stats.would_promote);
++	atomic64_add(pages, &parp_frontier_stats.would_promote_pages);
+ 	would_promote = true;
+ 	reason = PARP_FRONTIER_SCORE;
+ unlock:
+ 	rcu_read_unlock();
+ 	page_ext_put(page_ext);
+-	parp_frontier_emit(ctx, pages, score, reason, would_promote);
++	parp_frontier_emit(ctx, folio, pages, score, score_duration_ns, reason,
++			   would_promote);
+ }
+ 
+ void parp_frontier_feedback(struct lruvec *lruvec, int type,
+@@ -609,17 +698,28 @@ ssize_t parp_frontier_format_stats(char *buf, size_t size)
+ {
+ 	return scnprintf(buf, size,
+ 		"mode %u\nprepare %lld\ncandidates %lld\nscores %lld\n"
+-		"would_promote %lld\napplied %lld\nmetadata_missing %lld\n"
++		"would_promote %lld\nwould_promote_pages %lld\napplied %lld\n"
++		"actual_promote_pages %lld\nnative_bypass_pages %lld\n"
++		"budget_bypass_pages %lld\nfrontier_bypass_pages %lld\n"
++		"invalid_model_pages %lld\nmetadata_missing %lld\n"
+ 		"no_context %lld\nno_efficiency %lld\nno_capacity %lld\n"
+ 		"not_frontier %lld\nbelow_threshold %lld\nbudget_reject %lld\n"
+-		"repeat_epoch %lld\npressure_bypass %lld\nfeedback_samples %lld\n"
+-		"trace_events %lld\napply_compiled 0\n",
++		"repeat_epoch %lld\npressure_bypass %lld\nexpired %lld\n"
++		"feedback_samples %lld\ntrace_events %lld\n"
++		"score_time_ns_total %lld\nscore_time_ns_max %lld\n"
++		"apply_compiled 0\n",
+ 		parp_frontier_get_mode(),
+ 		atomic64_read(&parp_frontier_stats.prepare),
+ 		atomic64_read(&parp_frontier_stats.candidates),
+ 		atomic64_read(&parp_frontier_stats.scores),
+ 		atomic64_read(&parp_frontier_stats.would_promote),
++		atomic64_read(&parp_frontier_stats.would_promote_pages),
+ 		atomic64_read(&parp_frontier_stats.applied),
++		atomic64_read(&parp_frontier_stats.actual_promote_pages),
++		atomic64_read(&parp_frontier_stats.native_bypass_pages),
++		atomic64_read(&parp_frontier_stats.budget_bypass_pages),
++		atomic64_read(&parp_frontier_stats.frontier_bypass_pages),
++		atomic64_read(&parp_frontier_stats.invalid_model_pages),
+ 		atomic64_read(&parp_frontier_stats.metadata_missing),
+ 		atomic64_read(&parp_frontier_stats.no_context),
+ 		atomic64_read(&parp_frontier_stats.no_efficiency),
+@@ -629,6 +729,9 @@ ssize_t parp_frontier_format_stats(char *buf, size_t size)
+ 		atomic64_read(&parp_frontier_stats.budget_reject),
+ 		atomic64_read(&parp_frontier_stats.repeat_epoch),
+ 		atomic64_read(&parp_frontier_stats.pressure_bypass),
++		atomic64_read(&parp_frontier_stats.expired),
+ 		atomic64_read(&parp_frontier_stats.feedback_samples),
+-		atomic64_read(&parp_frontier_stats.trace_events));
++		atomic64_read(&parp_frontier_stats.trace_events),
++		atomic64_read(&parp_frontier_stats.score_time_ns_total),
++		atomic64_read(&parp_frontier_stats.score_time_ns_max));
+ }
+diff --git a/mm/parp/internal.h b/mm/parp/internal.h
+index 1952bb0f3..b1ba9f625 100644
+--- a/mm/parp/internal.h
++++ b/mm/parp/internal.h
+@@ -39,7 +39,13 @@ struct parp_frontier_stats {
+ 	atomic64_t candidates;
+ 	atomic64_t scores;
+ 	atomic64_t would_promote;
++	atomic64_t would_promote_pages;
+ 	atomic64_t applied;
++	atomic64_t actual_promote_pages;
++	atomic64_t native_bypass_pages;
++	atomic64_t budget_bypass_pages;
++	atomic64_t frontier_bypass_pages;
++	atomic64_t invalid_model_pages;
+ 	atomic64_t metadata_missing;
+ 	atomic64_t no_context;
+ 	atomic64_t no_efficiency;
+@@ -49,8 +55,11 @@ struct parp_frontier_stats {
+ 	atomic64_t budget_reject;
+ 	atomic64_t repeat_epoch;
+ 	atomic64_t pressure_bypass;
++	atomic64_t expired;
+ 	atomic64_t feedback_samples;
+ 	atomic64_t trace_events;
++	atomic64_t score_time_ns_total;
++	atomic64_t score_time_ns_max;
+ };
+ 
+ extern struct parp_frontier_stats parp_frontier_stats;
+@@ -64,6 +73,8 @@ bool parp_frontier_select(const unsigned long *capacities,
+ unsigned long parp_frontier_budget_min(unsigned long headroom,
+ 		unsigned long app_remaining, unsigned long batch_remaining,
+ 		unsigned long epoch_remaining);
++bool parp_frontier_context_valid(u64 now_ns, u64 valid_until_ns,
++		unsigned long source_seq, unsigned long expected_source_seq);
+ #endif
+ 
+ #define PARP_SCAN_INPUT_BIND_PRESENT	BIT(0)
+diff --git a/mm/parp/tests/parp_test.c b/mm/parp/tests/parp_test.c
+index d8768ec1a..50cebc0e1 100644
+--- a/mm/parp/tests/parp_test.c
++++ b/mm/parp/tests/parp_test.c
+@@ -823,6 +823,9 @@ static void parp_frontier_selection_budget_test(struct kunit *test)
+ 		ARRAY_SIZE(capacities), 100, 32767, &frontier, &headroom));
+ 	KUNIT_EXPECT_EQ(test,
+ 		parp_frontier_budget_min(64, 32, 16, 8), 8UL);
++	KUNIT_EXPECT_TRUE(test, parp_frontier_context_valid(99, 100, 7, 7));
++	KUNIT_EXPECT_FALSE(test, parp_frontier_context_valid(100, 100, 7, 7));
++	KUNIT_EXPECT_FALSE(test, parp_frontier_context_valid(99, 100, 7, 8));
+ 	KUNIT_EXPECT_EQ(test, parp_frontier_set_mode(PARP_FRONTIER_APPLY),
+ 		-EOPNOTSUPP);
+ }
+-- 
+2.25.1
+

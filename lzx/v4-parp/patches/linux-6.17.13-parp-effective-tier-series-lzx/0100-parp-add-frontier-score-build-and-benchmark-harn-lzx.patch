@@ -1,0 +1,236 @@
+From 8f6ad4bf376fe8a7956c8cdaea91476d075aad4f Mon Sep 17 00:00:00 2001
+From: Codex PARP Reproduction <codex@localhost>
+Date: Tue, 4 Aug 2026 12:50:18 +0800
+Subject: [PATCH 100/123] parp: add frontier score build and benchmark harness
+
+---
+ tools/parp/frontier_score/.kunitconfig |   8 ++
+ tools/parp/frontier_score/README.md    |   7 ++
+ tools/parp/frontier_score/cbench.c     | 146 +++++++++++++++++++++++++
+ tools/parp/frontier_score/cscore.c     |  12 +-
+ 4 files changed, 171 insertions(+), 2 deletions(-)
+ create mode 100644 tools/parp/frontier_score/.kunitconfig
+ create mode 100644 tools/parp/frontier_score/cbench.c
+
+diff --git a/tools/parp/frontier_score/.kunitconfig b/tools/parp/frontier_score/.kunitconfig
+new file mode 100644
+index 000000000..86ea27b6d
+--- /dev/null
++++ b/tools/parp/frontier_score/.kunitconfig
+@@ -0,0 +1,8 @@
++CONFIG_KUNIT=y
++CONFIG_CGROUPS=y
++CONFIG_MEMCG=y
++CONFIG_LRU_GEN=y
++CONFIG_PARP=y
++CONFIG_PARP_FRONTIER_SCORE=y
++CONFIG_PARP_KUNIT_TEST=y
++CONFIG_DEBUG_FS=y
+diff --git a/tools/parp/frontier_score/README.md b/tools/parp/frontier_score/README.md
+index c37a868dd..3041996db 100644
+--- a/tools/parp/frontier_score/README.md
++++ b/tools/parp/frontier_score/README.md
+@@ -30,3 +30,10 @@ Run the reference tests from the kernel tree root:
+ python3 -m unittest -v tools.parp.frontier_score.tests.test_reference
+ python3 tools/parp/frontier_score/benchmark.py --iterations 20000
+ ```
++
++Run the kernel suite without installing or booting this kernel:
++
++```sh
++tools/testing/kunit/kunit.py run --arch=um \
++  --kunitconfig tools/parp/frontier_score/.kunitconfig parp
++```
+diff --git a/tools/parp/frontier_score/cbench.c b/tools/parp/frontier_score/cbench.c
+new file mode 100644
+index 000000000..fad742867
+--- /dev/null
++++ b/tools/parp/frontier_score/cbench.c
+@@ -0,0 +1,146 @@
++// SPDX-License-Identifier: GPL-2.0
++/* Direct userspace microbenchmark of the fixed-cost C scoring contract. */
++#define _GNU_SOURCE
++#define PARP_CSCORE_NO_MAIN
++#include "cscore.c"
++
++#include <stdbool.h>
++#include <string.h>
++#include <time.h>
++
++#define BATCH_SIZE 128
++
++static bool shadow_enabled;
++
++static void consume_score(int32_t value)
++{
++	asm volatile("" : : "r"(value) : "memory");
++}
++
++static uint64_t now_ns(void)
++{
++	struct timespec value;
++
++	if (clock_gettime(CLOCK_MONOTONIC_RAW, &value))
++		exit(EXIT_FAILURE);
++	return (uint64_t)value.tv_sec * 1000000000ULL + value.tv_nsec;
++}
++
++static int compare_u64(const void *left, const void *right)
++{
++	const uint64_t a = *(const uint64_t *)left;
++	const uint64_t b = *(const uint64_t *)right;
++
++	return (a > b) - (a < b);
++}
++
++static uint64_t percentile(const uint64_t *samples, size_t count,
++			   unsigned int percent)
++{
++	size_t index = (count - 1) * percent / 100;
++
++	return samples[index];
++}
++
++static void measure(const char *name, const struct model *model,
++		    const int64_t values[FEATURES], int nr_features,
++		    size_t iterations, bool off_branch, bool trailing_comma)
++{
++	uint64_t *samples = calloc(iterations, sizeof(*samples));
++	int64_t working[FEATURES];
++	uint64_t total = 0;
++	size_t i;
++
++	if (!samples)
++		exit(EXIT_FAILURE);
++	memcpy(working, values, sizeof(working));
++	for (i = 0; i < iterations; i++) {
++		uint64_t start = now_ns();
++
++		working[0] = values[0] + (i & 1);
++		if (off_branch) {
++			if (shadow_enabled)
++				consume_score(score_n(model, working, nr_features));
++		} else {
++			consume_score(score_n(model, working, nr_features));
++		}
++		samples[i] = now_ns() - start;
++		total += samples[i];
++	}
++	qsort(samples, iterations, sizeof(*samples), compare_u64);
++	printf("    \"%s\": {\"features\": %d, \"p50_ns\": %" PRIu64
++	       ", \"p95_ns\": %" PRIu64 ", \"p99_ns\": %" PRIu64
++	       ", \"max_ns\": %" PRIu64 ", \"mean_ns\": %.3f}%s\n",
++	       name, nr_features, percentile(samples, iterations, 50),
++	       percentile(samples, iterations, 95),
++	       percentile(samples, iterations, 99), samples[iterations - 1],
++	       (double)total / iterations, trailing_comma ? "," : "");
++	free(samples);
++}
++
++static void measure_batch(const struct model *model,
++			  const int64_t values[FEATURES], size_t iterations)
++{
++	uint64_t *samples = calloc(iterations, sizeof(*samples));
++	int64_t working[FEATURES];
++	uint64_t total = 0;
++	size_t i;
++
++	if (!samples)
++		exit(EXIT_FAILURE);
++	memcpy(working, values, sizeof(working));
++	for (i = 0; i < iterations; i++) {
++		uint64_t start = now_ns();
++		int candidate;
++
++		for (candidate = 0; candidate < BATCH_SIZE; candidate++) {
++			working[0] = values[0] + (candidate & 1);
++			consume_score(score(model, working));
++		}
++		samples[i] = now_ns() - start;
++		total += samples[i];
++	}
++	qsort(samples, iterations, sizeof(*samples), compare_u64);
++	printf("  },\n  \"batch_128\": {\"p50_ns\": %" PRIu64
++	       ", \"p95_ns\": %" PRIu64 ", \"p99_ns\": %" PRIu64
++	       ", \"max_ns\": %" PRIu64 ", \"mean_ns\": %.3f}\n",
++	       percentile(samples, iterations, 50),
++	       percentile(samples, iterations, 95),
++	       percentile(samples, iterations, 99), samples[iterations - 1],
++	       (double)total / iterations);
++	free(samples);
++}
++
++int main(int argc, char **argv)
++{
++	const int64_t values[FEATURES] = {
++		50, 200, 128, 300, 1, 2, 700, 20000,
++	};
++	size_t iterations = 20000;
++	size_t batch_iterations;
++
++	if (argc == 2) {
++		char *end;
++		unsigned long parsed = strtoul(argv[1], &end, 10);
++
++		if (*end || !parsed)
++			return EXIT_FAILURE;
++		iterations = parsed;
++	}
++	shadow_enabled = getenv("PARP_BENCH_SHADOW_ENABLE") != NULL;
++	printf("{\n  \"iterations\": %zu,\n", iterations);
++	printf("  \"clock\": \"CLOCK_MONOTONIC_RAW\",\n");
++	printf("  \"measurements\": {\n");
++	measure("OFF_BRANCH", &models[0], values, FEATURES, iterations, true,
++		true);
++	measure("GENERIC_4", &models[0], values, 4, iterations, false, true);
++	measure("GENERIC_6", &models[0], values, 6, iterations, false, true);
++	measure("GENERIC_8", &models[0], values, 8, iterations, false, true);
++	measure("WPS_8", &models[1], values, 8, iterations, false, true);
++	measure("QQ_8", &models[2], values, 8, iterations, false, true);
++	measure("FILES_8", &models[3], values, 8, iterations, false, false);
++	batch_iterations = iterations / 32;
++	measure_batch(&models[0], values, batch_iterations ? batch_iterations : 1);
++	printf("}\n");
++	return EXIT_SUCCESS;
++}
+diff --git a/tools/parp/frontier_score/cscore.c b/tools/parp/frontier_score/cscore.c
+index 6e847fa6b..5ec5b6d96 100644
+--- a/tools/parp/frontier_score/cscore.c
++++ b/tools/parp/frontier_score/cscore.c
+@@ -84,12 +84,13 @@ static const struct model models[] = {
+ 	},
+ };
+ 
+-static int32_t score(const struct model *model, const int64_t values[FEATURES])
++static int32_t score_n(const struct model *model,
++		       const int64_t values[FEATURES], int nr_features)
+ {
+ 	int32_t total = 0;
+ 	int feature;
+ 
+-	for (feature = 0; feature < FEATURES; feature++) {
++	for (feature = 0; feature < nr_features; feature++) {
+ 		int bin = 0;
+ 
+ 		while (bin < BINS - 1 && values[feature] > model->edges[feature][bin])
+@@ -99,6 +100,12 @@ static int32_t score(const struct model *model, const int64_t values[FEATURES])
+ 	return total;
+ }
+ 
++static int32_t score(const struct model *model, const int64_t values[FEATURES])
++{
++	return score_n(model, values, FEATURES);
++}
++
++#ifndef PARP_CSCORE_NO_MAIN
+ int main(void)
+ {
+ 	int app_id;
+@@ -120,3 +127,4 @@ int main(void)
+ 	}
+ 	return ferror(stdin) ? EXIT_FAILURE : EXIT_SUCCESS;
+ }
++#endif
+-- 
+2.25.1
+

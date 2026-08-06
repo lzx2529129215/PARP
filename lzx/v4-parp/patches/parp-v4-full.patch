@@ -1,0 +1,1512 @@
+diff --git a/include/linux/parp.h b/include/linux/parp.h
+new file mode 100644
+index 000000000..c9a56bc6c
+--- /dev/null
++++ b/include/linux/parp.h
+@@ -0,0 +1,94 @@
++/* SPDX-License-Identifier: GPL-2.0 */
++#ifndef _LINUX_PARP_H
++#define _LINUX_PARP_H
++
++#include <linux/types.h>
++
++struct folio;
++struct lruvec;
++struct scan_control;
++
++enum parp_mode {
++	PARP_MODE_DISABLED,
++	PARP_MODE_OBSERVE,
++	PARP_MODE_APPLY,
++};
++
++enum parp_action {
++	PARP_ACTION_NATIVE,
++	PARP_ACTION_PROTECT,
++	PARP_ACTION_RECLAIM_BIAS,
++	PARP_ACTION_PREFETCH_CANDIDATE,
++};
++
++enum parp_fallback_reason {
++	PARP_FALLBACK_NONE,
++	PARP_FALLBACK_DISABLED,
++	PARP_FALLBACK_NO_DOMAIN,
++	PARP_FALLBACK_NO_BINDING,
++	PARP_FALLBACK_EXPIRED,
++	PARP_FALLBACK_MODEL_VERSION,
++	PARP_FALLBACK_NO_EVIDENCE,
++	PARP_FALLBACK_UNSAFE_FOLIO,
++};
++
++struct parp_decision {
++	enum parp_action original_action;
++	enum parp_action proposed_action;
++	enum parp_action applied_action;
++	enum parp_fallback_reason fallback;
++	u16 score_q15;
++};
++
++struct parp_reclaim_ctx {
++	u64 domain_id;
++	const void *snapshot;
++	enum parp_mode mode;
++	bool rcu_held;
++};
++
++#ifdef CONFIG_PARP
++void parp_adapter_prepare(struct parp_reclaim_ctx *ctx,
++			  struct lruvec *lruvec, struct scan_control *sc);
++struct parp_decision
++parp_adapter_score_folio(struct parp_reclaim_ctx *ctx, struct folio *folio,
++			 int type, int generation);
++void parp_adapter_apply_decision(struct parp_reclaim_ctx *ctx,
++				 struct folio *folio,
++				 struct parp_decision *decision);
++void parp_adapter_finish(struct parp_reclaim_ctx *ctx,
++			 unsigned long scanned, unsigned long isolated);
++#else
++static inline void parp_adapter_prepare(struct parp_reclaim_ctx *ctx,
++					struct lruvec *lruvec,
++					struct scan_control *sc)
++{
++	ctx->mode = PARP_MODE_DISABLED;
++	ctx->rcu_held = false;
++}
++
++static inline struct parp_decision
++parp_adapter_score_folio(struct parp_reclaim_ctx *ctx, struct folio *folio,
++			 int type, int generation)
++{
++	return (struct parp_decision) {
++		.original_action = PARP_ACTION_NATIVE,
++		.proposed_action = PARP_ACTION_NATIVE,
++		.applied_action = PARP_ACTION_NATIVE,
++		.fallback = PARP_FALLBACK_DISABLED,
++	};
++}
++
++static inline void
++parp_adapter_apply_decision(struct parp_reclaim_ctx *ctx, struct folio *folio,
++			    struct parp_decision *decision)
++{
++}
++
++static inline void parp_adapter_finish(struct parp_reclaim_ctx *ctx,
++				       unsigned long scanned,
++				       unsigned long isolated)
++{
++}
++#endif
++#endif
+diff --git a/include/trace/events/parp.h b/include/trace/events/parp.h
+new file mode 100644
+index 000000000..ca2e87bf2
+--- /dev/null
++++ b/include/trace/events/parp.h
+@@ -0,0 +1,42 @@
++/* SPDX-License-Identifier: GPL-2.0 */
++#undef TRACE_SYSTEM
++#define TRACE_SYSTEM parp
++
++#if !defined(_TRACE_PARP_H) || defined(TRACE_HEADER_MULTI_READ)
++#define _TRACE_PARP_H
++
++#include <linux/tracepoint.h>
++
++TRACE_EVENT(parp_decision,
++	TP_PROTO(u64 domain_id, u8 mode, u8 page_type, u8 original,
++		 u8 proposed, u8 applied, u8 fallback, u16 score),
++	TP_ARGS(domain_id, mode, page_type, original, proposed, applied,
++		fallback, score),
++	TP_STRUCT__entry(
++		__field(u64, domain_id)
++		__field(u8, mode)
++		__field(u8, page_type)
++		__field(u8, original)
++		__field(u8, proposed)
++		__field(u8, applied)
++		__field(u8, fallback)
++		__field(u16, score)
++	),
++	TP_fast_assign(
++		__entry->domain_id = domain_id;
++		__entry->mode = mode;
++		__entry->page_type = page_type;
++		__entry->original = original;
++		__entry->proposed = proposed;
++		__entry->applied = applied;
++		__entry->fallback = fallback;
++		__entry->score = score;
++	),
++	TP_printk("domain=%llu mode=%u type=%u original=%u proposed=%u applied=%u fallback=%u score_q15=%u",
++		  __entry->domain_id, __entry->mode, __entry->page_type,
++		  __entry->original, __entry->proposed, __entry->applied,
++		  __entry->fallback, __entry->score)
++);
++
++#endif
++#include <trace/define_trace.h>
+diff --git a/mm/Kconfig b/mm/Kconfig
+index e443fe8cd..0d734c412 100644
+--- a/mm/Kconfig
++++ b/mm/Kconfig
+@@ -1383,5 +1383,6 @@ config PT_RECLAIM
+ 
+ 
+ source "mm/damon/Kconfig"
++source "mm/parp/Kconfig"
+ 
+ endmenu
+diff --git a/mm/Makefile b/mm/Makefile
+index ef54aa615..b2e046c9b 100644
+--- a/mm/Makefile
++++ b/mm/Makefile
+@@ -133,6 +133,7 @@ obj-$(CONFIG_IDLE_PAGE_TRACKING) += page_idle.o
+ obj-$(CONFIG_DEBUG_PAGEALLOC) += debug_page_alloc.o
+ obj-$(CONFIG_DEBUG_PAGE_REF) += debug_page_ref.o
+ obj-$(CONFIG_DAMON) += damon/
++obj-$(CONFIG_PARP) += parp/
+ obj-$(CONFIG_HARDENED_USERCOPY) += usercopy.o
+ obj-$(CONFIG_PERCPU_STATS) += percpu-stats.o
+ obj-$(CONFIG_ZONE_DEVICE) += memremap.o
+diff --git a/mm/parp/Kconfig b/mm/parp/Kconfig
+new file mode 100644
+index 000000000..81af81a2c
+--- /dev/null
++++ b/mm/parp/Kconfig
+@@ -0,0 +1,18 @@
++# SPDX-License-Identifier: GPL-2.0
++config PARP
++	bool "Page-Access Reclaim Predictor"
++	depends on LRU_GEN
++	depends on MEMCG
++	select DEBUG_FS
++	help
++	  Build the low-intrusion Page-Access Reclaim Predictor. The default
++	  mode is observe-only: recommendations are traced but native MGLRU
++	  reclaim decisions remain unchanged.
++
++config PARP_KUNIT_TEST
++	tristate "KUnit tests for PARP" if !KUNIT_ALL_TESTS
++	depends on PARP && KUNIT
++	default KUNIT_ALL_TESTS
++	help
++	  Test fixed-point scoring, expiry, state assignment and observe-only
++	  behavior.
+diff --git a/mm/parp/Makefile b/mm/parp/Makefile
+new file mode 100644
+index 000000000..4d00c87af
+--- /dev/null
++++ b/mm/parp/Makefile
+@@ -0,0 +1,11 @@
++# SPDX-License-Identifier: GPL-2.0
++obj-y += parp.o
++parp-y := core/engine.o core/domain.o core/snapshot.o core/policy.o \
++	  core/budget.o core/fallback.o core/stats.o \
++	  model/model_store.o model/app_prior.o model/state_assigner.o \
++	  model/state_predictor.o model/file_predictor.o model/anon_predictor.o \
++	  mapping/file_region.o mapping/anon_region.o mapping/lifecycle.o \
++	  adapter/memcg_adapter.o adapter/mglru_adapter.o adapter/damon_adapter.o \
++	  adapter/file_adapter.o adapter/anon_adapter.o adapter/feedback_adapter.o \
++	  control/debugfs.o control/sysfs.o control/genl.o control/trace.o
++obj-$(CONFIG_PARP_KUNIT_TEST) += tests/parp_test.o
+diff --git a/mm/parp/adapter/anon_adapter.c b/mm/parp/adapter/anon_adapter.c
+new file mode 100644
+index 000000000..4f4ca1fb8
+--- /dev/null
++++ b/mm/parp/adapter/anon_adapter.c
+@@ -0,0 +1,3 @@
++// SPDX-License-Identifier: GPL-2.0
++#include "../internal.h"
++/* Anonymous region matching is side-table only; no hot-path rmap walk. */
+diff --git a/mm/parp/adapter/damon_adapter.c b/mm/parp/adapter/damon_adapter.c
+new file mode 100644
+index 000000000..cf7640d9a
+--- /dev/null
++++ b/mm/parp/adapter/damon_adapter.c
+@@ -0,0 +1,3 @@
++// SPDX-License-Identifier: GPL-2.0
++#include "../internal.h"
++/* DAMON samples will populate bounded side tables asynchronously. */
+diff --git a/mm/parp/adapter/feedback_adapter.c b/mm/parp/adapter/feedback_adapter.c
+new file mode 100644
+index 000000000..fd1b436d0
+--- /dev/null
++++ b/mm/parp/adapter/feedback_adapter.c
+@@ -0,0 +1,3 @@
++// SPDX-License-Identifier: GPL-2.0
++#include "../internal.h"
++/* Existing workingset signals are consumed asynchronously without a hook. */
+diff --git a/mm/parp/adapter/file_adapter.c b/mm/parp/adapter/file_adapter.c
+new file mode 100644
+index 000000000..cefe9a89b
+--- /dev/null
++++ b/mm/parp/adapter/file_adapter.c
+@@ -0,0 +1,3 @@
++// SPDX-License-Identifier: GPL-2.0
++#include "../internal.h"
++/* File identity extraction is isolated from the neutral predictor. */
+diff --git a/mm/parp/adapter/memcg_adapter.c b/mm/parp/adapter/memcg_adapter.c
+new file mode 100644
+index 000000000..e5b646e4f
+--- /dev/null
++++ b/mm/parp/adapter/memcg_adapter.c
+@@ -0,0 +1,3 @@
++// SPDX-License-Identifier: GPL-2.0
++#include "../internal.h"
++/* Domain identity conversion lives in mglru_adapter.c. */
+diff --git a/mm/parp/adapter/mglru_adapter.c b/mm/parp/adapter/mglru_adapter.c
+new file mode 100644
+index 000000000..5ebacaad0
+--- /dev/null
++++ b/mm/parp/adapter/mglru_adapter.c
+@@ -0,0 +1,79 @@
++// SPDX-License-Identifier: GPL-2.0
++#include <linux/mm.h>
++#include <linux/memcontrol.h>
++#include <linux/parp.h>
++#include <linux/swap.h>
++#include <trace/events/parp.h>
++#include "../../internal.h"
++#include "../internal.h"
++
++void parp_adapter_prepare(struct parp_reclaim_ctx *ctx,
++			  struct lruvec *lruvec, struct scan_control *sc)
++{
++	struct mem_cgroup *memcg = lruvec_memcg(lruvec);
++
++	memset(ctx, 0, sizeof(*ctx));
++	ctx->mode = parp_get_mode();
++	atomic64_inc(&parp_stats.prepare);
++	if (ctx->mode == PARP_MODE_DISABLED)
++		return;
++	ctx->domain_id = mem_cgroup_id(memcg);
++	ctx->snapshot = parp_snapshot_acquire();
++	ctx->rcu_held = true;
++}
++
++struct parp_decision
++parp_adapter_score_folio(struct parp_reclaim_ctx *ctx, struct folio *folio,
++			 int type, int generation)
++{
++	struct parp_page_sample sample = {
++		.type = type ? PARP_PAGE_FILE : PARP_PAGE_ANON,
++		.domain_id = ctx->domain_id,
++		.generation = generation,
++		.resident = true,
++		.dirty = folio_test_dirty(folio),
++		.writeback = folio_test_writeback(folio),
++		.unevictable = !folio_evictable(folio),
++		/*
++		 * Access windows are filled asynchronously by the DAMON adapter.
++		 * Until a matching side-table entry exists, native fallback is
++		 * mandatory.
++		 */
++		.evidence_valid = false,
++	};
++	struct parp_decision decision;
++
++	if (ctx->mode == PARP_MODE_DISABLED) {
++		decision = (struct parp_decision) {
++			.original_action = PARP_ACTION_NATIVE,
++			.proposed_action = PARP_ACTION_NATIVE,
++			.applied_action = PARP_ACTION_NATIVE,
++			.fallback = PARP_FALLBACK_DISABLED,
++		};
++	} else {
++		decision = parp_engine_score(ctx->snapshot, &sample);
++	}
++	parp_stats_account(&decision);
++	trace_parp_decision(ctx->domain_id, ctx->mode, sample.type,
++			    decision.original_action, decision.proposed_action,
++			    decision.applied_action, decision.fallback,
++			    decision.score_q15);
++	return decision;
++}
++
++void parp_adapter_apply_decision(struct parp_reclaim_ctx *ctx,
++				 struct folio *folio,
++				 struct parp_decision *decision)
++{
++	/* Observe-only and the initial APPLY placeholder both remain native. */
++	decision->applied_action = decision->original_action;
++}
++
++void parp_adapter_finish(struct parp_reclaim_ctx *ctx,
++			 unsigned long scanned, unsigned long isolated)
++{
++	if (ctx->rcu_held)
++		parp_snapshot_release();
++	ctx->rcu_held = false;
++	atomic64_inc(&parp_stats.finish);
++}
+diff --git a/mm/parp/control/debugfs.c b/mm/parp/control/debugfs.c
+new file mode 100644
+index 000000000..3754119da
+--- /dev/null
++++ b/mm/parp/control/debugfs.c
+@@ -0,0 +1,108 @@
++// SPDX-License-Identifier: GPL-2.0
++#include <linux/debugfs.h>
++#include <linux/fs.h>
++#include <linux/init.h>
++#include <linux/module.h>
++#include <linux/uaccess.h>
++#include "../internal.h"
++
++static struct dentry *parp_dir;
++
++static ssize_t mode_read(struct file *file, char __user *buf, size_t len,
++			 loff_t *ppos)
++{
++	char text[16];
++	int size = scnprintf(text, sizeof(text), "%u\n", parp_get_mode());
++
++	return simple_read_from_buffer(buf, len, ppos, text, size);
++}
++
++static ssize_t mode_write(struct file *file, const char __user *buf,
++			  size_t len, loff_t *ppos)
++{
++	char text[16];
++	unsigned int mode;
++
++	if (!len || len >= sizeof(text) || copy_from_user(text, buf, len))
++		return -EINVAL;
++	text[len] = '\0';
++	if (kstrtouint(strim(text), 0, &mode) || parp_set_mode(mode))
++		return -EINVAL;
++	return len;
++}
++
++static const struct file_operations mode_fops = {
++	.owner = THIS_MODULE,
++	.read = mode_read,
++	.write = mode_write,
++	.llseek = default_llseek,
++};
++
++static ssize_t bind_write(struct file *file, const char __user *buf,
++			  size_t len, loff_t *ppos)
++{
++	struct parp_binding binding = { .active = true };
++	char text[128];
++	unsigned long ttl_ms;
++	u64 now = ktime_get_mono_fast_ns();
++
++	if (!len || len >= sizeof(text) || copy_from_user(text, buf, len))
++		return -EINVAL;
++	text[len] = '\0';
++	if (sscanf(text, "%llu %u %lu %llu %llu",
++		   &binding.domain_id, &binding.app_id, &ttl_ms,
++		   &binding.epoch_id, &binding.model_version) != 5)
++		return -EINVAL;
++	binding.updated_ns = now;
++	binding.expires_ns = now + ttl_ms * NSEC_PER_MSEC;
++	binding.bind_generation = lower_32_bits(now);
++	if (parp_snapshot_update_binding(&binding))
++		return -ENOMEM;
++	return len;
++}
++
++static ssize_t prior_write(struct file *file, const char __user *buf,
++			   size_t len, loff_t *ppos)
++{
++	struct parp_app_prior prior = { .valid = true };
++	char text[128];
++	unsigned long ttl_ms;
++	u64 now = ktime_get_mono_fast_ns();
++
++	if (!len || len >= sizeof(text) || copy_from_user(text, buf, len))
++		return -EINVAL;
++	text[len] = '\0';
++	if (sscanf(text, "%u %hu %hu %u %lu %llu", &prior.app_id,
++		   &prior.use_score_q15, &prior.rank, &prior.horizon_ms,
++		   &ttl_ms, &prior.model_version) != 6)
++		return -EINVAL;
++	if (prior.use_score_q15 > PARP_Q15_ONE)
++		return -ERANGE;
++	prior.updated_ns = now;
++	prior.expires_ns = now + ttl_ms * NSEC_PER_MSEC;
++	if (parp_snapshot_update_prior(&prior))
++		return -ENOMEM;
++	return len;
++}
++
++static const struct file_operations bind_fops = {
++	.owner = THIS_MODULE,
++	.write = bind_write,
++	.llseek = noop_llseek,
++};
++
++static const struct file_operations prior_fops = {
++	.owner = THIS_MODULE,
++	.write = prior_write,
++	.llseek = noop_llseek,
++};
++
++static int __init parp_init(void)
++{
++	parp_dir = debugfs_create_dir("parp", NULL);
++	debugfs_create_file("mode", 0600, parp_dir, NULL, &mode_fops);
++	debugfs_create_file("app_bind", 0200, parp_dir, NULL, &bind_fops);
++	debugfs_create_file("app_prior", 0200, parp_dir, NULL, &prior_fops);
++	return 0;
++}
++subsys_initcall(parp_init);
+diff --git a/mm/parp/control/genl.c b/mm/parp/control/genl.c
+new file mode 100644
+index 000000000..40504ecfb
+--- /dev/null
++++ b/mm/parp/control/genl.c
+@@ -0,0 +1,7 @@
++// SPDX-License-Identifier: GPL-2.0
++#include "../internal.h"
++/*
++ * Versioned Generic Netlink transport is intentionally a safe stub in this
++ * observe-only reproduction. parpctl can validate and pack its v1 schema,
++ * while no hot-path message is ever emitted.
++ */
+diff --git a/mm/parp/control/sysfs.c b/mm/parp/control/sysfs.c
+new file mode 100644
+index 000000000..3b54be44f
+--- /dev/null
++++ b/mm/parp/control/sysfs.c
+@@ -0,0 +1,3 @@
++// SPDX-License-Identifier: GPL-2.0
++#include "../internal.h"
++/* Debugfs is the only enabled control surface in the safe first stage. */
+diff --git a/mm/parp/control/trace.c b/mm/parp/control/trace.c
+new file mode 100644
+index 000000000..505f68d73
+--- /dev/null
++++ b/mm/parp/control/trace.c
+@@ -0,0 +1,3 @@
++// SPDX-License-Identifier: GPL-2.0
++#define CREATE_TRACE_POINTS
++#include <trace/events/parp.h>
+diff --git a/mm/parp/core/budget.c b/mm/parp/core/budget.c
+new file mode 100644
+index 000000000..43bbe4a35
+--- /dev/null
++++ b/mm/parp/core/budget.c
+@@ -0,0 +1,7 @@
++// SPDX-License-Identifier: GPL-2.0
++#include "../internal.h"
++
++bool parp_budget_allow(unsigned int used, unsigned int limit)
++{
++	return used < limit;
++}
+diff --git a/mm/parp/core/domain.c b/mm/parp/core/domain.c
+new file mode 100644
+index 000000000..73c885103
+--- /dev/null
++++ b/mm/parp/core/domain.c
+@@ -0,0 +1,17 @@
++// SPDX-License-Identifier: GPL-2.0
++#include "../internal.h"
++
++static enum parp_mode parp_mode = PARP_MODE_OBSERVE;
++
++enum parp_mode parp_get_mode(void)
++{
++	return READ_ONCE(parp_mode);
++}
++
++int parp_set_mode(enum parp_mode mode)
++{
++	if (mode < PARP_MODE_DISABLED || mode > PARP_MODE_APPLY)
++		return -EINVAL;
++	WRITE_ONCE(parp_mode, mode);
++	return 0;
++}
+diff --git a/mm/parp/core/engine.c b/mm/parp/core/engine.c
+new file mode 100644
+index 000000000..0d993b25e
+--- /dev/null
++++ b/mm/parp/core/engine.c
+@@ -0,0 +1,103 @@
++// SPDX-License-Identifier: GPL-2.0
++#include "../internal.h"
++
++u16 parp_q15_mul(u16 a, u16 b)
++{
++	u32 product = (u32)min_t(u16, a, PARP_Q15_ONE) *
++		      min_t(u16, b, PARP_Q15_ONE);
++
++	return min_t(u32, (product + (1U << 14)) >> 15, PARP_Q15_ONE);
++}
++
++s16 parp_q15_sat_add(s16 a, s16 b)
++{
++	s32 sum = (s32)a + b;
++
++	return clamp_t(s32, sum, S16_MIN, S16_MAX);
++}
++
++static const struct parp_binding *
++parp_find_binding(const struct parp_snapshot *snapshot, u64 domain_id)
++{
++	unsigned int i;
++
++	for (i = 0; i < min_t(u32, snapshot->nr_bindings,
++			      PARP_MAX_DOMAINS); i++)
++		if (snapshot->bindings[i].active &&
++		    snapshot->bindings[i].domain_id == domain_id)
++			return &snapshot->bindings[i];
++	return NULL;
++}
++
++static const struct parp_app_prior *
++parp_find_prior(const struct parp_snapshot *snapshot, u32 app_id)
++{
++	unsigned int i;
++
++	for (i = 0; i < min_t(u32, snapshot->nr_priors, PARP_MAX_APPS); i++)
++		if (snapshot->priors[i].valid &&
++		    snapshot->priors[i].app_id == app_id)
++			return &snapshot->priors[i];
++	return NULL;
++}
++
++struct parp_decision parp_engine_score(const struct parp_snapshot *snapshot,
++				       const struct parp_page_sample *sample)
++{
++	const struct parp_binding *binding;
++	const struct parp_app_prior *prior;
++	struct parp_page_sample enriched = *sample;
++	struct parp_decision decision = {
++		.original_action = PARP_ACTION_NATIVE,
++		.proposed_action = PARP_ACTION_NATIVE,
++		.applied_action = PARP_ACTION_NATIVE,
++	};
++	u64 now = ktime_get_mono_fast_ns();
++
++	if (!snapshot) {
++		decision.fallback = PARP_FALLBACK_NO_DOMAIN;
++		return decision;
++	}
++	binding = parp_find_binding(snapshot, sample->domain_id);
++	if (!binding) {
++		decision.fallback = PARP_FALLBACK_NO_BINDING;
++		return decision;
++	}
++	if (now >= binding->expires_ns || now >= snapshot->expires_ns) {
++		decision.fallback = PARP_FALLBACK_EXPIRED;
++		return decision;
++	}
++	prior = parp_find_prior(snapshot, binding->app_id);
++	if (!prior || now >= prior->expires_ns) {
++		decision.fallback = PARP_FALLBACK_EXPIRED;
++		return decision;
++	}
++	if (prior->model_version != binding->model_version) {
++		decision.fallback = PARP_FALLBACK_MODEL_VERSION;
++		return decision;
++	}
++	if (!sample->evidence_valid) {
++		decision.fallback = PARP_FALLBACK_NO_EVIDENCE;
++		return decision;
++	}
++	if (sample->dirty || sample->writeback || sample->unevictable) {
++		decision.fallback = PARP_FALLBACK_UNSAFE_FOLIO;
++		return decision;
++	}
++
++	enriched.app_prior_q15 = prior->use_score_q15;
++	if (sample->type == PARP_PAGE_FILE) {
++		decision.score_q15 = parp_file_future_score(&enriched);
++		if (decision.score_q15 >= 24576)
++			decision.proposed_action = sample->resident ?
++				PARP_ACTION_PROTECT :
++				PARP_ACTION_PREFETCH_CANDIDATE;
++		else if (decision.score_q15 <= 4096)
++			decision.proposed_action = PARP_ACTION_RECLAIM_BIAS;
++	} else {
++		decision.score_q15 = parp_anon_cold_score(&enriched);
++		if (decision.score_q15 >= 24576)
++			decision.proposed_action = PARP_ACTION_RECLAIM_BIAS;
++	}
++	return decision;
++}
+diff --git a/mm/parp/core/fallback.c b/mm/parp/core/fallback.c
+new file mode 100644
+index 000000000..1e624dab7
+--- /dev/null
++++ b/mm/parp/core/fallback.c
+@@ -0,0 +1,7 @@
++// SPDX-License-Identifier: GPL-2.0
++#include "../internal.h"
++
++bool parp_fallback_is_native(enum parp_fallback_reason reason)
++{
++	return reason != PARP_FALLBACK_NONE;
++}
+diff --git a/mm/parp/core/policy.c b/mm/parp/core/policy.c
+new file mode 100644
+index 000000000..de54386ff
+--- /dev/null
++++ b/mm/parp/core/policy.c
+@@ -0,0 +1,10 @@
++// SPDX-License-Identifier: GPL-2.0
++#include "../internal.h"
++
++/* Apply remains deliberately inert until bounded budgets are validated. */
++enum parp_action parp_policy_applied(enum parp_mode mode,
++				     enum parp_action original,
++				     enum parp_action proposed)
++{
++	return original;
++}
+diff --git a/mm/parp/core/snapshot.c b/mm/parp/core/snapshot.c
+new file mode 100644
+index 000000000..45923e89f
+--- /dev/null
++++ b/mm/parp/core/snapshot.c
+@@ -0,0 +1,93 @@
++// SPDX-License-Identifier: GPL-2.0
++#include <linux/slab.h>
++#include "../internal.h"
++
++static DEFINE_SPINLOCK(parp_snapshot_lock);
++static struct parp_snapshot __rcu *parp_active_snapshot;
++
++static void parp_free_snapshot(struct rcu_head *head)
++{
++	kfree(container_of(head, struct parp_snapshot, rcu));
++}
++
++const struct parp_snapshot *parp_snapshot_acquire(void)
++{
++	rcu_read_lock();
++	return rcu_dereference(parp_active_snapshot);
++}
++
++void parp_snapshot_release(void)
++{
++	rcu_read_unlock();
++}
++
++static struct parp_snapshot *parp_clone_snapshot(gfp_t gfp)
++{
++	struct parp_snapshot *old;
++	struct parp_snapshot *new;
++
++	new = kzalloc(sizeof(*new), gfp);
++	if (!new)
++		return NULL;
++	rcu_read_lock();
++	old = rcu_dereference(parp_active_snapshot);
++	if (old)
++		memcpy(new, old, sizeof(*new));
++	rcu_read_unlock();
++	memset(&new->rcu, 0, sizeof(new->rcu));
++	new->version++;
++	new->created_ns = ktime_get_mono_fast_ns();
++	new->expires_ns = new->created_ns + 300ULL * NSEC_PER_SEC;
++	return new;
++}
++
++static void parp_publish_snapshot(struct parp_snapshot *new)
++{
++	struct parp_snapshot *old;
++
++	spin_lock(&parp_snapshot_lock);
++	old = rcu_dereference_protected(parp_active_snapshot,
++					lockdep_is_held(&parp_snapshot_lock));
++	rcu_assign_pointer(parp_active_snapshot, new);
++	spin_unlock(&parp_snapshot_lock);
++	if (old)
++		call_rcu(&old->rcu, parp_free_snapshot);
++}
++
++int parp_snapshot_update_binding(const struct parp_binding *binding)
++{
++	struct parp_snapshot *new = parp_clone_snapshot(GFP_KERNEL);
++	unsigned int i, slot;
++
++	if (!new)
++		return -ENOMEM;
++	slot = min_t(u32, new->nr_bindings, PARP_MAX_DOMAINS - 1);
++	for (i = 0; i < new->nr_bindings; i++)
++		if (new->bindings[i].domain_id == binding->domain_id) {
++			slot = i;
++			break;
++		}
++	new->bindings[slot] = *binding;
++	new->nr_bindings = max_t(u32, new->nr_bindings, slot + 1);
++	parp_publish_snapshot(new);
++	return 0;
++}
++
++int parp_snapshot_update_prior(const struct parp_app_prior *prior)
++{
++	struct parp_snapshot *new = parp_clone_snapshot(GFP_KERNEL);
++	unsigned int i, slot;
++
++	if (!new)
++		return -ENOMEM;
++	slot = min_t(u32, new->nr_priors, PARP_MAX_APPS - 1);
++	for (i = 0; i < new->nr_priors; i++)
++		if (new->priors[i].app_id == prior->app_id) {
++			slot = i;
++			break;
++		}
++	new->priors[slot] = *prior;
++	new->nr_priors = max_t(u32, new->nr_priors, slot + 1);
++	parp_publish_snapshot(new);
++	return 0;
++}
+diff --git a/mm/parp/core/stats.c b/mm/parp/core/stats.c
+new file mode 100644
+index 000000000..12b3d683c
+--- /dev/null
++++ b/mm/parp/core/stats.c
+@@ -0,0 +1,11 @@
++// SPDX-License-Identifier: GPL-2.0
++#include "../internal.h"
++
++struct parp_stats parp_stats;
++
++void parp_stats_account(const struct parp_decision *decision)
++{
++	atomic64_inc(&parp_stats.scored);
++	atomic64_inc(&parp_stats.proposed[decision->proposed_action]);
++	atomic64_inc(&parp_stats.fallback[decision->fallback]);
++}
+diff --git a/mm/parp/internal.h b/mm/parp/internal.h
+new file mode 100644
+index 000000000..421ac5f81
+--- /dev/null
++++ b/mm/parp/internal.h
+@@ -0,0 +1,140 @@
++/* SPDX-License-Identifier: GPL-2.0 */
++#ifndef _MM_PARP_INTERNAL_H
++#define _MM_PARP_INTERNAL_H
++
++#include <linux/parp.h>
++#include <linux/rcupdate.h>
++#include <linux/spinlock.h>
++#include <linux/ktime.h>
++
++#define PARP_Q15_ONE		32767U
++#define PARP_MAX_APPS		32
++#define PARP_MAX_DOMAINS	64
++#define PARP_MAX_STATES		16
++#define PARP_MAX_REGIONS	64
++
++enum parp_page_type {
++	PARP_PAGE_ANON,
++	PARP_PAGE_FILE,
++};
++
++struct parp_file_key {
++	u32 dev_major;
++	u32 dev_minor;
++	u64 inode;
++	u64 file_version;
++	u64 start_index;
++	u32 nr_pages;
++};
++
++struct parp_anon_key {
++	u64 domain_id;
++	u64 foreground_epoch_id;
++	u64 mm_cookie;
++	u32 process_role;
++	u64 vma_signature;
++	u32 relative_start_pages;
++	u32 nr_pages;
++};
++
++struct parp_page_sample {
++	enum parp_page_type type;
++	u64 domain_id;
++	u64 epoch_id;
++	u64 file_version;
++	u64 index;
++	u32 accesses_10s;
++	u32 accesses_30s;
++	u32 accesses_60s;
++	u32 age;
++	u16 active_ratio_q15;
++	u16 app_prior_q15;
++	u16 next_state_q15;
++	u16 support_q15;
++	u16 stability_q15;
++	u16 freshness_q15;
++	u8 generation;
++	bool resident;
++	bool dirty;
++	bool writeback;
++	bool unevictable;
++	bool evidence_valid;
++};
++
++struct parp_app_prior {
++	u32 app_id;
++	u16 use_score_q15;
++	u16 rank;
++	u32 horizon_ms;
++	u64 updated_ns;
++	u64 expires_ns;
++	u64 model_version;
++	bool valid;
++};
++
++struct parp_binding {
++	u64 domain_id;
++	u32 app_id;
++	u32 bind_generation;
++	u64 updated_ns;
++	u64 expires_ns;
++	u64 epoch_id;
++	u64 model_version;
++	bool active;
++};
++
++struct parp_snapshot {
++	struct rcu_head rcu;
++	u64 version;
++	u64 created_ns;
++	u64 expires_ns;
++	u32 nr_priors;
++	u32 nr_bindings;
++	struct parp_app_prior priors[PARP_MAX_APPS];
++	struct parp_binding bindings[PARP_MAX_DOMAINS];
++};
++
++struct parp_stats {
++	atomic64_t prepare;
++	atomic64_t scored;
++	atomic64_t proposed[4];
++	atomic64_t fallback[8];
++	atomic64_t finish;
++};
++
++extern struct parp_stats parp_stats;
++
++u16 parp_q15_mul(u16 a, u16 b);
++s16 parp_q15_sat_add(s16 a, s16 b);
++int parp_assign_state(const s16 *features, const s16 *centers,
++		      unsigned int nr_features, unsigned int nr_states,
++		      u32 unknown_threshold);
++u16 parp_predict_next_state(const u16 *table, unsigned int nr_states,
++			    unsigned int current_state, unsigned int previous_state,
++			    unsigned int duration_bin,
++			    unsigned int app_prior_bin);
++u16 parp_file_future_score(const struct parp_page_sample *sample);
++u16 parp_anon_cold_score(const struct parp_page_sample *sample);
++struct parp_decision parp_engine_score(const struct parp_snapshot *snapshot,
++				       const struct parp_page_sample *sample);
++enum parp_mode parp_get_mode(void);
++int parp_set_mode(enum parp_mode mode);
++const struct parp_snapshot *parp_snapshot_acquire(void);
++void parp_snapshot_release(void);
++int parp_snapshot_update_binding(const struct parp_binding *binding);
++int parp_snapshot_update_prior(const struct parp_app_prior *prior);
++void parp_stats_account(const struct parp_decision *decision);
++enum parp_action parp_policy_applied(enum parp_mode mode,
++				     enum parp_action original,
++				     enum parp_action proposed);
++bool parp_budget_allow(unsigned int used, unsigned int limit);
++bool parp_fallback_is_native(enum parp_fallback_reason reason);
++unsigned int parp_app_prior_bin(u16 score);
++bool parp_file_key_equal(const struct parp_file_key *a,
++			 const struct parp_file_key *b);
++bool parp_anon_key_valid(const struct parp_anon_key *key, u64 epoch);
++bool parp_not_expired(u64 expires_ns, u64 now_ns);
++int parp_control_init(void);
++void parp_control_exit(void);
++
++#endif
+diff --git a/mm/parp/mapping/anon_region.c b/mm/parp/mapping/anon_region.c
+new file mode 100644
+index 000000000..972cb26dc
+--- /dev/null
++++ b/mm/parp/mapping/anon_region.c
+@@ -0,0 +1,7 @@
++// SPDX-License-Identifier: GPL-2.0
++#include "../internal.h"
++
++bool parp_anon_key_valid(const struct parp_anon_key *key, u64 epoch)
++{
++	return key->foreground_epoch_id == epoch && key->mm_cookie;
++}
+diff --git a/mm/parp/mapping/file_region.c b/mm/parp/mapping/file_region.c
+new file mode 100644
+index 000000000..99bf6b1a4
+--- /dev/null
++++ b/mm/parp/mapping/file_region.c
+@@ -0,0 +1,8 @@
++// SPDX-License-Identifier: GPL-2.0
++#include "../internal.h"
++
++bool parp_file_key_equal(const struct parp_file_key *a,
++			 const struct parp_file_key *b)
++{
++	return !memcmp(a, b, sizeof(*a));
++}
+diff --git a/mm/parp/mapping/lifecycle.c b/mm/parp/mapping/lifecycle.c
+new file mode 100644
+index 000000000..a8a39911f
+--- /dev/null
++++ b/mm/parp/mapping/lifecycle.c
+@@ -0,0 +1,7 @@
++// SPDX-License-Identifier: GPL-2.0
++#include "../internal.h"
++
++bool parp_not_expired(u64 expires_ns, u64 now_ns)
++{
++	return now_ns < expires_ns;
++}
+diff --git a/mm/parp/model/anon_predictor.c b/mm/parp/model/anon_predictor.c
+new file mode 100644
+index 000000000..c812894fb
+--- /dev/null
++++ b/mm/parp/model/anon_predictor.c
+@@ -0,0 +1,18 @@
++// SPDX-License-Identifier: GPL-2.0
++#include "../internal.h"
++
++u16 parp_anon_cold_score(const struct parp_page_sample *sample)
++{
++	u32 recent;
++	u32 cold;
++
++	if (!sample->evidence_valid)
++		return 0;
++	recent = min_t(u32, sample->accesses_10s * 4 +
++		       sample->accesses_30s * 2 + sample->accesses_60s, 32767);
++	cold = PARP_Q15_ONE - recent;
++	cold = (cold + (PARP_Q15_ONE - sample->active_ratio_q15)) / 2;
++	/* app prior may modulate evidence, but can never create it. */
++	return parp_q15_mul(cold, PARP_Q15_ONE -
++			    min_t(u16, sample->app_prior_q15, PARP_Q15_ONE));
++}
+diff --git a/mm/parp/model/app_prior.c b/mm/parp/model/app_prior.c
+new file mode 100644
+index 000000000..f1061cee9
+--- /dev/null
++++ b/mm/parp/model/app_prior.c
+@@ -0,0 +1,7 @@
++// SPDX-License-Identifier: GPL-2.0
++#include "../internal.h"
++
++unsigned int parp_app_prior_bin(u16 score)
++{
++	return min_t(unsigned int, score / 8192, 3);
++}
+diff --git a/mm/parp/model/file_predictor.c b/mm/parp/model/file_predictor.c
+new file mode 100644
+index 000000000..223004405
+--- /dev/null
++++ b/mm/parp/model/file_predictor.c
+@@ -0,0 +1,12 @@
++// SPDX-License-Identifier: GPL-2.0
++#include "../internal.h"
++
++u16 parp_file_future_score(const struct parp_page_sample *sample)
++{
++	u16 score;
++
++	score = parp_q15_mul(sample->app_prior_q15, sample->next_state_q15);
++	score = parp_q15_mul(score, sample->support_q15);
++	score = parp_q15_mul(score, sample->stability_q15);
++	return parp_q15_mul(score, sample->freshness_q15);
++}
+diff --git a/mm/parp/model/model_store.c b/mm/parp/model/model_store.c
+new file mode 100644
+index 000000000..af35453ad
+--- /dev/null
++++ b/mm/parp/model/model_store.c
+@@ -0,0 +1,3 @@
++// SPDX-License-Identifier: GPL-2.0
++#include "../internal.h"
++/* Versioned models are published through immutable snapshots. */
+diff --git a/mm/parp/model/state_assigner.c b/mm/parp/model/state_assigner.c
+new file mode 100644
+index 000000000..631e104d7
+--- /dev/null
++++ b/mm/parp/model/state_assigner.c
+@@ -0,0 +1,26 @@
++// SPDX-License-Identifier: GPL-2.0
++#include "../internal.h"
++
++int parp_assign_state(const s16 *features, const s16 *centers,
++		      unsigned int nr_features, unsigned int nr_states,
++		      u32 unknown_threshold)
++{
++	u64 best = U64_MAX;
++	unsigned int state, feature, best_state = 0;
++
++	for (state = 0; state < min(nr_states, (unsigned int)PARP_MAX_STATES);
++	     state++) {
++		u64 distance = 0;
++
++		for (feature = 0; feature < nr_features; feature++) {
++			s32 delta = features[feature] -
++				    centers[state * nr_features + feature];
++			distance += (u64)delta * delta;
++		}
++		if (distance < best) {
++			best = distance;
++			best_state = state;
++		}
++	}
++	return best > unknown_threshold ? -1 : best_state;
++}
+diff --git a/mm/parp/model/state_predictor.c b/mm/parp/model/state_predictor.c
+new file mode 100644
+index 000000000..5bd83623b
+--- /dev/null
++++ b/mm/parp/model/state_predictor.c
+@@ -0,0 +1,17 @@
++// SPDX-License-Identifier: GPL-2.0
++#include "../internal.h"
++
++u16 parp_predict_next_state(const u16 *table, unsigned int nr_states,
++			    unsigned int current_state, unsigned int previous_state,
++			    unsigned int duration_bin,
++			    unsigned int app_prior_bin)
++{
++	size_t index;
++
++	if (!nr_states || current_state >= nr_states ||
++	    previous_state >= nr_states)
++		return 0;
++	index = (((previous_state * nr_states + current_state) * 3 +
++		  min(duration_bin, 2U)) * 4 + min(app_prior_bin, 3U));
++	return min_t(u16, table[index], PARP_Q15_ONE);
++}
+diff --git a/mm/parp/tests/parp_test.c b/mm/parp/tests/parp_test.c
+new file mode 100644
+index 000000000..d787e2b2d
+--- /dev/null
++++ b/mm/parp/tests/parp_test.c
+@@ -0,0 +1,176 @@
++// SPDX-License-Identifier: GPL-2.0
++#include <kunit/test.h>
++#include "../internal.h"
++
++static void parp_q15_test(struct kunit *test)
++{
++	KUNIT_EXPECT_EQ(test, parp_q15_mul(PARP_Q15_ONE, PARP_Q15_ONE),
++			(u16)32766);
++	KUNIT_EXPECT_EQ(test, parp_q15_sat_add(30000, 10000), (s16)S16_MAX);
++}
++
++static void parp_state_test(struct kunit *test)
++{
++	const s16 features[] = { 10, 12 };
++	const s16 centers[] = { 9, 11, 100, 100 };
++	u16 table[2 * 2 * 3 * 4] = { 0 };
++
++	table[4] = 25000;
++	KUNIT_EXPECT_EQ(test, parp_assign_state(features, centers, 2, 2, 16), 0);
++	KUNIT_EXPECT_EQ(test, parp_assign_state(features, centers, 2, 2, 1), -1);
++	KUNIT_EXPECT_EQ(test, parp_predict_next_state(table, 2, 0, 0, 1, 0),
++			(u16)25000);
++}
++
++static void parp_predictor_test(struct kunit *test)
++{
++	struct parp_page_sample sample = {
++		.app_prior_q15 = PARP_Q15_ONE,
++		.next_state_q15 = PARP_Q15_ONE,
++		.support_q15 = PARP_Q15_ONE,
++		.stability_q15 = PARP_Q15_ONE,
++		.freshness_q15 = PARP_Q15_ONE,
++		.evidence_valid = true,
++	};
++
++	KUNIT_EXPECT_GT(test, parp_file_future_score(&sample), (u16)32000);
++	sample.app_prior_q15 = 0;
++	KUNIT_EXPECT_EQ(test, parp_anon_cold_score(&sample), (u16)32766);
++	sample.evidence_valid = false;
++	KUNIT_EXPECT_EQ(test, parp_anon_cold_score(&sample), (u16)0);
++}
++
++static void parp_metadata_test(struct kunit *test)
++{
++	struct parp_file_key file = {
++		.dev_major = 8,
++		.dev_minor = 1,
++		.inode = 42,
++		.file_version = 7,
++		.start_index = 128,
++		.nr_pages = 16,
++	};
++	struct parp_file_key changed = file;
++	struct parp_anon_key anon = {
++		.domain_id = 9,
++		.foreground_epoch_id = 11,
++		.mm_cookie = 13,
++	};
++
++	KUNIT_EXPECT_EQ(test, parp_app_prior_bin(0), 0U);
++	KUNIT_EXPECT_EQ(test, parp_app_prior_bin(PARP_Q15_ONE), 3U);
++	KUNIT_EXPECT_TRUE(test, parp_not_expired(101, 100));
++	KUNIT_EXPECT_FALSE(test, parp_not_expired(100, 100));
++	KUNIT_EXPECT_TRUE(test, parp_file_key_equal(&file, &changed));
++	changed.file_version++;
++	KUNIT_EXPECT_FALSE(test, parp_file_key_equal(&file, &changed));
++	KUNIT_EXPECT_TRUE(test, parp_anon_key_valid(&anon, 11));
++	KUNIT_EXPECT_FALSE(test, parp_anon_key_valid(&anon, 12));
++	anon.mm_cookie = 0;
++	KUNIT_EXPECT_FALSE(test, parp_anon_key_valid(&anon, 11));
++	KUNIT_EXPECT_TRUE(test, parp_budget_allow(3, 4));
++	KUNIT_EXPECT_FALSE(test, parp_budget_allow(4, 4));
++}
++
++static void parp_fallback_test(struct kunit *test)
++{
++	struct parp_snapshot *snapshot;
++	struct parp_page_sample sample = {
++		.type = PARP_PAGE_FILE,
++		.domain_id = 17,
++		.evidence_valid = true,
++	};
++	struct parp_decision decision;
++	u64 now = ktime_get_mono_fast_ns();
++
++	snapshot = kunit_kzalloc(test, sizeof(*snapshot), GFP_KERNEL);
++	KUNIT_ASSERT_NOT_NULL(test, snapshot);
++	decision = parp_engine_score(NULL, &sample);
++	KUNIT_EXPECT_EQ(test, decision.fallback, PARP_FALLBACK_NO_DOMAIN);
++
++	snapshot->expires_ns = now + NSEC_PER_SEC;
++	decision = parp_engine_score(snapshot, &sample);
++	KUNIT_EXPECT_EQ(test, decision.fallback, PARP_FALLBACK_NO_BINDING);
++
++	snapshot->nr_bindings = 1;
++	snapshot->bindings[0] = (struct parp_binding) {
++		.domain_id = sample.domain_id,
++		.app_id = 23,
++		.expires_ns = now + NSEC_PER_SEC,
++		.model_version = 3,
++		.active = true,
++	};
++	snapshot->nr_priors = 1;
++	snapshot->priors[0] = (struct parp_app_prior) {
++		.app_id = 23,
++		.expires_ns = now + NSEC_PER_SEC,
++		.model_version = 4,
++		.valid = true,
++	};
++	decision = parp_engine_score(snapshot, &sample);
++	KUNIT_EXPECT_EQ(test, decision.fallback,
++			PARP_FALLBACK_MODEL_VERSION);
++	snapshot->priors[0].model_version = 3;
++	sample.evidence_valid = false;
++	decision = parp_engine_score(snapshot, &sample);
++	KUNIT_EXPECT_EQ(test, decision.fallback, PARP_FALLBACK_NO_EVIDENCE);
++	sample.evidence_valid = true;
++	sample.dirty = true;
++	decision = parp_engine_score(snapshot, &sample);
++	KUNIT_EXPECT_EQ(test, decision.fallback, PARP_FALLBACK_UNSAFE_FOLIO);
++}
++
++static void parp_snapshot_test(struct kunit *test)
++{
++	const struct parp_snapshot *snapshot;
++	struct parp_binding binding = {
++		.domain_id = 31,
++		.app_id = 37,
++		.expires_ns = U64_MAX,
++		.model_version = 5,
++		.active = true,
++	};
++
++	KUNIT_ASSERT_EQ(test, parp_snapshot_update_binding(&binding), 0);
++	snapshot = parp_snapshot_acquire();
++	KUNIT_ASSERT_NOT_NULL(test, snapshot);
++	KUNIT_EXPECT_GE(test, snapshot->version, 1ULL);
++	KUNIT_EXPECT_EQ(test, snapshot->bindings[0].domain_id, 31ULL);
++	parp_snapshot_release();
++}
++
++static void parp_observe_test(struct kunit *test)
++{
++	struct parp_decision decision = {
++		.original_action = PARP_ACTION_NATIVE,
++		.proposed_action = PARP_ACTION_PROTECT,
++		.applied_action = PARP_ACTION_NATIVE,
++	};
++
++	KUNIT_EXPECT_EQ(test, decision.applied_action, decision.original_action);
++	KUNIT_EXPECT_NE(test, decision.proposed_action, decision.applied_action);
++	KUNIT_EXPECT_EQ(test,
++			parp_policy_applied(PARP_MODE_OBSERVE,
++					    PARP_ACTION_NATIVE,
++					    PARP_ACTION_PROTECT),
++			PARP_ACTION_NATIVE);
++}
++
++static struct kunit_case parp_cases[] = {
++	KUNIT_CASE(parp_q15_test),
++	KUNIT_CASE(parp_state_test),
++	KUNIT_CASE(parp_predictor_test),
++	KUNIT_CASE(parp_metadata_test),
++	KUNIT_CASE(parp_fallback_test),
++	KUNIT_CASE(parp_snapshot_test),
++	KUNIT_CASE(parp_observe_test),
++	{}
++};
++
++static struct kunit_suite parp_suite = {
++	.name = "parp",
++	.test_cases = parp_cases,
++};
++kunit_test_suite(parp_suite);
++
++MODULE_LICENSE("GPL");
+diff --git a/mm/vmscan.c b/mm/vmscan.c
+index 674999999..702901c20 100644
+--- a/mm/vmscan.c
++++ b/mm/vmscan.c
+@@ -58,6 +58,7 @@
+ #include <linux/random.h>
+ #include <linux/mmu_notifier.h>
+ #include <linux/parser.h>
++#include <linux/parp.h>
+ 
+ #include <asm/tlbflush.h>
+ #include <asm/div64.h>
+@@ -4568,6 +4569,7 @@ static int scan_folios(unsigned long nr_to_scan, struct lruvec *lruvec,
+ 		       struct scan_control *sc, int type, int tier,
+ 		       struct list_head *list)
+ {
++	struct parp_reclaim_ctx parp_ctx;
+ 	int i;
+ 	int gen;
+ 	enum vm_event_item item;
+@@ -4585,6 +4587,7 @@ static int scan_folios(unsigned long nr_to_scan, struct lruvec *lruvec,
+ 		return 0;
+ 
+ 	gen = lru_gen_from_seq(lrugen->min_seq[type]);
++	parp_adapter_prepare(&parp_ctx, lruvec, sc);
+ 
+ 	for (i = MAX_NR_ZONES; i > 0; i--) {
+ 		LIST_HEAD(moved);
+@@ -4594,6 +4597,7 @@ static int scan_folios(unsigned long nr_to_scan, struct lruvec *lruvec,
+ 
+ 		while (!list_empty(head)) {
+ 			struct folio *folio = lru_to_folio(head);
++			struct parp_decision parp_decision;
+ 			int delta = folio_nr_pages(folio);
+ 
+ 			VM_WARN_ON_ONCE_FOLIO(folio_test_unevictable(folio), folio);
+@@ -4602,6 +4606,10 @@ static int scan_folios(unsigned long nr_to_scan, struct lruvec *lruvec,
+ 			VM_WARN_ON_ONCE_FOLIO(folio_zonenum(folio) != zone, folio);
+ 
+ 			scanned += delta;
++			parp_decision = parp_adapter_score_folio(&parp_ctx, folio,
++								type, gen);
++			parp_adapter_apply_decision(&parp_ctx, folio,
++						   &parp_decision);
+ 
+ 			if (sort_folio(lruvec, folio, sc, tier))
+ 				sorted += delta;
+@@ -4640,6 +4648,7 @@ static int scan_folios(unsigned long nr_to_scan, struct lruvec *lruvec,
+ 				type ? LRU_INACTIVE_FILE : LRU_INACTIVE_ANON);
+ 	if (type == LRU_GEN_FILE)
+ 		sc->nr.file_taken += isolated;
++	parp_adapter_finish(&parp_ctx, scanned, isolated);
+ 	/*
+ 	 * There might not be eligible folios due to reclaim_idx. Check the
+ 	 * remaining to prevent livelock if it's not making progress.
+diff --git a/tools/parp/README.md b/tools/parp/README.md
+new file mode 100644
+index 000000000..5deea90cb
+--- /dev/null
++++ b/tools/parp/README.md
+@@ -0,0 +1,6 @@
++# PARP userspace tools
++
++`parpctl.py` controls the safe debugfs mode. `model_pack.py` validates and
++packs Q15 model values; `reference_model.py` is the bit-exact oracle used by
++`evaluate.py`. Generic Netlink transport is intentionally not activated in
++this safe-stub milestone.
+diff --git a/tools/parp/configs/example.json b/tools/parp/configs/example.json
+new file mode 100644
+index 000000000..e973737d1
+--- /dev/null
++++ b/tools/parp/configs/example.json
+@@ -0,0 +1 @@
++{"schema_version": 1, "model_version": 1, "q15_values": [32767, 24576, 8192, 0]}
+diff --git a/tools/parp/evaluate.py b/tools/parp/evaluate.py
+new file mode 100755
+index 000000000..ad91c9218
+--- /dev/null
++++ b/tools/parp/evaluate.py
+@@ -0,0 +1,34 @@
++#!/usr/bin/env python3
++import unittest
++
++from reference_model import (Q15_ONE, anon_cold_score, assign_state,
++                             file_future_score, q15_mul)
++from schema import APP_BIND, APP_PRIOR, pack_app_bind, pack_app_prior
++
++
++class ReferenceModelTest(unittest.TestCase):
++    def test_q15(self):
++        self.assertEqual(q15_mul(Q15_ONE, Q15_ONE), 32766)
++
++    def test_state_and_unknown(self):
++        self.assertEqual(assign_state([10, 12], [[9, 11], [100, 100]], 16), 0)
++        self.assertEqual(assign_state([10, 12], [[9, 11], [100, 100]], 1), -1)
++
++    def test_file_score(self):
++        self.assertGreater(file_future_score(*([Q15_ONE] * 5)), 32000)
++
++    def test_anon_needs_evidence(self):
++        self.assertEqual(anon_cold_score(0, 0, 0, 0, 0, False), 0)
++        self.assertEqual(anon_cold_score(0, 0, 0, 0, 0), 32766)
++
++    def test_control_schema(self):
++        prior = pack_app_prior(7, 30000, 1, 30000, 60_000_000_000, 9, 11)
++        bind = pack_app_bind(13, 7, 2, 17, 19, 23, 9)
++        self.assertEqual(len(prior), APP_PRIOR.size)
++        self.assertEqual(len(bind), APP_BIND.size)
++        self.assertEqual(APP_PRIOR.unpack(prior)[-2:], (9, 11))
++        self.assertEqual(APP_BIND.unpack(bind)[-2:], (9, True))
++
++
++if __name__ == "__main__":
++    unittest.main()
+diff --git a/tools/parp/model_pack.py b/tools/parp/model_pack.py
+new file mode 100755
+index 000000000..cf0ca5803
+--- /dev/null
++++ b/tools/parp/model_pack.py
+@@ -0,0 +1,26 @@
++#!/usr/bin/env python3
++"""Validate JSON and emit deterministic binary model payloads."""
++
++import argparse
++import json
++import struct
++
++
++def main():
++    parser = argparse.ArgumentParser()
++    parser.add_argument("input")
++    parser.add_argument("output")
++    args = parser.parse_args()
++    with open(args.input, encoding="utf-8") as source:
++        model = json.load(source)
++    values = model["q15_values"]
++    if any(not 0 <= value <= 32767 for value in values):
++        raise SystemExit("q15 value out of range")
++    payload = struct.pack("<II", 1, len(values))
++    payload += struct.pack("<" + "H" * len(values), *values)
++    with open(args.output, "wb") as target:
++        target.write(payload)
++
++
++if __name__ == "__main__":
++    main()
+diff --git a/tools/parp/parpctl.py b/tools/parp/parpctl.py
+new file mode 100755
+index 000000000..0458afbab
+--- /dev/null
++++ b/tools/parp/parpctl.py
+@@ -0,0 +1,25 @@
++#!/usr/bin/env python3
++"""Minimal observe-only PARP control client."""
++
++import argparse
++from pathlib import Path
++
++MODE = {"disabled": "0", "observe": "1", "apply": "2"}
++MODE_PATH = Path("/sys/kernel/debug/parp/mode")
++
++
++def main():
++    parser = argparse.ArgumentParser()
++    sub = parser.add_subparsers(dest="command", required=True)
++    sub.add_parser("mode-get")
++    mode_set = sub.add_parser("mode-set")
++    mode_set.add_argument("mode", choices=MODE)
++    args = parser.parse_args()
++    if args.command == "mode-get":
++        print(MODE_PATH.read_text(encoding="ascii").strip())
++    else:
++        MODE_PATH.write_text(MODE[args.mode] + "\n", encoding="ascii")
++
++
++if __name__ == "__main__":
++    main()
+diff --git a/tools/parp/reference_model.py b/tools/parp/reference_model.py
+new file mode 100755
+index 000000000..04cb4dc71
+--- /dev/null
++++ b/tools/parp/reference_model.py
+@@ -0,0 +1,38 @@
++#!/usr/bin/env python3
++"""Bit-exact reference operations for the PARP Q15 kernel implementation."""
++
++Q15_ONE = 32767
++
++
++def q15_mul(a: int, b: int) -> int:
++    a = min(max(a, 0), Q15_ONE)
++    b = min(max(b, 0), Q15_ONE)
++    return min((a * b + (1 << 14)) >> 15, Q15_ONE)
++
++
++def file_future_score(app_prior: int, next_state: int, support: int,
++                      stability: int, freshness: int) -> int:
++    score = q15_mul(app_prior, next_state)
++    score = q15_mul(score, support)
++    score = q15_mul(score, stability)
++    return q15_mul(score, freshness)
++
++
++def anon_cold_score(accesses_10s: int, accesses_30s: int,
++                    accesses_60s: int, active_ratio: int,
++                    app_prior: int, evidence_valid: bool = True) -> int:
++    if not evidence_valid:
++        return 0
++    recent = min(accesses_10s * 4 + accesses_30s * 2 + accesses_60s,
++                 Q15_ONE)
++    cold = (Q15_ONE - recent + Q15_ONE - active_ratio) // 2
++    return q15_mul(cold, Q15_ONE - min(app_prior, Q15_ONE))
++
++
++def assign_state(features, centers, unknown_threshold):
++    distances = [
++        sum((x - y) ** 2 for x, y in zip(features, center))
++        for center in centers
++    ]
++    state = min(range(len(distances)), key=distances.__getitem__)
++    return -1 if distances[state] > unknown_threshold else state
+diff --git a/tools/parp/schema.py b/tools/parp/schema.py
+new file mode 100755
+index 000000000..d61357677
+--- /dev/null
++++ b/tools/parp/schema.py
+@@ -0,0 +1,21 @@
++#!/usr/bin/env python3
++"""Versioned userspace schema; the kernel never parses JSON."""
++
++import struct
++
++SCHEMA_VERSION = 1
++APP_PRIOR = struct.Struct("<IIHHIQQQ")
++APP_BIND = struct.Struct("<I Q I I Q Q Q Q ?")
++
++
++def pack_app_prior(app_id, use_score, rank, horizon_ms, ttl_ns,
++                   model_version, timestamp_ns):
++    return APP_PRIOR.pack(SCHEMA_VERSION, app_id, use_score, rank, horizon_ms,
++                          ttl_ns, model_version, timestamp_ns)
++
++
++def pack_app_bind(domain_id, app_id, generation, updated_ns, expires_ns,
++                  epoch_id, model_version, active=True):
++    return APP_BIND.pack(SCHEMA_VERSION, domain_id, app_id, generation,
++                         updated_ns, expires_ns, epoch_id, model_version,
++                         active)

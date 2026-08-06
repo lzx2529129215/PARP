@@ -6,7 +6,7 @@ WPS 0010–0070 七个性能场景、样本准备和结果验证工具已合并�
 [`README_WPS.md`](README_WPS.md)。统一入口为：
 
 ```bash
-cd /home/lzxxxxxx/桌面/huawei/huawei_mem/lzx
+cd /home/lzxxxxxx/桌面/huawei/myself-kswapd/lzx
 automation/run_wps_case.sh 0070 --dry-run
 ```
 
@@ -15,7 +15,7 @@ automation/run_wps_case.sh 0070 --dry-run
 新增的丰富场景通过统一入口执行：
 
 ```bash
-cd /home/lzxxxxxx/桌面/huawei/huawei_mem/lzx
+cd /home/lzxxxxxx/桌面/huawei/myself-kswapd/lzx
 automation/run_rich_scenario.sh --list
 automation/run_rich_scenario.sh qq --dry-run
 automation/run_rich_scenario.sh files --dry-run
@@ -75,7 +75,7 @@ sudo apt install xdotool
 一键运行自动化：
 
 ```bash
-cd /home/lzx/Desktop/huawei/huawei_mem/lzx
+cd /home/lzxxxxxx/桌面/huawei/myself-kswapd/lzx
 automation/run_automation.sh
 ```
 
@@ -104,7 +104,7 @@ automation/run_automation.sh --dry-run
 手动运行底层 Python：
 
 ```bash
-cd /home/lzx/Desktop/huawei/huawei_mem/lzx
+cd /home/lzxxxxxx/桌面/huawei/myself-kswapd/lzx
 python3 automation/app_automation.py configs/automation/scenario_local_wps.json --dry-run
 python3 automation/app_automation.py configs/automation/scenario_local_wps.json
 ```

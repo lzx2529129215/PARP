@@ -1,0 +1,71 @@
+From 14233c73ee895bd6cea5c1f994b4d1ce0b76c7b6 Mon Sep 17 00:00:00 2001
+From: Codex PARP Reproduction <codex@localhost>
+Date: Tue, 4 Aug 2026 20:48:09 +0800
+Subject: [PATCH 112/123] parp: record live shadow build artifacts
+
+---
+ .../effective_tier/live_shadow_preflight.py   | 32 ++++++++++++++++++-
+ 1 file changed, 31 insertions(+), 1 deletion(-)
+
+diff --git a/tools/parp/effective_tier/live_shadow_preflight.py b/tools/parp/effective_tier/live_shadow_preflight.py
+index bad7cf4b7..1b78bb69f 100644
+--- a/tools/parp/effective_tier/live_shadow_preflight.py
++++ b/tools/parp/effective_tier/live_shadow_preflight.py
+@@ -141,6 +141,21 @@ def _kernel_config(config: Optional[Path]) -> Dict[str, object]:
+     }
+ 
+ 
++def _artifact(path: Optional[Path]) -> Dict[str, object]:
++    if path is None:
++        return {"path": None, "exists": False, "size": None, "sha256": None}
++    try:
++        size = path.stat().st_size
++    except OSError:
++        size = None
++    return {
++        "path": str(path),
++        "exists": size is not None,
++        "size": size,
++        "sha256": _sha256(path) if size is not None else None,
++    }
++
++
+ def _write_json(path: Path, value: object) -> None:
+     path.write_text(json.dumps(value, indent=2, sort_keys=True) + "\n",
+                     encoding="utf-8")
+@@ -315,6 +330,18 @@ def create_preflight(tree: Path, output: Path, build_dir: Optional[Path],
+         "preflight_is_read_only": True,
+     }
+     config = _kernel_config(build_dir / ".config" if build_dir else None)
++    build_artifacts = {
++        "bzImage": _artifact(build_dir / "arch/x86/boot/bzImage"
++                              if build_dir else None),
++        "System.map": _artifact(build_dir / "System.map" if build_dir else None),
++        "vmlinux": _artifact(build_dir / "vmlinux" if build_dir else None),
++        "modules_directory": {
++            "path": str(build_dir / "lib/modules" if build_dir else ""),
++            "exists": bool(build_dir and (build_dir / "lib/modules").is_dir()),
++            "sha256": None,
++            "reason": "module trees require a manifest, not a directory hash",
++        },
++    }
+     boot_inspection = {
+         "uname": _run(["uname", "-a"]),
+         "cmdline": _text(Path("/proc/cmdline")),
+@@ -354,9 +381,12 @@ def create_preflight(tree: Path, output: Path, build_dir: Optional[Path],
+     }
+     _write_json(output / "repository_audit.json", repository_audit)
+     _write_json(output / "build_manifest.json", {
+-        "status": "PREBUILD_CONFIGURATION_AUDITED",
++        "status": ("BUILD_ARTIFACTS_AUDITED" if
++                   build_artifacts["bzImage"]["exists"] else
++                   "PREBUILD_CONFIGURATION_AUDITED"),
+         "kernel_config": config,
+         "kernel_release_expected": expected_release,
++        "artifacts": build_artifacts,
+         "head": head,
+         "compiler": _run(["cc", "--version"]),
+         "linker": _run(["ld", "--version"]),
+-- 
+2.25.1
+

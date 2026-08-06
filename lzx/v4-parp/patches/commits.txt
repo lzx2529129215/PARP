@@ -1,0 +1,4 @@
+8b50569a94be652c3dc6f08e9886c42db11ea257 mm: add neutral PARP prediction engine
+af43d4a7bde8025f425eae1fd5f0192bb1d88a2a mm: connect PARP observe-only MGLRU adapter
+073281fcd0b68892a220ac06cc7a95546111bf01 parp: add KUnit and userspace reference tools
+9728adb6ca561186e3139d5eadf5300a5895d4b5 parp: mark userspace tools executable

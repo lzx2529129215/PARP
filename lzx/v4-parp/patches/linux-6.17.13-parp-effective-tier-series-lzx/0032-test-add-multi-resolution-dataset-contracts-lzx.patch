@@ -1,0 +1,418 @@
+From a0659556d2c6c7ce1ac4c8d30783f7ffde69d307 Mon Sep 17 00:00:00 2001
+From: Codex PARP Reproduction <codex@localhost>
+Date: Sun, 2 Aug 2026 15:30:27 +0800
+Subject: [PATCH 032/123] test: add multi-resolution dataset contracts
+
+---
+ tools/parp/intra_app_prediction/__init__.py   |  2 +
+ .../intra_app_prediction/tests/__init__.py    |  1 +
+ .../tests/test_labels_split.py                | 68 ++++++++++++++++
+ .../tests/test_predictors_anon.py             | 77 ++++++++++++++++++
+ .../tests/test_segmenter.py                   | 64 +++++++++++++++
+ .../tests/test_weighted_coverage.py           | 58 +++++++++++++
+ .../tests/test_windows_operations.py          | 81 +++++++++++++++++++
+ 7 files changed, 351 insertions(+)
+ create mode 100644 tools/parp/intra_app_prediction/__init__.py
+ create mode 100644 tools/parp/intra_app_prediction/tests/__init__.py
+ create mode 100644 tools/parp/intra_app_prediction/tests/test_labels_split.py
+ create mode 100644 tools/parp/intra_app_prediction/tests/test_predictors_anon.py
+ create mode 100644 tools/parp/intra_app_prediction/tests/test_segmenter.py
+ create mode 100644 tools/parp/intra_app_prediction/tests/test_weighted_coverage.py
+ create mode 100644 tools/parp/intra_app_prediction/tests/test_windows_operations.py
+
+diff --git a/tools/parp/intra_app_prediction/__init__.py b/tools/parp/intra_app_prediction/__init__.py
+new file mode 100644
+index 000000000..22c44635c
+--- /dev/null
++++ b/tools/parp/intra_app_prediction/__init__.py
+@@ -0,0 +1,2 @@
++"""PARP Phase2.7 offline intra-application page prediction."""
++
+diff --git a/tools/parp/intra_app_prediction/tests/__init__.py b/tools/parp/intra_app_prediction/tests/__init__.py
+new file mode 100644
+index 000000000..8b1378917
+--- /dev/null
++++ b/tools/parp/intra_app_prediction/tests/__init__.py
+@@ -0,0 +1 @@
++
+diff --git a/tools/parp/intra_app_prediction/tests/test_labels_split.py b/tools/parp/intra_app_prediction/tests/test_labels_split.py
+new file mode 100644
+index 000000000..254133f94
+--- /dev/null
++++ b/tools/parp/intra_app_prediction/tests/test_labels_split.py
+@@ -0,0 +1,68 @@
++import unittest
++
++from intra_app_prediction.future_labels import attach_future_labels
++from intra_app_prediction.splitter import chronological_split
++
++
++class FutureLabelTests(unittest.TestCase):
++    def rows(self):
++        return [{"window_start_ns": i * 10_000_000_000, "coverage_ratio": float(i % 2),
++                 "weighted_coverage_ratio": 0.0, "window_id": str(i), "session_id": "s"}
++                for i in range(10)]
++
++    def test_next_10_label(self):
++        out = attach_future_labels(self.rows())
++        self.assertEqual(out[0]["label_next_10s_access"], 1)
++
++    def test_30_and_60_max(self):
++        out = attach_future_labels(self.rows())
++        self.assertEqual((out[0]["label_next_30s_max_coverage"], out[0]["label_next_60s_max_coverage"]), (1.0, 1.0))
++
++    def test_tail_availability_not_zero_filled(self):
++        tail = attach_future_labels(self.rows())[-1]
++        self.assertFalse(tail["label_available_10s"])
++        self.assertIsNone(tail["label_next_10s_access"])
++
++    def test_future_active_thresholds(self):
++        out = attach_future_labels(self.rows())
++        self.assertTrue(out[0]["future_active_80_10s"])
++
++
++class SplitTests(unittest.TestCase):
++    def sessions(self, count=10):
++        return [{"window_id": f"{s}-{i}", "session_id": f"s{s}",
++                 "window_start_ns": (s * 1000 + i * 10) * 1_000_000_000}
++                for s in range(count) for i in range(12)]
++
++    def test_session_does_not_cross_split(self):
++        split = chronological_split(self.sessions())
++        sets = [{r["session_id"] for r in split[x]} for x in ("train", "val", "test")]
++        self.assertFalse((sets[0] & sets[1]) | (sets[0] & sets[2]) | (sets[1] & sets[2]))
++
++    def test_sixty_second_purge_gap(self):
++        split = chronological_split(self.sessions(), purge_gap_ns=60_000_000_000)
++        self.assertGreaterEqual(min(r["window_start_ns"] for r in split["val"]) - max(r["window_start_ns"] for r in split["train"]), 60_000_000_000)
++
++    def test_window_ids_unique(self):
++        rows = self.sessions()
++        rows.append(dict(rows[0]))
++        with self.assertRaises(ValueError):
++            chronological_split(rows)
++
++    def test_train_vocab_excludes_test_files(self):
++        split = chronological_split(self.sessions())
++        train_vocab = {r["session_id"] for r in split["train"]}
++        self.assertNotIn(split["test"][0]["session_id"], train_vocab)
++
++    def test_normalization_is_train_only(self):
++        split = chronological_split(self.sessions())
++        self.assertEqual(split["audit"]["normalization_source"], "train")
++
++    def test_future_horizon_does_not_cross_boundary(self):
++        split = chronological_split(self.sessions(), purge_gap_ns=60_000_000_000)
++        self.assertTrue(split["audit"]["future_horizon_isolated"])
++
++
++if __name__ == "__main__":
++    unittest.main()
++
+diff --git a/tools/parp/intra_app_prediction/tests/test_predictors_anon.py b/tools/parp/intra_app_prediction/tests/test_predictors_anon.py
+new file mode 100644
+index 000000000..680b38958
+--- /dev/null
++++ b/tools/parp/intra_app_prediction/tests/test_predictors_anon.py
+@@ -0,0 +1,77 @@
++import tempfile
++import unittest
++from pathlib import Path
++
++from intra_app_prediction.anon_features import summarize_anon
++from intra_app_prediction.baselines import GlobalFrequency, LastWindow, RecentFrequency
++from intra_app_prediction.online_dry_run import DryRunPredictor, probability_to_q15
++from intra_app_prediction.state_markov import PageStateMarkov
++
++
++class AnonTests(unittest.TestCase):
++    def rows(self):
++        return [
++            {"domain_id": 1, "foreground_epoch": 2, "mm_cookie": 3, "nr_pages": 10, "nr_accesses": 0, "age": 5},
++            {"domain_id": 1, "foreground_epoch": 2, "mm_cookie": 3, "nr_pages": 10, "nr_accesses": 5, "age": 1},
++        ]
++
++    def test_domain_summary(self):
++        out = summarize_anon(self.rows(), 10)
++        self.assertEqual((out["anon_total_bytes"], out["anon_region_count"]), (81920, 2))
++
++    def test_epoch_isolation(self):
++        rows = self.rows() + [{**self.rows()[0], "foreground_epoch": 4}]
++        with self.assertRaises(ValueError):
++            summarize_anon(rows, 10)
++
++    def test_mm_cookie_isolation(self):
++        rows = self.rows() + [{**self.rows()[0], "mm_cookie": 4}]
++        with self.assertRaises(ValueError):
++            summarize_anon(rows, 10)
++
++    def test_boot_isolation(self):
++        rows = [{**r, "boot_id": "a"} for r in self.rows()]
++        rows.append({**rows[0], "boot_id": "b"})
++        with self.assertRaises(ValueError):
++            summarize_anon(rows, 10)
++
++
++class PredictorTests(unittest.TestCase):
++    def test_last_window(self):
++        self.assertEqual(LastWindow().predict([{1, 2}]), {1: 1.0, 2: 1.0})
++
++    def test_recent_frequency(self):
++        self.assertEqual(RecentFrequency(2).predict([{1}, {1, 2}]), {1: 1.0, 2: .5})
++
++    def test_global_frequency(self):
++        model = GlobalFrequency().fit([{1}, {1, 2}, {2}])
++        self.assertAlmostEqual(model.predict([])[1], 2 / 3)
++
++    def test_markov_transition(self):
++        model = PageStateMarkov().fit([(1, "0_10", 2), (1, "0_10", 2), (1, "0_10", 3)])
++        self.assertGreater(model.predict(1, "0_10")[2], model.predict(1, "0_10")[3])
++
++    def test_unknown_state(self):
++        self.assertEqual(PageStateMarkov().predict(99, "0_10"), {})
++
++    def test_q15_range(self):
++        self.assertEqual((probability_to_q15(-1), probability_to_q15(1), probability_to_q15(.5)), (0, 32767, 16384))
++
++    def test_generation_continues(self):
++        with tempfile.TemporaryDirectory() as d:
++            state = Path(d) / "generation.json"
++            predictor = DryRunPredictor(state)
++            self.assertEqual((predictor.next_generation(), predictor.next_generation()), (1, 2))
++
++    def test_unknown_file_has_no_strong_prediction(self):
++        with tempfile.TemporaryDirectory() as d:
++            predictor = DryRunPredictor(Path(d) / "g.json", known_files={"known"})
++            self.assertEqual(predictor.file_prediction("unknown", {}), {"status": "UNKNOWN"})
++
++    def test_dry_run_has_no_kernel_write_method(self):
++        self.assertFalse(hasattr(DryRunPredictor, "write_kernel"))
++
++
++if __name__ == "__main__":
++    unittest.main()
++
+diff --git a/tools/parp/intra_app_prediction/tests/test_segmenter.py b/tools/parp/intra_app_prediction/tests/test_segmenter.py
+new file mode 100644
+index 000000000..46fa1d38b
+--- /dev/null
++++ b/tools/parp/intra_app_prediction/tests/test_segmenter.py
+@@ -0,0 +1,64 @@
++import unittest
++
++from intra_app_prediction.file_identity import FileIdentity, PartitionTracker
++from intra_app_prediction.segmenter import page_to_segment, segment_bounds
++
++
++class SegmenterTests(unittest.TestCase):
++    def test_ten_bins(self):
++        self.assertEqual(page_to_segment(55, 100, 10).segment_id, 5)
++
++    def test_hundred_bins(self):
++        self.assertEqual(page_to_segment(555, 1000, 100).segment_id, 55)
++
++    def test_thousand_bins(self):
++        self.assertEqual(page_to_segment(5555, 10000, 1000).segment_id, 555)
++
++    def test_first_page(self):
++        spec = page_to_segment(0, 103, 10)
++        self.assertEqual((spec.segment_id, spec.start_page), (0, 0))
++
++    def test_last_page(self):
++        spec = page_to_segment(102, 103, 10)
++        self.assertEqual((spec.segment_id, spec.end_page_exclusive), (9, 103))
++
++    def test_even_division(self):
++        self.assertEqual(segment_bounds(4, 100, 10), (40, 50))
++
++    def test_uneven_division_is_complete(self):
++        bounds = [segment_bounds(i, 103, 10) for i in range(10)]
++        self.assertEqual(bounds[0][0], 0)
++        self.assertEqual(bounds[-1][1], 103)
++        self.assertTrue(all(a[1] == b[0] for a, b in zip(bounds, bounds[1:])))
++
++    def test_small_file_caps_effective_bins(self):
++        spec = page_to_segment(2, 3, 1000)
++        self.assertEqual((spec.effective_bins, spec.segment_id), (3, 2))
++
++    def test_single_page(self):
++        spec = page_to_segment(0, 1, 1000)
++        self.assertEqual((spec.effective_bins, spec.start_page, spec.end_page_exclusive), (1, 0, 1))
++
++    def test_out_of_range_and_empty_rejected(self):
++        for args in ((0, 0, 10), (-1, 10, 10), (10, 10, 10), (0, 10, 0)):
++            with self.assertRaises(ValueError):
++                page_to_segment(*args)
++
++    def test_u64_scale_mapping_avoids_overflow(self):
++        pages = (1 << 64) - 1
++        spec = page_to_segment(pages - 1, pages, 1000)
++        self.assertEqual((spec.segment_id, spec.end_page_exclusive), (999, pages))
++
++    def test_partition_generation_changes_on_size_or_version(self):
++        tracker = PartitionTracker()
++        identity = FileIdentity(8, 5, 1, 7)
++        a = tracker.observe(identity, 100, 409600)
++        b = tracker.observe(identity, 100, 409600)
++        c = tracker.observe(identity, 101, 413696)
++        d = tracker.observe(FileIdentity(8, 5, 1, 8), 101, 413696)
++        self.assertEqual((a, b, c, d), (1, 1, 2, 1))
++
++
++if __name__ == "__main__":
++    unittest.main()
++
+diff --git a/tools/parp/intra_app_prediction/tests/test_weighted_coverage.py b/tools/parp/intra_app_prediction/tests/test_weighted_coverage.py
+new file mode 100644
+index 000000000..196bca5ba
+--- /dev/null
++++ b/tools/parp/intra_app_prediction/tests/test_weighted_coverage.py
+@@ -0,0 +1,58 @@
++import unittest
++
++from intra_app_prediction.weighted_coverage import IntervalEvidence, coverage_summary
++
++
++class WeightedCoverageTests(unittest.TestCase):
++    def test_single_interval(self):
++        out = coverage_summary(0, 10, [IntervalEvidence(2, 7, 1.0, 3)])
++        self.assertEqual((out.accessed_unique_pages, out.coverage_ratio), (5, 0.5))
++
++    def test_non_overlapping(self):
++        out = coverage_summary(0, 10, [IntervalEvidence(0, 2, .5, 1), IntervalEvidence(8, 10, .5, 2)])
++        self.assertAlmostEqual(out.weighted_coverage_ratio, .2)
++
++    def test_complete_overlap_uses_max(self):
++        out = coverage_summary(0, 10, [IntervalEvidence(0, 10, .2, 1), IntervalEvidence(0, 10, .7, 2)])
++        self.assertAlmostEqual(out.weighted_coverage_ratio, .7)
++
++    def test_partial_overlap(self):
++        out = coverage_summary(0, 10, [IntervalEvidence(0, 6, .5, 1), IntervalEvidence(4, 10, 1.0, 2)])
++        self.assertAlmostEqual(out.weighted_access_pages, 8.0)
++
++    def test_clips_across_segment(self):
++        out = coverage_summary(10, 20, [IntervalEvidence(0, 15, 1.0, 1), IntervalEvidence(18, 30, 1.0, 2)])
++        self.assertEqual(out.accessed_unique_pages, 7)
++
++    def test_weight_zero_is_observed_not_accessed(self):
++        out = coverage_summary(0, 10, [IntervalEvidence(0, 10, 0.0, 5)])
++        self.assertEqual((out.observed_unique_pages, out.accessed_unique_pages), (10, 0))
++
++    def test_weight_one(self):
++        self.assertEqual(coverage_summary(0, 7, [IntervalEvidence(0, 7, 1, 1)]).weighted_access_pages, 7)
++
++    def test_multiple_weights(self):
++        rows = [IntervalEvidence(0, 3, .2, 1), IntervalEvidence(3, 6, .4, 2), IntervalEvidence(6, 10, .8, 3)]
++        self.assertAlmostEqual(coverage_summary(0, 10, rows).weighted_access_pages, 5.0)
++
++    def test_file_tail_is_clipped(self):
++        self.assertEqual(coverage_summary(90, 100, [IntervalEvidence(95, 110, 1, 1)]).accessed_unique_pages, 5)
++
++    def test_duplicate_samples_do_not_double_count(self):
++        row = IntervalEvidence(0, 10, .5, 3)
++        self.assertAlmostEqual(coverage_summary(0, 10, [row, row]).weighted_coverage_ratio, .5)
++
++    def test_ratios_never_exceed_one(self):
++        rows = [IntervalEvidence(0, 10, 1, i) for i in range(20)]
++        out = coverage_summary(0, 10, rows)
++        self.assertLessEqual(max(out.coverage_ratio, out.weighted_coverage_ratio), 1.0)
++
++    def test_invalid_interval_or_weight_rejected(self):
++        for args in ((2, 1, .5, 1), (0, 1, -1, 1), (0, 1, 1.1, 1)):
++            with self.assertRaises(ValueError):
++                IntervalEvidence(*args)
++
++
++if __name__ == "__main__":
++    unittest.main()
++
+diff --git a/tools/parp/intra_app_prediction/tests/test_windows_operations.py b/tools/parp/intra_app_prediction/tests/test_windows_operations.py
+new file mode 100644
+index 000000000..16ec8b955
+--- /dev/null
++++ b/tools/parp/intra_app_prediction/tests/test_windows_operations.py
+@@ -0,0 +1,81 @@
++import unittest
++
++from intra_app_prediction.operation_alignment import OperationEvent, align_operations
++from intra_app_prediction.window_builder import EventWindowBuilder, window_bounds
++
++
++S = 1_000_000_000
++
++
++class WindowTests(unittest.TestCase):
++    def test_exact_boundary(self):
++        self.assertEqual(window_bounds(20 * S), (20 * S, 30 * S))
++
++    def test_end_point_is_next_window(self):
++        self.assertNotEqual(window_bounds(29999999999), window_bounds(30 * S))
++
++    def test_cross_minute(self):
++        self.assertEqual(window_bounds(65 * S), (60 * S, 70 * S))
++
++    def test_cross_hour(self):
++        self.assertEqual(window_bounds(3605 * S), (3600 * S, 3610 * S))
++
++    def test_out_of_order_events_are_sorted(self):
++        b = EventWindowBuilder()
++        b.add("boot", "session", 25 * S, "b")
++        b.add("boot", "session", 15 * S, "a")
++        self.assertEqual([w.start_ns for w in b.windows()], [10 * S, 20 * S])
++
++    def test_late_event_is_retained_with_flag(self):
++        b = EventWindowBuilder(watermark_ns=5 * S)
++        b.add("boot", "s", 20 * S, 1)
++        b.add("boot", "s", 10 * S, 2)
++        self.assertEqual(b.late_events, 1)
++
++    def test_boot_ids_cannot_merge(self):
++        b = EventWindowBuilder()
++        b.add("a", "s", 1, 1)
++        b.add("b", "s", 2, 2)
++        self.assertEqual(len(b.windows()), 2)
++
++    def test_monotonic_to_wall_anchor(self):
++        b = EventWindowBuilder(monotonic_anchor_ns=100, wall_anchor_ns=1000)
++        self.assertEqual(b.monotonic_to_wall(150), 1050)
++
++
++class OperationTests(unittest.TestCase):
++    def event(self, name, start, end):
++        return OperationEvent(name, "WPS", start * S, end * S, name, "automation", 1.0, "s")
++
++    def test_single_operation_pure(self):
++        out = align_operations(0, 10 * S, [self.event("OPEN", 0, 10)])
++        self.assertEqual((out.dominant_operation, out.label_quality), ("OPEN", "PURE"))
++
++    def test_multiple_operations_choose_longest(self):
++        out = align_operations(0, 10 * S, [self.event("A", 0, 3), self.event("B", 3, 10)])
++        self.assertEqual(out.dominant_operation, "B")
++
++    def test_mixed_window(self):
++        out = align_operations(0, 10 * S, [self.event("A", 0, 6)])
++        self.assertEqual(out.label_quality, "MIXED")
++
++    def test_low_confidence_window(self):
++        out = align_operations(0, 10 * S, [self.event("A", 0, 4)])
++        self.assertEqual(out.label_quality, "LOW_CONFIDENCE")
++
++    def test_operation_transition(self):
++        out = align_operations(0, 10 * S, [self.event("A", 0, 5), self.event("B", 5, 10)])
++        self.assertEqual(out.operation_transition, "A->B")
++
++    def test_future_operation_not_used_as_current(self):
++        out = align_operations(0, 10 * S, [self.event("FUTURE", 10, 20)])
++        self.assertEqual((out.operation_count, out.dominant_operation), (0, "UNKNOWN"))
++
++    def test_operation_at_start_and_end(self):
++        out = align_operations(0, 10 * S, [self.event("A", -1, 4), self.event("B", 4, 11)])
++        self.assertEqual((out.operation_at_start, out.operation_at_end), ("A", "B"))
++
++
++if __name__ == "__main__":
++    unittest.main()
++
+-- 
+2.25.1
+

@@ -1,0 +1,26 @@
+From 9fdf54f0d72c728e8bc4c1e1074a3d6c0fee8d69 Mon Sep 17 00:00:00 2001
+From: Codex PARP Reproduction <codex@localhost>
+Date: Tue, 4 Aug 2026 00:03:25 +0800
+Subject: [PATCH 092/123] fix: scope realism metrics to frozen selector
+
+---
+ tools/parp/phase210b/offline_pipeline_b.py | 3 +--
+ 1 file changed, 1 insertion(+), 2 deletions(-)
+
+diff --git a/tools/parp/phase210b/offline_pipeline_b.py b/tools/parp/phase210b/offline_pipeline_b.py
+index f3c962240..6b5e7fefa 100644
+--- a/tools/parp/phase210b/offline_pipeline_b.py
++++ b/tools/parp/phase210b/offline_pipeline_b.py
+@@ -267,8 +267,7 @@ def main():
+         writer.writeheader(); writer.writerows(support)
+     qq_universe = [row for decision in qq_decisions for row in decision["candidates"]]
+     final_meta = [row for row in selection_meta if row["selector_id"] == "S3" and row["quota_template"] == "Q_BALANCED" and row["app"] == "QQ"]
+-    final_ids = {(row["decision_id"], row["candidate"]["identity"]) for row in selected_rows if row["selector_id"] == "S3" and row["quota_template"] == "Q_BALANCED" and row["app"] == "QQ"}
+-    final_candidates = [row["candidate"] for row in selected_rows if (row["decision_id"], row["candidate"]["identity"]) in final_ids]
++    final_candidates = [row["candidate"] for row in selected_rows if row["selector_id"] == "S3" and row["quota_template"] == "Q_BALANCED" and row["app"] == "QQ"]
+     realism_payload = realism(qq_universe, final_candidates)
+     atomic_json(output / "realism/realism_metrics.json", realism_payload)
+     atomic_json(output / "candidate_universe/schema.json", {"schema_version": 1, "fields": list(source_contract()["features"]), "causal": source_contract()})
+-- 
+2.25.1
+

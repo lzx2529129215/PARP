@@ -1,0 +1,98 @@
+From 2450d91e4b209dc9f137c6596e3538a630ae5feb Mon Sep 17 00:00:00 2001
+From: Codex PARP Reproduction <codex@localhost>
+Date: Tue, 4 Aug 2026 12:41:02 +0800
+Subject: [PATCH 099/123] parp: test frontier scoring and safety gates
+
+---
+ mm/parp/tests/parp_test.c | 68 +++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 68 insertions(+)
+
+diff --git a/mm/parp/tests/parp_test.c b/mm/parp/tests/parp_test.c
+index a3074fe56..d8768ec1a 100644
+--- a/mm/parp/tests/parp_test.c
++++ b/mm/parp/tests/parp_test.c
+@@ -781,6 +781,69 @@ static void parp_phase27_region_trace_schema_test(struct kunit *test)
+ 				event.sample_interval_us, 200U);
+ }
+ 
++#ifdef CONFIG_PARP_FRONTIER_SCORE
++static void parp_frontier_quantized_score_test(struct kunit *test)
++{
++	const s64 lower_edges[PARP_FRONTIER_FEATURES] = {
++		10, 10, 8, 10, 0, 0, 10, 4096,
++	};
++	const s64 above_edges[PARP_FRONTIER_FEATURES] = {
++		11, 11, 9, 11, 1, 1, 11, 4097,
++	};
++	s32 threshold = 0;
++
++	/* Equality belongs to the lower bin in both Python and C. */
++	KUNIT_EXPECT_EQ(test,
++		parp_frontier_score_values(0, lower_edges, &threshold), 102);
++	KUNIT_EXPECT_EQ(test, threshold, 96);
++	KUNIT_EXPECT_EQ(test,
++		parp_frontier_score_values(99, lower_edges, &threshold), 102);
++	KUNIT_EXPECT_EQ(test,
++		parp_frontier_score_values(0, above_edges, &threshold), 78);
++	KUNIT_EXPECT_EQ(test,
++		parp_frontier_score_values(1, lower_edges, &threshold), 110);
++	KUNIT_EXPECT_EQ(test, threshold, 94);
++}
++
++static void parp_frontier_selection_budget_test(struct kunit *test)
++{
++	const unsigned long capacities[] = { 10, 20, 30 };
++	unsigned long headroom = 0;
++	unsigned int frontier = 0;
++
++	KUNIT_EXPECT_TRUE(test, parp_frontier_select(capacities,
++		ARRAY_SIZE(capacities), 25, 32767, &frontier, &headroom));
++	KUNIT_EXPECT_EQ(test, frontier, 1U);
++	KUNIT_EXPECT_EQ(test, headroom, 5UL);
++	KUNIT_EXPECT_TRUE(test, parp_frontier_select(capacities,
++		ARRAY_SIZE(capacities), 12, 16384, &frontier, &headroom));
++	KUNIT_EXPECT_EQ(test, frontier, 1U);
++	KUNIT_EXPECT_EQ(test, headroom, 3UL);
++	KUNIT_EXPECT_FALSE(test, parp_frontier_select(capacities,
++		ARRAY_SIZE(capacities), 100, 32767, &frontier, &headroom));
++	KUNIT_EXPECT_EQ(test,
++		parp_frontier_budget_min(64, 32, 16, 8), 8UL);
++	KUNIT_EXPECT_EQ(test, parp_frontier_set_mode(PARP_FRONTIER_APPLY),
++		-EOPNOTSUPP);
++}
++
++static void parp_frontier_trace_schema_test(struct kunit *test)
++{
++	struct parp_frontier_trace event = {
++		.source_seq = 7,
++		.frontier_seq = 9,
++		.folio_pages = 4,
++		.would_promote = true,
++		.applied = false,
++	};
++
++	KUNIT_EXPECT_EQ(test, event.frontier_seq - event.source_seq, 2ULL);
++	KUNIT_EXPECT_EQ(test, event.folio_pages, 4ULL);
++	KUNIT_EXPECT_TRUE(test, event.would_promote);
++	KUNIT_EXPECT_FALSE(test, event.applied);
++}
++#endif
++
+ static struct kunit_case parp_cases[] = {
+ 	KUNIT_CASE(parp_q15_test),
+ 	KUNIT_CASE(parp_tier2_ewma_test),
+@@ -806,6 +869,11 @@ static struct kunit_case parp_cases[] = {
+ 	KUNIT_CASE(parp_prior_batch_validation_test),
+ 	KUNIT_CASE(parp_scan_budget_circuit_test),
+ 	KUNIT_CASE(parp_phase27_region_trace_schema_test),
++#ifdef CONFIG_PARP_FRONTIER_SCORE
++	KUNIT_CASE(parp_frontier_quantized_score_test),
++	KUNIT_CASE(parp_frontier_selection_budget_test),
++	KUNIT_CASE(parp_frontier_trace_schema_test),
++#endif
+ 	{}
+ };
+ 
+-- 
+2.25.1
+

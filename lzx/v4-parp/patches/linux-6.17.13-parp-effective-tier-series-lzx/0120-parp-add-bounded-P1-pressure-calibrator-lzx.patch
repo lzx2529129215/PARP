@@ -1,0 +1,254 @@
+From 608978849f260dbab0eaddc661712cbde38aa8e2 Mon Sep 17 00:00:00 2001
+From: Codex PARP Reproduction <codex@localhost>
+Date: Wed, 5 Aug 2026 19:04:28 +0800
+Subject: [PATCH 120/123] parp: add bounded P1 pressure calibrator
+
+---
+ .../live-p1-pressure-calibrator-lzx.py        | 235 ++++++++++++++++++
+ 1 file changed, 235 insertions(+)
+ create mode 100644 tools/parp/effective_tier/live-p1-pressure-calibrator-lzx.py
+
+diff --git a/tools/parp/effective_tier/live-p1-pressure-calibrator-lzx.py b/tools/parp/effective_tier/live-p1-pressure-calibrator-lzx.py
+new file mode 100644
+index 000000000..c1dacadea
+--- /dev/null
++++ b/tools/parp/effective_tier/live-p1-pressure-calibrator-lzx.py
+@@ -0,0 +1,235 @@
++#!/usr/bin/env python3
++# SPDX-License-Identifier: GPL-2.0
++"""Bounded P1-only memory.high calibration inside huawei-test.slice.  #lzx"""
++
++from __future__ import annotations
++
++import argparse
++import json
++import os
++import pwd
++import signal
++import sys
++import time
++from pathlib import Path
++from typing import Dict, List
++
++
++MIB = 1024 * 1024  #lzx
++PAGE = 4096  #lzx
++
++
++def read_text(path: Path) -> str:
++    return path.read_text(encoding="utf-8", errors="replace").strip()
++
++
++def read_events(path: Path) -> Dict[str, int]:
++    values: Dict[str, int] = {}
++    for line in read_text(path).splitlines():
++        key, value = line.split(maxsplit=1)
++        values[key] = int(value)
++    return values
++
++
++def read_pressure(path: Path) -> Dict[str, float]:
++    values: Dict[str, float] = {}
++    for line in read_text(path).splitlines():
++        fields = line.split()
++        if not fields:
++            continue
++        kind = fields[0]
++        for field in fields[1:]:
++            key, value = field.split("=", 1)
++            values[f"{kind}_{key}"] = float(value)
++    return values
++
++
++def write_text(path: Path, value: str) -> None:
++    path.write_text(f"{value}\n", encoding="ascii")
++
++
++def worker(read_fd: int, target_bytes: int, uid: int, gid: int) -> None:
++    """Allocate only after the parent moved this process into the test cgroup."""
++
++    os.setgid(gid)  #lzx
++    os.setuid(uid)  #lzx
++    if not os.read(read_fd, 1):
++        os._exit(2)
++    chunks: List[bytearray] = []
++    try:
++        while sum(map(len, chunks)) < target_bytes:
++            chunk = bytearray(min(16 * MIB, target_bytes - sum(map(len, chunks))))
++            for offset in range(0, len(chunk), PAGE):
++                chunk[offset] = 1
++            chunks.append(chunk)
++        while True:
++            time.sleep(1)
++    except MemoryError:
++        os._exit(3)
++
++
++def validate_cgroup(cgroup: Path) -> None:
++    expected = "huawei-test.slice"
++    if cgroup.name != expected or "huawei.slice" not in cgroup.parts:
++        raise ValueError("refusing a cgroup outside huawei-test.slice")
++    for name in ("cgroup.procs", "memory.current", "memory.events",
++                 "memory.high", "memory.max", "memory.pressure"):
++        if not (cgroup / name).is_file():
++            raise ValueError(f"missing required cgroup file: {name}")
++
++
++def child_exit_status(pid: int) -> int | None:
++    waited, status = os.waitpid(pid, os.WNOHANG)
++    if not waited:
++        return None
++    if os.WIFEXITED(status):
++        return os.WEXITSTATUS(status)
++    if os.WIFSIGNALED(status):
++        return 128 + os.WTERMSIG(status)
++    return 255
++
++
++def terminate_child(pid: int) -> None:
++    try:
++        os.kill(pid, signal.SIGTERM)
++    except ProcessLookupError:
++        return
++    deadline = time.monotonic() + 5
++    while time.monotonic() < deadline:
++        if child_exit_status(pid) is not None:
++            return
++        time.sleep(0.1)
++    try:
++        os.kill(pid, signal.SIGKILL)
++    except ProcessLookupError:
++        return
++    os.waitpid(pid, 0)
++
++
++def abort_on_signal(signum: int, _frame: object) -> None:
++    """Convert service shutdown into a cleanup path.  #lzx"""
++
++    raise RuntimeError(f"P1_SIGNAL_{signum}")
++
++
++def run(args: argparse.Namespace) -> Dict[str, object]:
++    cgroup = Path(args.cgroup).resolve()
++    validate_cgroup(cgroup)
++    if os.geteuid() != 0:
++        raise PermissionError("run this P1 calibrator through sudo")
++    if args.duration_s <= 0 or args.duration_s > 30:
++        raise ValueError("P1 duration must be in 1..30 seconds")
++    if args.target_mib <= 0 or args.target_mib > 512:
++        raise ValueError("P1 load must be in 1..512 MiB")
++    if args.headroom_mib < 128 or args.headroom_mib > 512:
++        raise ValueError("P1 memory.high headroom must be in 128..512 MiB")
++
++    before_high = read_text(cgroup / "memory.high")
++    before_max = read_text(cgroup / "memory.max")
++    before_events = read_events(cgroup / "memory.events")
++    before_pressure = read_pressure(cgroup / "memory.pressure")
++    baseline_current = int(read_text(cgroup / "memory.current"))
++    high_value = baseline_current + args.headroom_mib * MIB
++    report: Dict[str, object] = {
++        "status": "P1_NOT_STARTED",
++        "cgroup": str(cgroup),
++        "duration_s": args.duration_s,
++        "target_mib": args.target_mib,
++        "headroom_mib": args.headroom_mib,
++        "memory_high_before": before_high,
++        "memory_max_before": before_max,
++        "memory_max_written": False,
++        "memory_events_before": before_events,
++        "memory_pressure_before": before_pressure,
++        "samples": [],
++        "abort_reason": None,
++    }
++    if args.dry_run:
++        report["status"] = "P1_DRY_RUN"
++        report["memory_high_planned"] = str(high_value)
++        return report
++
++    account = pwd.getpwnam(args.user)
++    read_fd, write_fd = os.pipe()
++    child_pid = -1
++    full_samples = 0
++    try:
++        write_text(cgroup / "memory.high", str(high_value))
++        child_pid = os.fork()
++        if child_pid == 0:
++            os.close(write_fd)
++            worker(read_fd, args.target_mib * MIB, account.pw_uid, account.pw_gid)
++            os._exit(0)
++        os.close(read_fd)
++        write_text(cgroup / "cgroup.procs", str(child_pid))
++        os.write(write_fd, b"1")
++        os.close(write_fd)
++        deadline = time.monotonic() + args.duration_s
++        report["status"] = "P1_RUNNING"
++        while time.monotonic() < deadline:
++            events = read_events(cgroup / "memory.events")
++            pressure = read_pressure(cgroup / "memory.pressure")
++            current = int(read_text(cgroup / "memory.current"))
++            sample = {"monotonic_s": round(time.monotonic(), 3),
++                      "memory_current": current, "memory_events": events,
++                      "memory_pressure": pressure}
++            report["samples"].append(sample)
++            if events.get("oom", 0) > before_events.get("oom", 0) or \
++                    events.get("oom_kill", 0) > before_events.get("oom_kill", 0):
++                report["abort_reason"] = "MEMORY_OOM_EVENT"
++                break
++            if pressure.get("full_avg10", 0.0) >= args.full_avg10_limit:
++                full_samples += 1
++            else:
++                full_samples = 0
++            if full_samples >= args.full_sample_limit:
++                report["abort_reason"] = "PERSISTENT_FULL_PSI"
++                break
++            status = child_exit_status(child_pid)
++            if status is not None:
++                report["abort_reason"] = f"WORKER_EXITED_{status}"
++                break
++            time.sleep(1)
++        if report["abort_reason"] is None:
++            report["status"] = "P1_COMPLETED"
++        else:
++            report["status"] = "P1_ABORTED"
++    finally:
++        if child_pid > 0:
++            terminate_child(child_pid)
++        write_text(cgroup / "memory.high", before_high)
++        report["memory_high_after"] = read_text(cgroup / "memory.high")
++        report["memory_max_after"] = read_text(cgroup / "memory.max")
++        report["memory_events_after"] = read_events(cgroup / "memory.events")
++        report["memory_pressure_after"] = read_pressure(cgroup / "memory.pressure")
++    return report
++
++
++def main() -> int:
++    parser = argparse.ArgumentParser(description=__doc__)
++    parser.add_argument("--cgroup", required=True)
++    parser.add_argument("--output", required=True)
++    parser.add_argument("--user", default="lzxxxxxx")
++    parser.add_argument("--duration-s", type=int, default=30)
++    parser.add_argument("--target-mib", type=int, default=512)
++    parser.add_argument("--headroom-mib", type=int, default=256)
++    parser.add_argument("--full-avg10-limit", type=float, default=0.20)
++    parser.add_argument("--full-sample-limit", type=int, default=3)
++    parser.add_argument("--dry-run", action="store_true")
++    args = parser.parse_args()
++    signal.signal(signal.SIGTERM, abort_on_signal)  #lzx
++    signal.signal(signal.SIGINT, abort_on_signal)  #lzx
++    try:
++        report = run(args)
++    except (RuntimeError, KeyboardInterrupt) as exc:
++        report = {"status": "P1_ABORTED", "reason": str(exc)}
++    except (OSError, PermissionError, ValueError) as exc:
++        report = {"status": "P1_REFUSED", "reason": str(exc)}
++    Path(args.output).write_text(json.dumps(report, indent=2, sort_keys=True) + "\n",
++                                 encoding="utf-8")
++    print(json.dumps({"status": report["status"], "output": args.output}))
++    return 0 if report["status"] in ("P1_COMPLETED", "P1_DRY_RUN") else 1
++
++
++if __name__ == "__main__":
++    sys.exit(main())
+-- 
+2.25.1
+

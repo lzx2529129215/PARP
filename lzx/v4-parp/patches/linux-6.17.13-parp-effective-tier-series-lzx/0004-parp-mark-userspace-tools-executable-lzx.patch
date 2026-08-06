@@ -1,0 +1,36 @@
+From 9728adb6ca561186e3139d5eadf5300a5895d4b5 Mon Sep 17 00:00:00 2001
+From: Codex PARP Reproduction <codex@localhost>
+Date: Fri, 31 Jul 2026 17:33:17 +0800
+Subject: [PATCH 004/123] parp: mark userspace tools executable
+
+---
+ tools/parp/evaluate.py        | 0
+ tools/parp/model_pack.py      | 0
+ tools/parp/parpctl.py         | 0
+ tools/parp/reference_model.py | 0
+ tools/parp/schema.py          | 0
+ 5 files changed, 0 insertions(+), 0 deletions(-)
+ mode change 100644 => 100755 tools/parp/evaluate.py
+ mode change 100644 => 100755 tools/parp/model_pack.py
+ mode change 100644 => 100755 tools/parp/parpctl.py
+ mode change 100644 => 100755 tools/parp/reference_model.py
+ mode change 100644 => 100755 tools/parp/schema.py
+
+diff --git a/tools/parp/evaluate.py b/tools/parp/evaluate.py
+old mode 100644
+new mode 100755
+diff --git a/tools/parp/model_pack.py b/tools/parp/model_pack.py
+old mode 100644
+new mode 100755
+diff --git a/tools/parp/parpctl.py b/tools/parp/parpctl.py
+old mode 100644
+new mode 100755
+diff --git a/tools/parp/reference_model.py b/tools/parp/reference_model.py
+old mode 100644
+new mode 100755
+diff --git a/tools/parp/schema.py b/tools/parp/schema.py
+old mode 100644
+new mode 100755
+-- 
+2.25.1
+

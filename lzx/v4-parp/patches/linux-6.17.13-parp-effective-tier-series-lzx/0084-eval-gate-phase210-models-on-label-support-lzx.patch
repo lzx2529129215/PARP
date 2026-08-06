@@ -1,0 +1,116 @@
+From dc0d49f0361486fdf6000b1daa4721ae793602ee Mon Sep 17 00:00:00 2001
+From: Codex PARP Reproduction <codex@localhost>
+Date: Mon, 3 Aug 2026 21:18:42 +0800
+Subject: [PATCH 084/123] eval: gate phase210 models on label support
+
+---
+ tools/parp/phase210/offline_pipeline.py       | 42 ++++++++++++++++++-
+ .../phase210/tests/test_phase210_offline.py   | 18 ++++++++
+ 2 files changed, 58 insertions(+), 2 deletions(-)
+
+diff --git a/tools/parp/phase210/offline_pipeline.py b/tools/parp/phase210/offline_pipeline.py
+index 853786330..3b19a7ae0 100644
+--- a/tools/parp/phase210/offline_pipeline.py
++++ b/tools/parp/phase210/offline_pipeline.py
+@@ -468,6 +468,9 @@ def aggregate(rows):
+     return {
+         "decision_count": len(rows),
+         "candidate_count": sum(row["candidate_count"] for row in rows),
++        "positive_candidates": sum(row["positives"] for row in rows),
++        "positive_decisions": sum(row["positives"] > 0 for row in rows),
++        "pairwise_evaluable_decisions": sum(0 < row["positives"] < row["candidate_count"] for row in rows),
+         "reclaimed_candidates": reclaimed,
+         "future_reuse_after_reclaim": after,
+         "future_reuse_saved": sum(row["future_reuse_saved"] for row in rows),
+@@ -634,7 +637,40 @@ def run(tree, output):
+         and generic_stats["block_bootstrap_95_ci"][0] > 0
+         and wrong_stats["block_bootstrap_95_ci"][0] > 0
+     )
+-    status = "PARP_PHASE210_OFFLINE_GATES_PASSED" if g0 and g1 else "PARP_PHASE210_APP_SPECIALIZATION_NOT_SUPPORTED"
++    data_adequacy = {}
++    for app in ("WPS", "FILES", "QQ"):
++        train_subset = [row for row in train_decisions if row["app"] == app]
++        train_positive = sum(
++            candidate["future"]["60"] is not None
++            for decision in train_subset
++            for candidate in decision["candidates"]
++        )
++        evaluation_summary = baseline_details[app]["NATIVE"]
++        data_adequacy[app] = {
++            "train_decisions": len(train_subset),
++            "train_positive_candidates": train_positive,
++            "evaluation_decisions": evaluation_summary["decision_count"],
++            "evaluation_positive_candidates": evaluation_summary["positive_candidates"],
++            "evaluation_positive_decisions": evaluation_summary["positive_decisions"],
++            "pairwise_evaluable_decisions": evaluation_summary["pairwise_evaluable_decisions"],
++            "minimum_train_positive_candidates": 20,
++            "minimum_evaluation_positive_candidates": 20,
++            "minimum_pairwise_evaluable_decisions": 10,
++        }
++        data_adequacy[app]["passed"] = (
++            train_positive >= 20
++            and evaluation_summary["positive_candidates"] >= 20
++            and evaluation_summary["pairwise_evaluable_decisions"] >= 10
++        )
++    inadequate_apps = [app for app, row in data_adequacy.items() if not row["passed"]]
++    if inadequate_apps:
++        status = (
++            "PARP_PHASE210_QQ_MODEL_DATA_INSUFFICIENT"
++            if "QQ" in inadequate_apps
++            else "PARP_PHASE210_DATA_INSUFFICIENT"
++        )
++    else:
++        status = "PARP_PHASE210_OFFLINE_GATES_PASSED" if g0 and g1 else "PARP_PHASE210_APP_SPECIALIZATION_NOT_SUPPORTED"
+ 
+     offline = output / "offline/app_specific"
+     offline.mkdir(parents=True, exist_ok=True)
+@@ -662,6 +698,8 @@ def run(tree, output):
+         "matched_better_wrong_apps": matched_better_wrong,
+         "matched_vs_generic_statistics": generic_stats,
+         "matched_vs_wrong_statistics": wrong_stats,
++        "data_adequacy": data_adequacy,
++        "inadequate_apps": inadequate_apps,
+         "real_refault": False,
+         "claim_boundary": "held-out trace future-reuse proxy only",
+     }
+@@ -710,7 +748,7 @@ def run(tree, output):
+         "timestamp_ns": time.time_ns(),
+         "g0_passed": g0,
+         "g1_passed": g1,
+-        "next_stage": "OBSERVE_DESIGN" if g0 and g1 else "STOP_APP_SPECIALIZATION_NOT_SUPPORTED",
++        "next_stage": "OBSERVE_DESIGN" if not inadequate_apps and g0 and g1 else "STOP_OFFLINE_GATE",
+         "root_used": False,
+         "kernel_write": False,
+     }
+diff --git a/tools/parp/phase210/tests/test_phase210_offline.py b/tools/parp/phase210/tests/test_phase210_offline.py
+index 4ce9befa5..99c1559bd 100644
+--- a/tools/parp/phase210/tests/test_phase210_offline.py
++++ b/tools/parp/phase210/tests/test_phase210_offline.py
+@@ -54,6 +54,24 @@ class Phase210OfflineContracts(unittest.TestCase):
+     def test_future_is_not_a_candidate_feature(self):
+         self.assertNotIn("future", offline.FEATURES)
+ 
++    def test_aggregate_reports_label_adequacy(self):
++        rows = [
++            {"candidate_count": 128, "positives": 2, "reclaimed": 64,
++             "future_reuse_after_reclaim": 1, "future_reuse_saved": 1,
++             "pairwise_auc": 0.6, "ndcg_at_budget": 0.5,
++             "recall_at_budget": 0.5, "tie_rate": 0.0,
++             "ranking_hash": "a", "candidate_hash": "c"},
++            {"candidate_count": 128, "positives": 0, "reclaimed": 64,
++             "future_reuse_after_reclaim": 0, "future_reuse_saved": 0,
++             "pairwise_auc": 0.5, "ndcg_at_budget": 0.0,
++             "recall_at_budget": 0.0, "tie_rate": 1.0,
++             "ranking_hash": "b", "candidate_hash": "d"},
++        ]
++        result = offline.aggregate(rows)
++        self.assertEqual(result["positive_candidates"], 2)
++        self.assertEqual(result["positive_decisions"], 1)
++        self.assertEqual(result["pairwise_evaluable_decisions"], 1)
++
+ 
+ if __name__ == "__main__":
+     unittest.main()
+-- 
+2.25.1
+

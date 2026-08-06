@@ -24,3 +24,14 @@ v4.1-parp/outputs/
 
 # Legacy local kernel trees are retained only in the old workspace during migration.
 /MGLRU-test/
+
+# PARP local kernel workspaces: track portable patches/configuration only.  #lzx
+v4-parp/build/
+v4-parp/outputs/
+v4-parp/upstream/
+v4-parp/work/
+v4-parp/.output_dir
+v4-parp/.phase25_output
+v4-parp/.phase26_output
+v4-parp/.phase2_output
+v4-parp/.task_timestamp
