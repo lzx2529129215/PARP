@@ -1,0 +1,30 @@
+{
+  "policy": "正式在线checkpoint和来源不完整checkpoint均保持原位；来源不完整对象为UNKNOWN_DO_NOT_TOUCH。",
+  "records": [
+    {
+      "asset_id": "duration_switch_harmony_bundle_copy",
+      "provenance_status": "RESOLVED",
+      "retention_class": "KEEP_IN_PLACE"
+    },
+    {
+      "asset_id": "duration_persistence_v3",
+      "provenance_status": "PARTIALLY_RESOLVED",
+      "retention_class": "UNKNOWN_DO_NOT_TOUCH"
+    },
+    {
+      "asset_id": "duration_switch_v3_active",
+      "provenance_status": "RESOLVED",
+      "retention_class": "KEEP_IN_PLACE"
+    },
+    {
+      "asset_id": "lsapp_app_lstm_v2",
+      "provenance_status": "PARTIALLY_RESOLVED",
+      "retention_class": "UNKNOWN_DO_NOT_TOUCH"
+    },
+    {
+      "asset_id": "app_lstm_v2_original",
+      "provenance_status": "PARTIALLY_RESOLVED",
+      "retention_class": "UNKNOWN_DO_NOT_TOUCH"
+    }
+  ]
+}

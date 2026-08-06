@@ -1,0 +1,26 @@
+{
+  "description": "Temporary local-video player verification.",
+  "variables": {
+    "PPT": "${PROJECT_ROOT}/samples/wps/presentation_200m.pptx",
+    "IMAGE": "${PROJECT_ROOT}/samples/wps/visible_paste_test.png",
+    "VIDEO": "${PROJECT_ROOT}/samples/wps/video_5s_test.mp4",
+    "OUTPUT": "${PROJECT_ROOT}/outputs/wps/presentation_with_video.pptx"
+  },
+  "actions": [
+    {"type": "shell", "command": "python3 \"${PROJECT_ROOT}/automation/insert_video_into_ppt.py\" --input \"${PPT}\" --image \"${IMAGE}\" --video \"${VIDEO}\" --output \"${OUTPUT}\""},
+    {"type": "launch", "name": "wpp", "command": "wpp ${OUTPUT}"},
+    {"type": "wait_window", "name": "wps", "class": "wpp|wps|wpsoffice", "timeout": 20},
+    {"type": "window_state", "name": "wps", "class": "wpp|wps|wpsoffice", "state": "maximize"},
+    {"type": "wait", "seconds": 20},
+    {"type": "click_window", "name": "wps", "class": "wpp|wps|wpsoffice", "x_ratio": 0.10, "y_ratio": 0.55},
+    {"type": "key", "key": "ctrl+End", "name": "wps"},
+    {"type": "key", "key": "shift+F5", "name": "wps"},
+    {"type": "wait", "seconds": 4},
+    {"type": "click", "x": 640, "y": 400},
+    {"type": "wait", "seconds": 1},
+    {"type": "shell", "command": "xdotool mousemove 187 602"},
+    {"type": "wait", "seconds": 1},
+    {"type": "shell", "command": "xdotool click 1"},
+    {"type": "wait", "seconds": 1}
+  ]
+}

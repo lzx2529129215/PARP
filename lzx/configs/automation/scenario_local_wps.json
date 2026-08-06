@@ -1,0 +1,150 @@
+{
+  "actions": [
+    {
+      "type": "launch",
+      "name": "wps",
+      "command": "wps"
+    },
+    {
+      "type": "wait",
+      "seconds": 5
+    },
+    {
+      "type": "key",
+      "key": "ctrl+o"
+    },
+    {
+      "type": "wait",
+      "seconds": 2
+    },
+    {
+      "type": "key",
+      "key": "Escape"
+    },
+    {
+      "type": "shell",
+      "name": "qq",
+      "command": "nohup sh -c 'gtk-launch qq || gtk-launch linuxqq || linuxqq || qq' >/tmp/qq_automation.log 2>&1 &"
+    },
+    {
+      "type": "wait",
+      "seconds": 5
+    },
+    {
+      "type": "shell",
+      "name": "firefox",
+      "command": "mkdir -p \"${HOME}/firefox_profiles/automation\" && env -u WAYLAND_DISPLAY MOZ_ENABLE_WAYLAND=0 GDK_BACKEND=x11 firefox --new-instance --no-remote -profile \"${HOME}/firefox_profiles/automation\" --new-window about:blank",
+      "optional": true
+    },
+    {
+      "type": "wait",
+      "seconds": 5
+    },
+    {
+      "type": "focus",
+      "class": "wps"
+    },
+    {
+      "type": "wait",
+      "seconds": 2
+    },
+    {
+      "type": "switch",
+      "class": "qq|linuxqq",
+      "title": "QQ",
+      "command": "gtk-launch qq"
+    },
+    {
+      "type": "wait",
+      "seconds": 3
+    },
+    {
+      "type": "switch",
+      "class": "firefox|Firefox",
+      "title": "Mozilla Firefox",
+      "optional": true
+    },
+    {
+      "type": "wait",
+      "seconds": 3
+    },
+    {
+      "type": "switch",
+      "class": "wps",
+      "command": "wps"
+    },
+    {
+      "type": "wait",
+      "seconds": 2
+    },
+    {
+      "type": "switch",
+      "class": "qq|linuxqq",
+      "title": "QQ",
+      "command": "gtk-launch qq"
+    },
+    {
+      "type": "wait",
+      "seconds": 2
+    },
+    {
+      "type": "switch",
+      "class": "firefox|Firefox",
+      "title": "Mozilla Firefox",
+      "optional": true
+    },
+    {
+      "type": "wait",
+      "seconds": 2
+    },
+    {
+      "type": "close",
+      "name": "firefox",
+      "class": "firefox|Firefox",
+      "cmdline_contains": [
+        "${HOME}/firefox_profiles/automation"
+      ],
+      "wait_after_window_close": 2,
+      "force_after_seconds": 3,
+      "optional": true
+    },
+    {
+      "type": "wait",
+      "seconds": 1
+    },
+    {
+      "type": "close",
+      "name": "qq",
+      "class": "qq|linuxqq",
+      "process_names": [
+        "qq",
+        "linuxqq"
+      ],
+      "path_contains": [
+        "/opt/QQ",
+        "/opt/qq",
+        "/opt/linuxqq",
+        "/usr/lib/tencent-qq"
+      ],
+      "wait_after_window_close": 2,
+      "force_after_seconds": 0
+    },
+    {
+      "type": "close",
+      "name": "wps",
+      "class": "wps",
+      "process_names": [
+        "wpsoffice",
+        "wps",
+        "wpp",
+        "et",
+        "wpspdf"
+      ],
+      "path_contains": [
+        "/opt/kingsoft/wps-office"
+      ],
+      "wait_after_window_close": 2,
+      "force_after_seconds": 3
+    }
+  ]
+}

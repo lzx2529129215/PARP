@@ -1,0 +1,312 @@
+{
+  "description": "test1 Linux 白名单十应用启动、前台切换和安全关闭序列。",
+  "validation_mode": true,
+  "variables": {
+    "FIREFOX_PROFILE": "${HOME}/firefox_profiles/test1",
+    "LIBREOFFICE_PROFILE": "${PROJECT_ROOT}/outputs/runtime_monitor/test1-libreoffice-profile",
+    "FIREFOX_BIN": "${PROJECT_ROOT}/tools/firefox/firefox/firefox",
+    "EVINCE_DOCUMENT": "${PROJECT_ROOT}/samples/wps/document_0070.pdf",
+    "NAUTILUS_DIR": "${PROJECT_ROOT}"
+  },
+  "actions": [
+    {
+      "type": "shell",
+      "name": "firefox",
+      "app_key": "FIREFOX",
+      "command": "mkdir -p \"${FIREFOX_PROFILE}\" && env -u WAYLAND_DISPLAY MOZ_ENABLE_WAYLAND=0 GDK_BACKEND=x11 \"${FIREFOX_BIN}\" --new-instance --no-remote -profile \"${FIREFOX_PROFILE}\" --new-window about:blank",
+      "label": "TEST1_LAUNCH_FIREFOX",
+      "optional": true
+    },
+    {
+      "type": "launch",
+      "name": "libreoffice",
+      "app_key": "LIBREOFFICE",
+      "command": "libreoffice -env:UserInstallation=file://${LIBREOFFICE_PROFILE} --writer",
+      "label": "TEST1_LAUNCH_LIBREOFFICE",
+      "optional": true
+    },
+    {
+      "type": "launch",
+      "name": "vlc",
+      "app_key": "VLC",
+      "command": "vlc --no-video-title-show",
+      "label": "TEST1_LAUNCH_VLC",
+      "optional": true
+    },
+    {
+      "type": "launch",
+      "name": "gimp",
+      "app_key": "GIMP",
+      "command": "gimp",
+      "label": "TEST1_LAUNCH_GIMP",
+      "optional": true
+    },
+    {
+      "type": "launch",
+      "name": "audacity",
+      "app_key": "AUDACITY",
+      "command": "audacity",
+      "label": "TEST1_LAUNCH_AUDACITY",
+      "optional": true
+    },
+    {
+      "type": "launch",
+      "name": "thunderbird",
+      "app_key": "THUNDERBIRD",
+      "command": "thunderbird --new-instance",
+      "label": "TEST1_LAUNCH_THUNDERBIRD",
+      "optional": true
+    },
+    {
+      "type": "launch",
+      "name": "telegram",
+      "app_key": "TELEGRAM",
+      "command": "telegram-desktop",
+      "label": "TEST1_LAUNCH_TELEGRAM",
+      "optional": true
+    },
+    {
+      "type": "launch",
+      "name": "evince",
+      "app_key": "EVINCE",
+      "command": "evince --new-window ${EVINCE_DOCUMENT}",
+      "label": "TEST1_LAUNCH_EVINCE",
+      "optional": true
+    },
+    {
+      "type": "launch",
+      "name": "files",
+      "app_key": "FILES",
+      "command": "env GDK_BACKEND=x11 pcmanfm ${NAUTILUS_DIR}",
+      "label": "TEST1_LAUNCH_FILES",
+      "optional": true
+    },
+    {
+      "type": "launch",
+      "name": "calculator",
+      "app_key": "CALCULATOR",
+      "command": "gnome-calculator",
+      "label": "TEST1_LAUNCH_CALCULATOR",
+      "optional": true
+    },
+    {
+      "type": "wait",
+      "seconds": 15,
+      "label": "TEST1_WAIT_ALL_WINDOWS"
+    },
+    {
+      "type": "repeat",
+      "times": 2,
+      "actions": [
+        {
+          "type": "switch",
+          "name": "firefox",
+          "app_key": "FIREFOX",
+          "class": "firefox|Firefox",
+          "title": "Mozilla Firefox|about:blank",
+          "label": "TEST1_SWITCH_FIREFOX",
+          "optional": true
+        },
+        {
+          "type": "verify_foreground",
+          "name": "firefox",
+          "app_key": "FIREFOX",
+          "class": "firefox|Firefox",
+          "label": "TEST1_VERIFY_FIREFOX",
+          "optional": true
+        },
+        {"type": "wait", "seconds": 3, "label": "TEST1_DWELL_FIREFOX"},
+        {
+          "type": "switch",
+          "name": "libreoffice",
+          "app_key": "LIBREOFFICE",
+          "class": "libreoffice-writer|soffice",
+          "title": "Writer|LibreOffice",
+          "label": "TEST1_SWITCH_LIBREOFFICE",
+          "optional": true
+        },
+        {
+          "type": "verify_foreground",
+          "name": "libreoffice",
+          "app_key": "LIBREOFFICE",
+          "class": "libreoffice-writer|soffice",
+          "label": "TEST1_VERIFY_LIBREOFFICE",
+          "optional": true
+        },
+        {"type": "wait", "seconds": 3, "label": "TEST1_DWELL_LIBREOFFICE"},
+        {
+          "type": "switch",
+          "name": "vlc",
+          "app_key": "VLC",
+          "class": "vlc|Vlc",
+          "title": "VLC",
+          "label": "TEST1_SWITCH_VLC",
+          "optional": true
+        },
+        {
+          "type": "verify_foreground",
+          "name": "vlc",
+          "app_key": "VLC",
+          "class": "vlc|Vlc",
+          "label": "TEST1_VERIFY_VLC",
+          "optional": true
+        },
+        {"type": "wait", "seconds": 3, "label": "TEST1_DWELL_VLC"},
+        {
+          "type": "switch",
+          "name": "gimp",
+          "app_key": "GIMP",
+          "class": "gimp|Gimp",
+          "title": "GIMP",
+          "label": "TEST1_SWITCH_GIMP",
+          "optional": true
+        },
+        {
+          "type": "verify_foreground",
+          "name": "gimp",
+          "app_key": "GIMP",
+          "class": "gimp|Gimp",
+          "label": "TEST1_VERIFY_GIMP",
+          "optional": true
+        },
+        {"type": "wait", "seconds": 3, "label": "TEST1_DWELL_GIMP"},
+        {
+          "type": "switch",
+          "name": "audacity",
+          "app_key": "AUDACITY",
+          "class": "audacity|Audacity",
+          "title": "Audacity",
+          "label": "TEST1_SWITCH_AUDACITY",
+          "optional": true
+        },
+        {
+          "type": "verify_foreground",
+          "name": "audacity",
+          "app_key": "AUDACITY",
+          "class": "audacity|Audacity",
+          "label": "TEST1_VERIFY_AUDACITY",
+          "optional": true
+        },
+        {"type": "wait", "seconds": 3, "label": "TEST1_DWELL_AUDACITY"},
+        {
+          "type": "switch",
+          "name": "thunderbird",
+          "app_key": "THUNDERBIRD",
+          "class": "thunderbird|Thunderbird",
+          "title": "Thunderbird|邮件",
+          "label": "TEST1_SWITCH_THUNDERBIRD",
+          "optional": true
+        },
+        {
+          "type": "verify_foreground",
+          "name": "thunderbird",
+          "app_key": "THUNDERBIRD",
+          "class": "thunderbird|Thunderbird",
+          "label": "TEST1_VERIFY_THUNDERBIRD",
+          "optional": true
+        },
+        {"type": "wait", "seconds": 3, "label": "TEST1_DWELL_THUNDERBIRD"},
+        {
+          "type": "switch",
+          "name": "telegram",
+          "app_key": "TELEGRAM",
+          "class": "telegramdesktop|TelegramDesktop|telegram-desktop",
+          "title": "Telegram",
+          "label": "TEST1_SWITCH_TELEGRAM",
+          "optional": true
+        },
+        {
+          "type": "verify_foreground",
+          "name": "telegram",
+          "app_key": "TELEGRAM",
+          "class": "telegramdesktop|TelegramDesktop|telegram-desktop",
+          "label": "TEST1_VERIFY_TELEGRAM",
+          "optional": true
+        },
+        {"type": "wait", "seconds": 3, "label": "TEST1_DWELL_TELEGRAM"},
+        {
+          "type": "switch",
+          "name": "evince",
+          "app_key": "EVINCE",
+          "class": "evince|Evince",
+          "title": "Document Viewer|Evince|document_0070",
+          "label": "TEST1_SWITCH_EVINCE",
+          "optional": true
+        },
+        {
+          "type": "verify_foreground",
+          "name": "evince",
+          "app_key": "EVINCE",
+          "class": "evince|Evince",
+          "label": "TEST1_VERIFY_EVINCE",
+          "optional": true
+        },
+        {"type": "wait", "seconds": 3, "label": "TEST1_DWELL_EVINCE"},
+        {
+          "type": "switch",
+          "name": "files",
+          "app_key": "FILES",
+          "class": "pcmanfm|Pcmanfm|org.gnome.Nautilus|Nautilus|nautilus",
+          "title": "Desktop|Files|Home|huawei_mem",
+          "label": "TEST1_SWITCH_FILES",
+          "optional": true
+        },
+        {
+          "type": "verify_foreground",
+          "name": "files",
+          "app_key": "FILES",
+          "class": "pcmanfm|Pcmanfm|org.gnome.Nautilus|Nautilus|nautilus",
+          "label": "TEST1_VERIFY_FILES",
+          "optional": true
+        },
+        {"type": "wait", "seconds": 3, "label": "TEST1_DWELL_FILES"},
+        {
+          "type": "switch",
+          "name": "calculator",
+          "app_key": "CALCULATOR",
+          "class": "gnome-calculator|Calculator",
+          "title": "Calculator|计算器",
+          "label": "TEST1_SWITCH_CALCULATOR",
+          "optional": true
+        },
+        {
+          "type": "verify_foreground",
+          "name": "calculator",
+          "app_key": "CALCULATOR",
+          "class": "gnome-calculator|Calculator",
+          "label": "TEST1_VERIFY_CALCULATOR",
+          "optional": true
+        },
+        {"type": "wait", "seconds": 3, "label": "TEST1_DWELL_CALCULATOR"}
+      ]
+    },
+    {
+      "type": "window_state",
+      "name": "calculator",
+      "app_key": "CALCULATOR",
+      "class": "gnome-calculator|Calculator",
+      "state": "minimize",
+      "label": "TEST1_MINIMIZE_CALCULATOR"
+    },
+    {"type": "wait", "seconds": 2, "label": "TEST1_DWELL_MINIMIZED_CALCULATOR"},
+    {
+      "type": "window_state",
+      "name": "calculator",
+      "app_key": "CALCULATOR",
+      "class": "gnome-calculator|Calculator",
+      "state": "restore",
+      "label": "TEST1_RESTORE_CALCULATOR"
+    },
+    {"type": "wait", "seconds": 2, "label": "TEST1_DWELL_RESTORED_CALCULATOR"},
+    {"type": "close", "name": "calculator", "app_key": "CALCULATOR", "process_names": ["gnome-calculator"], "force_after_seconds": 2, "optional": true, "label": "TEST1_CLOSE_CALCULATOR"},
+    {"type": "close", "name": "files", "app_key": "FILES", "process_names": ["pcmanfm"], "force_after_seconds": 2, "optional": true, "label": "TEST1_CLOSE_FILES"},
+    {"type": "close", "name": "evince", "app_key": "EVINCE", "process_names": ["evince"], "force_after_seconds": 2, "optional": true, "label": "TEST1_CLOSE_EVINCE"},
+    {"type": "close", "name": "telegram", "app_key": "TELEGRAM", "process_names": ["telegram-desktop", "telegramdesktop"], "force_after_seconds": 2, "optional": true, "label": "TEST1_CLOSE_TELEGRAM"},
+    {"type": "close", "name": "thunderbird", "app_key": "THUNDERBIRD", "process_names": ["thunderbird"], "force_after_seconds": 2, "optional": true, "label": "TEST1_CLOSE_THUNDERBIRD"},
+    {"type": "close", "name": "audacity", "app_key": "AUDACITY", "process_names": ["audacity"], "force_after_seconds": 2, "optional": true, "label": "TEST1_CLOSE_AUDACITY"},
+    {"type": "close", "name": "gimp", "app_key": "GIMP", "process_names": ["gimp", "gimp-2.10"], "force_after_seconds": 2, "optional": true, "label": "TEST1_CLOSE_GIMP"},
+    {"type": "close", "name": "vlc", "app_key": "VLC", "process_names": ["vlc"], "force_after_seconds": 2, "optional": true, "label": "TEST1_CLOSE_VLC"},
+    {"type": "close", "name": "libreoffice", "app_key": "LIBREOFFICE", "process_names": ["soffice.bin", "soffice"], "force_after_seconds": 2, "optional": true, "label": "TEST1_CLOSE_LIBREOFFICE"},
+    {"type": "close", "name": "firefox", "app_key": "FIREFOX", "cmdline_contains": ["${FIREFOX_PROFILE}"], "force_after_seconds": 3, "optional": true, "label": "TEST1_CLOSE_FIREFOX"}
+  ]
+}

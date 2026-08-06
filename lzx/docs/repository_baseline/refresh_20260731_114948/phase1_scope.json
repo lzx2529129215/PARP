@@ -1,0 +1,114 @@
+{
+  "whitelist": [
+    {
+      "migration_id": "P1-001",
+      "source_path": "outputs/harmony_porting_bundle_20260717_152948.tar.gz.sha256",
+      "destination_path": "outputs/governed_20260731_114948/manifests/harmony_porting_bundle.tar.gz.sha256",
+      "proposed_action": "COPY_THEN_VERIFY",
+      "content_class": "REPORT",
+      "rationale": "独立SHA sidecar，非源码、非模型、非原始数据、非protected asset。",
+      "checksum_strategy": "full_sha256_source_and_copy",
+      "known_consumers": [],
+      "preconditions": [
+        "source exists",
+        "source not protected"
+      ],
+      "rollback_steps": [
+        "删除新治理副本文件即可；原文件未改变。"
+      ],
+      "protected_exceptions": [],
+      "expected_consumer_impact": "无，新增只读治理副本。",
+      "approval_required": false,
+      "execution_permission": "ALLOWED"
+    },
+    {
+      "migration_id": "P1-002",
+      "source_path": "outputs/harmony_porting_bundle_20260717_152948.zip.sha256",
+      "destination_path": "outputs/governed_20260731_114948/manifests/harmony_porting_bundle.zip.sha256",
+      "proposed_action": "COPY_THEN_VERIFY",
+      "content_class": "REPORT",
+      "rationale": "独立SHA sidecar，非源码、非模型、非原始数据、非protected asset。",
+      "checksum_strategy": "full_sha256_source_and_copy",
+      "known_consumers": [],
+      "preconditions": [
+        "source exists",
+        "source not protected"
+      ],
+      "rollback_steps": [
+        "删除新治理副本文件即可；原文件未改变。"
+      ],
+      "protected_exceptions": [],
+      "expected_consumer_impact": "无，新增只读治理副本。",
+      "approval_required": false,
+      "execution_permission": "ALLOWED"
+    }
+  ],
+  "excluded": [
+    {
+      "exclusion_id": "E-001",
+      "path": "operation_predictor/data/raw/datasets/LSApp",
+      "reason": "独立嵌套Git仓库及9项既有修改",
+      "classification": "KEEP_IN_PLACE"
+    },
+    {
+      "exclusion_id": "E-002",
+      "path": "cache_ext",
+      "reason": "上游组件及本地修改",
+      "classification": "EXTERNAL_COMPONENT"
+    },
+    {
+      "exclusion_id": "E-003",
+      "path": "mem/Harmony/v6-Homeny/hdc_out",
+      "reason": "Linux独立原始实验数据",
+      "classification": "UNIQUE_IRREPRODUCIBLE"
+    },
+    {
+      "exclusion_id": "E-004",
+      "path": "mem/Harmony/v6-python/hdc_out",
+      "reason": "Windows独立原始实验数据",
+      "classification": "UNIQUE_IRREPRODUCIBLE"
+    },
+    {
+      "exclusion_id": "E-005",
+      "path": "operation_predictor/outputs/checkpoints",
+      "reason": "正式和来源不完整checkpoint",
+      "classification": "KEEP_IN_PLACE"
+    },
+    {
+      "exclusion_id": "E-006",
+      "path": "/boot and /lib/modules kernel assets",
+      "reason": "当前、回退、generic内核均不治理",
+      "classification": "KEEP_IN_PLACE"
+    },
+    {
+      "exclusion_id": "E-007",
+      "path": "MGLRU-test/v0/mglru_kernel_transfer/linux-hwe-6.17-6.17.0",
+      "reason": "正式内核源码树",
+      "classification": "KEEP_IN_PLACE"
+    },
+    {
+      "exclusion_id": "E-008",
+      "path": "../ljw/tracer_new",
+      "reason": "独立兄弟研究子系统",
+      "classification": "KEEP_IN_PLACE"
+    },
+    {
+      "exclusion_id": "E-009",
+      "path": "runtime_monitor, automation, operation_predictor, mem/Harmony source, configs",
+      "reason": "业务源码与运行配置",
+      "classification": "KEEP_IN_PLACE"
+    },
+    {
+      "exclusion_id": "E-010",
+      "path": "14 protected assets and 6 unique assets",
+      "reason": "保护资产",
+      "classification": "KEEP_IN_PLACE"
+    },
+    {
+      "exclusion_id": "E-011",
+      "path": "all UNKNOWN_DO_NOT_TOUCH outputs and backups",
+      "reason": "无法证明可重建或重复",
+      "classification": "UNKNOWN_DO_NOT_TOUCH"
+    }
+  ]
+}

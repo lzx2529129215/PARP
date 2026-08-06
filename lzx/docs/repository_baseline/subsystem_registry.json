@@ -1,0 +1,665 @@
+{
+  "schema_version": "repository-subsystem-registry-v1",
+  "generated_at": "2026-07-17T20:13:11.560759+08:00",
+  "count": 11,
+  "subsystems": [
+    {
+      "subsystem_id": "pytest_cache",
+      "display_name": "pytest缓存",
+      "status": "GENERATED",
+      "canonical_path": ".pytest_cache",
+      "path_status": "EXISTS",
+      "responsibilities": [
+        "保存pytest自动生成的本地缓存"
+      ],
+      "official_entrypoints": [],
+      "compatibility_entrypoints": [],
+      "inputs": [
+        "见源审计data_flow.md"
+      ],
+      "outputs": [
+        "outputs/或子系统历史output目录"
+      ],
+      "configs": [
+        ".pytest_cache/.gitignore"
+      ],
+      "tests": [],
+      "upstream_dependencies": [
+        "see dependency_map.md"
+      ],
+      "downstream_consumers": [
+        "pytest"
+      ],
+      "runtime_environment": [
+        "Linux desktop/device/kernel depending on subsystem"
+      ],
+      "generated_artifacts": [
+        "see artifacts.csv"
+      ],
+      "known_limitations": [
+        "生命周期状态不能仅由目录名称推断",
+        "迁移、删除和重构尚未批准"
+      ],
+      "evidence": [
+        "outputs/repository_audit_20260717_175447/tables/subsystems.csv",
+        "outputs/repository_audit_20260717_175447/reports/directory_roles.md"
+      ],
+      "confidence": "HIGH",
+      "migration_permission": "NOT_APPROVED"
+    },
+    {
+      "subsystem_id": "mglru_kernel",
+      "display_name": "MGLRU与预测回收内核",
+      "status": "KERNEL_SOURCE",
+      "canonical_path": "MGLRU-test",
+      "path_status": "EXISTS",
+      "responsibilities": [
+        "保存v0-v4内核源码、构建、安装和运行验收证据",
+        "承载App Bind、CONTINUE、REENTRY和observe-only实现"
+      ],
+      "official_entrypoints": [],
+      "compatibility_entrypoints": [],
+      "inputs": [
+        "见源审计data_flow.md"
+      ],
+      "outputs": [
+        "outputs/或子系统历史output目录"
+      ],
+      "configs": [
+        "MGLRU-test/v3/mglru_kernel_transfer/config-6.17.13-mglru",
+        "MGLRU-test/v3/mglru_kernel_transfer/linux-hwe-6.17-6.17.0/.rustfmt.toml",
+        "MGLRU-test/v3/mglru_kernel_transfer/linux-hwe-6.17-6.17.0/Makefile",
+        "MGLRU-test/v3/mglru_kernel_transfer/linux-hwe-6.17-6.17.0/Kconfig",
+        "MGLRU-test/v3/mglru_kernel_transfer/linux-hwe-6.17-6.17.0/.clippy.toml",
+        "MGLRU-test/v3/mglru_kernel_transfer/linux-hwe-6.17-6.17.0/.gitignore",
+        "MGLRU-test/v3/mglru_kernel_transfer/linux-hwe-6.17-6.17.0/security/Makefile",
+        "MGLRU-test/v3/mglru_kernel_transfer/linux-hwe-6.17-6.17.0/security/Kconfig",
+        "MGLRU-test/v3/mglru_kernel_transfer/linux-hwe-6.17-6.17.0/security/smack/Makefile",
+        "MGLRU-test/v3/mglru_kernel_transfer/linux-hwe-6.17-6.17.0/security/smack/Kconfig",
+        "MGLRU-test/v3/mglru_kernel_transfer/linux-hwe-6.17-6.17.0/security/ipe/Makefile",
+        "MGLRU-test/v3/mglru_kernel_transfer/linux-hwe-6.17-6.17.0/security/ipe/Kconfig",
+        "MGLRU-test/v3/mglru_kernel_transfer/linux-hwe-6.17-6.17.0/security/ipe/.gitignore",
+        "MGLRU-test/v3/mglru_kernel_transfer/linux-hwe-6.17-6.17.0/security/lockdown/Makefile",
+        "MGLRU-test/v3/mglru_kernel_transfer/linux-hwe-6.17-6.17.0/security/lockdown/Kconfig",
+        "MGLRU-test/v3/mglru_kernel_transfer/linux-hwe-6.17-6.17.0/security/bpf/Makefile",
+        "MGLRU-test/v3/mglru_kernel_transfer/linux-hwe-6.17-6.17.0/security/landlock/Makefile",
+        "MGLRU-test/v3/mglru_kernel_transfer/linux-hwe-6.17-6.17.0/security/landlock/Kconfig",
+        "MGLRU-test/v3/mglru_kernel_transfer/linux-hwe-6.17-6.17.0/security/apparmor/Makefile",
+        "MGLRU-test/v3/mglru_kernel_transfer/linux-hwe-6.17-6.17.0/security/apparmor/Kconfig"
+      ],
+      "tests": [],
+      "upstream_dependencies": [
+        "see dependency_map.md"
+      ],
+      "downstream_consumers": [
+        "kernel source/build/runtime"
+      ],
+      "runtime_environment": [
+        "Linux desktop/device/kernel depending on subsystem"
+      ],
+      "generated_artifacts": [
+        "see artifacts.csv"
+      ],
+      "known_limitations": [
+        "生命周期状态不能仅由目录名称推断",
+        "迁移、删除和重构尚未批准"
+      ],
+      "evidence": [
+        "outputs/repository_audit_20260717_175447/tables/subsystems.csv",
+        "outputs/repository_audit_20260717_175447/reports/directory_roles.md"
+      ],
+      "confidence": "HIGH",
+      "migration_permission": "NOT_APPROVED"
+    },
+    {
+      "subsystem_id": "automation",
+      "display_name": "PC语义自动化",
+      "status": "ACTIVE",
+      "canonical_path": "automation",
+      "path_status": "EXISTS",
+      "responsibilities": [
+        "执行桌面应用启动、操作、切换和trace marker",
+        "为Runtime Monitor提供operation trace"
+      ],
+      "official_entrypoints": [
+        "automation/run_automation.sh",
+        "automation/app_automation.py"
+      ],
+      "compatibility_entrypoints": [],
+      "inputs": [
+        "见源审计data_flow.md"
+      ],
+      "outputs": [
+        "outputs/或子系统历史output目录"
+      ],
+      "configs": [
+        "automation/scenario_local_wps_files.json",
+        "automation/scenario_local_wps.json",
+        "automation/scenario_local_wps_files_qq_auto_login.json",
+        "automation/semantic/profiles/bilibili_1920x1080.json",
+        "automation/semantic/profiles/files_1920x1080.json",
+        "automation/semantic/profiles/wechat_1920x1080.json",
+        "automation/semantic/profiles/browser_1920x1080.json",
+        "automation/semantic/profiles/wps_1920x1080.json",
+        "automation/semantic/assets/browser_urls.json",
+        "automation/semantic/assets/assets_manifest.example.json",
+        "automation/semantic/scenarios/scenario_bilibili_browse_play.json",
+        "automation/semantic/scenarios/scenario_cross_app_media.json",
+        "automation/semantic/scenarios/scenario_wps_multi_documents.json",
+        "automation/semantic/scenarios/scenario_browser_multitab.json",
+        "automation/semantic/scenarios/scenario_wps_templates.json",
+        "automation/semantic/scenarios/scenario_wps_ppt_operations.json",
+        "automation/semantic/scenarios/scenario_cross_app_mixed.json",
+        "automation/semantic/scenarios/scenario_wechat_messages.json",
+        "automation/semantic/scenarios/scenario_cross_app_productivity.json",
+        "automation/semantic/scenarios/scenario_wps_new_documents.json"
+      ],
+      "tests": [
+        "automation/test.sh",
+        "automation/tests/test_semantic_automation.py",
+        "automation/scripts/build_semantic_ui_smoke_report.py",
+        "automation/scripts/create_semantic_ui_smoke_assets.py",
+        "automation/scripts/validate_semantic_ui_smoke.py"
+      ],
+      "upstream_dependencies": [
+        "see dependency_map.md"
+      ],
+      "downstream_consumers": [
+        "runtime_monitor"
+      ],
+      "runtime_environment": [
+        "Linux desktop/device/kernel depending on subsystem"
+      ],
+      "generated_artifacts": [
+        "see artifacts.csv"
+      ],
+      "known_limitations": [
+        "生命周期状态不能仅由目录名称推断",
+        "迁移、删除和重构尚未批准"
+      ],
+      "evidence": [
+        "outputs/repository_audit_20260717_175447/tables/subsystems.csv",
+        "outputs/repository_audit_20260717_175447/reports/directory_roles.md"
+      ],
+      "confidence": "HIGH",
+      "migration_permission": "NOT_APPROVED"
+    },
+    {
+      "subsystem_id": "cache_ext",
+      "display_name": "cache_ext研究子系统",
+      "status": "ACTIVE_EXPERIMENTAL",
+      "canonical_path": "cache_ext",
+      "path_status": "EXISTS",
+      "responsibilities": [
+        "保存cache_ext内核研究、策略和评测",
+        "包含第三方LevelDB、RocksDB和YCSB"
+      ],
+      "official_entrypoints": [],
+      "compatibility_entrypoints": [],
+      "inputs": [
+        "见源审计data_flow.md"
+      ],
+      "outputs": [
+        "outputs/或子系统历史output目录"
+      ],
+      "configs": [
+        "cache_ext/.gitmodules",
+        "cache_ext/.gitignore",
+        "cache_ext/rocksdb/.gitmodules",
+        "cache_ext/rocksdb/Makefile",
+        "cache_ext/rocksdb/.lgtm.yml",
+        "cache_ext/rocksdb/.gitignore",
+        "cache_ext/rocksdb/examples/Makefile",
+        "cache_ext/rocksdb/examples/rocksdb_option_file_example.ini",
+        "cache_ext/rocksdb/examples/.gitignore",
+        "cache_ext/rocksdb/tools/advisor/test/input_files/rules_err1.ini",
+        "cache_ext/rocksdb/tools/advisor/test/input_files/rules_err3.ini",
+        "cache_ext/rocksdb/tools/advisor/test/input_files/rules_err4.ini",
+        "cache_ext/rocksdb/tools/advisor/test/input_files/triggered_rules.ini",
+        "cache_ext/rocksdb/tools/advisor/test/input_files/test_rules.ini",
+        "cache_ext/rocksdb/tools/advisor/test/input_files/rules_err2.ini",
+        "cache_ext/rocksdb/tools/advisor/advisor/config_optimizer_example.py",
+        "cache_ext/rocksdb/tools/advisor/advisor/rules.ini",
+        "cache_ext/rocksdb/fuzz/Makefile",
+        "cache_ext/rocksdb/fuzz/.gitignore",
+        "cache_ext/rocksdb/docs/_config.yml"
+      ],
+      "tests": [
+        "cache_ext/rocksdb/build_tools/regression_build_test.sh",
+        "cache_ext/rocksdb/tools/regression_test.sh",
+        "cache_ext/rocksdb/tools/advisor/test/test_db_log_parser.py",
+        "cache_ext/rocksdb/tools/advisor/test/test_db_bench_runner.py",
+        "cache_ext/rocksdb/tools/advisor/test/test_db_options_parser.py",
+        "cache_ext/rocksdb/tools/advisor/test/test_rule_parser.py",
+        "cache_ext/rocksdb/tools/advisor/test/test_db_stats_fetcher.py",
+        "cache_ext/rocksdb/utilities/cassandra/test_utils.cc",
+        "cache_ext/rocksdb/utilities/cassandra/test_utils.h",
+        "cache_ext/rocksdb/utilities/agg_merge/test_agg_merge.h",
+        "cache_ext/rocksdb/utilities/agg_merge/test_agg_merge.cc",
+        "cache_ext/rocksdb/test_util/testutil.cc",
+        "cache_ext/rocksdb/test_util/testutil_test.cc",
+        "cache_ext/rocksdb/test_util/testutil.h",
+        "cache_ext/rocksdb/test_util/testharness.cc",
+        "cache_ext/rocksdb/test_util/testharness.h",
+        "cache_ext/rocksdb/java/rocksjni/testable_event_listener.cc",
+        "cache_ext/leveldb/util/testutil.cc",
+        "cache_ext/leveldb/util/testutil.h"
+      ],
+      "upstream_dependencies": [
+        "see dependency_map.md"
+      ],
+      "downstream_consumers": [
+        "kernel/cache experiments"
+      ],
+      "runtime_environment": [
+        "Linux desktop/device/kernel depending on subsystem"
+      ],
+      "generated_artifacts": [
+        "see artifacts.csv"
+      ],
+      "known_limitations": [
+        "生命周期状态不能仅由目录名称推断",
+        "迁移、删除和重构尚未批准"
+      ],
+      "evidence": [
+        "outputs/repository_audit_20260717_175447/tables/subsystems.csv",
+        "outputs/repository_audit_20260717_175447/reports/directory_roles.md"
+      ],
+      "confidence": "MEDIUM",
+      "migration_permission": "NOT_APPROVED"
+    },
+    {
+      "subsystem_id": "configs",
+      "display_name": "共享配置",
+      "status": "ACTIVE",
+      "canonical_path": "configs",
+      "path_status": "EXISTS",
+      "responsibilities": [
+        "保存automation、runtime和vocab配置",
+        "为多个用户态入口提供参数"
+      ],
+      "official_entrypoints": [],
+      "compatibility_entrypoints": [],
+      "inputs": [
+        "见源审计data_flow.md"
+      ],
+      "outputs": [
+        "outputs/或子系统历史output目录"
+      ],
+      "configs": [
+        "configs/runtime/config.yaml",
+        "configs/runtime/app_mapping.json",
+        "configs/runtime/runtime_app_scope.json",
+        "configs/runtime/mglru_lstm_reclaim_policy.json",
+        "configs/automation/wps_perf_0060_spreadsheet.json",
+        "configs/automation/scenario_validation_wps_edit_loop.json",
+        "configs/automation/wps_writer_debug.json",
+        "configs/automation/wps_perf_0050_presentation.json",
+        "configs/automation/wps_ppt_debug.json",
+        "configs/automation/scenario_local_files.json",
+        "configs/automation/scenario_local_wps.json",
+        "configs/automation/wps_perf_0040_word.json",
+        "configs/automation/wps_0010_pause.json",
+        "configs/automation/scenario_unified_pipeline_bilibili.json",
+        "configs/automation/wps_perf_0030_ten_documents.json",
+        "configs/automation/scenario_validation_prediction_hit.json",
+        "configs/automation/wps_perf_0010_templates.json",
+        "configs/automation/scenario_validation_multi_app_loop.json",
+        "configs/automation/wps_perf_0070_pdf.json",
+        "configs/automation/scenario_dual_markov_bindfix_validation.json"
+      ],
+      "tests": [],
+      "upstream_dependencies": [
+        "see dependency_map.md"
+      ],
+      "downstream_consumers": [
+        "multiple userspace subsystems"
+      ],
+      "runtime_environment": [
+        "Linux desktop/device/kernel depending on subsystem"
+      ],
+      "generated_artifacts": [
+        "see artifacts.csv"
+      ],
+      "known_limitations": [
+        "生命周期状态不能仅由目录名称推断",
+        "迁移、删除和重构尚未批准"
+      ],
+      "evidence": [
+        "outputs/repository_audit_20260717_175447/tables/subsystems.csv",
+        "outputs/repository_audit_20260717_175447/reports/directory_roles.md"
+      ],
+      "confidence": "HIGH",
+      "migration_permission": "NOT_APPROVED"
+    },
+    {
+      "subsystem_id": "design",
+      "display_name": "设计基线",
+      "status": "ACTIVE",
+      "canonical_path": "design",
+      "path_status": "EXISTS",
+      "responsibilities": [
+        "记录App Bind、Markov、hint和双模式语义"
+      ],
+      "official_entrypoints": [],
+      "compatibility_entrypoints": [],
+      "inputs": [
+        "见源审计data_flow.md"
+      ],
+      "outputs": [
+        "outputs/或子系统历史output目录"
+      ],
+      "configs": [],
+      "tests": [],
+      "upstream_dependencies": [
+        "see dependency_map.md"
+      ],
+      "downstream_consumers": [
+        "runtime/kernel"
+      ],
+      "runtime_environment": [
+        "Linux desktop/device/kernel depending on subsystem"
+      ],
+      "generated_artifacts": [
+        "see artifacts.csv"
+      ],
+      "known_limitations": [
+        "生命周期状态不能仅由目录名称推断",
+        "迁移、删除和重构尚未批准"
+      ],
+      "evidence": [
+        "outputs/repository_audit_20260717_175447/tables/subsystems.csv",
+        "outputs/repository_audit_20260717_175447/reports/directory_roles.md"
+      ],
+      "confidence": "HIGH",
+      "migration_permission": "NOT_APPROVED"
+    },
+    {
+      "subsystem_id": "project_doc",
+      "display_name": "项目历史文档",
+      "status": "COMPATIBILITY",
+      "canonical_path": "doc",
+      "path_status": "EXISTS",
+      "responsibilities": [
+        "保存内核修改和阶段说明"
+      ],
+      "official_entrypoints": [],
+      "compatibility_entrypoints": [],
+      "inputs": [
+        "见源审计data_flow.md"
+      ],
+      "outputs": [
+        "outputs/或子系统历史output目录"
+      ],
+      "configs": [],
+      "tests": [],
+      "upstream_dependencies": [
+        "see dependency_map.md"
+      ],
+      "downstream_consumers": [
+        "project"
+      ],
+      "runtime_environment": [
+        "Linux desktop/device/kernel depending on subsystem"
+      ],
+      "generated_artifacts": [
+        "see artifacts.csv"
+      ],
+      "known_limitations": [
+        "生命周期状态不能仅由目录名称推断",
+        "迁移、删除和重构尚未批准"
+      ],
+      "evidence": [
+        "outputs/repository_audit_20260717_175447/tables/subsystems.csv",
+        "outputs/repository_audit_20260717_175447/reports/directory_roles.md"
+      ],
+      "confidence": "MEDIUM",
+      "migration_permission": "NOT_APPROVED"
+    },
+    {
+      "subsystem_id": "memory_platform",
+      "display_name": "Linux与Harmony内存采集",
+      "status": "ACTIVE_EXPERIMENTAL",
+      "canonical_path": "mem",
+      "path_status": "EXISTS",
+      "responsibilities": [
+        "保存Harmony HDC/VMA采集与56维特征工具",
+        "保存Linux page access和接口实验版本"
+      ],
+      "official_entrypoints": [],
+      "compatibility_entrypoints": [],
+      "inputs": [
+        "见源审计data_flow.md"
+      ],
+      "outputs": [
+        "outputs/或子系统历史output目录"
+      ],
+      "configs": [
+        "mem/Linux/v8/Makefile"
+      ],
+      "tests": [],
+      "upstream_dependencies": [
+        "see dependency_map.md"
+      ],
+      "downstream_consumers": [
+        "Harmony/Linux"
+      ],
+      "runtime_environment": [
+        "Linux desktop/device/kernel depending on subsystem"
+      ],
+      "generated_artifacts": [
+        "see artifacts.csv"
+      ],
+      "known_limitations": [
+        "生命周期状态不能仅由目录名称推断",
+        "迁移、删除和重构尚未批准"
+      ],
+      "evidence": [
+        "outputs/repository_audit_20260717_175447/tables/subsystems.csv",
+        "outputs/repository_audit_20260717_175447/reports/directory_roles.md"
+      ],
+      "confidence": "HIGH",
+      "migration_permission": "NOT_APPROVED"
+    },
+    {
+      "subsystem_id": "operation_predictor",
+      "display_name": "应用预测模型",
+      "status": "ACTIVE",
+      "canonical_path": "operation_predictor",
+      "path_status": "EXISTS",
+      "responsibilities": [
+        "构建LSApp数据集",
+        "训练和推理duration-aware LSTM",
+        "管理vocab和checkpoint"
+      ],
+      "official_entrypoints": [],
+      "compatibility_entrypoints": [],
+      "inputs": [
+        "见源审计data_flow.md"
+      ],
+      "outputs": [
+        "outputs/或子系统历史output目录"
+      ],
+      "configs": [
+        "operation_predictor/.gitignore",
+        "operation_predictor/data/vocab/app_vocab.json",
+        "operation_predictor/data/vocab/op_vocab.json",
+        "operation_predictor/data/vocab/app_vocab_duration.json",
+        "operation_predictor/data/vocab/user_group_vocab.json",
+        "operation_predictor/data/processed/app_lstm_duration_gap3600_periodic180/dataset_meta.json",
+        "operation_predictor/data/processed/app_lstm_duration/dataset_meta.json",
+        "operation_predictor/data/raw/datasets/LSApp/tool/mapping_apply_report.json",
+        "operation_predictor/data/raw/datasets/LSApp/tool/app_names.json",
+        "operation_predictor/data/raw/datasets/LSApp/models/markov_stats.json",
+        "operation_predictor/data/raw/datasets/LSApp/models/markov_counts_v1.json",
+        "operation_predictor/data/raw/datasets/LSApp/models/markov_model_v1.json"
+      ],
+      "tests": [],
+      "upstream_dependencies": [
+        "see dependency_map.md"
+      ],
+      "downstream_consumers": [
+        "runtime_monitor/kernel hints"
+      ],
+      "runtime_environment": [
+        "Linux desktop/device/kernel depending on subsystem"
+      ],
+      "generated_artifacts": [
+        "see artifacts.csv"
+      ],
+      "known_limitations": [
+        "生命周期状态不能仅由目录名称推断",
+        "迁移、删除和重构尚未批准"
+      ],
+      "evidence": [
+        "outputs/repository_audit_20260717_175447/tables/subsystems.csv",
+        "outputs/repository_audit_20260717_175447/reports/directory_roles.md"
+      ],
+      "confidence": "HIGH",
+      "migration_permission": "NOT_APPROVED"
+    },
+    {
+      "subsystem_id": "outputs",
+      "display_name": "运行与实验输出",
+      "status": "GENERATED",
+      "canonical_path": "outputs",
+      "path_status": "EXISTS",
+      "responsibilities": [
+        "保存session、运行证据、报告和共享包"
+      ],
+      "official_entrypoints": [],
+      "compatibility_entrypoints": [],
+      "inputs": [
+        "见源审计data_flow.md"
+      ],
+      "outputs": [
+        "outputs/或子系统历史output目录"
+      ],
+      "configs": [
+        "outputs/runtime_monitor/session_region_fail_closed_20260715_174001/region_monitor/region_monitor_analysis.json",
+        "outputs/runtime_monitor/session_region_fail_closed_20260715_174001/region_monitor/region_vocab.json",
+        "outputs/runtime_monitor/session_region_fail_closed_20260715_174001/region_monitor/capability_report.json",
+        "outputs/runtime_monitor/session_region_fail_closed_20260715_174001/region_monitor/vma_refresh_stats.json",
+        "outputs/mglru/damon_kernel_enable_20260715/config_diff.md",
+        "outputs/mglru/damon_kernel_enable_20260715/runtime_preboot_check_fixed/damon_kernel_runtime_report.json",
+        "outputs/mglru/damon_kernel_enable_20260715/runtime_preboot_check/damon_kernel_runtime_report.json",
+        "outputs/mglru/share_dual_markov_runtime_validation_20260713_184203/dual_markov_runtime_validation.json",
+        "outputs/mglru/share_dual_markov_runtime_validation_20260713_184203/manifest.json",
+        "outputs/mglru/share_dual_markov_runtime_validation_20260713_184203/reports/dual_markov_runtime_validation.json",
+        "outputs/mglru/share_dual_markov_runtime_validation_20260713_184203/kernel/precheck/kernel_boot_check.json",
+        "outputs/mglru/share_dual_markov_runtime_validation_20260713_184203/live/scenario_dual_markov_runtime.json",
+        "outputs/mglru/share_dual_markov_bindfix_20260714_092525/manifest.json",
+        "outputs/mglru/share_dual_markov_bindfix_20260714_092525/reports/dual_markov_bindfix_runtime_summary.json",
+        "outputs/mglru/dual_markov_bindfix_20260714_092525/reports/dual_markov_bindfix_summary.json",
+        "outputs/mglru/dual_markov_bindfix_20260714_092525/runtime/reports/dual_markov_bindfix_runtime_summary.json",
+        "outputs/mglru/dual_markov_bindfix_20260714_092525/install/kernel_install_summary.json",
+        "outputs/mglru/dual_markov_bindfix_20260714_092525/replay/app_bind_replay_summary.json",
+        "outputs/mglru/damon_runtime_validation_20260715/final_validation_report.json",
+        "outputs/mglru/damon_runtime_validation_20260715/damon_kernel_runtime_report.json"
+      ],
+      "tests": [],
+      "upstream_dependencies": [
+        "see dependency_map.md"
+      ],
+      "downstream_consumers": [
+        "all subsystems"
+      ],
+      "runtime_environment": [
+        "Linux desktop/device/kernel depending on subsystem"
+      ],
+      "generated_artifacts": [
+        "see artifacts.csv"
+      ],
+      "known_limitations": [
+        "生命周期状态不能仅由目录名称推断",
+        "迁移、删除和重构尚未批准"
+      ],
+      "evidence": [
+        "outputs/repository_audit_20260717_175447/tables/subsystems.csv",
+        "outputs/repository_audit_20260717_175447/reports/directory_roles.md"
+      ],
+      "confidence": "HIGH",
+      "migration_permission": "NOT_APPROVED"
+    },
+    {
+      "subsystem_id": "runtime_monitor",
+      "display_name": "Runtime Monitor",
+      "status": "ACTIVE",
+      "canonical_path": "runtime_monitor",
+      "path_status": "EXISTS",
+      "responsibilities": [
+        "前台识别和cgroup采集",
+        "workload分类和双模式Markov",
+        "在线LSTM和内核控制接口编排"
+      ],
+      "official_entrypoints": [
+        "runtime_monitor/monitor.py"
+      ],
+      "compatibility_entrypoints": [
+        "runtime_monitor/online_monitor.py"
+      ],
+      "inputs": [
+        "见源审计data_flow.md"
+      ],
+      "outputs": [
+        "outputs/或子系统历史output目录"
+      ],
+      "configs": [
+        "runtime_monitor/config.yaml",
+        "runtime_monitor/app_mapping.json",
+        "runtime_monitor/config/runtime_app_scope.json",
+        "runtime_monitor/config/region_monitor.json",
+        "runtime_monitor/config/runtime_app_scope.semantic_automation.json",
+        "runtime_monitor/region_monitor/config.py",
+        "runtime_monitor/region_monitor/__pycache__/config.cpython-310.pyc",
+        "runtime_monitor/core/schema.py",
+        "runtime_monitor/core/__pycache__/schema.cpython-310.pyc",
+        "runtime_monitor/gnome_extension/metadata.json"
+      ],
+      "tests": [
+        "runtime_monitor/test.sh",
+        "runtime_monitor/tests/test_tracefs_event_source.py",
+        "runtime_monitor/tests/test_region_overlap.py",
+        "runtime_monitor/tests/test_foreground_continue_markov.py",
+        "runtime_monitor/tests/test_online_causal_workload_markov.py",
+        "runtime_monitor/tests/test_reentry_workload_markov.py",
+        "runtime_monitor/tests/test_region_monitor_default.py",
+        "runtime_monitor/tests/test_pid_tracker.py",
+        "runtime_monitor/tests/test_mglru_lstm_reclaim_policy.py",
+        "runtime_monitor/tests/test_cgroup_feature_adapter.py",
+        "runtime_monitor/tests/test_build_pipeline_timeline.py",
+        "runtime_monitor/tests/test_pipeline_intermediate_audit.py",
+        "runtime_monitor/tests/test_workload_classifier.py",
+        "runtime_monitor/tests/test_inspect_pipeline_intermediates.py",
+        "runtime_monitor/tests/test_dual_markov_debugfs.py",
+        "runtime_monitor/tests/test_vma_parser.py",
+        "runtime_monitor/tests/test_online_state.py",
+        "runtime_monitor/tests/test_dual_markov_policy.py",
+        "runtime_monitor/tests/test_dual_markov_full_fix.py",
+        "runtime_monitor/tests/test_dual_workload_markov.py"
+      ],
+      "upstream_dependencies": [
+        "see dependency_map.md"
+      ],
+      "downstream_consumers": [
+        "automation/predictor/kernel"
+      ],
+      "runtime_environment": [
+        "Linux desktop/device/kernel depending on subsystem"
+      ],
+      "generated_artifacts": [
+        "see artifacts.csv"
+      ],
+      "known_limitations": [
+        "生命周期状态不能仅由目录名称推断",
+        "迁移、删除和重构尚未批准"
+      ],
+      "evidence": [
+        "outputs/repository_audit_20260717_175447/tables/subsystems.csv",
+        "outputs/repository_audit_20260717_175447/reports/directory_roles.md"
+      ],
+      "confidence": "HIGH",
+      "migration_permission": "NOT_APPROVED"
+    }
+  ]
+}

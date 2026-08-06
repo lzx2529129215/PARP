@@ -1,0 +1,29 @@
+{
+  "description": "GIMP 多场景：打开隔离图片副本、缩放、画布浏览、单窗口/全屏、复制图像和保存 XCF。",
+  "variables": {
+    "GIMP_SOURCE": "${PROJECT_ROOT}/samples/wps/visible_paste_test.png",
+    "GIMP_OUT": "${PROJECT_ROOT}/outputs/automation_rich/gimp"
+  },
+  "actions": [
+    {"type": "assert_file", "path": "${GIMP_SOURCE}", "label": "GIMP_ASSERT_SOURCE"},
+    {"type": "shell", "command": "mkdir -p \"${GIMP_OUT}\" && cp \"${GIMP_SOURCE}\" \"${GIMP_OUT}/working_copy.png\"", "label": "GIMP_PREPARE_COPY"},
+    {"type": "launch", "name": "gimp", "app_key": "GIMP", "command": "gimp ${GIMP_OUT}/working_copy.png", "label": "GIMP_LAUNCH_IMAGE"},
+    {"type": "wait_window", "name": "gimp", "app_key": "GIMP", "class": "gimp|Gimp", "title": "GIMP|working_copy", "timeout": 35, "label": "GIMP_WAIT_WINDOW"},
+    {"type": "window_state", "name": "gimp", "app_key": "GIMP", "class": "gimp|Gimp", "state": "maximize", "label": "GIMP_MAXIMIZE"},
+    {"type": "verify_foreground", "name": "gimp", "app_key": "GIMP", "class": "gimp|Gimp", "label": "GIMP_VERIFY"},
+    {"type": "key", "name": "gimp", "key": "2", "optional": true, "label": "GIMP_FIT_IMAGE_IN_WINDOW"},
+    {"type": "key", "name": "gimp", "key": "plus", "repeat": 2, "label": "GIMP_ZOOM_IN"},
+    {"type": "key", "name": "gimp", "key": "minus", "label": "GIMP_ZOOM_OUT"},
+    {"type": "scroll", "name": "gimp", "app_key": "GIMP", "class": "gimp|Gimp", "direction": "down", "amount": 3, "optional": true, "label": "GIMP_SCROLL_CANVAS"},
+    {"type": "key", "name": "gimp", "key": "Tab", "label": "GIMP_HIDE_DOCKS"},
+    {"type": "wait", "seconds": 2, "label": "GIMP_CANVAS_ONLY_DWELL"},
+    {"type": "key", "name": "gimp", "key": "Tab", "label": "GIMP_SHOW_DOCKS"},
+    {"type": "key", "name": "gimp", "key": "F11", "label": "GIMP_FULLSCREEN"},
+    {"type": "wait", "seconds": 2, "label": "GIMP_FULLSCREEN_DWELL"},
+    {"type": "key", "name": "gimp", "key": "F11", "label": "GIMP_EXIT_FULLSCREEN"},
+    {"type": "hotkey", "name": "gimp", "key": "ctrl+d", "optional": true, "label": "GIMP_DUPLICATE_IMAGE"},
+    {"type": "save_as", "name": "gimp", "app_key": "GIMP", "class": "gimp|Gimp", "path": "${GIMP_OUT}/automation_image.xcf", "wait_after": 5, "label": "GIMP_SAVE_XCF"},
+    {"type": "assert_file", "path": "${GIMP_OUT}/automation_image.xcf", "label": "GIMP_VERIFY_XCF"},
+    {"type": "close", "name": "gimp", "app_key": "GIMP", "class": "gimp|Gimp", "process_names": ["gimp", "gimp-2.10"], "path_contains": ["/usr/bin/gimp"], "wait_after_window_close": 1, "force_after_seconds": 2, "label": "GIMP_CLOSE"}
+  ]
+}

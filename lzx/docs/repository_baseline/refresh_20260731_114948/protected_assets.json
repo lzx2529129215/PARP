@@ -1,0 +1,165 @@
+{
+  "count": 16,
+  "assets": [
+    {
+      "asset_id": "lsapp_nested_repo",
+      "path": "operation_predictor/data/raw/datasets/LSApp",
+      "type": "CRITICAL_DO_NOT_TOUCH",
+      "reason": "原始数据且包含独立Git历史",
+      "checksum_strategy": "targeted_sha_or_existing_manifest",
+      "reproducibility": false,
+      "current_status": "EXISTS",
+      "phase1_permission": "KEEP_IN_PLACE"
+    },
+    {
+      "asset_id": "lsapp_nine_modifications",
+      "path": "operation_predictor/data/raw/datasets/LSApp",
+      "type": "CRITICAL_DO_NOT_TOUCH",
+      "reason": "九项审计前已有tracked修改不得被覆盖",
+      "checksum_strategy": "targeted_sha_or_existing_manifest",
+      "reproducibility": false,
+      "current_status": "EXISTS",
+      "phase1_permission": "KEEP_IN_PLACE"
+    },
+    {
+      "asset_id": "mapped_app_events",
+      "path": "operation_predictor/data/raw/lsapp/app_events.csv",
+      "type": "PRESERVE_HIGH_PRIORITY",
+      "reason": "duration数据集直接来源",
+      "checksum_strategy": "targeted_sha_or_existing_manifest",
+      "reproducibility": false,
+      "current_status": "EXISTS",
+      "phase1_permission": "KEEP_IN_PLACE"
+    },
+    {
+      "asset_id": "active_switch_checkpoint",
+      "path": "operation_predictor/outputs/checkpoints/app_lstm_duration/lsapp_app_lstm_duration_switch.pt",
+      "type": "CRITICAL_DO_NOT_TOUCH",
+      "reason": "Runtime Monitor默认在线checkpoint",
+      "checksum_strategy": "targeted_sha_or_existing_manifest",
+      "reproducibility": false,
+      "current_status": "EXISTS",
+      "phase1_permission": "KEEP_IN_PLACE"
+    },
+    {
+      "asset_id": "all_checkpoint_set",
+      "path": "operation_predictor/outputs/checkpoints",
+      "type": "PRESERVE_HIGH_PRIORITY",
+      "reason": "五个登记模型的唯一训练产物集合",
+      "checksum_strategy": "targeted_sha_or_existing_manifest",
+      "reproducibility": false,
+      "current_status": "EXISTS",
+      "phase1_permission": "KEEP_IN_PLACE"
+    },
+    {
+      "asset_id": "current_kernel_boot_assets",
+      "path": "/boot/vmlinuz-6.17.13-mglru-dual-observe-damon-20260715",
+      "type": "CRITICAL_DO_NOT_TOUCH",
+      "reason": "当前启动内核",
+      "checksum_strategy": "targeted_sha_or_existing_manifest",
+      "reproducibility": false,
+      "current_status": "EXISTS",
+      "phase1_permission": "KEEP_IN_PLACE"
+    },
+    {
+      "asset_id": "bindfix_fallback_boot_assets",
+      "path": "/boot/vmlinuz-6.17.13-mglru-dual-observe-bindfix-20260714_092525",
+      "type": "CRITICAL_DO_NOT_TOUCH",
+      "reason": "vmlinuz.old指向的回退内核",
+      "checksum_strategy": "targeted_sha_or_existing_manifest",
+      "reproducibility": false,
+      "current_status": "EXISTS",
+      "phase1_permission": "KEEP_IN_PLACE"
+    },
+    {
+      "asset_id": "canonical_kernel_source",
+      "path": "MGLRU-test/v0/mglru_kernel_transfer/linux-hwe-6.17-6.17.0",
+      "type": "CRITICAL_DO_NOT_TOUCH",
+      "reason": "当前App Bind与双模式Markov正式源码树",
+      "checksum_strategy": "targeted_sha_or_existing_manifest",
+      "reproducibility": false,
+      "current_status": "EXISTS",
+      "phase1_permission": "KEEP_IN_PLACE"
+    },
+    {
+      "asset_id": "kernel_configs",
+      "path": "/boot/config-6.17.13-mglru-dual-observe-damon-20260715",
+      "type": "PRESERVE_HIGH_PRIORITY",
+      "reason": "当前与回退构建配置基线",
+      "checksum_strategy": "targeted_sha_or_existing_manifest",
+      "reproducibility": false,
+      "current_status": "EXISTS",
+      "phase1_permission": "KEEP_IN_PLACE"
+    },
+    {
+      "asset_id": "cache_ext_tree",
+      "path": "cache_ext",
+      "type": "PRESERVE_HIGH_PRIORITY",
+      "reason": "混合研究代码与第三方来源，正式状态未完全确认",
+      "checksum_strategy": "targeted_sha_or_existing_manifest",
+      "reproducibility": false,
+      "current_status": "EXISTS",
+      "phase1_permission": "KEEP_IN_PLACE"
+    },
+    {
+      "asset_id": "harmony_raw_data",
+      "path": "mem/Harmony",
+      "type": "CRITICAL_DO_NOT_TOUCH",
+      "reason": "真机HDC/VMA数据可能不可重建",
+      "checksum_strategy": "targeted_sha_or_existing_manifest",
+      "reproducibility": false,
+      "current_status": "EXISTS",
+      "phase1_permission": "KEEP_IN_PLACE"
+    },
+    {
+      "asset_id": "mglru_runtime_validation",
+      "path": "outputs/mglru/dual_markov_bindfix_20260714_092525",
+      "type": "PRESERVE_HIGH_PRIORITY",
+      "reason": "observe-only和App Bind运行验收证据",
+      "checksum_strategy": "targeted_sha_or_existing_manifest",
+      "reproducibility": false,
+      "current_status": "EXISTS",
+      "phase1_permission": "KEEP_IN_PLACE"
+    },
+    {
+      "asset_id": "damon_runtime_validation",
+      "path": "outputs/mglru/damon_runtime_validation_20260715",
+      "type": "PRESERVE_HIGH_PRIORITY",
+      "reason": "当前内核DAMON真机/运行态证据",
+      "checksum_strategy": "targeted_sha_or_existing_manifest",
+      "reproducibility": false,
+      "current_status": "EXISTS",
+      "phase1_permission": "KEEP_IN_PLACE"
+    },
+    {
+      "asset_id": "automation_validation_evidence",
+      "path": "outputs/automation",
+      "type": "PRESERVE",
+      "reason": "语义自动化和GUI校准历史证据",
+      "checksum_strategy": "targeted_sha_or_existing_manifest",
+      "reproducibility": "UNKNOWN",
+      "current_status": "EXISTS",
+      "phase1_permission": "KEEP_IN_PLACE"
+    },
+    {
+      "asset_id": "harmony_linux_hdc_out",
+      "path": "mem/Harmony/v6-Homeny/hdc_out",
+      "type": "CRITICAL_DO_NOT_TOUCH",
+      "reason": "独立真机实验原始数据",
+      "checksum_strategy": "manifest/tree metadata",
+      "reproducibility": "UNIQUE_IRREPRODUCIBLE",
+      "current_status": "EXISTS",
+      "phase1_permission": "KEEP_IN_PLACE"
+    },
+    {
+      "asset_id": "harmony_windows_hdc_out",
+      "path": "mem/Harmony/v6-python/hdc_out",
+      "type": "CRITICAL_DO_NOT_TOUCH",
+      "reason": "独立真机实验原始数据，不是Linux数据副本",
+      "checksum_strategy": "manifest/tree metadata",
+      "reproducibility": "UNIQUE_IRREPRODUCIBLE",
+      "current_status": "EXISTS",
+      "phase1_permission": "KEEP_IN_PLACE"
+    }
+  ]
+}

@@ -1,0 +1,128 @@
+{
+  "validation_mode": true,
+  "keep_alive_after_s": 90,
+  "actions": [
+    {
+      "type": "shell",
+      "label": "MULTI_APP_VALIDATION_SETUP",
+      "command": "mkdir -p /home/lzx/Desktop/huawei/huawei_mem/lzx/outputs/automation_validation/multi/files && printf 'multi app validation\\n' > /home/lzx/Desktop/huawei/huawei_mem/lzx/outputs/automation_validation/multi/files/sample.txt"
+    },
+    {
+      "type": "shell",
+      "name": "files",
+      "label": "FILES_LAUNCH_MULTI",
+      "command": "nautilus --new-window /home/lzx/Desktop/huawei/huawei_mem/lzx/outputs/automation_validation/multi/files",
+      "optional": true
+    },
+    {
+      "type": "wait",
+      "seconds": 5,
+      "name": "files",
+      "label": "FILES_WAIT_MULTI"
+    },
+    {
+      "type": "launch",
+      "name": "wps",
+      "command": "wps"
+    },
+    {
+      "type": "wait",
+      "seconds": 8,
+      "name": "wps",
+      "label": "WPS_WAIT_MULTI"
+    },
+    {
+      "type": "shell",
+      "name": "qq",
+      "label": "QQ_LAUNCH_MULTI",
+      "command": "nohup sh -c 'gtk-launch qq || gtk-launch linuxqq || linuxqq || qq' >/tmp/qq_automation_validation.log 2>&1 &",
+      "optional": true
+    },
+    {
+      "type": "wait",
+      "seconds": 6,
+      "name": "qq",
+      "label": "QQ_WAIT_MULTI"
+    },
+    {
+      "type": "repeat",
+      "times": 2,
+      "actions": [
+        {
+          "type": "switch",
+          "name": "files",
+          "class": "org.gnome.Nautilus|Nautilus|nautilus",
+          "title": "files|文件|Home|主文件夹",
+          "command": "nautilus --new-window /home/lzx/Desktop/huawei/huawei_mem/lzx/outputs/automation_validation/multi/files",
+          "optional": true,
+          "label": "MULTI_SWITCH_FILES"
+        },
+        {
+          "type": "key",
+          "name": "files",
+          "key": "ctrl+f",
+          "optional": true,
+          "label": "MULTI_FILES_SEARCH"
+        },
+        {
+          "type": "type",
+          "name": "files",
+          "text": "sample",
+          "delay_ms": 1,
+          "optional": true,
+          "label": "MULTI_FILES_TYPE"
+        },
+        {
+          "type": "wait",
+          "seconds": 8,
+          "name": "files",
+          "label": "MULTI_FILES_DWELL"
+        },
+        {
+          "type": "key",
+          "name": "files",
+          "key": "Escape",
+          "optional": true,
+          "label": "MULTI_FILES_ESCAPE"
+        },
+        {
+          "type": "switch",
+          "name": "wps",
+          "class": "wps|wpsoffice|Wps",
+          "command": "wps",
+          "optional": true,
+          "label": "MULTI_SWITCH_WPS"
+        },
+        {
+          "type": "type",
+          "name": "wps",
+          "text": "multi app validation ",
+          "delay_ms": 5,
+          "optional": true,
+          "label": "MULTI_WPS_TYPE"
+        },
+        {
+          "type": "wait",
+          "seconds": 12,
+          "name": "wps",
+          "label": "MULTI_WPS_DWELL"
+        },
+        {
+          "type": "switch",
+          "name": "qq",
+          "class": "qq|QQ|linuxqq",
+          "title": "QQ",
+          "command": "gtk-launch qq",
+          "optional": true,
+          "label": "MULTI_SWITCH_QQ"
+        },
+        {
+          "type": "wait",
+          "seconds": 8,
+          "name": "qq",
+          "label": "MULTI_QQ_DWELL"
+        }
+      ]
+    }
+  ]
+}

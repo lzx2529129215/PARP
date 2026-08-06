@@ -1,0 +1,40 @@
+{
+  "description": "Perf_WPS_0010：在当前 Linux WPS 界面中浏览稻壳儿的演示模板、海报素材、插画元素和 AI 简历资源。",
+  "actions": [
+    {"type": "launch", "name": "wps", "command": "wps", "label": "WPS_LAUNCH"},
+    {"type": "wait_window", "name": "wps", "class": "wps|wpsoffice", "timeout": 30, "label": "WPS_WAIT_HOME"},
+    {"type": "window_state", "name": "wps", "class": "wps|wpsoffice", "state": "maximize", "label": "WPS_MAXIMIZE"},
+    {"type": "wait", "seconds": 25, "label": "WPS_HOME_READY"},
+
+    {"type": "click", "x": 103, "y": 214, "label": "WPS_OPEN_DAOKE"},
+    {"type": "wait", "seconds": 12, "label": "WPS_WAIT_DAOKE"},
+    {"type": "scroll", "name": "wps", "class": "wps|wpsoffice", "direction": "down", "amount": 3, "label": "WPS_DAOKE_HOME_SCROLL_DOWN"},
+    {"type": "scroll", "name": "wps", "class": "wps|wpsoffice", "direction": "up", "amount": 3, "label": "WPS_DAOKE_HOME_SCROLL_UP"},
+
+    {"type": "click", "x": 106, "y": 274, "label": "WPS_OPEN_PRESENTATION_TEMPLATES"},
+    {"type": "wait", "seconds": 10, "label": "WPS_WAIT_PRESENTATION_TEMPLATES"},
+    {"type": "scroll", "name": "wps", "class": "wps|wpsoffice", "direction": "down", "amount": 3, "label": "WPS_PRESENTATION_SCROLL_DOWN"},
+    {"type": "scroll", "name": "wps", "class": "wps|wpsoffice", "direction": "up", "amount": 3, "label": "WPS_PRESENTATION_SCROLL_UP"},
+
+    {"type": "click", "x": 144, "y": 706, "label": "WPS_OPEN_IMAGE_LIBRARY"},
+    {"type": "wait", "seconds": 12, "label": "WPS_WAIT_IMAGE_LIBRARY"},
+    {"type": "scroll", "name": "wps", "class": "wps|wpsoffice", "direction": "down", "amount": 3, "label": "WPS_IMAGE_SCROLL_DOWN"},
+    {"type": "scroll", "name": "wps", "class": "wps|wpsoffice", "direction": "up", "amount": 3, "label": "WPS_IMAGE_SCROLL_UP"},
+
+    {"type": "click", "x": 1170, "y": 312, "label": "WPS_OPEN_ICON_LIBRARY"},
+    {"type": "wait", "seconds": 8, "label": "WPS_WAIT_ICON_LIBRARY"},
+    {"type": "scroll", "name": "wps", "class": "wps|wpsoffice", "direction": "down", "amount": 3, "label": "WPS_ICON_SCROLL_DOWN"},
+    {"type": "scroll", "name": "wps", "class": "wps|wpsoffice", "direction": "up", "amount": 3, "label": "WPS_ICON_SCROLL_UP"},
+
+    {"type": "click", "x": 320, "y": 46, "label": "WPS_TEMPLATE_HOME"},
+    {"type": "wait", "seconds": 5, "label": "WPS_WAIT_DAOKE_TAB"},
+    {"type": "click", "x": 148, "y": 742, "label": "WPS_OPEN_RESUME_SET"},
+    {"type": "wait", "seconds": 10, "label": "WPS_WAIT_RESUME_SET"},
+    {"type": "scroll", "name": "wps", "class": "wps|wpsoffice", "direction": "down", "amount": 3, "label": "WPS_RESUME_SCROLL_DOWN"},
+    {"type": "scroll", "name": "wps", "class": "wps|wpsoffice", "direction": "up", "amount": 3, "label": "WPS_RESUME_SCROLL_UP"},
+
+    {"type": "window_state", "name": "wps", "class": "wps|wpsoffice", "state": "minimize", "label": "WPS_MINIMIZE"},
+    {"type": "wait", "seconds": 2},
+    {"type": "close", "name": "wps", "class": "wps|wpsoffice", "process_names": ["wpsoffice", "wps", "wpp", "et", "wpspdf"], "path_contains": ["/opt/kingsoft/wps-office"], "force_after_seconds": 3, "label": "WPS_CLOSE"}
+  ]
+}

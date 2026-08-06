@@ -1,0 +1,28 @@
+{
+  "validation_mode": true,
+  "keep_alive_after_s": 120,
+  "actions": [
+    {"type": "launch", "name": "files", "command": "nautilus --new-window /home/lzx", "optional": true, "label": "FILES_LAUNCH"},
+    {"type": "wait", "seconds": 8, "name": "files", "label": "FILES_DWELL_1"},
+    {"type": "launch", "name": "wps", "command": "wps", "optional": true, "label": "WPS_LAUNCH"},
+    {"type": "wait", "seconds": 10, "name": "wps", "label": "WPS_DWELL_1"},
+    {"type": "shell", "name": "qq", "command": "gtk-launch qq || gtk-launch linuxqq || linuxqq || qq", "optional": true, "label": "QQ_LAUNCH"},
+    {"type": "wait", "seconds": 10, "name": "qq", "label": "QQ_DWELL_1"},
+    {"type": "shell", "name": "bilibili", "command": "gtk-launch io.github.msojocs.bilibili || bilibili", "optional": true, "label": "BILIBILI_LAUNCH"},
+    {"type": "wait", "seconds": 10, "name": "bilibili", "label": "BILIBILI_DWELL_1"},
+    {"type": "switch", "name": "files", "class": "org.gnome.Nautilus|Nautilus|nautilus", "title": "Home|主文件夹|文件", "command": "nautilus --new-window /home/lzx", "optional": true, "label": "APP_SWITCH_FILES_1"},
+    {"type": "wait", "seconds": 10, "name": "files", "label": "FILES_DWELL_2"},
+    {"type": "switch", "name": "wps", "class": "wps", "command": "wps", "optional": true, "label": "APP_SWITCH_WPS_1"},
+    {"type": "wait", "seconds": 10, "name": "wps", "label": "WPS_DWELL_2"},
+    {"type": "switch", "name": "qq", "class": "qq|QQ|linuxqq", "title": "QQ", "command": "gtk-launch qq", "optional": true, "label": "APP_SWITCH_QQ_2"},
+    {"type": "wait", "seconds": 10, "name": "qq", "label": "QQ_DWELL_2"},
+    {"type": "switch", "name": "files", "class": "org.gnome.Nautilus|Nautilus|nautilus", "title": "Home|主文件夹|文件", "command": "nautilus --new-window /home/lzx", "optional": true, "label": "APP_SWITCH_FILES_2"},
+    {"type": "wait", "seconds": 10, "name": "files", "label": "FILES_DWELL_3"},
+    {"type": "switch", "name": "wps", "class": "wps", "command": "wps", "optional": true, "label": "APP_SWITCH_WPS_2"},
+    {"type": "wait", "seconds": 10, "name": "wps", "label": "WPS_DWELL_3"},
+    {"type": "switch", "name": "bilibili", "class": "bilibili|Bilibili", "title": "哔哩哔哩|Bilibili|bilibili", "command": "gtk-launch io.github.msojocs.bilibili || bilibili", "optional": true, "label": "APP_SWITCH_BILIBILI_2"},
+    {"type": "wait", "seconds": 10, "name": "bilibili", "label": "BILIBILI_DWELL_2"},
+    {"type": "switch", "name": "files", "class": "org.gnome.Nautilus|Nautilus|nautilus", "title": "Home|主文件夹|文件", "command": "nautilus --new-window /home/lzx", "optional": true, "label": "APP_SWITCH_FILES_3"},
+    {"type": "wait", "seconds": 15, "name": "files", "label": "FILES_KEEP_ACTIVE"}
+  ]
+}

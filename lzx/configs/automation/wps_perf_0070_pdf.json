@@ -1,0 +1,47 @@
+{
+  "description": "Perf_WPS_0070：启动WPS并打开多页PDF，上下各滚动3次，跳到末页和首页，最小化、最大化等待10秒，关闭PDF标签并关闭WPS。",
+  "variables": {
+    "WPS_PDF_FILE": "${PROJECT_ROOT}/samples/wps/document_0070.pdf",
+    "WPS_PDF_LOAD_SECONDS": "12"
+  },
+  "actions": [
+    {"type": "shell", "command": "mkdir -p \"${PROJECT_ROOT}/samples/wps\" \"${PROJECT_ROOT}/outputs/runtime_monitor\" && rm -f \"${PROJECT_ROOT}/outputs/runtime_monitor/0070_\"*.xwd && python3 \"${PROJECT_ROOT}/automation/create_pdf_fixture.py\" --output \"${WPS_PDF_FILE}\" --pages 12 && pdfinfo \"${WPS_PDF_FILE}\" | grep -q '^Pages:[[:space:]]*12$'", "label": "WPS_PDF_PREPARE_12_PAGE_FIXTURE"},
+    {"type": "assert_file", "path": "${WPS_PDF_FILE}", "label": "WPS_REQUIRE_PDF_SAMPLE"},
+
+    {"type": "launch", "name": "wpspdf", "command": "wpspdf", "label": "WPS_PDF_S1_LAUNCH"},
+    {"type": "wait_window", "name": "wps", "class": "wpspdf|wpsoffice", "timeout": 45, "label": "WPS_PDF_WAIT_HOME"},
+    {"type": "wait", "seconds": 5},
+    {"type": "open_file", "name": "wps", "class": "wpspdf|wpsoffice", "path": "${WPS_PDF_FILE}", "wait_after": "${WPS_PDF_LOAD_SECONDS}", "label": "WPS_PDF_S2_OPEN"},
+    {"type": "wait_window", "name": "wps", "class": "wpsoffice", "timeout": 45, "label": "WPS_PDF_WAIT_DOCUMENT"},
+    {"type": "window_state", "name": "wps", "class": "wpsoffice", "state": "maximize", "label": "WPS_PDF_MAXIMIZE_AFTER_OPEN"},
+    {"type": "wait", "seconds": 3},
+    {"type": "shell", "command": "xdotool mousemove 1260 780 && xwd -silent -root -out \"${PROJECT_ROOT}/outputs/runtime_monitor/0070_first_page.xwd\"", "label": "WPS_PDF_CAPTURE_FIRST_PAGE_INITIAL"},
+
+    {"type": "shell", "command": "xdotool mousemove 850 500 click 5 click 5 click 5", "label": "WPS_PDF_S3_SCROLL_DOWN_3"},
+    {"type": "wait", "seconds": 3},
+    {"type": "shell", "command": "xdotool mousemove 1260 780 && xwd -silent -root -out \"${PROJECT_ROOT}/outputs/runtime_monitor/0070_scrolled_down.xwd\"", "label": "WPS_PDF_CAPTURE_SCROLLED_DOWN"},
+    {"type": "shell", "command": "xdotool mousemove 850 500 click 4 click 4 click 4", "label": "WPS_PDF_S3_SCROLL_UP_3"},
+    {"type": "wait", "seconds": 3},
+    {"type": "shell", "command": "xdotool mousemove 1260 780 && xwd -silent -root -out \"${PROJECT_ROOT}/outputs/runtime_monitor/0070_scrolled_up.xwd\"", "label": "WPS_PDF_CAPTURE_SCROLLED_UP"},
+
+    {"type": "key", "key": "ctrl+End", "name": "wps", "label": "WPS_PDF_S4_LAST_PAGE"},
+    {"type": "wait", "seconds": 5},
+    {"type": "shell", "command": "xdotool mousemove 1260 780 && xwd -silent -root -out \"${PROJECT_ROOT}/outputs/runtime_monitor/0070_last_page.xwd\"", "label": "WPS_PDF_CAPTURE_LAST_PAGE"},
+    {"type": "key", "key": "ctrl+Home", "name": "wps", "label": "WPS_PDF_S5_FIRST_PAGE"},
+    {"type": "wait", "seconds": 5},
+    {"type": "shell", "command": "xdotool mousemove 1260 780 && xwd -silent -root -out \"${PROJECT_ROOT}/outputs/runtime_monitor/0070_first_page_returned.xwd\"", "label": "WPS_PDF_CAPTURE_FIRST_PAGE_RETURNED"},
+
+    {"type": "window_state", "name": "wps", "class": "wpsoffice", "state": "minimize", "label": "WPS_PDF_S6_MINIMIZE"},
+    {"type": "wait", "seconds": 3},
+    {"type": "shell", "command": "xwd -silent -root -out \"${PROJECT_ROOT}/outputs/runtime_monitor/0070_minimized.xwd\"", "label": "WPS_PDF_CAPTURE_MINIMIZED"},
+    {"type": "window_state", "name": "wps", "class": "wpsoffice", "state": "restore", "label": "WPS_PDF_RESTORE_FOR_MAXIMIZE"},
+    {"type": "window_state", "name": "wps", "class": "wpsoffice", "state": "maximize", "label": "WPS_PDF_S7_MAXIMIZE"},
+    {"type": "wait", "seconds": 10, "label": "WPS_PDF_S7_WAIT_10_SECONDS"},
+    {"type": "shell", "command": "xdotool mousemove 1260 780 && xwd -silent -root -out \"${PROJECT_ROOT}/outputs/runtime_monitor/0070_maximized.xwd\"", "label": "WPS_PDF_CAPTURE_MAXIMIZED"},
+
+    {"type": "key", "key": "ctrl+w", "name": "wps", "label": "WPS_PDF_S8_TAB_CLOSE"},
+    {"type": "wait", "seconds": 4},
+    {"type": "shell", "command": "xdotool mousemove 1260 780 && xwd -silent -root -out \"${PROJECT_ROOT}/outputs/runtime_monitor/0070_tab_closed.xwd\"", "label": "WPS_PDF_CAPTURE_TAB_CLOSED"},
+    {"type": "close", "name": "wpspdf", "class": "wpspdf|wpsoffice", "process_names": ["wpsoffice", "wpspdf"], "path_contains": ["/opt/kingsoft/wps-office"], "force_after_seconds": 3, "label": "WPS_CLOSE"}
+  ]
+}

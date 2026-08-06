@@ -1,0 +1,53 @@
+{
+  "count": 6,
+  "assets": [
+    {
+      "asset_id": "lsapp_original_nested",
+      "path": "operation_predictor/data/raw/datasets/LSApp",
+      "classification": "UNIQUE_IRREPRODUCIBLE",
+      "current_status": "EXISTS",
+      "phase1_permission": "KEEP_IN_PLACE",
+      "reason": "不可证明可重建或包含独立采集证据"
+    },
+    {
+      "asset_id": "bindfix_runtime_session",
+      "path": "outputs/runtime_monitor/session_dual_markov_bindfix_runtime_20260714_103542",
+      "classification": "UNIQUE_IRREPRODUCIBLE",
+      "current_status": "EXISTS",
+      "phase1_permission": "KEEP_IN_PLACE",
+      "reason": "不可证明可重建或包含独立采集证据"
+    },
+    {
+      "asset_id": "bindfix_kernel_validation",
+      "path": "outputs/mglru/dual_markov_bindfix_20260714_092525",
+      "classification": "UNIQUE_IRREPRODUCIBLE",
+      "current_status": "EXISTS",
+      "phase1_permission": "KEEP_IN_PLACE",
+      "reason": "不可证明可重建或包含独立采集证据"
+    },
+    {
+      "asset_id": "harmony_hdc_raw",
+      "path": "mem/Harmony/v6-Homeny/hdc_out",
+      "classification": "UNIQUE_IRREPRODUCIBLE",
+      "current_status": "EXISTS",
+      "phase1_permission": "KEEP_IN_PLACE",
+      "reason": "不可证明可重建或包含独立采集证据"
+    },
+    {
+      "asset_id": "harmony_python_raw",
+      "path": "mem/Harmony/v6-python/hdc_out",
+      "classification": "UNIQUE_IRREPRODUCIBLE",
+      "current_status": "EXISTS",
+      "phase1_permission": "KEEP_IN_PLACE",
+      "reason": "不可证明可重建或包含独立采集证据"
+    },
+    {
+      "asset_id": "damon_runtime_data",
+      "path": "outputs/mglru/damon_runtime_validation_20260715",
+      "classification": "UNIQUE_IRREPRODUCIBLE",
+      "current_status": "EXISTS",
+      "phase1_permission": "KEEP_IN_PLACE",
+      "reason": "不可证明可重建或包含独立采集证据"
+    }
+  ]
+}

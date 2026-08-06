@@ -1,0 +1,285 @@
+{
+  "schema_version": "repository-model-registry-v1",
+  "generated_at": "2026-07-17T20:13:11.560759+08:00",
+  "count": 5,
+  "active_runtime_model_id": "duration_switch_v3_active",
+  "active_runtime_checkpoint": "operation_predictor/outputs/checkpoints/app_lstm_duration/lsapp_app_lstm_duration_switch.pt",
+  "active_app_vocab": "operation_predictor/data/vocab/app_vocab_duration.json",
+  "models": [
+    {
+      "model_id": "duration_switch_harmony_bundle_copy",
+      "architecture": "AppLSTMDurationV3",
+      "task": "duration-aware switch next-app prediction",
+      "training_script": "operation_predictor/v3/train/train_app_lstm_duration.py",
+      "dataset": "duration_switch_gap3600_periodic180",
+      "vocabulary": [
+        "operation_predictor/data/vocab/app_vocab_duration.json",
+        "operation_predictor/data/vocab/user_group_vocab.json"
+      ],
+      "evaluation_result": "operation_predictor/outputs/results/v3/lsapp_app_lstm_duration_switch_results.csv",
+      "active_or_legacy": "GENERATED_COPY",
+      "reproducibility": "REPRODUCIBLE_EXPENSIVE",
+      "provenance_status": "RESOLVED",
+      "protection_level": "PRESERVE",
+      "path": "outputs/harmony_porting_bundle_20260717_152948/04_userspace/model/lsapp_app_lstm_duration_switch.pt",
+      "path_status": "EXISTS",
+      "filename": "lsapp_app_lstm_duration_switch.pt",
+      "size": 179733,
+      "sha256": "5d2b46d51a16d97486ae8f2a6d4cb38507fd1a1ead9a50a16039d3169209b0cf",
+      "training_script_status": "EXISTS",
+      "inference_consumer": [
+        "operation_predictor推理脚本"
+      ],
+      "dataset_manifest": "operation_predictor/data/processed/app_lstm_duration_gap3600_periodic180/dataset_meta.json",
+      "training_config": {
+        "num_apps": 32,
+        "num_ops": null,
+        "num_user_groups": 9,
+        "horizons": [
+          3,
+          5,
+          10
+        ],
+        "label_mode": "switch",
+        "checkpoint_keys": [
+          "args",
+          "dataset_meta",
+          "duration_cap_s",
+          "horizons",
+          "label_mode",
+          "model_state_dict",
+          "num_apps",
+          "num_user_groups",
+          "pad_id",
+          "unknown_id"
+        ]
+      },
+      "git_commit": "d11f626d7d33ceab2b82c1906b0959a204d0d55c",
+      "created_time": "2026-07-02T17:30:17.879740+08:00",
+      "evidence": [
+        "raw/evidence/checkpoint_metadata.json",
+        "runtime_monitor/monitor.py:1131",
+        "operation_predictor/v3/infer/infer_app_lstm_duration.py"
+      ],
+      "migration_permission": "NOT_APPROVED"
+    },
+    {
+      "model_id": "duration_persistence_v3",
+      "architecture": "AppLSTMDurationV3",
+      "task": "duration-aware persistence labels next-app prediction",
+      "training_script": "operation_predictor/v3/train/train_app_lstm_duration.py",
+      "dataset": "duration_dataset_original",
+      "vocabulary": [
+        "operation_predictor/data/vocab/app_vocab_duration.json",
+        "operation_predictor/data/vocab/user_group_vocab.json"
+      ],
+      "evaluation_result": "operation_predictor/outputs/results/v3/lsapp_app_lstm_duration_results.csv",
+      "active_or_legacy": "COMPATIBILITY",
+      "reproducibility": "REPRODUCIBLE_EXPENSIVE",
+      "provenance_status": "PARTIALLY_RESOLVED",
+      "protection_level": "PRESERVE_HIGH_PRIORITY",
+      "path": "operation_predictor/outputs/checkpoints/app_lstm_duration/lsapp_app_lstm_duration.pt",
+      "path_status": "EXISTS",
+      "filename": "lsapp_app_lstm_duration.pt",
+      "size": 178797,
+      "sha256": "396f5bc8216c08ee2c89f0d9035be4318e2a021ced5792eb1bddafc2182d8ad4",
+      "training_script_status": "EXISTS",
+      "inference_consumer": [
+        "operation_predictor推理脚本"
+      ],
+      "dataset_manifest": null,
+      "training_config": {
+        "num_apps": 32,
+        "num_ops": null,
+        "num_user_groups": 9,
+        "horizons": [
+          3,
+          5,
+          10
+        ],
+        "label_mode": null,
+        "checkpoint_keys": [
+          "args",
+          "dataset_meta",
+          "duration_cap_s",
+          "horizons",
+          "model_state_dict",
+          "num_apps",
+          "num_user_groups",
+          "pad_id",
+          "unknown_id"
+        ]
+      },
+      "git_commit": "d11f626d7d33ceab2b82c1906b0959a204d0d55c",
+      "created_time": "2026-07-02T16:51:04.409769+08:00",
+      "evidence": [
+        "raw/evidence/checkpoint_metadata.json",
+        "runtime_monitor/monitor.py:1131",
+        "operation_predictor/v3/infer/infer_app_lstm_duration.py"
+      ],
+      "migration_permission": "NOT_APPROVED"
+    },
+    {
+      "model_id": "duration_switch_v3_active",
+      "architecture": "AppLSTMDurationV3",
+      "task": "duration-aware switch next-app prediction",
+      "training_script": "operation_predictor/v3/train/train_app_lstm_duration.py",
+      "dataset": "duration_switch_gap3600_periodic180",
+      "vocabulary": [
+        "operation_predictor/data/vocab/app_vocab_duration.json",
+        "operation_predictor/data/vocab/user_group_vocab.json"
+      ],
+      "evaluation_result": "operation_predictor/outputs/results/v3/lsapp_app_lstm_duration_switch_results.csv",
+      "active_or_legacy": "ACTIVE",
+      "reproducibility": "REPRODUCIBLE_EXPENSIVE",
+      "provenance_status": "RESOLVED",
+      "protection_level": "PRESERVE_HIGH_PRIORITY",
+      "path": "operation_predictor/outputs/checkpoints/app_lstm_duration/lsapp_app_lstm_duration_switch.pt",
+      "path_status": "EXISTS",
+      "filename": "lsapp_app_lstm_duration_switch.pt",
+      "size": 179733,
+      "sha256": "5d2b46d51a16d97486ae8f2a6d4cb38507fd1a1ead9a50a16039d3169209b0cf",
+      "training_script_status": "EXISTS",
+      "inference_consumer": [
+        "runtime_monitor/monitor.py",
+        "runtime_monitor/predictor_duration.py"
+      ],
+      "dataset_manifest": "operation_predictor/data/processed/app_lstm_duration_gap3600_periodic180/dataset_meta.json",
+      "training_config": {
+        "num_apps": 32,
+        "num_ops": null,
+        "num_user_groups": 9,
+        "horizons": [
+          3,
+          5,
+          10
+        ],
+        "label_mode": "switch",
+        "checkpoint_keys": [
+          "args",
+          "dataset_meta",
+          "duration_cap_s",
+          "horizons",
+          "label_mode",
+          "model_state_dict",
+          "num_apps",
+          "num_user_groups",
+          "pad_id",
+          "unknown_id"
+        ]
+      },
+      "git_commit": "d11f626d7d33ceab2b82c1906b0959a204d0d55c",
+      "created_time": "2026-07-02T17:30:17.879740+08:00",
+      "evidence": [
+        "raw/evidence/checkpoint_metadata.json",
+        "runtime_monitor/monitor.py:1131",
+        "operation_predictor/v3/infer/infer_app_lstm_duration.py"
+      ],
+      "migration_permission": "NOT_APPROVED"
+    },
+    {
+      "model_id": "lsapp_app_lstm_v2",
+      "architecture": "AppLSTM v2",
+      "task": "30-app next-app prediction",
+      "training_script": "operation_predictor/v2/train/train_app_lstm.py",
+      "dataset": "lsapp_v2_processed",
+      "vocabulary": [
+        "operation_predictor/data/vocab/app_vocab.json",
+        "operation_predictor/data/vocab/user_group_vocab.json"
+      ],
+      "evaluation_result": "operation_predictor/outputs/results/v2/lsapp_app_lstm_results.csv",
+      "active_or_legacy": "COMPATIBILITY",
+      "reproducibility": "REPRODUCIBLE_EXPENSIVE",
+      "provenance_status": "PARTIALLY_RESOLVED",
+      "protection_level": "PRESERVE_HIGH_PRIORITY",
+      "path": "operation_predictor/outputs/checkpoints/app_lstm/lsapp_app_lstm.pt",
+      "path_status": "EXISTS",
+      "filename": "lsapp_app_lstm.pt",
+      "size": 166093,
+      "sha256": "90f7144b6a093eb9db84671683ead3af1684b8b76336ee46d1228c6fb3e4154e",
+      "training_script_status": "EXISTS",
+      "inference_consumer": [
+        "operation_predictor推理脚本"
+      ],
+      "dataset_manifest": null,
+      "training_config": {
+        "num_apps": 30,
+        "num_ops": null,
+        "num_user_groups": 9,
+        "horizons": [
+          3,
+          5,
+          10
+        ],
+        "label_mode": null,
+        "checkpoint_keys": [
+          "args",
+          "horizons",
+          "model_state_dict",
+          "num_apps",
+          "num_user_groups"
+        ]
+      },
+      "git_commit": "d11f626d7d33ceab2b82c1906b0959a204d0d55c",
+      "created_time": "2026-06-26T15:31:08.790797+08:00",
+      "evidence": [
+        "raw/evidence/checkpoint_metadata.json",
+        "runtime_monitor/monitor.py:1131",
+        "operation_predictor/v3/infer/infer_app_lstm_duration.py"
+      ],
+      "migration_permission": "NOT_APPROVED"
+    },
+    {
+      "model_id": "app_lstm_v2_original",
+      "architecture": "AppLSTM v2",
+      "task": "original app next-app prediction",
+      "training_script": "operation_predictor/v2/train/train_app_lstm.py",
+      "dataset": "original_v2_processed_unresolved",
+      "vocabulary": [
+        "operation_predictor/data/vocab/app_vocab.json",
+        "operation_predictor/data/vocab/user_group_vocab.json"
+      ],
+      "evaluation_result": "operation_predictor/outputs/results/v2/app_lstm_results.csv",
+      "active_or_legacy": "COMPATIBILITY",
+      "reproducibility": "NOT_CURRENTLY_REPRODUCIBLE",
+      "provenance_status": "UNRESOLVED_MODEL_PROVENANCE",
+      "protection_level": "PRESERVE_HIGH_PRIORITY",
+      "path": "operation_predictor/outputs/checkpoints/app_lstm/app_lstm.pt",
+      "path_status": "EXISTS",
+      "filename": "app_lstm.pt",
+      "size": 165961,
+      "sha256": "5a7302fce941c5ea77af8e7e5d7289ed0149b25f36b16dbcce9f7734469dec14",
+      "training_script_status": "EXISTS",
+      "inference_consumer": [
+        "operation_predictor推理脚本"
+      ],
+      "dataset_manifest": null,
+      "training_config": {
+        "num_apps": 30,
+        "num_ops": null,
+        "num_user_groups": 9,
+        "horizons": [
+          3,
+          5,
+          10
+        ],
+        "label_mode": null,
+        "checkpoint_keys": [
+          "args",
+          "horizons",
+          "model_state_dict",
+          "num_apps",
+          "num_user_groups"
+        ]
+      },
+      "git_commit": "d11f626d7d33ceab2b82c1906b0959a204d0d55c",
+      "created_time": "2026-06-26T15:31:08.789797+08:00",
+      "evidence": [
+        "raw/evidence/checkpoint_metadata.json",
+        "runtime_monitor/monitor.py:1131",
+        "operation_predictor/v3/infer/infer_app_lstm_duration.py"
+      ],
+      "migration_permission": "NOT_APPROVED"
+    }
+  ]
+}

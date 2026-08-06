@@ -1,0 +1,115 @@
+{
+  "slice": "huawei-test.slice",
+  "apps": [
+    {
+      "app_key": "FIREFOX",
+      "app_id": 1,
+      "vocab_name": "Firefox",
+      "scope_name": "automation-firefox.scope",
+      "unit_name": "automation-firefox",
+      "workload_enabled": true,
+      "prediction_enabled": true,
+      "window_keywords": ["firefox", "mozilla"],
+      "process_keywords": ["firefox", "org.mozilla.firefox", "/usr/lib/firefox", "/snap/firefox"]
+    },
+    {
+      "app_key": "LIBREOFFICE",
+      "app_id": 2,
+      "vocab_name": "LibreOffice",
+      "scope_name": "automation-libreoffice.scope",
+      "unit_name": "automation-libreoffice",
+      "workload_enabled": true,
+      "prediction_enabled": true,
+      "window_keywords": ["libreoffice", "soffice", "writer", "calc", "impress"],
+      "process_keywords": ["libreoffice", "soffice", "soffice.bin", "oosplash", "scalc", "swriter", "simpress", "sdraw"]
+    },
+    {
+      "app_key": "VLC",
+      "app_id": 3,
+      "vocab_name": "VLC",
+      "scope_name": "automation-vlc.scope",
+      "unit_name": "automation-vlc",
+      "workload_enabled": true,
+      "prediction_enabled": true,
+      "window_keywords": ["vlc", "video lan"],
+      "process_keywords": ["vlc"]
+    },
+    {
+      "app_key": "GIMP",
+      "app_id": 4,
+      "vocab_name": "GIMP",
+      "scope_name": "automation-gimp.scope",
+      "unit_name": "automation-gimp",
+      "workload_enabled": true,
+      "prediction_enabled": true,
+      "window_keywords": ["gimp", "image manipulation"],
+      "process_keywords": ["gimp"]
+    },
+    {
+      "app_key": "AUDACITY",
+      "app_id": 5,
+      "vocab_name": "Audacity",
+      "scope_name": "automation-audacity.scope",
+      "unit_name": "automation-audacity",
+      "workload_enabled": true,
+      "prediction_enabled": true,
+      "window_keywords": ["audacity"],
+      "process_keywords": ["audacity"]
+    },
+    {
+      "app_key": "THUNDERBIRD",
+      "app_id": 6,
+      "vocab_name": "Thunderbird",
+      "scope_name": "automation-thunderbird.scope",
+      "unit_name": "automation-thunderbird",
+      "workload_enabled": true,
+      "prediction_enabled": true,
+      "window_keywords": ["thunderbird", "mozilla mail"],
+      "process_keywords": ["thunderbird", "org.mozilla.Thunderbird"]
+    },
+    {
+      "app_key": "TELEGRAM",
+      "app_id": 7,
+      "vocab_name": "Telegram",
+      "scope_name": "automation-telegram.scope",
+      "unit_name": "automation-telegram",
+      "workload_enabled": true,
+      "prediction_enabled": true,
+      "window_keywords": ["telegram"],
+      "process_keywords": ["telegram-desktop", "telegramdesktop", "telegram"]
+    },
+    {
+      "app_key": "EVINCE",
+      "app_id": 8,
+      "vocab_name": "Evince",
+      "scope_name": "automation-evince.scope",
+      "unit_name": "automation-evince",
+      "workload_enabled": true,
+      "prediction_enabled": true,
+      "window_keywords": ["evince", "document viewer", "pdf"],
+      "process_keywords": ["evince", "org.gnome.Evince"]
+    },
+    {
+      "app_key": "FILES",
+      "app_id": 9,
+      "vocab_name": "Files",
+      "scope_name": "automation-files.scope",
+      "unit_name": "automation-files",
+      "workload_enabled": true,
+      "prediction_enabled": true,
+      "window_keywords": ["nautilus", "pcmanfm", "files", "主文件夹"],
+      "process_keywords": ["nautilus", "org.gnome.Nautilus", "pcmanfm"]
+    },
+    {
+      "app_key": "CALCULATOR",
+      "app_id": 10,
+      "vocab_name": "Calculator",
+      "scope_name": "automation-calculator.scope",
+      "unit_name": "automation-calculator",
+      "workload_enabled": true,
+      "prediction_enabled": true,
+      "window_keywords": ["calculator", "gnome calculator", "计算器"],
+      "process_keywords": ["gnome-calculator", "org.gnome.Calculator"]
+    }
+  ]
+}

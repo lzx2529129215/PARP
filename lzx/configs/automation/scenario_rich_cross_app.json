@@ -1,0 +1,53 @@
+{
+  "description": "Files→WPS→QQ 跨应用场景：在隔离目录准备任务，Files 定位素材，WPS 产出文档，Files 检索产物，QQ 生成但清除通知草稿。",
+  "variables": {
+    "CROSS_ROOT": "${PROJECT_ROOT}/outputs/automation_rich/cross_app",
+    "WORD_SOURCE": "${PROJECT_ROOT}/samples/wps/word_0040_fixture.docx",
+    "QQ_TEST_CONTACT": "我的电脑"
+  },
+  "actions": [
+    {"type": "shell", "command": "mkdir -p \"${CROSS_ROOT}/inbox\" \"${CROSS_ROOT}/outbox\" && printf 'Cross-app task: prepare WPS report and notify in QQ draft.\\n' > \"${CROSS_ROOT}/inbox/task.txt\"", "label": "CROSS_PREPARE_TASK"},
+    {"type": "assert_file", "path": "${WORD_SOURCE}", "label": "CROSS_ASSERT_WORD_SOURCE"},
+
+    {"type": "shell", "name": "files", "command": "nautilus --new-window \"${CROSS_ROOT}/inbox\"", "label": "CROSS_FILES_OPEN_INBOX"},
+    {"type": "wait_window", "name": "files", "class": "org.gnome.Nautilus|Nautilus|nautilus", "title": "inbox|文件", "timeout": 20, "label": "CROSS_FILES_WAIT"},
+    {"type": "hotkey", "name": "files", "key": "ctrl+f", "label": "CROSS_FILES_SEARCH"},
+    {"type": "paste_text", "name": "files", "text": "task", "label": "CROSS_FILES_SEARCH_TASK"},
+    {"type": "wait", "seconds": 2, "label": "CROSS_FILES_REVIEW_TASK"},
+    {"type": "key", "name": "files", "key": "Escape", "label": "CROSS_FILES_CLOSE_SEARCH"},
+
+    {"type": "launch", "name": "wps", "command": "wps ${WORD_SOURCE}", "label": "CROSS_WPS_OPEN_SOURCE"},
+    {"type": "wait_window", "name": "wps", "class": "wps|wpsoffice", "timeout": 35, "label": "CROSS_WPS_WAIT"},
+    {"type": "switch", "name": "wps", "class": "wps|wpsoffice", "command": "wps", "label": "CROSS_SWITCH_WPS"},
+    {"type": "key", "name": "wps", "key": "ctrl+End", "label": "CROSS_WPS_GOTO_END"},
+    {"type": "key", "name": "wps", "key": "Return", "repeat": 2, "label": "CROSS_WPS_NEW_PARAGRAPH"},
+    {"type": "paste_text", "name": "wps", "text": "Cross-app automation report completed.", "label": "CROSS_WPS_WRITE_RESULT"},
+    {"type": "save_as", "name": "wps", "path": "${CROSS_ROOT}/outbox/cross_app_report.docx", "wait_after": 5, "label": "CROSS_WPS_SAVE_REPORT"},
+    {"type": "assert_file", "path": "${CROSS_ROOT}/outbox/cross_app_report.docx", "label": "CROSS_VERIFY_REPORT_FILE"},
+
+    {"type": "switch", "name": "files", "class": "org.gnome.Nautilus|Nautilus|nautilus", "title": "inbox|文件", "command": "nautilus --new-window \"${CROSS_ROOT}/outbox\"", "label": "CROSS_SWITCH_FILES"},
+    {"type": "hotkey", "name": "files", "key": "ctrl+l", "label": "CROSS_FILES_LOCATION_OUTBOX"},
+    {"type": "paste_text", "name": "files", "text": "${CROSS_ROOT}/outbox", "label": "CROSS_FILES_TYPE_OUTBOX"},
+    {"type": "key", "name": "files", "key": "Return", "label": "CROSS_FILES_OPEN_OUTBOX"},
+    {"type": "hotkey", "name": "files", "key": "ctrl+f", "label": "CROSS_FILES_SEARCH_REPORT"},
+    {"type": "paste_text", "name": "files", "text": "cross_app_report", "label": "CROSS_FILES_FIND_REPORT"},
+    {"type": "wait", "seconds": 2, "label": "CROSS_FILES_REPORT_VISIBLE"},
+    {"type": "key", "name": "files", "key": "Escape", "label": "CROSS_FILES_CLOSE_REPORT_SEARCH"},
+
+    {"type": "shell", "name": "qq", "command": "gtk-launch qq || gtk-launch linuxqq || linuxqq || qq", "label": "CROSS_QQ_LAUNCH"},
+    {"type": "wait_window", "name": "qq", "class": "qq|QQ|linuxqq", "title": "QQ", "timeout": 25, "label": "CROSS_QQ_WAIT"},
+    {"type": "switch", "name": "qq", "class": "qq|QQ|linuxqq", "title": "QQ", "command": "gtk-launch qq", "label": "CROSS_SWITCH_QQ"},
+    {"type": "hotkey", "name": "qq", "key": "ctrl+f", "label": "CROSS_QQ_SEARCH_CONTACT"},
+    {"type": "paste_text", "name": "qq", "text": "${QQ_TEST_CONTACT}", "label": "CROSS_QQ_TYPE_CONTACT"},
+    {"type": "wait", "seconds": 2, "label": "CROSS_QQ_SEARCH_DWELL"},
+    {"type": "key", "name": "qq", "key": "Down", "optional": true, "label": "CROSS_QQ_SELECT_CONTACT"},
+    {"type": "key", "name": "qq", "key": "Return", "optional": true, "label": "CROSS_QQ_OPEN_CONTACT"},
+    {"type": "paste_text", "name": "qq", "text": "Automation report ready: ${CROSS_ROOT}/outbox/cross_app_report.docx", "label": "CROSS_QQ_TYPE_DRAFT_NO_SEND"},
+    {"type": "wait", "seconds": 2, "label": "CROSS_QQ_REVIEW_DRAFT"},
+    {"type": "hotkey", "name": "qq", "key": "ctrl+a", "label": "CROSS_QQ_SELECT_DRAFT"},
+    {"type": "key", "name": "qq", "key": "BackSpace", "label": "CROSS_QQ_CLEAR_DRAFT"},
+
+    {"type": "close", "name": "files", "class": "org.gnome.Nautilus|Nautilus|nautilus", "process_names": ["nautilus"], "wait_after_window_close": 1, "force_after_seconds": 0, "optional": true, "label": "CROSS_CLOSE_FILES"},
+    {"type": "close", "name": "wps", "class": "wps|wpsoffice", "process_names": ["wpsoffice", "wps", "wpp", "et", "wpspdf"], "path_contains": ["/opt/kingsoft/wps-office"], "wait_after_window_close": 2, "force_after_seconds": 3, "label": "CROSS_CLOSE_WPS"}
+  ]
+}

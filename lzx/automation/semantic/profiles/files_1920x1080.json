@@ -1,0 +1,1 @@
+{"app_key":"FILES","window":{"width":1920,"height":1080},"geometry_tolerance_ratio":0.25,"coordinates":{"location_entry":{"x_ratio":0.5,"y_ratio":0.08}},"notes":"只使用窗口相对坐标；目录校验必须指向本轮输出目录。"}

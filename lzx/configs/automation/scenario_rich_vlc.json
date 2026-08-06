@@ -1,0 +1,27 @@
+{
+  "description": "VLC 多场景：打开本地视频、播放/暂停、快进/后退、音量、静音、全屏和播放列表。",
+  "variables": {"VLC_MEDIA": "${PROJECT_ROOT}/samples/wps/video_5s_test.mp4"},
+  "actions": [
+    {"type": "assert_file", "path": "${VLC_MEDIA}", "label": "VLC_ASSERT_MEDIA"},
+    {"type": "launch", "name": "vlc", "app_key": "VLC", "command": "vlc --no-video-title-show ${VLC_MEDIA}", "label": "VLC_LAUNCH_MEDIA"},
+    {"type": "wait_window", "name": "vlc", "app_key": "VLC", "class": "vlc|Vlc", "title": "VLC|video_5s_test", "timeout": 25, "label": "VLC_WAIT_WINDOW"},
+    {"type": "window_state", "name": "vlc", "app_key": "VLC", "class": "vlc|Vlc", "state": "maximize", "label": "VLC_MAXIMIZE"},
+    {"type": "verify_foreground", "name": "vlc", "app_key": "VLC", "class": "vlc|Vlc", "label": "VLC_VERIFY"},
+    {"type": "key", "name": "vlc", "key": "space", "label": "VLC_PAUSE"},
+    {"type": "wait", "seconds": 2, "label": "VLC_PAUSE_DWELL"},
+    {"type": "key", "name": "vlc", "key": "space", "label": "VLC_PLAY"},
+    {"type": "key", "name": "vlc", "key": "Right", "label": "VLC_SEEK_FORWARD"},
+    {"type": "key", "name": "vlc", "key": "Left", "label": "VLC_SEEK_BACKWARD"},
+    {"type": "hotkey", "name": "vlc", "key": "ctrl+Up", "repeat": 2, "label": "VLC_VOLUME_UP"},
+    {"type": "hotkey", "name": "vlc", "key": "ctrl+Down", "label": "VLC_VOLUME_DOWN"},
+    {"type": "key", "name": "vlc", "key": "m", "label": "VLC_MUTE"},
+    {"type": "key", "name": "vlc", "key": "m", "label": "VLC_UNMUTE"},
+    {"type": "key", "name": "vlc", "key": "f", "label": "VLC_FULLSCREEN"},
+    {"type": "wait", "seconds": 2, "label": "VLC_FULLSCREEN_DWELL"},
+    {"type": "key", "name": "vlc", "key": "Escape", "label": "VLC_EXIT_FULLSCREEN"},
+    {"type": "hotkey", "name": "vlc", "key": "ctrl+l", "label": "VLC_TOGGLE_PLAYLIST"},
+    {"type": "wait", "seconds": 2, "label": "VLC_PLAYLIST_DWELL"},
+    {"type": "hotkey", "name": "vlc", "key": "ctrl+l", "label": "VLC_RETURN_PLAYER"},
+    {"type": "close", "name": "vlc", "app_key": "VLC", "class": "vlc|Vlc", "process_names": ["vlc"], "wait_after_window_close": 1, "force_after_seconds": 2, "label": "VLC_CLOSE"}
+  ]
+}

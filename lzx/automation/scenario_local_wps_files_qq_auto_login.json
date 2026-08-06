@@ -1,0 +1,192 @@
+{
+  "actions": [
+    {
+      "type": "launch",
+      "name": "wps",
+      "command": "wps"
+    },
+    {
+      "type": "wait",
+      "seconds": 5
+    },
+    {
+      "type": "key",
+      "key": "ctrl+o",
+      "name": "wps",
+      "label": "WPS_OPEN_DOC_DIALOG"
+    },
+    {
+      "type": "wait",
+      "seconds": 2
+    },
+    {
+      "type": "key",
+      "key": "Escape",
+      "name": "wps",
+      "label": "WPS_CANCEL_DIALOG"
+    },
+    {
+      "type": "shell",
+      "name": "qq",
+      "command": "nohup sh -c 'gtk-launch qq || gtk-launch linuxqq || linuxqq || qq' >/tmp/qq_automation.log 2>&1 &"
+    },
+    {
+      "type": "wait_window",
+      "name": "qq",
+      "class": "qq|QQ|linuxqq",
+      "title": "QQ",
+      "timeout": 15,
+      "label": "QQ_WAIT_WINDOW"
+    },
+    {
+      "type": "click_window",
+      "name": "qq",
+      "class": "qq|QQ|linuxqq",
+      "title": "QQ",
+      "x_ratio": 0.5,
+      "y_ratio": 0.82,
+      "button": 1,
+      "label": "QQ_CLICK_LOGIN"
+    },
+    {
+      "type": "wait",
+      "seconds": 6,
+      "name": "qq",
+      "label": "QQ_WAIT_AUTO_LOGIN"
+    },
+    {
+      "type": "switch",
+      "name": "qq",
+      "class": "qq|QQ|linuxqq",
+      "title": "QQ",
+      "command": "gtk-launch qq",
+      "label": "APP_SWITCH_QQ"
+    },
+    {
+      "type": "verify_foreground",
+      "name": "qq",
+      "class": "qq|QQ|linuxqq",
+      "title": "QQ",
+      "label": "QQ_VERIFY_MAIN_WINDOW"
+    },
+    {
+      "type": "shell",
+      "name": "files",
+      "command": "nautilus --new-window /home/lzx",
+      "optional": true
+    },
+    {
+      "type": "wait",
+      "seconds": 5
+    },
+    {
+      "type": "focus",
+      "class": "wps"
+    },
+    {
+      "type": "wait",
+      "seconds": 2
+    },
+    {
+      "type": "switch",
+      "class": "qq|linuxqq",
+      "title": "QQ",
+      "command": "gtk-launch qq"
+    },
+    {
+      "type": "wait",
+      "seconds": 3
+    },
+    {
+      "type": "switch",
+      "class": "org.gnome.Nautilus|Nautilus|nautilus",
+      "title": "Home|主文件夹|文件",
+      "command": "nautilus --new-window /home/lzx",
+      "optional": true
+    },
+    {
+      "type": "wait",
+      "seconds": 3
+    },
+    {
+      "type": "switch",
+      "class": "wps",
+      "command": "wps"
+    },
+    {
+      "type": "wait",
+      "seconds": 2
+    },
+    {
+      "type": "switch",
+      "class": "qq|linuxqq",
+      "title": "QQ",
+      "command": "gtk-launch qq"
+    },
+    {
+      "type": "wait",
+      "seconds": 2
+    },
+    {
+      "type": "switch",
+      "class": "org.gnome.Nautilus|Nautilus|nautilus",
+      "title": "Home|主文件夹|文件",
+      "command": "nautilus --new-window /home/lzx",
+      "optional": true
+    },
+    {
+      "type": "wait",
+      "seconds": 2
+    },
+    {
+      "type": "close",
+      "name": "files",
+      "class": "org.gnome.Nautilus|Nautilus|nautilus",
+      "title": "Home|主文件夹|文件",
+      "process_names": [
+        "nautilus"
+      ],
+      "wait_after_window_close": 1,
+      "force_after_seconds": 1,
+      "optional": true
+    },
+    {
+      "type": "wait",
+      "seconds": 1
+    },
+    {
+      "type": "close",
+      "name": "qq",
+      "class": "qq|linuxqq",
+      "process_names": [
+        "qq",
+        "linuxqq"
+      ],
+      "path_contains": [
+        "/opt/QQ",
+        "/opt/qq",
+        "/opt/linuxqq",
+        "/usr/lib/tencent-qq"
+      ],
+      "wait_after_window_close": 2,
+      "force_after_seconds": 0
+    },
+    {
+      "type": "close",
+      "name": "wps",
+      "class": "wps",
+      "process_names": [
+        "wpsoffice",
+        "wps",
+        "wpp",
+        "et",
+        "wpspdf"
+      ],
+      "path_contains": [
+        "/opt/kingsoft/wps-office"
+      ],
+      "wait_after_window_close": 2,
+      "force_after_seconds": 3
+    }
+  ]
+}

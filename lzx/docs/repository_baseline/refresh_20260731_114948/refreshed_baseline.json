@@ -1,0 +1,59 @@
+{
+  "phase": "PHASE0_REFRESH_COMPLETE",
+  "head": "244df022ff1d7e8db0298d718a4ae8f7ef45829c",
+  "baseline_directory": "docs/repository_baseline/refresh_20260731_114948",
+  "subsystem_count": 12,
+  "entrypoint_count": 4,
+  "checkpoint_count": 5,
+  "kernel_record_count": 8,
+  "protected_asset_count": 16,
+  "unique_asset_count": 6,
+  "test_baseline": {
+    "host_pytest": {
+      "status": "PASS",
+      "result": "138 passed, 7 subtests passed",
+      "environment": "host-only",
+      "evidence": "phase0_refresh/raw/evidence/pytest_host.log"
+    },
+    "harmony_pytest": {
+      "status": "PASS",
+      "result": "92 passed, 3 skipped",
+      "environment": "host-only; device cases skipped",
+      "evidence": "phase0_refresh/raw/evidence/pytest_harmony.log"
+    },
+    "python_syntax": {
+      "status": "PASS",
+      "result": "208 files",
+      "evidence": "phase0_refresh/raw/evidence/python_compileall.log"
+    },
+    "shell_syntax": {
+      "status": "PASS",
+      "result": "30 files",
+      "evidence": "phase0_refresh/raw/evidence/shell_syntax.log"
+    },
+    "json_parse": {
+      "status": "PASS",
+      "result": "28 files",
+      "evidence": "phase0_refresh/raw/evidence/json_validation.log"
+    },
+    "powershell": {
+      "status": "NOT_RUN_ENVIRONMENT_GATED",
+      "result": "pwsh not installed",
+      "evidence": "phase0_refresh/raw/evidence/pwsh_exit_code.txt"
+    },
+    "hdc_gui_root_kernel_training": {
+      "status": "NOT_RUN_ENVIRONMENT_GATED",
+      "result": "not executed by policy",
+      "evidence": "task constraints"
+    }
+  },
+  "historical_build_paths": "HISTORICAL_BUILD_PATH_REMOVED_INTENTIONALLY",
+  "safe_to_start_phase_1": true,
+  "safe_to_move_generated_outputs": false,
+  "safe_to_archive_backups": false,
+  "safe_to_delete_anything": false,
+  "safe_to_modify_kernel_layout": false,
+  "safe_to_refactor_runtime_monitor": false,
+  "safe_to_refactor_harmony_pipeline": false,
+  "ready_for_apply": false
+}

@@ -1,0 +1,46 @@
+{
+  "source_config": "/home/lzx/Desktop/huawei/huawei_mem/lzx/configs/runtime/runtime_app_scope.json",
+  "candidates": [
+    {
+      "app_key": "BROWSER",
+      "runtime_app_id": 5,
+      "model_app_id": null,
+      "vocab_name": "",
+      "scope_name": "automation-browser.scope",
+      "class": "firefox|chrome|chromium",
+      "cmdline_contains": [
+        "firefox",
+        "chrome",
+        "chromium"
+      ],
+      "window_match": [
+        "firefox",
+        "chrome",
+        "chromium"
+      ],
+      "enabled": false,
+      "reason": "候选项；未配置模型 vocab，默认不启用 prediction"
+    },
+    {
+      "app_key": "WECHAT",
+      "runtime_app_id": 6,
+      "model_app_id": null,
+      "vocab_name": "",
+      "scope_name": "automation-wechat.scope",
+      "class": "wechat|weixin|微信",
+      "cmdline_contains": [
+        "wechat",
+        "weixin",
+        "微信"
+      ],
+      "window_match": [
+        "wechat",
+        "weixin",
+        "微信"
+      ],
+      "enabled": false,
+      "reason": "候选项；未配置模型 vocab，默认不启用 prediction"
+    }
+  ],
+  "notes": "仅候选配置；不替换现有 runtime_app_scope.json。"
+}

@@ -1,0 +1,65 @@
+{
+  "apps": {
+    "WPS": {
+      "keywords": [
+        "wps",
+        "et",
+        "wpp",
+        "wpspdf",
+        "kingsoft",
+        "office"
+      ],
+      "exclude_keywords": [
+        "wpscloudsvr",
+        "wpscenter",
+        "wpsupdate",
+        "wpsnotify",
+        "wpsassist",
+        "kcloud"
+      ]
+    },
+    "QQ": {
+      "keywords": [
+        "qq",
+        "linuxqq",
+        "Tencent",
+        "tencent",
+        "腾讯",
+        "tencent-qq",
+        "/opt/QQ",
+        "/opt/linuxqq",
+        "/usr/lib/tencent-qq"
+      ],
+      "exclude_keywords": []
+    },
+    "FILES": {
+      "keywords": [
+        "nautilus",
+        "org.gnome.Nautilus"
+      ],
+      "exclude_keywords": [
+        "power-profiles-daemon"
+      ]
+    }
+  },
+  "file_extensions": [
+    "doc",
+    "docx",
+    "xls",
+    "xlsx",
+    "ppt",
+    "pptx",
+    "pdf",
+    "tmp",
+    "so",
+    "dll",
+    "ttf",
+    "otf",
+    "conf",
+    "json",
+    "xml",
+    "png",
+    "jpg",
+    "jpeg"
+  ]
+}

@@ -1,0 +1,93 @@
+{
+  "slice": "huawei-test.slice",
+  "apps": [
+    {
+      "app_key": "WPS",
+      "app_id": 1,
+      "vocab_name": "WPS",
+      "scope_name": "automation-wps.scope",
+      "unit_name": "automation-wps",
+      "workload_enabled": true,
+      "prediction_enabled": true,
+      "window_keywords": [
+        "wps",
+        "wpsoffice",
+        "kingsoft"
+      ],
+      "process_keywords": [
+        "wps",
+        "et",
+        "wpp",
+        "wpspdf",
+        "wpsoffice",
+        "kingsoft",
+        "office"
+      ]
+    },
+    {
+      "app_key": "QQ",
+      "app_id": 2,
+      "vocab_name": "腾讯QQ",
+      "scope_name": "automation-qq.scope",
+      "unit_name": "automation-qq",
+      "workload_enabled": true,
+      "prediction_enabled": true,
+      "window_keywords": [
+        "qq",
+        "linuxqq",
+        "tencent",
+        "腾讯"
+      ],
+      "process_keywords": [
+        "qq",
+        "linuxqq",
+        "Tencent",
+        "tencent",
+        "腾讯",
+        "tencent-qq",
+        "/opt/QQ",
+        "/opt/linuxqq",
+        "/usr/lib/tencent-qq"
+      ]
+    },
+    {
+      "app_key": "FILES",
+      "app_id": 3,
+      "vocab_name": "图库",
+      "scope_name": "automation-files.scope",
+      "unit_name": "automation-files",
+      "workload_enabled": true,
+      "prediction_enabled": true,
+      "window_keywords": [
+        "org.gnome.nautilus",
+        "nautilus",
+        "files",
+        "文件",
+        "home",
+        "主文件夹"
+      ],
+      "process_keywords": [
+        "nautilus",
+        "org.gnome.Nautilus"
+      ]
+    },
+    {
+      "app_key": "BILIBILI",
+      "app_id": 4,
+      "vocab_name": "哔哩哔哩",
+      "scope_name": "automation-bilibili.scope",
+      "unit_name": "automation-bilibili",
+      "workload_enabled": true,
+      "prediction_enabled": true,
+      "window_keywords": [
+        "bilibili",
+        "哔哩哔哩",
+        "B站"
+      ],
+      "process_keywords": [
+        "bilibili",
+        "哔哩哔哩"
+      ]
+    }
+  ]
+}

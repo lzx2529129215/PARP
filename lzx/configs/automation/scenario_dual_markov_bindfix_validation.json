@@ -1,0 +1,24 @@
+{
+  "validation_mode": true,
+  "keep_alive_after_s": 90,
+  "actions": [
+    {"type": "shell", "name": "files", "command": "nautilus --new-window /home/lzx", "label": "BIND_FIX_FILES_1"},
+    {"type": "wait", "seconds": 10, "name": "files"},
+    {"type": "shell", "name": "qq", "command": "gtk-launch qq || gtk-launch linuxqq || linuxqq || qq", "label": "BIND_FIX_QQ_1", "optional": true},
+    {"type": "wait", "seconds": 10, "name": "qq"},
+    {"type": "launch", "name": "wps", "command": "wps", "label": "BIND_FIX_WPS_1"},
+    {"type": "wait", "seconds": 10, "name": "wps"},
+    {"type": "switch", "name": "qq", "class": "qq|QQ|linuxqq", "title": "QQ", "command": "gtk-launch qq", "label": "BIND_FIX_QQ_2", "optional": true},
+    {"type": "wait", "seconds": 9, "name": "qq"},
+    {"type": "switch", "name": "files", "class": "org.gnome.Nautilus|Nautilus|nautilus", "title": "Home|主文件夹|文件", "command": "nautilus --new-window /home/lzx", "label": "BIND_FIX_FILES_2", "optional": true},
+    {"type": "wait", "seconds": 9, "name": "files"},
+    {"type": "switch", "name": "wps", "class": "wps", "command": "wps", "label": "BIND_FIX_WPS_2"},
+    {"type": "wait", "seconds": 9, "name": "wps"},
+    {"type": "switch", "name": "qq", "class": "qq|QQ|linuxqq", "title": "QQ", "command": "gtk-launch qq", "label": "BIND_FIX_QQ_3", "optional": true},
+    {"type": "wait", "seconds": 9, "name": "qq"},
+    {"type": "switch", "name": "files", "class": "org.gnome.Nautilus|Nautilus|nautilus", "title": "Home|主文件夹|文件", "command": "nautilus --new-window /home/lzx", "label": "BIND_FIX_FILES_3", "optional": true},
+    {"type": "wait", "seconds": 9, "name": "files"},
+    {"type": "switch", "name": "wps", "class": "wps", "command": "wps", "label": "BIND_FIX_WPS_3"},
+    {"type": "wait", "seconds": 10, "name": "wps"}
+  ]
+}

@@ -1,0 +1,1 @@
+{"scenario_id":"scenario_wps_templates","description":"WPS 模板浏览场景；需 profile 的操作会标注为未演练。","validation_mode":true,"variables":{"wps_command":"wps"},"phases":[{"phase_id":"wps_templates","operation_ref":["WPS_LAUNCH","WPS_OPEN_TEMPLATE_CENTER","WPS_SCROLL_TEMPLATE_HOME","WPS_OPEN_PRESENTATION_TEMPLATES","WPS_CLOSE_TEMPLATE_CENTER"]}],"keep_alive_after_s":0}

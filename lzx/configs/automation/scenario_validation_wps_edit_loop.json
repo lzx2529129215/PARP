@@ -1,0 +1,90 @@
+{
+  "validation_mode": true,
+  "keep_alive_after_s": 60,
+  "actions": [
+    {
+      "type": "shell",
+      "label": "WPS_VALIDATION_SETUP",
+      "command": "mkdir -p /home/lzx/Desktop/huawei/huawei_mem/lzx/outputs/automation_validation/wps && printf 'WPS validation seed\\n' > /home/lzx/Desktop/huawei/huawei_mem/lzx/outputs/automation_validation/wps/validation_wps.txt"
+    },
+    {
+      "type": "launch",
+      "name": "wps",
+      "command": "wps"
+    },
+    {
+      "type": "wait",
+      "seconds": 8,
+      "name": "wps",
+      "label": "WPS_WAIT_LAUNCH"
+    },
+    {
+      "type": "repeat",
+      "times": 2,
+      "actions": [
+        {
+          "type": "switch",
+          "name": "wps",
+          "class": "wps|wpsoffice|Wps",
+          "command": "wps",
+          "optional": true,
+          "label": "WPS_FOCUS"
+        },
+        {
+          "type": "key",
+          "name": "wps",
+          "key": "ctrl+n",
+          "optional": true,
+          "label": "WPS_NEW_DOC"
+        },
+        {
+          "type": "wait",
+          "seconds": 3,
+          "name": "wps",
+          "label": "WPS_WAIT_DOC"
+        },
+        {
+          "type": "type",
+          "name": "wps",
+          "text": "MGLRU observe only validation text. ",
+          "delay_ms": 5,
+          "optional": true,
+          "label": "WPS_TYPE_TEXT"
+        },
+        {
+          "type": "key",
+          "name": "wps",
+          "key": "Page_Down",
+          "optional": true,
+          "label": "WPS_SCROLL_DOWN"
+        },
+        {
+          "type": "key",
+          "name": "wps",
+          "key": "ctrl+s",
+          "optional": true,
+          "label": "WPS_SAVE_SHORTCUT"
+        },
+        {
+          "type": "wait",
+          "seconds": 2,
+          "name": "wps",
+          "label": "WPS_WAIT_SAVE_DIALOG"
+        },
+        {
+          "type": "key",
+          "name": "wps",
+          "key": "Escape",
+          "optional": true,
+          "label": "WPS_CLOSE_DIALOG"
+        },
+        {
+          "type": "wait",
+          "seconds": 5,
+          "name": "wps",
+          "label": "WPS_LOOP_PAUSE"
+        }
+      ]
+    }
+  ]
+}

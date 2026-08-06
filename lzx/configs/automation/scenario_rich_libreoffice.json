@@ -1,0 +1,42 @@
+{
+  "description": "LibreOffice 三组件多场景：Writer 文档、Calc 数据表和 Impress 演示文稿的创建、编辑、搜索、放映与另存。",
+  "variables": {"LO_OUT": "${PROJECT_ROOT}/outputs/automation_rich/libreoffice"},
+  "actions": [
+    {"type": "shell", "command": "mkdir -p \"${LO_OUT}\"", "label": "LO_PREPARE_OUTPUT"},
+    {"type": "launch", "name": "lo_writer", "app_key": "LIBREOFFICE", "command": "libreoffice --writer", "label": "LO_WRITER_LAUNCH"},
+    {"type": "wait_window", "name": "lo_writer", "app_key": "LIBREOFFICE", "class": "libreoffice-writer|soffice", "title": "Writer|LibreOffice", "timeout": 35, "label": "LO_WRITER_WAIT"},
+    {"type": "window_state", "name": "lo_writer", "app_key": "LIBREOFFICE", "class": "libreoffice-writer|soffice", "state": "maximize", "label": "LO_WRITER_MAXIMIZE"},
+    {"type": "paste_text", "name": "lo_writer", "text": "Daily automation report\n\nThunderbird, VLC, GIMP, KeePassXC and LibreOffice scenarios.", "label": "LO_WRITER_TYPE_REPORT"},
+    {"type": "hotkey", "name": "lo_writer", "key": "ctrl+f", "label": "LO_WRITER_SEARCH"},
+    {"type": "paste_text", "name": "lo_writer", "text": "automation", "label": "LO_WRITER_SEARCH_TEXT"},
+    {"type": "key", "name": "lo_writer", "key": "Escape", "label": "LO_WRITER_CLOSE_SEARCH"},
+    {"type": "save_as", "name": "lo_writer", "app_key": "LIBREOFFICE", "class": "libreoffice-writer|soffice", "path": "${LO_OUT}/daily_report.odt", "wait_after": 4, "label": "LO_WRITER_SAVE"},
+    {"type": "assert_file", "path": "${LO_OUT}/daily_report.odt", "label": "LO_WRITER_VERIFY"},
+    {"type": "key", "name": "lo_writer", "key": "ctrl+w", "label": "LO_WRITER_CLOSE_DOCUMENT"},
+
+    {"type": "launch", "name": "lo_calc", "app_key": "LIBREOFFICE", "command": "libreoffice --calc", "label": "LO_CALC_LAUNCH"},
+    {"type": "wait_window", "name": "lo_calc", "app_key": "LIBREOFFICE", "class": "libreoffice-calc|soffice", "title": "Calc|LibreOffice", "timeout": 35, "label": "LO_CALC_WAIT"},
+    {"type": "window_state", "name": "lo_calc", "app_key": "LIBREOFFICE", "class": "libreoffice-calc|soffice", "state": "maximize", "label": "LO_CALC_MAXIMIZE"},
+    {"type": "goto_cell", "name": "lo_calc", "reference": "A1", "label": "LO_CALC_GOTO_A1"},
+    {"type": "paste_text", "name": "lo_calc", "text": "Application\tScenario\tStatus\nThunderbird\tMail search\tREADY\nVLC\tPlayback\tREADY\nGIMP\tImage edit\tREADY\nKeePassXC\tSafe UI\tREADY\nLibreOffice\tOffice flow\tREADY", "label": "LO_CALC_FILL_TABLE"},
+    {"type": "hotkey", "name": "lo_calc", "key": "ctrl+a", "label": "LO_CALC_SELECT_DATA"},
+    {"type": "hotkey", "name": "lo_calc", "key": "ctrl+shift+1", "optional": true, "label": "LO_CALC_NUMBER_FORMAT"},
+    {"type": "save_as", "name": "lo_calc", "app_key": "LIBREOFFICE", "class": "libreoffice-calc|soffice", "path": "${LO_OUT}/scenario_matrix.ods", "wait_after": 4, "label": "LO_CALC_SAVE"},
+    {"type": "assert_file", "path": "${LO_OUT}/scenario_matrix.ods", "label": "LO_CALC_VERIFY"},
+    {"type": "key", "name": "lo_calc", "key": "ctrl+w", "label": "LO_CALC_CLOSE_DOCUMENT"},
+
+    {"type": "launch", "name": "lo_impress", "app_key": "LIBREOFFICE", "command": "libreoffice --impress", "label": "LO_IMPRESS_LAUNCH"},
+    {"type": "wait_window", "name": "lo_impress", "app_key": "LIBREOFFICE", "class": "libreoffice-impress|soffice", "title": "Impress|LibreOffice", "timeout": 35, "label": "LO_IMPRESS_WAIT"},
+    {"type": "window_state", "name": "lo_impress", "app_key": "LIBREOFFICE", "class": "libreoffice-impress|soffice", "state": "maximize", "label": "LO_IMPRESS_MAXIMIZE"},
+    {"type": "key", "name": "lo_impress", "key": "Escape", "optional": true, "label": "LO_IMPRESS_CLOSE_TEMPLATE_CHOOSER"},
+    {"type": "paste_text", "name": "lo_impress", "text": "Daily multi-application automation", "optional": true, "label": "LO_IMPRESS_TYPE_TITLE"},
+    {"type": "hotkey", "name": "lo_impress", "key": "ctrl+m", "label": "LO_IMPRESS_NEW_SLIDE"},
+    {"type": "paste_text", "name": "lo_impress", "text": "Mail, media, image, password manager and office", "optional": true, "label": "LO_IMPRESS_TYPE_SUMMARY"},
+    {"type": "key", "name": "lo_impress", "key": "F5", "optional": true, "label": "LO_IMPRESS_SLIDESHOW"},
+    {"type": "wait", "seconds": 3, "label": "LO_IMPRESS_SLIDESHOW_DWELL"},
+    {"type": "key", "name": "lo_impress", "key": "Escape", "optional": true, "label": "LO_IMPRESS_EXIT_SLIDESHOW"},
+    {"type": "save_as", "name": "lo_impress", "app_key": "LIBREOFFICE", "class": "libreoffice-impress|soffice", "path": "${LO_OUT}/daily_summary.odp", "wait_after": 4, "label": "LO_IMPRESS_SAVE"},
+    {"type": "assert_file", "path": "${LO_OUT}/daily_summary.odp", "label": "LO_IMPRESS_VERIFY"},
+    {"type": "close", "name": "lo_impress", "app_key": "LIBREOFFICE", "class": "libreoffice-impress|libreoffice-calc|libreoffice-writer|soffice", "process_names": ["soffice.bin", "soffice"], "path_contains": ["/usr/lib/libreoffice"], "wait_after_window_close": 1, "force_after_seconds": 2, "label": "LO_CLOSE_ALL"}
+  ]
+}

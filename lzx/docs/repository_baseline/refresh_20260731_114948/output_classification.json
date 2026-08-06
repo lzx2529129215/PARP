@@ -1,0 +1,272 @@
+{
+  "count": 13,
+  "records": [
+    {
+      "asset_id": "output_01",
+      "source_path": "outputs/runtime_monitor",
+      "object_type": "RUNTIME_SESSION_COLLECTION",
+      "content_class": "UNKNOWN",
+      "approximate_size_bytes": null,
+      "producing_pipeline": "见已有审计/相邻README",
+      "producer_entrypoint": "按子系统确定",
+      "known_consumers": [],
+      "reproducibility": "UNKNOWN",
+      "unique_content": true,
+      "protection_class": "UNKNOWN_DO_NOT_TOUCH",
+      "phase1_permission": "UNKNOWN_DO_NOT_TOUCH",
+      "checksum_strategy": "existing_manifest_or_metadata",
+      "evidence": [
+        "outputs/repository_audit_20260717_175447/tables/artifacts.csv"
+      ],
+      "exceptions": [
+        "session_dual_markov_bindfix_runtime_20260714_103542"
+      ],
+      "rationale": "混合运行session，包含唯一实验与派生结果"
+    },
+    {
+      "asset_id": "output_02",
+      "source_path": "outputs/mglru",
+      "object_type": "KERNEL_VALIDATION_COLLECTION",
+      "content_class": "HISTORICAL_EVIDENCE",
+      "approximate_size_bytes": null,
+      "producing_pipeline": "见已有审计/相邻README",
+      "producer_entrypoint": "按子系统确定",
+      "known_consumers": [],
+      "reproducibility": "HISTORICAL_EVIDENCE",
+      "unique_content": true,
+      "protection_class": "KEEP_IN_PLACE",
+      "phase1_permission": "KEEP_IN_PLACE",
+      "checksum_strategy": "existing_manifest_or_metadata",
+      "evidence": [
+        "outputs/repository_audit_20260717_175447/tables/artifacts.csv"
+      ],
+      "exceptions": [
+        "dual_markov_bindfix_20260714_092525",
+        "damon_runtime_validation_20260715"
+      ],
+      "rationale": "包含bindfix和DAMON运行验证"
+    },
+    {
+      "asset_id": "output_03",
+      "source_path": "outputs/automation",
+      "object_type": "AUTOMATION_EVIDENCE",
+      "content_class": "HISTORICAL_EVIDENCE",
+      "approximate_size_bytes": null,
+      "producing_pipeline": "见已有审计/相邻README",
+      "producer_entrypoint": "按子系统确定",
+      "known_consumers": [],
+      "reproducibility": "HISTORICAL_EVIDENCE",
+      "unique_content": true,
+      "protection_class": "KEEP_IN_PLACE",
+      "phase1_permission": "KEEP_IN_PLACE",
+      "checksum_strategy": "existing_manifest_or_metadata",
+      "evidence": [
+        "outputs/repository_audit_20260717_175447/tables/artifacts.csv"
+      ],
+      "exceptions": [
+        "semantic_ui_smoke_gui_20260714_171443"
+      ],
+      "rationale": "包含语义GUI校验证据"
+    },
+    {
+      "asset_id": "output_04",
+      "source_path": "outputs/harmony_porting_bundle_20260717_152948",
+      "object_type": "HARMONY_PORTING_BUNDLE",
+      "content_class": "HISTORICAL_EVIDENCE",
+      "approximate_size_bytes": null,
+      "producing_pipeline": "见已有审计/相邻README",
+      "producer_entrypoint": "按子系统确定",
+      "known_consumers": [],
+      "reproducibility": "HISTORICAL_EVIDENCE",
+      "unique_content": false,
+      "protection_class": "KEEP_IN_PLACE",
+      "phase1_permission": "KEEP_IN_PLACE",
+      "checksum_strategy": "existing_manifest_or_metadata",
+      "evidence": [
+        "outputs/repository_audit_20260717_175447/tables/artifacts.csv"
+      ],
+      "exceptions": [],
+      "rationale": "可复核移植包及模型副本"
+    },
+    {
+      "asset_id": "output_05",
+      "source_path": "outputs/harmony_porting_bundle_20260717_152948.tar.gz",
+      "object_type": "ARCHIVE",
+      "content_class": "HISTORICAL_EVIDENCE",
+      "approximate_size_bytes": 666867,
+      "producing_pipeline": "见已有审计/相邻README",
+      "producer_entrypoint": "按子系统确定",
+      "known_consumers": [],
+      "reproducibility": "HISTORICAL_EVIDENCE",
+      "unique_content": false,
+      "protection_class": "KEEP_IN_PLACE",
+      "phase1_permission": "KEEP_IN_PLACE",
+      "checksum_strategy": "existing_manifest_or_metadata",
+      "evidence": [
+        "outputs/repository_audit_20260717_175447/tables/artifacts.csv"
+      ],
+      "exceptions": [],
+      "rationale": "归档本体，未证明冗余"
+    },
+    {
+      "asset_id": "output_06",
+      "source_path": "outputs/harmony_porting_bundle_20260717_152948.zip",
+      "object_type": "ARCHIVE",
+      "content_class": "HISTORICAL_EVIDENCE",
+      "approximate_size_bytes": 758511,
+      "producing_pipeline": "见已有审计/相邻README",
+      "producer_entrypoint": "按子系统确定",
+      "known_consumers": [],
+      "reproducibility": "HISTORICAL_EVIDENCE",
+      "unique_content": false,
+      "protection_class": "KEEP_IN_PLACE",
+      "phase1_permission": "KEEP_IN_PLACE",
+      "checksum_strategy": "existing_manifest_or_metadata",
+      "evidence": [
+        "outputs/repository_audit_20260717_175447/tables/artifacts.csv"
+      ],
+      "exceptions": [],
+      "rationale": "归档本体，未证明冗余"
+    },
+    {
+      "asset_id": "output_07",
+      "source_path": "outputs/repository_audit_20260717_175447",
+      "object_type": "AUDIT_EVIDENCE",
+      "content_class": "HISTORICAL_EVIDENCE",
+      "approximate_size_bytes": null,
+      "producing_pipeline": "见已有审计/相邻README",
+      "producer_entrypoint": "按子系统确定",
+      "known_consumers": [],
+      "reproducibility": "HISTORICAL_EVIDENCE",
+      "unique_content": false,
+      "protection_class": "KEEP_IN_PLACE",
+      "phase1_permission": "KEEP_IN_PLACE",
+      "checksum_strategy": "existing_manifest_or_metadata",
+      "evidence": [
+        "outputs/repository_audit_20260717_175447/tables/artifacts.csv"
+      ],
+      "exceptions": [],
+      "rationale": "旧全量审计基线"
+    },
+    {
+      "asset_id": "output_08",
+      "source_path": "outputs/repository_phase0_20260717_195813",
+      "object_type": "FROZEN_BASELINE",
+      "content_class": "HISTORICAL_EVIDENCE",
+      "approximate_size_bytes": null,
+      "producing_pipeline": "见已有审计/相邻README",
+      "producer_entrypoint": "按子系统确定",
+      "known_consumers": [],
+      "reproducibility": "HISTORICAL_EVIDENCE",
+      "unique_content": false,
+      "protection_class": "KEEP_IN_PLACE",
+      "phase1_permission": "KEEP_IN_PLACE",
+      "checksum_strategy": "existing_manifest_or_metadata",
+      "evidence": [
+        "outputs/repository_audit_20260717_175447/tables/artifacts.csv"
+      ],
+      "exceptions": [],
+      "rationale": "旧Phase0冻结证据"
+    },
+    {
+      "asset_id": "output_09",
+      "source_path": "outputs/repository_phase05_20260731_111343",
+      "object_type": "BLOCKED_ATTEMPT",
+      "content_class": "HISTORICAL_EVIDENCE",
+      "approximate_size_bytes": null,
+      "producing_pipeline": "见已有审计/相邻README",
+      "producer_entrypoint": "按子系统确定",
+      "known_consumers": [],
+      "reproducibility": "HISTORICAL_EVIDENCE",
+      "unique_content": false,
+      "protection_class": "KEEP_IN_PLACE",
+      "phase1_permission": "KEEP_IN_PLACE",
+      "checksum_strategy": "existing_manifest_or_metadata",
+      "evidence": [
+        "outputs/repository_audit_20260717_175447/tables/artifacts.csv"
+      ],
+      "exceptions": [],
+      "rationale": "HEAD漂移阻塞证据"
+    },
+    {
+      "asset_id": "output_10",
+      "source_path": "outputs/repository_head_delta_20260731_112325",
+      "object_type": "HEAD_DELTA_AUDIT",
+      "content_class": "HISTORICAL_EVIDENCE",
+      "approximate_size_bytes": null,
+      "producing_pipeline": "见已有审计/相邻README",
+      "producer_entrypoint": "按子系统确定",
+      "known_consumers": [],
+      "reproducibility": "HISTORICAL_EVIDENCE",
+      "unique_content": false,
+      "protection_class": "KEEP_IN_PLACE",
+      "phase1_permission": "KEEP_IN_PLACE",
+      "checksum_strategy": "existing_manifest_or_metadata",
+      "evidence": [
+        "outputs/repository_audit_20260717_175447/tables/artifacts.csv"
+      ],
+      "exceptions": [],
+      "rationale": "当前HEAD差异审计"
+    },
+    {
+      "asset_id": "output_11",
+      "source_path": "outputs/repository_governance_20260731_114948",
+      "object_type": "GOVERNANCE_OUTPUT",
+      "content_class": "REPORT",
+      "approximate_size_bytes": null,
+      "producing_pipeline": "见已有审计/相邻README",
+      "producer_entrypoint": "按子系统确定",
+      "known_consumers": [],
+      "reproducibility": "HISTORICAL_EVIDENCE",
+      "unique_content": false,
+      "protection_class": "KEEP_IN_PLACE",
+      "phase1_permission": "KEEP_IN_PLACE",
+      "checksum_strategy": "existing_manifest_or_metadata",
+      "evidence": [
+        "outputs/repository_audit_20260717_175447/tables/artifacts.csv"
+      ],
+      "exceptions": [],
+      "rationale": "本次治理输出"
+    },
+    {
+      "asset_id": "output_12",
+      "source_path": "outputs/wps",
+      "object_type": "WPS_EXPERIMENT_OUTPUT",
+      "content_class": "UNKNOWN",
+      "approximate_size_bytes": null,
+      "producing_pipeline": "见已有审计/相邻README",
+      "producer_entrypoint": "按子系统确定",
+      "known_consumers": [],
+      "reproducibility": "UNKNOWN",
+      "unique_content": false,
+      "protection_class": "UNKNOWN_DO_NOT_TOUCH",
+      "phase1_permission": "UNKNOWN_DO_NOT_TOUCH",
+      "checksum_strategy": "existing_manifest_or_metadata",
+      "evidence": [
+        "outputs/repository_audit_20260717_175447/tables/artifacts.csv"
+      ],
+      "exceptions": [],
+      "rationale": "未证明可重建"
+    },
+    {
+      "asset_id": "output_13",
+      "source_path": "outputs/kernel_modification_inventory_20260724_111252",
+      "object_type": "KERNEL_INVENTORY_REPORT",
+      "content_class": "REPORT",
+      "approximate_size_bytes": null,
+      "producing_pipeline": "见已有审计/相邻README",
+      "producer_entrypoint": "按子系统确定",
+      "known_consumers": [],
+      "reproducibility": "HISTORICAL_EVIDENCE",
+      "unique_content": false,
+      "protection_class": "KEEP_IN_PLACE",
+      "phase1_permission": "KEEP_IN_PLACE",
+      "checksum_strategy": "existing_manifest_or_metadata",
+      "evidence": [
+        "outputs/repository_audit_20260717_175447/tables/artifacts.csv"
+      ],
+      "exceptions": [],
+      "rationale": "内核修改清单"
+    }
+  ]
+}

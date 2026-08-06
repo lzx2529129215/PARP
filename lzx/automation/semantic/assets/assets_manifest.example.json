@@ -1,0 +1,18 @@
+{
+  "test_image": {"path": "", "notes": "本地测试图片，不提交个人图片"},
+  "test_video": {"path": "", "notes": "本地测试视频，不提交大文件"},
+  "test_audio": {"path": "", "notes": "本地测试音频"},
+  "test_doc_2m": {"path": "", "notes": "约 2MB 的测试文档"},
+  "test_small_word": {"path": "", "notes": "小型 Word 测试文件"},
+  "test_medium_word": {"path": "", "notes": "20MB-100MB 可配置样本"},
+  "test_medium_ppt": {"path": "", "notes": "20MB-100MB 可配置样本"},
+  "test_medium_excel": {"path": "", "notes": "20MB-100MB 可配置样本"},
+  "wps_large_document_set": {"path": "", "notes": "不默认生成或提交"},
+  "browser_download_dir": {"path": "", "notes": "本轮独立下载目录"},
+  "wps_output_dir": {"path": "", "notes": "本轮独立 WPS 输出目录"},
+  "wechat_test_recipient": {"path": "", "notes": "仅本地 allowlist 标识，不保存联系人信息"},
+  "bilibili_test_account": {"path": "", "notes": "仅本地测试账号引用，不保存凭据"},
+  "online_sheet_url": {"path": "", "notes": "测试账号可写在线表格 URL"},
+  "online_ppt_url": {"path": "", "notes": "测试账号在线 PPT URL"},
+  "online_word_url": {"path": "", "notes": "测试账号在线 Word URL"}
+}

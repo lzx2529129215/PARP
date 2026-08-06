@@ -1,0 +1,102 @@
+{
+  "items": [
+    {
+      "unresolved_id": "UR-001",
+      "question": "monitor.py与online_monitor.py长期入口关系",
+      "status": "OPEN",
+      "governance_classification": "UNKNOWN_DO_NOT_TOUCH",
+      "resolution_note": "保守保留，未进入Phase1。"
+    },
+    {
+      "unresolved_id": "UR-002",
+      "question": "旧checkpoint来源与保留策略",
+      "status": "PARTIALLY_RESOLVED",
+      "governance_classification": "UNKNOWN_DO_NOT_TOUCH",
+      "resolution_note": "active和bundle switch checkpoint来源已解析；其余旧模型来源不完整，KEEP_IN_PLACE。"
+    },
+    {
+      "unresolved_id": "UR-003",
+      "question": "LSApp嵌套仓库定位",
+      "status": "RESOLVED",
+      "governance_classification": "KEEP_IN_PLACE",
+      "resolution_note": "KEEP_INDEPENDENT_NESTED_GIT_REPOSITORY。"
+    },
+    {
+      "unresolved_id": "UR-004",
+      "question": "cache_ext角色",
+      "status": "RESOLVED",
+      "governance_classification": "EXTERNAL_COMPONENT",
+      "resolution_note": "UPSTREAM_COMPONENT_WITH_LOCAL_MODIFICATIONS。"
+    },
+    {
+      "unresolved_id": "UR-005",
+      "question": "多套内核源码树角色",
+      "status": "OPEN",
+      "governance_classification": "UNKNOWN_DO_NOT_TOUCH",
+      "resolution_note": "保守保留，未进入Phase1。"
+    },
+    {
+      "unresolved_id": "UR-006",
+      "question": "Harmony外部工作区",
+      "status": "OPEN",
+      "governance_classification": "UNKNOWN_DO_NOT_TOUCH",
+      "resolution_note": "保守保留，未进入Phase1。"
+    },
+    {
+      "unresolved_id": "UR-007",
+      "question": "UNKNOWN入口归属",
+      "status": "OPEN",
+      "governance_classification": "UNKNOWN_DO_NOT_TOUCH",
+      "resolution_note": "保守保留，未进入Phase1。"
+    },
+    {
+      "unresolved_id": "UR-008",
+      "question": "app vocab正式关系",
+      "status": "OPEN",
+      "governance_classification": "UNKNOWN_DO_NOT_TOUCH",
+      "resolution_note": "保守保留，未进入Phase1。"
+    },
+    {
+      "unresolved_id": "UR-009",
+      "question": "operation词表source of truth",
+      "status": "OPEN",
+      "governance_classification": "UNKNOWN_DO_NOT_TOUCH",
+      "resolution_note": "保守保留，未进入Phase1。"
+    },
+    {
+      "unresolved_id": "UR-010",
+      "question": "workload/state ID契约",
+      "status": "OPEN",
+      "governance_classification": "UNKNOWN_DO_NOT_TOUCH",
+      "resolution_note": "保守保留，未进入Phase1。"
+    },
+    {
+      "unresolved_id": "UR-011",
+      "question": "不可重建outputs识别",
+      "status": "PARTIALLY_RESOLVED",
+      "governance_classification": "UNKNOWN_DO_NOT_TOUCH",
+      "resolution_note": "outputs已目录级分类；未证明可重建对象排除。"
+    },
+    {
+      "unresolved_id": "UR-012",
+      "question": "backup唯一性",
+      "status": "PARTIALLY_RESOLVED",
+      "governance_classification": "UNKNOWN_DO_NOT_TOUCH",
+      "resolution_note": "206项backup缺少安全的单对象强证据，均保守排除。"
+    },
+    {
+      "unresolved_id": "UR-013",
+      "question": "Harmony独立数据定位",
+      "status": "RESOLVED",
+      "governance_classification": "KEEP_IN_PLACE",
+      "resolution_note": "INDEPENDENT_EXPERIMENT_DATASETS。"
+    },
+    {
+      "unresolved_id": "UR-014",
+      "question": "generic内核资产",
+      "status": "RESOLVED",
+      "governance_classification": "UNKNOWN_DO_NOT_TOUCH",
+      "resolution_note": "generic为DOCUMENT_ONLY_UNREADABLE_ARTIFACT，排除Phase1。"
+    }
+  ]
+}

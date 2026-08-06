@@ -1,0 +1,123 @@
+{
+  "count": 8,
+  "kernels": [
+    {
+      "kernel_id": "damon_runtime",
+      "release": "6.17.13-mglru-dual-observe-damon-20260715",
+      "role": "RUNNING_CUSTOM",
+      "image_path": "/boot/vmlinuz-6.17.13-mglru-dual-observe-damon-20260715",
+      "image_status": "EXISTS",
+      "image_sha256": "e13eb42af047f9beee63035a0aca0fd08c4eb23402632ec557b09bfc352e9952",
+      "config_path": "/boot/config-6.17.13-mglru-dual-observe-damon-20260715",
+      "config_status": "EXISTS",
+      "config_sha256": "5bea4b7f1740a1039046e752b5e5dcf3d8eb46eed92cfa6d3129d6e9d7936dab",
+      "initramfs_path": "/boot/initrd.img-6.17.13-mglru-dual-observe-damon-20260715",
+      "initramfs_status": "EXISTS",
+      "initramfs_sha256": "b472f5205ce9a9bf72e12a8dad3cbb06e30ada326d342649c9599eb011d4e6b2",
+      "modules_path": "/lib/modules/6.17.13-mglru-dual-observe-damon-20260715",
+      "modules_status": "EXISTS",
+      "phase1_permission": "KEEP_IN_PLACE",
+      "source_tree": "MGLRU-test/v0/mglru_kernel_transfer/linux-hwe-6.17-6.17.0"
+    },
+    {
+      "kernel_id": "bindfix_available",
+      "release": "6.17.13-mglru-dual-observe-bindfix-20260714_092525",
+      "role": "AVAILABLE_CUSTOM_FALLBACK",
+      "image_path": "/boot/vmlinuz-6.17.13-mglru-dual-observe-bindfix-20260714_092525",
+      "image_status": "EXISTS",
+      "image_sha256": "b9303a25e74250828b1448966d09056c1abfadcf163471c651deacd4780f5700",
+      "config_path": "/boot/config-6.17.13-mglru-dual-observe-bindfix-20260714_092525",
+      "config_status": "EXISTS",
+      "config_sha256": "68479b2c5b625ed02137bbc19b87d0ec8e9154f47e6aae0d3b0ac7419c241b51",
+      "initramfs_path": "/boot/initrd.img-6.17.13-mglru-dual-observe-bindfix-20260714_092525",
+      "initramfs_status": "EXISTS",
+      "initramfs_sha256": "88c58db7cd2165533b02baff3ed6cba012bf001160ed8784aeff5e6a434339f1",
+      "modules_path": "/lib/modules/6.17.13-mglru-dual-observe-bindfix-20260714_092525",
+      "modules_status": "EXISTS",
+      "phase1_permission": "KEEP_IN_PLACE",
+      "source_tree": "MGLRU-test/v0/mglru_kernel_transfer/linux-hwe-6.17-6.17.0"
+    },
+    {
+      "kernel_id": "pre_bindfix_available",
+      "release": "6.17.13-mglru-dual-observe-20260713_174412",
+      "role": "AVAILABLE_EXPERIMENTAL",
+      "image_path": "/boot/vmlinuz-6.17.13-mglru-dual-observe-20260713_174412",
+      "image_status": "EXISTS",
+      "image_sha256": "b85e92a2aebf809dcee735a6df8c0908dbb125ed1cc624e1dd509ee281e03ce3",
+      "config_path": "/boot/config-6.17.13-mglru-dual-observe-20260713_174412",
+      "config_status": "EXISTS",
+      "config_sha256": "a7dfa1e9347e1b043c09e4e45cacdc7fbc6da2e35385c65b6acb6a7b56b609c0",
+      "initramfs_path": "/boot/initrd.img-6.17.13-mglru-dual-observe-20260713_174412",
+      "initramfs_status": "EXISTS",
+      "initramfs_sha256": "ca34d0b77a58d73a6f46c767822316d8b725cc63d6325734f320e152fa958ec0",
+      "modules_path": "/lib/modules/6.17.13-mglru-dual-observe-20260713_174412",
+      "modules_status": "EXISTS",
+      "phase1_permission": "KEEP_IN_PLACE",
+      "source_tree": "MGLRU-test/v0/mglru_kernel_transfer/linux-hwe-6.17-6.17.0"
+    },
+    {
+      "kernel_id": "generic_default_link",
+      "release": "6.8.0-136-generic",
+      "role": "DEFAULT_BOOT_LINK",
+      "image_path": "/boot/vmlinuz-6.8.0-136-generic",
+      "image_status": "EXISTS",
+      "image_sha256": null,
+      "config_path": "/boot/config-6.8.0-136-generic",
+      "config_status": "EXISTS",
+      "config_sha256": "6cf6a5586c2c38b84650d7cad3f9345c7773f5fd57131e5e1c053f64a91082e7",
+      "initramfs_path": "/boot/initrd.img-6.8.0-136-generic",
+      "initramfs_status": "EXISTS",
+      "initramfs_sha256": "1ca3443131745fcb424371ecc67be5d7791e64445a5783810af19503c847b0eb",
+      "modules_path": "/lib/modules/6.8.0-136-generic",
+      "modules_status": "EXISTS",
+      "phase1_permission": "KEEP_IN_PLACE",
+      "source_tree": null
+    },
+    {
+      "kernel_id": "generic_legacy",
+      "release": "6.8.0-124-generic",
+      "role": "INSTALLED_REFERENCE",
+      "image_path": "/boot/vmlinuz-6.8.0-124-generic",
+      "image_status": "EXISTS",
+      "image_sha256": null,
+      "config_path": "/boot/config-6.8.0-124-generic",
+      "config_status": "EXISTS",
+      "config_sha256": "4b764abe98b87817f0f12c332ee230ece528a6c45cc8f3e077ad8a75190c07ac",
+      "initramfs_path": "/boot/initrd.img-6.8.0-124-generic",
+      "initramfs_status": "EXISTS",
+      "initramfs_sha256": "d6e25a352160ada234f855a34a65aba1b56b43a129ac5b15a8b33824875a7f00",
+      "modules_path": "/lib/modules/6.8.0-124-generic",
+      "modules_status": "EXISTS",
+      "phase1_permission": "KEEP_IN_PLACE",
+      "source_tree": null
+    },
+    {
+      "kernel_id": "boot_vmlinuz_link",
+      "path": "/boot/vmlinuz",
+      "resolved_target": "/boot/vmlinuz-6.8.0-136-generic",
+      "role": "DEFAULT_BOOT_LINK",
+      "phase1_permission": "KEEP_IN_PLACE"
+    },
+    {
+      "kernel_id": "boot_vmlinuz_old_link",
+      "path": "/boot/vmlinuz.old",
+      "resolved_target": "/boot/vmlinuz-6.17.13-mglru-dual-observe-damon-20260715",
+      "role": "SECONDARY_BOOT_LINK",
+      "phase1_permission": "KEEP_IN_PLACE"
+    },
+    {
+      "kernel_id": "historical_build_config_paths",
+      "paths": [
+        "MGLRU-test/v0/mglru_kernel_transfer/linux-hwe-6.17-dual-damon-build-20260715/.config",
+        "MGLRU-test/v0/mglru_kernel_transfer/linux-hwe-6.17-dual-bindfix-build-20260714_092525/.config"
+      ],
+      "status": "HISTORICAL_BUILD_PATH_REMOVED_INTENTIONALLY",
+      "replacement_config_sources": [
+        "/boot/config-6.17.13-mglru-dual-observe-damon-20260715",
+        "/boot/config-6.17.13-mglru-dual-observe-bindfix-20260714_092525"
+      ],
+      "phase1_permission": "KEEP_IN_PLACE"
+    }
+  ],
+  "canonical_source_tree": "MGLRU-test/v0/mglru_kernel_transfer/linux-hwe-6.17-6.17.0"
+}

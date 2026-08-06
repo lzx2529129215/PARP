@@ -1,0 +1,1 @@
+{"app_key":"WPS","window":{"width":1920,"height":1080},"geometry_tolerance_ratio":0.25,"coordinates":{"template_entry":{"x_ratio":0.2,"y_ratio":0.2}},"notes":"模板及对象操作先执行 calibration-only，不匹配时不点击。"}

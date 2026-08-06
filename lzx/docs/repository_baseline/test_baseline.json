@@ -1,0 +1,183 @@
+{
+  "schema_version": "repository-test-baseline-v1",
+  "generated_at": "2026-07-17T20:13:11.560759+08:00",
+  "count": 11,
+  "tests": [
+    {
+      "test_id": "phase0_host_unit",
+      "subsystem": "runtime_monitor+automation",
+      "level": "UNIT",
+      "command": "python3 -m pytest -q -p no:cacheprovider <79-safe-host-tests>",
+      "environment": "current host; no device/GUI/root",
+      "status": "PASS",
+      "count_passed": 79,
+      "count_failed": 0,
+      "duration": 0.21,
+      "evidence": [
+        "outputs/repository_phase0_20260717_195813/raw/test_outputs/pytest_safe_host.log"
+      ],
+      "required_for_future_refactor": true,
+      "execution_scope": "CURRENT_PHASE0"
+    },
+    {
+      "test_id": "phase0_python_syntax",
+      "subsystem": "project_owned_python",
+      "level": "SOURCE_SYNTAX",
+      "command": "py_compile with cfile under Phase0 output",
+      "environment": "Python 3 host",
+      "status": "PASS",
+      "count_passed": 198,
+      "count_failed": 0,
+      "duration": null,
+      "evidence": [
+        "outputs/repository_phase0_20260717_195813/raw/test_outputs/python_compile.log"
+      ],
+      "required_for_future_refactor": true,
+      "execution_scope": "CURRENT_PHASE0"
+    },
+    {
+      "test_id": "phase0_shell_syntax",
+      "subsystem": "project_owned_shell",
+      "level": "SOURCE_SYNTAX",
+      "command": "bash -n <60 scripts>",
+      "environment": "bash host",
+      "status": "PASS",
+      "count_passed": 60,
+      "count_failed": 0,
+      "duration": null,
+      "evidence": [
+        "outputs/repository_phase0_20260717_195813/raw/test_outputs/bash_syntax.log"
+      ],
+      "required_for_future_refactor": true,
+      "execution_scope": "CURRENT_PHASE0"
+    },
+    {
+      "test_id": "phase0_json_parse",
+      "subsystem": "project_configs",
+      "level": "SOURCE_SYNTAX",
+      "command": "python json.load <62 configs>",
+      "environment": "Python standard library",
+      "status": "PASS",
+      "count_passed": 62,
+      "count_failed": 0,
+      "duration": null,
+      "evidence": [
+        "outputs/repository_phase0_20260717_195813/raw/test_outputs/json_validation.log"
+      ],
+      "required_for_future_refactor": true,
+      "execution_scope": "CURRENT_PHASE0"
+    },
+    {
+      "test_id": "phase0_powershell_parse",
+      "subsystem": "cross_platform_scripts",
+      "level": "SOURCE_SYNTAX",
+      "command": "PowerShell parser",
+      "environment": "pwsh unavailable",
+      "status": "SKIPPED",
+      "count_passed": 0,
+      "count_failed": 0,
+      "duration": null,
+      "evidence": [
+        "outputs/repository_phase0_20260717_195813/raw/test_outputs/powershell_status.txt"
+      ],
+      "required_for_future_refactor": true,
+      "execution_scope": "CURRENT_PHASE0"
+    },
+    {
+      "test_id": "audit_collect_only",
+      "subsystem": "runtime_monitor+automation",
+      "level": "UNIT",
+      "command": "pytest --collect-only",
+      "environment": "audit host",
+      "status": "HISTORICAL_PASS",
+      "count_passed": 138,
+      "count_failed": 0,
+      "duration": 0.11,
+      "evidence": [
+        "outputs/repository_audit_20260717_175447/logs/test_runs/pytest_collect_only.log"
+      ],
+      "required_for_future_refactor": true,
+      "execution_scope": "HISTORICAL_EVIDENCE"
+    },
+    {
+      "test_id": "audit_host_unit",
+      "subsystem": "runtime_monitor+automation",
+      "level": "UNIT",
+      "command": "audit safe host whitelist",
+      "environment": "audit host",
+      "status": "HISTORICAL_PASS",
+      "count_passed": 79,
+      "count_failed": 0,
+      "duration": 0.22,
+      "evidence": [
+        "outputs/repository_audit_20260717_175447/logs/test_runs/pytest_safe_host.log"
+      ],
+      "required_for_future_refactor": true,
+      "execution_scope": "HISTORICAL_EVIDENCE"
+    },
+    {
+      "test_id": "audit_source_syntax",
+      "subsystem": "project",
+      "level": "SOURCE_SYNTAX",
+      "command": "Python/Bash/JSON checks",
+      "environment": "audit host",
+      "status": "HISTORICAL_PASS",
+      "count_passed": 320,
+      "count_failed": 0,
+      "duration": null,
+      "evidence": [
+        "outputs/repository_audit_20260717_175447/reports/test_matrix.md"
+      ],
+      "required_for_future_refactor": true,
+      "execution_scope": "HISTORICAL_EVIDENCE"
+    },
+    {
+      "test_id": "bindfix_kernel_runtime",
+      "subsystem": "mglru_kernel",
+      "level": "KERNEL_RUNTIME_HISTORICAL",
+      "command": "historical bindfix runtime acceptance",
+      "environment": "6.17.13 bindfix kernel",
+      "status": "HISTORICAL_PASS",
+      "count_passed": 9,
+      "count_failed": 0,
+      "duration": null,
+      "evidence": [
+        "outputs/mglru/dual_markov_bindfix_20260714_092525/runtime/reports/dual_markov_bindfix_runtime_summary.md"
+      ],
+      "required_for_future_refactor": true,
+      "execution_scope": "HISTORICAL_EVIDENCE"
+    },
+    {
+      "test_id": "damon_kernel_runtime",
+      "subsystem": "memory_platform",
+      "level": "DEVICE_COLLECTOR_HISTORICAL",
+      "command": "historical DAMON region acceptance",
+      "environment": "current DAMON kernel",
+      "status": "HISTORICAL_PASS",
+      "count_passed": 1,
+      "count_failed": 0,
+      "duration": null,
+      "evidence": [
+        "outputs/mglru/damon_runtime_validation_20260715/final_validation_report.md"
+      ],
+      "required_for_future_refactor": true,
+      "execution_scope": "HISTORICAL_EVIDENCE"
+    },
+    {
+      "test_id": "semantic_gui_smoke",
+      "subsystem": "automation",
+      "level": "DEVICE_UI_HISTORICAL",
+      "command": "historical semantic GUI smoke",
+      "environment": "Linux desktop",
+      "status": "HISTORICAL_PASS",
+      "count_passed": 1,
+      "count_failed": 0,
+      "duration": null,
+      "evidence": [
+        "outputs/automation/semantic_ui_smoke_gui_20260714_171443/reports/semantic_ui_smoke_summary.md"
+      ],
+      "required_for_future_refactor": true,
+      "execution_scope": "HISTORICAL_EVIDENCE"
+    }
+  ]
+}

@@ -1,0 +1,26 @@
+# Python and locally built helpers
+__pycache__/
+*.py[cod]
+runtime_monitor/tools/parp_memory_ballast
+
+# Runtime captures, generated reports, caches, and downloaded application bundles
+/outputs/
+/cache_ext/
+/tools/
+/mem/
+/samples/
+
+# Training data, checkpoints, and generated model results are reproducible assets,
+# not Git source.  Keep model/training code under operation_predictor/ tracked.
+operation_predictor/data/
+operation_predictor/outputs/
+
+# Linux 6.17.13 is obtained separately.  Version the PARP patch, build manifest,
+# configuration, tests, and wrapper tooling, but never the source tarball/build tree.
+v4.1-parp/kernel/downloads/
+v4.1-parp/kernel/build/
+v4.1-parp/kernel/src/
+v4.1-parp/outputs/
+
+# Legacy local kernel trees are retained only in the old workspace during migration.
+/MGLRU-test/

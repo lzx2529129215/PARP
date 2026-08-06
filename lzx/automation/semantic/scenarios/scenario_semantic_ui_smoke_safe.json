@@ -1,0 +1,34 @@
+{
+  "scenario_id": "scenario_semantic_ui_smoke_safe",
+  "description": "FILES、WPS、浏览器的本地无外部副作用 Smoke 场景；实际路径和 loopback URL 必须由 --set 注入。",
+  "validation_mode": true,
+  "variables": {
+    "collection_output_dir": "/tmp/semantic_ui_smoke_placeholder/output",
+    "files_command": "nautilus --new-window /tmp/semantic_ui_smoke_placeholder/output",
+    "wps_command": "wps",
+    "test_text": "semantic ui smoke local text",
+    "search_text": "semantic",
+    "wps_output_path": "/tmp/semantic_ui_smoke_placeholder/output/semantic_smoke.docx",
+    "browser_command": "env -u WAYLAND_DISPLAY MOZ_ENABLE_WAYLAND=0 GDK_BACKEND=x11 firefox --new-window http://127.0.0.1:18080/page1.html",
+    "url": "http://127.0.0.1:18080/page1.html",
+    "browser_page1": "http://127.0.0.1:18080/page1.html",
+    "browser_page2": "http://127.0.0.1:18080/page2.html",
+    "browser_page3": "http://127.0.0.1:18080/page3.html",
+    "app_switch_specs": {
+      "FILES": {"name": "files", "class": "org.gnome.Nautilus|Nautilus|nautilus", "title": "semantic_ui_smoke|Files|文件", "command": "nautilus --new-window ${collection_output_dir}"},
+      "WPS": {"name": "wps", "class": "wps|WPS|wpsoffice|kingsoft", "title": "WPS|wps", "command": "wps"},
+      "BROWSER": {"name": "browser", "class": "firefox|Firefox", "title": "Semantic Smoke", "command": "env -u WAYLAND_DISPLAY MOZ_ENABLE_WAYLAND=0 GDK_BACKEND=x11 firefox --new-window ${url}"}
+    }
+  },
+  "phases": [
+    {"phase_id": "files_initial", "operation_ref": ["FILES_LAUNCH", "FILES_OPEN_OUTPUT_DIR"], "wait_after_switch_s": 1},
+    {"phase_id": "wps_word", "operation_ref": ["WPS_LAUNCH", "WPS_CREATE_WORD", "WPS_TYPE_WORD_CONTENT", "WPS_SAVE_DOCUMENT"], "wait_after_switch_s": 1},
+    {"phase_id": "browser_initial", "operation_ref": ["BROWSER_LAUNCH", {"operation_ref": "BROWSER_OPEN_URL", "operation_params": {"url": "${browser_page1}"}}, "BROWSER_NEW_TAB", {"operation_ref": "BROWSER_OPEN_URL", "operation_params": {"url": "${browser_page2}"}}, "BROWSER_NEW_TAB", {"operation_ref": "BROWSER_OPEN_URL", "operation_params": {"url": "${browser_page3}"}}, "BROWSER_SWITCH_TAB", "BROWSER_SCROLL_PAGE"], "wait_after_switch_s": 1},
+    {"phase_id": "wps_reentry", "switch_to_app": "WPS", "operation_ref": ["WPS_SCROLL_DOCUMENT", "WPS_TYPE_WORD_CONTENT", "WPS_SAVE_DOCUMENT"], "wait_after_switch_s": 1},
+    {"phase_id": "files_reentry", "switch_to_app": "FILES", "operation_ref": ["FILES_OPEN_OUTPUT_DIR"], "wait_after_switch_s": 1},
+    {"phase_id": "browser_reentry", "switch_to_app": "BROWSER", "operation_ref": ["BROWSER_SWITCH_TAB", "BROWSER_SCROLL_PAGE"], "wait_after_switch_s": 1},
+    {"phase_id": "wps_ppt", "switch_to_app": "WPS", "operation_ref": ["WPS_CREATE_PPT", "WPS_TYPE_PPT_CONTENT"], "wait_after_switch_s": 1, "optional": true},
+    {"phase_id": "files_final", "switch_to_app": "FILES", "operation_ref": ["FILES_OPEN_OUTPUT_DIR"], "wait_after_switch_s": 1}
+  ],
+  "keep_alive_after_s": 0
+}

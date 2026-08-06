@@ -1,0 +1,427 @@
+{
+  "schema_version": "repository-protected-assets-v1",
+  "generated_at": "2026-07-17T20:13:11.560759+08:00",
+  "count": 14,
+  "assets": [
+    {
+      "protected_asset_id": "lsapp_nested_repo",
+      "path": "operation_predictor/data/raw/datasets/LSApp",
+      "path_status": "EXISTS",
+      "protection_level": "CRITICAL_DO_NOT_TOUCH",
+      "reason": "原始数据且包含独立Git历史",
+      "rebuildable": false,
+      "rebuild_cost": "HIGH_OR_UNKNOWN",
+      "uniqueness": "UNIQUE_OR_NOT_YET_PROVEN_REDUNDANT",
+      "allowed_operations": [
+        "read-only inspection",
+        "targeted checksum",
+        "owner-approved backup"
+      ],
+      "forbidden_operations": [
+        "delete",
+        "move",
+        "rename",
+        "overwrite",
+        "rebuild in place"
+      ],
+      "future_move_prerequisites": [
+        "owner approval",
+        "consumer inventory",
+        "manifest",
+        "backup",
+        "rollback rehearsal"
+      ],
+      "migration_permission": "FORBIDDEN_UNTIL_MANUAL_REVIEW"
+    },
+    {
+      "protected_asset_id": "lsapp_nine_modifications",
+      "path": "operation_predictor/data/raw/datasets/LSApp",
+      "path_status": "EXISTS",
+      "protection_level": "CRITICAL_DO_NOT_TOUCH",
+      "reason": "九项审计前已有tracked修改不得被覆盖",
+      "rebuildable": false,
+      "rebuild_cost": "HIGH_OR_UNKNOWN",
+      "uniqueness": "UNIQUE_OR_NOT_YET_PROVEN_REDUNDANT",
+      "allowed_operations": [
+        "read-only inspection",
+        "targeted checksum",
+        "owner-approved backup"
+      ],
+      "forbidden_operations": [
+        "delete",
+        "move",
+        "rename",
+        "overwrite",
+        "rebuild in place"
+      ],
+      "future_move_prerequisites": [
+        "owner approval",
+        "consumer inventory",
+        "manifest",
+        "backup",
+        "rollback rehearsal"
+      ],
+      "migration_permission": "FORBIDDEN_UNTIL_MANUAL_REVIEW"
+    },
+    {
+      "protected_asset_id": "mapped_app_events",
+      "path": "operation_predictor/data/raw/lsapp/app_events.csv",
+      "path_status": "EXISTS",
+      "protection_level": "PRESERVE_HIGH_PRIORITY",
+      "reason": "duration数据集直接来源",
+      "rebuildable": false,
+      "rebuild_cost": "HIGH_OR_UNKNOWN",
+      "uniqueness": "UNIQUE_OR_NOT_YET_PROVEN_REDUNDANT",
+      "allowed_operations": [
+        "read-only inspection",
+        "targeted checksum",
+        "owner-approved backup"
+      ],
+      "forbidden_operations": [
+        "delete",
+        "move",
+        "rename",
+        "overwrite",
+        "rebuild in place"
+      ],
+      "future_move_prerequisites": [
+        "owner approval",
+        "consumer inventory",
+        "manifest",
+        "backup",
+        "rollback rehearsal"
+      ],
+      "migration_permission": "NOT_APPROVED"
+    },
+    {
+      "protected_asset_id": "active_switch_checkpoint",
+      "path": "operation_predictor/outputs/checkpoints/app_lstm_duration/lsapp_app_lstm_duration_switch.pt",
+      "path_status": "EXISTS",
+      "protection_level": "CRITICAL_DO_NOT_TOUCH",
+      "reason": "Runtime Monitor默认在线checkpoint",
+      "rebuildable": false,
+      "rebuild_cost": "HIGH_OR_UNKNOWN",
+      "uniqueness": "UNIQUE_OR_NOT_YET_PROVEN_REDUNDANT",
+      "allowed_operations": [
+        "read-only inspection",
+        "targeted checksum",
+        "owner-approved backup"
+      ],
+      "forbidden_operations": [
+        "delete",
+        "move",
+        "rename",
+        "overwrite",
+        "rebuild in place"
+      ],
+      "future_move_prerequisites": [
+        "owner approval",
+        "consumer inventory",
+        "manifest",
+        "backup",
+        "rollback rehearsal"
+      ],
+      "migration_permission": "FORBIDDEN_UNTIL_MANUAL_REVIEW"
+    },
+    {
+      "protected_asset_id": "all_checkpoint_set",
+      "path": "operation_predictor/outputs/checkpoints",
+      "path_status": "EXISTS",
+      "protection_level": "PRESERVE_HIGH_PRIORITY",
+      "reason": "五个登记模型的唯一训练产物集合",
+      "rebuildable": false,
+      "rebuild_cost": "HIGH_OR_UNKNOWN",
+      "uniqueness": "UNIQUE_OR_NOT_YET_PROVEN_REDUNDANT",
+      "allowed_operations": [
+        "read-only inspection",
+        "targeted checksum",
+        "owner-approved backup"
+      ],
+      "forbidden_operations": [
+        "delete",
+        "move",
+        "rename",
+        "overwrite",
+        "rebuild in place"
+      ],
+      "future_move_prerequisites": [
+        "owner approval",
+        "consumer inventory",
+        "manifest",
+        "backup",
+        "rollback rehearsal"
+      ],
+      "migration_permission": "FORBIDDEN_UNTIL_MANUAL_REVIEW"
+    },
+    {
+      "protected_asset_id": "current_kernel_boot_assets",
+      "path": "/boot/vmlinuz-6.17.13-mglru-dual-observe-damon-20260715",
+      "path_status": "EXISTS",
+      "protection_level": "CRITICAL_DO_NOT_TOUCH",
+      "reason": "当前启动内核",
+      "rebuildable": false,
+      "rebuild_cost": "HIGH_OR_UNKNOWN",
+      "uniqueness": "UNIQUE_OR_NOT_YET_PROVEN_REDUNDANT",
+      "allowed_operations": [
+        "read-only inspection",
+        "targeted checksum",
+        "owner-approved backup"
+      ],
+      "forbidden_operations": [
+        "delete",
+        "move",
+        "rename",
+        "overwrite",
+        "rebuild in place"
+      ],
+      "future_move_prerequisites": [
+        "owner approval",
+        "consumer inventory",
+        "manifest",
+        "backup",
+        "rollback rehearsal"
+      ],
+      "migration_permission": "FORBIDDEN_UNTIL_MANUAL_REVIEW"
+    },
+    {
+      "protected_asset_id": "bindfix_fallback_boot_assets",
+      "path": "/boot/vmlinuz-6.17.13-mglru-dual-observe-bindfix-20260714_092525",
+      "path_status": "EXISTS",
+      "protection_level": "CRITICAL_DO_NOT_TOUCH",
+      "reason": "vmlinuz.old指向的回退内核",
+      "rebuildable": false,
+      "rebuild_cost": "HIGH_OR_UNKNOWN",
+      "uniqueness": "UNIQUE_OR_NOT_YET_PROVEN_REDUNDANT",
+      "allowed_operations": [
+        "read-only inspection",
+        "targeted checksum",
+        "owner-approved backup"
+      ],
+      "forbidden_operations": [
+        "delete",
+        "move",
+        "rename",
+        "overwrite",
+        "rebuild in place"
+      ],
+      "future_move_prerequisites": [
+        "owner approval",
+        "consumer inventory",
+        "manifest",
+        "backup",
+        "rollback rehearsal"
+      ],
+      "migration_permission": "FORBIDDEN_UNTIL_MANUAL_REVIEW"
+    },
+    {
+      "protected_asset_id": "canonical_kernel_source",
+      "path": "MGLRU-test/v0/mglru_kernel_transfer/linux-hwe-6.17-6.17.0",
+      "path_status": "EXISTS",
+      "protection_level": "CRITICAL_DO_NOT_TOUCH",
+      "reason": "当前App Bind与双模式Markov正式源码树",
+      "rebuildable": false,
+      "rebuild_cost": "HIGH_OR_UNKNOWN",
+      "uniqueness": "UNIQUE_OR_NOT_YET_PROVEN_REDUNDANT",
+      "allowed_operations": [
+        "read-only inspection",
+        "targeted checksum",
+        "owner-approved backup"
+      ],
+      "forbidden_operations": [
+        "delete",
+        "move",
+        "rename",
+        "overwrite",
+        "rebuild in place"
+      ],
+      "future_move_prerequisites": [
+        "owner approval",
+        "consumer inventory",
+        "manifest",
+        "backup",
+        "rollback rehearsal"
+      ],
+      "migration_permission": "FORBIDDEN_UNTIL_MANUAL_REVIEW"
+    },
+    {
+      "protected_asset_id": "kernel_configs",
+      "path": "/boot/config-6.17.13-mglru-dual-observe-damon-20260715",
+      "path_status": "EXISTS",
+      "protection_level": "PRESERVE_HIGH_PRIORITY",
+      "reason": "当前与回退构建配置基线",
+      "rebuildable": false,
+      "rebuild_cost": "HIGH_OR_UNKNOWN",
+      "uniqueness": "UNIQUE_OR_NOT_YET_PROVEN_REDUNDANT",
+      "allowed_operations": [
+        "read-only inspection",
+        "targeted checksum",
+        "owner-approved backup"
+      ],
+      "forbidden_operations": [
+        "delete",
+        "move",
+        "rename",
+        "overwrite",
+        "rebuild in place"
+      ],
+      "future_move_prerequisites": [
+        "owner approval",
+        "consumer inventory",
+        "manifest",
+        "backup",
+        "rollback rehearsal"
+      ],
+      "migration_permission": "FORBIDDEN_UNTIL_MANUAL_REVIEW"
+    },
+    {
+      "protected_asset_id": "cache_ext_tree",
+      "path": "cache_ext",
+      "path_status": "EXISTS",
+      "protection_level": "PRESERVE_HIGH_PRIORITY",
+      "reason": "混合研究代码与第三方来源，正式状态未完全确认",
+      "rebuildable": false,
+      "rebuild_cost": "HIGH_OR_UNKNOWN",
+      "uniqueness": "UNIQUE_OR_NOT_YET_PROVEN_REDUNDANT",
+      "allowed_operations": [
+        "read-only inspection",
+        "targeted checksum",
+        "owner-approved backup"
+      ],
+      "forbidden_operations": [
+        "delete",
+        "move",
+        "rename",
+        "overwrite",
+        "rebuild in place"
+      ],
+      "future_move_prerequisites": [
+        "owner approval",
+        "consumer inventory",
+        "manifest",
+        "backup",
+        "rollback rehearsal"
+      ],
+      "migration_permission": "FORBIDDEN_UNTIL_MANUAL_REVIEW"
+    },
+    {
+      "protected_asset_id": "harmony_raw_data",
+      "path": "mem/Harmony",
+      "path_status": "EXISTS",
+      "protection_level": "CRITICAL_DO_NOT_TOUCH",
+      "reason": "真机HDC/VMA数据可能不可重建",
+      "rebuildable": false,
+      "rebuild_cost": "HIGH_OR_UNKNOWN",
+      "uniqueness": "UNIQUE_OR_NOT_YET_PROVEN_REDUNDANT",
+      "allowed_operations": [
+        "read-only inspection",
+        "targeted checksum",
+        "owner-approved backup"
+      ],
+      "forbidden_operations": [
+        "delete",
+        "move",
+        "rename",
+        "overwrite",
+        "rebuild in place"
+      ],
+      "future_move_prerequisites": [
+        "owner approval",
+        "consumer inventory",
+        "manifest",
+        "backup",
+        "rollback rehearsal"
+      ],
+      "migration_permission": "FORBIDDEN_UNTIL_MANUAL_REVIEW"
+    },
+    {
+      "protected_asset_id": "mglru_runtime_validation",
+      "path": "outputs/mglru/dual_markov_bindfix_20260714_092525",
+      "path_status": "EXISTS",
+      "protection_level": "PRESERVE_HIGH_PRIORITY",
+      "reason": "observe-only和App Bind运行验收证据",
+      "rebuildable": false,
+      "rebuild_cost": "HIGH_OR_UNKNOWN",
+      "uniqueness": "UNIQUE_OR_NOT_YET_PROVEN_REDUNDANT",
+      "allowed_operations": [
+        "read-only inspection",
+        "targeted checksum",
+        "owner-approved backup"
+      ],
+      "forbidden_operations": [
+        "delete",
+        "move",
+        "rename",
+        "overwrite",
+        "rebuild in place"
+      ],
+      "future_move_prerequisites": [
+        "owner approval",
+        "consumer inventory",
+        "manifest",
+        "backup",
+        "rollback rehearsal"
+      ],
+      "migration_permission": "NOT_APPROVED"
+    },
+    {
+      "protected_asset_id": "damon_runtime_validation",
+      "path": "outputs/mglru/damon_runtime_validation_20260715",
+      "path_status": "EXISTS",
+      "protection_level": "PRESERVE_HIGH_PRIORITY",
+      "reason": "当前内核DAMON真机/运行态证据",
+      "rebuildable": false,
+      "rebuild_cost": "HIGH_OR_UNKNOWN",
+      "uniqueness": "UNIQUE_OR_NOT_YET_PROVEN_REDUNDANT",
+      "allowed_operations": [
+        "read-only inspection",
+        "targeted checksum",
+        "owner-approved backup"
+      ],
+      "forbidden_operations": [
+        "delete",
+        "move",
+        "rename",
+        "overwrite",
+        "rebuild in place"
+      ],
+      "future_move_prerequisites": [
+        "owner approval",
+        "consumer inventory",
+        "manifest",
+        "backup",
+        "rollback rehearsal"
+      ],
+      "migration_permission": "NOT_APPROVED"
+    },
+    {
+      "protected_asset_id": "automation_validation_evidence",
+      "path": "outputs/automation",
+      "path_status": "EXISTS",
+      "protection_level": "PRESERVE",
+      "reason": "语义自动化和GUI校准历史证据",
+      "rebuildable": "UNKNOWN",
+      "rebuild_cost": "HIGH_OR_UNKNOWN",
+      "uniqueness": "UNIQUE_OR_NOT_YET_PROVEN_REDUNDANT",
+      "allowed_operations": [
+        "read-only inspection",
+        "targeted checksum",
+        "owner-approved backup"
+      ],
+      "forbidden_operations": [
+        "delete",
+        "move",
+        "rename",
+        "overwrite",
+        "rebuild in place"
+      ],
+      "future_move_prerequisites": [
+        "owner approval",
+        "consumer inventory",
+        "manifest",
+        "backup",
+        "rollback rehearsal"
+      ],
+      "migration_permission": "NOT_APPROVED"
+    }
+  ]
+}

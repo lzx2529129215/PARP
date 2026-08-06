@@ -1,0 +1,11 @@
+{
+  "schema_version": 1,
+  "current_phase0": "refresh_20260731_114948",
+  "head": "244df022ff1d7e8db0298d718a4ae8f7ef45829c",
+  "baseline_directory": "docs/repository_baseline/refresh_20260731_114948",
+  "governance_output_directory": "outputs/repository_governance_20260731_114948",
+  "selection_reason": "Phase0 refresh completed from the intended repository HEAD with conservative protected-asset and unresolved-item retention.",
+  "safe_to_start_phase_1": true,
+  "safe_to_delete_anything": false,
+  "ready_for_apply": false
+}

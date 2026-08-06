@@ -1,0 +1,74 @@
+{
+  "rules": [
+    {
+      "app": "Firefox",
+      "gtk_app_id": ["firefox", "org.mozilla.firefox", "firefox.desktop"],
+      "wm_class": ["firefox", "Firefox"],
+      "process": ["firefox"],
+      "title_contains": ["Mozilla Firefox"]
+    },
+    {
+      "app": "LibreOffice",
+      "gtk_app_id": ["libreoffice", "org.libreoffice.LibreOffice"],
+      "wm_class": ["libreoffice", "soffice", "LibreOffice"],
+      "process": ["libreoffice", "soffice.bin", "oosplash", "scalc", "swriter", "simpress", "sdraw"],
+      "title_contains": ["LibreOffice"]
+    },
+    {
+      "app": "VLC",
+      "gtk_app_id": ["vlc"],
+      "wm_class": ["vlc", "Vlc"],
+      "process": ["vlc"],
+      "title_contains": ["VLC media player"]
+    },
+    {
+      "app": "GIMP",
+      "gtk_app_id": ["gimp"],
+      "wm_class": ["gimp", "Gimp"],
+      "process": ["gimp"],
+      "title_contains": ["GNU Image Manipulation Program", "GIMP"]
+    },
+    {
+      "app": "Audacity",
+      "gtk_app_id": ["audacity"],
+      "wm_class": ["audacity", "Audacity"],
+      "process": ["audacity"],
+      "title_contains": ["Audacity"]
+    },
+    {
+      "app": "Thunderbird",
+      "gtk_app_id": ["thunderbird", "org.mozilla.Thunderbird"],
+      "wm_class": ["thunderbird", "Thunderbird"],
+      "process": ["thunderbird"],
+      "title_contains": ["Mozilla Thunderbird", "Thunderbird"]
+    },
+    {
+      "app": "Telegram",
+      "gtk_app_id": ["telegramdesktop", "telegram-desktop", "org.telegram.desktop"],
+      "wm_class": ["telegramdesktop", "telegram-desktop", "TelegramDesktop"],
+      "process": ["telegram-desktop", "telegramdesktop", "telegram"],
+      "title_contains": ["Telegram"]
+    },
+    {
+      "app": "Evince",
+      "gtk_app_id": ["org.gnome.Evince", "evince"],
+      "wm_class": ["evince", "Evince"],
+      "process": ["evince"],
+      "title_contains": ["Document Viewer", "Evince"]
+    },
+    {
+      "app": "Files",
+      "gtk_app_id": ["org.gnome.Nautilus", "nautilus"],
+      "wm_class": ["nautilus", "Nautilus"],
+      "process": ["nautilus", "org.gnome.Nautilus"],
+      "title_contains": ["Files", "Home", "主文件夹"]
+    },
+    {
+      "app": "Calculator",
+      "gtk_app_id": ["org.gnome.Calculator", "gnome-calculator"],
+      "wm_class": ["gnome-calculator", "Calculator"],
+      "process": ["gnome-calculator", "gnome-calculator"] ,
+      "title_contains": ["Calculator", "计算器"]
+    }
+  ]
+}

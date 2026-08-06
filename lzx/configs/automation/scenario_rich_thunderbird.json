@@ -1,0 +1,24 @@
+{
+  "description": "Thunderbird 多场景：启动邮件窗口、搜索、文件夹导航、地址簿和日历切换；不发送邮件。",
+  "variables": {"TB_SEARCH_TEXT": "automation"},
+  "actions": [
+    {"type": "launch", "name": "thunderbird", "app_key": "THUNDERBIRD", "command": "thunderbird", "label": "TB_LAUNCH_MAIL"},
+    {"type": "wait_window", "name": "thunderbird", "app_key": "THUNDERBIRD", "class": "thunderbird|Thunderbird", "title": "Thunderbird|邮件", "timeout": 35, "label": "TB_WAIT_MAIL"},
+    {"type": "window_state", "name": "thunderbird", "app_key": "THUNDERBIRD", "class": "thunderbird|Thunderbird", "state": "maximize", "label": "TB_MAXIMIZE"},
+    {"type": "verify_foreground", "name": "thunderbird", "app_key": "THUNDERBIRD", "class": "thunderbird|Thunderbird", "label": "TB_VERIFY_MAIL"},
+    {"type": "hotkey", "name": "thunderbird", "key": "ctrl+k", "label": "TB_GLOBAL_SEARCH"},
+    {"type": "paste_text", "name": "thunderbird", "text": "${TB_SEARCH_TEXT}", "label": "TB_SEARCH_TEXT"},
+    {"type": "wait", "seconds": 3, "label": "TB_SEARCH_DWELL"},
+    {"type": "key", "name": "thunderbird", "key": "Escape", "label": "TB_CLOSE_SEARCH"},
+    {"type": "key", "name": "thunderbird", "key": "F6", "repeat": 3, "interval": 0.5, "label": "TB_CYCLE_MAIL_PANES"},
+    {"type": "key", "name": "thunderbird", "key": "Down", "repeat": 3, "interval": 0.3, "optional": true, "label": "TB_BROWSE_FOLDER_LIST"},
+    {"type": "scroll", "name": "thunderbird", "app_key": "THUNDERBIRD", "class": "thunderbird|Thunderbird", "direction": "down", "amount": 4, "optional": true, "label": "TB_SCROLL_MESSAGE_LIST"},
+    {"type": "hotkey", "name": "thunderbird", "key": "ctrl+shift+b", "optional": true, "label": "TB_OPEN_ADDRESS_BOOK"},
+    {"type": "wait", "seconds": 3, "label": "TB_ADDRESS_BOOK_DWELL"},
+    {"type": "hotkey", "name": "thunderbird", "key": "ctrl+shift+c", "optional": true, "label": "TB_OPEN_CALENDAR"},
+    {"type": "wait", "seconds": 3, "label": "TB_CALENDAR_DWELL"},
+    {"type": "switch", "name": "thunderbird", "app_key": "THUNDERBIRD", "class": "thunderbird|Thunderbird", "title": "Thunderbird|邮件", "command": "thunderbird", "label": "TB_RETURN_MAIL"},
+    {"type": "window_state", "name": "thunderbird", "app_key": "THUNDERBIRD", "class": "thunderbird|Thunderbird", "state": "minimize", "optional": true, "label": "TB_MINIMIZE"},
+    {"type": "window_state", "name": "thunderbird", "app_key": "THUNDERBIRD", "class": "thunderbird|Thunderbird", "state": "restore", "optional": true, "label": "TB_RESTORE"}
+  ]
+}

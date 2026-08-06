@@ -1,0 +1,20 @@
+{
+  "description": "真实桌面冒烟测试：不修改文档，只验证 WPS 窗口启动、快捷键、窗口状态和关闭。",
+  "actions": [
+    {"type": "launch", "name": "wps", "command": "wps", "label": "WPS_SMOKE_LAUNCH"},
+    {"type": "wait_window", "name": "wps", "class": "wps|wpsoffice", "timeout": 30, "label": "WPS_SMOKE_WAIT_WINDOW"},
+    {"type": "focus", "name": "wps", "class": "wps|wpsoffice", "label": "WPS_SMOKE_FOCUS"},
+    {"type": "window_state", "name": "wps", "class": "wps|wpsoffice", "state": "maximize", "label": "WPS_SMOKE_MAXIMIZE"},
+    {"type": "verify_foreground", "name": "wps", "class": "wps|wpsoffice", "label": "WPS_SMOKE_VERIFY_FOREGROUND_1"},
+    {"type": "key", "key": "ctrl+o", "name": "wps", "label": "WPS_SMOKE_OPEN_DIALOG"},
+    {"type": "wait", "seconds": 2},
+    {"type": "paste_text", "text": "剪贴板测试", "name": "wps", "label": "WPS_SMOKE_CLIPBOARD_PASTE"},
+    {"type": "key", "key": "Escape", "name": "wps", "label": "WPS_SMOKE_CANCEL_DIALOG"},
+    {"type": "window_state", "name": "wps", "class": "wps|wpsoffice", "state": "minimize", "label": "WPS_SMOKE_MINIMIZE"},
+    {"type": "wait", "seconds": 2},
+    {"type": "window_state", "name": "wps", "class": "wps|wpsoffice", "state": "restore", "label": "WPS_SMOKE_RESTORE"},
+    {"type": "window_state", "name": "wps", "class": "wps|wpsoffice", "state": "maximize", "label": "WPS_SMOKE_MAXIMIZE_2"},
+    {"type": "verify_foreground", "name": "wps", "class": "wps|wpsoffice", "label": "WPS_SMOKE_VERIFY_FOREGROUND_2"},
+    {"type": "close", "name": "wps", "class": "wps|wpsoffice", "process_names": ["wpsoffice", "wps", "wpp", "et", "wpspdf"], "path_contains": ["/opt/kingsoft/wps-office"], "wait_after_window_close": 2, "force_after_seconds": 3, "label": "WPS_SMOKE_CLOSE"}
+  ]
+}

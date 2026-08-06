@@ -1,0 +1,7 @@
+{
+  "description": "Temporary WPS player-control hover check.",
+  "actions": [
+    {"type": "shell", "command": "xdotool mousemove 187 602"},
+    {"type": "wait", "seconds": 2}
+  ]
+}

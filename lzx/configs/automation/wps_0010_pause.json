@@ -1,0 +1,11 @@
+{
+  "description": "Pause probe for WPS Daoke navigation.",
+  "actions": [
+    {"type": "launch", "name": "wps", "command": "wps"},
+    {"type": "wait_window", "name": "wps", "class": "wps|wpsoffice", "timeout": 30},
+    {"type": "window_state", "name": "wps", "class": "wps|wpsoffice", "state": "maximize"},
+    {"type": "click", "x": 220, "y": 335},
+    {"type": "wait", "seconds": 30},
+    {"type": "close", "name": "wps", "class": "wps|wpsoffice", "process_names": ["wpsoffice", "wps"], "path_contains": ["/opt/kingsoft/wps-office"], "force_after_seconds": 2}
+  ]
+}

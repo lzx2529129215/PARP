@@ -1,0 +1,235 @@
+{
+  "validation_mode": true,
+  "variables": {
+    "FIREFOX_PROFILE": "${HOME}/firefox_profiles/test1_gnome_search",
+    "EVINCE_DOCUMENT": "${PROJECT_ROOT}/samples/wps/document_0070.pdf",
+    "NAUTILUS_DIR": "${PROJECT_ROOT}"
+  },
+  "actions": [
+    {
+      "type": "launch",
+      "name": "FIREFOX",
+      "app_key": "FIREFOX",
+      "scope_name": "firefox",
+      "command": "env MOZ_ENABLE_WAYLAND=1 GDK_BACKEND=wayland firefox --new-instance --no-remote -profile \"${FIREFOX_PROFILE}\" --new-window about:blank"
+    },
+    {
+      "type": "launch",
+      "name": "LIBREOFFICE",
+      "app_key": "LIBREOFFICE",
+      "scope_name": "libreoffice",
+      "command": "env GDK_BACKEND=x11 libreoffice --writer"
+    },
+    {
+      "type": "launch",
+      "name": "VLC",
+      "app_key": "VLC",
+      "scope_name": "vlc",
+      "command": "env GDK_BACKEND=x11 vlc --no-video-title-show"
+    },
+    {
+      "type": "launch",
+      "name": "GIMP",
+      "app_key": "GIMP",
+      "scope_name": "gimp",
+      "command": "env GDK_BACKEND=x11 gimp"
+    },
+    {
+      "type": "launch",
+      "name": "AUDACITY",
+      "app_key": "AUDACITY",
+      "scope_name": "audacity",
+      "command": "env GDK_BACKEND=x11 audacity"
+    },
+    {
+      "type": "launch",
+      "name": "THUNDERBIRD",
+      "app_key": "THUNDERBIRD",
+      "scope_name": "thunderbird",
+      "command": "env GDK_BACKEND=x11 thunderbird --new-instance"
+    },
+    {
+      "type": "launch",
+      "name": "TELEGRAM",
+      "app_key": "TELEGRAM",
+      "scope_name": "telegram",
+      "command": "env GDK_BACKEND=x11 telegram-desktop"
+    },
+    {
+      "type": "launch",
+      "name": "EVINCE",
+      "app_key": "EVINCE",
+      "scope_name": "evince",
+      "command": "env GDK_BACKEND=x11 evince --new-window ${EVINCE_DOCUMENT}"
+    },
+    {
+      "type": "launch",
+      "name": "FILES",
+      "app_key": "FILES",
+      "scope_name": "files",
+      "command": "env GDK_BACKEND=x11 nautilus --new-window \"${NAUTILUS_DIR}\""
+    },
+    {
+      "type": "launch",
+      "name": "CALCULATOR",
+      "app_key": "CALCULATOR",
+      "scope_name": "calculator",
+      "command": "env GDK_BACKEND=x11 gnome-calculator"
+    },
+    {
+      "type": "wait",
+      "seconds": 15
+    },
+    {
+      "type": "gnome_search_focus",
+      "name": "LIBREOFFICE",
+      "app_key": "LIBREOFFICE",
+      "search_text": "LibreOffice",
+      "label": "TEST1_GNOME_FOCUS_LIBREOFFICE"
+    },
+    {
+      "type": "wait",
+      "seconds": 2
+    },
+    {
+      "type": "gnome_search_focus",
+      "name": "VLC",
+      "app_key": "VLC",
+      "search_text": "VLC",
+      "label": "TEST1_GNOME_FOCUS_VLC"
+    },
+    {
+      "type": "wait",
+      "seconds": 2
+    },
+    {
+      "type": "gnome_search_focus",
+      "name": "GIMP",
+      "app_key": "GIMP",
+      "search_text": "GIMP",
+      "label": "TEST1_GNOME_FOCUS_GIMP"
+    },
+    {
+      "type": "wait",
+      "seconds": 2
+    },
+    {
+      "type": "gnome_search_focus",
+      "name": "AUDACITY",
+      "app_key": "AUDACITY",
+      "search_text": "Audacity",
+      "label": "TEST1_GNOME_FOCUS_AUDACITY"
+    },
+    {
+      "type": "wait",
+      "seconds": 2
+    },
+    {
+      "type": "gnome_search_focus",
+      "name": "THUNDERBIRD",
+      "app_key": "THUNDERBIRD",
+      "search_text": "Thunderbird",
+      "label": "TEST1_GNOME_FOCUS_THUNDERBIRD"
+    },
+    {
+      "type": "wait",
+      "seconds": 2
+    },
+    {
+      "type": "gnome_search_focus",
+      "name": "TELEGRAM",
+      "app_key": "TELEGRAM",
+      "search_text": "Telegram",
+      "label": "TEST1_GNOME_FOCUS_TELEGRAM"
+    },
+    {
+      "type": "wait",
+      "seconds": 2
+    },
+    {
+      "type": "gnome_search_focus",
+      "name": "EVINCE",
+      "app_key": "EVINCE",
+      "search_text": "Document Viewer",
+      "label": "TEST1_GNOME_FOCUS_EVINCE"
+    },
+    {
+      "type": "wait",
+      "seconds": 2
+    },
+    {
+      "type": "gnome_search_focus",
+      "name": "FILES",
+      "app_key": "FILES",
+      "search_text": "Files",
+      "label": "TEST1_GNOME_FOCUS_FILES"
+    },
+    {
+      "type": "wait",
+      "seconds": 2
+    },
+    {
+      "type": "gnome_search_focus",
+      "name": "CALCULATOR",
+      "app_key": "CALCULATOR",
+      "search_text": "Calculator",
+      "label": "TEST1_GNOME_FOCUS_CALCULATOR"
+    },
+    {
+      "type": "wait",
+      "seconds": 2
+    },
+    {
+      "type": "gnome_search_focus",
+      "name": "FIREFOX",
+      "app_key": "FIREFOX",
+      "search_text": "Firefox",
+      "verify": false,
+      "label": "TEST1_GNOME_FOCUS_FIREFOX"
+    },
+    {
+      "type": "wait",
+      "seconds": 3
+    },
+    {
+      "type": "close",
+      "name": "CALCULATOR"
+    },
+    {
+      "type": "close",
+      "name": "FILES"
+    },
+    {
+      "type": "close",
+      "name": "EVINCE"
+    },
+    {
+      "type": "close",
+      "name": "TELEGRAM"
+    },
+    {
+      "type": "close",
+      "name": "THUNDERBIRD"
+    },
+    {
+      "type": "close",
+      "name": "AUDACITY"
+    },
+    {
+      "type": "close",
+      "name": "GIMP"
+    },
+    {
+      "type": "close",
+      "name": "VLC"
+    },
+    {
+      "type": "close",
+      "name": "LIBREOFFICE"
+    },
+    {
+      "type": "close",
+      "name": "FIREFOX"
+    }
+  ]
+}

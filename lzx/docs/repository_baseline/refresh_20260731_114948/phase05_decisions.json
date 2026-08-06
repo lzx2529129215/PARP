@@ -1,0 +1,32 @@
+{
+  "UR-003": {
+    "status": "RESOLVED",
+    "resolution": "KEEP_INDEPENDENT_NESTED_GIT_REPOSITORY",
+    "phase1_permission": "KEEP_IN_PLACE"
+  },
+  "UR-004": {
+    "status": "RESOLVED",
+    "resolution": "UPSTREAM_COMPONENT_WITH_LOCAL_MODIFICATIONS",
+    "phase1_permission": "KEEP_IN_PLACE"
+  },
+  "UR-013": {
+    "status": "RESOLVED",
+    "resolution": "INDEPENDENT_EXPERIMENT_DATASETS",
+    "linux_phase1_permission": "KEEP_IN_PLACE",
+    "windows_phase1_permission": "KEEP_IN_PLACE"
+  },
+  "ljw_tracer_new": {
+    "status": "RESOLVED",
+    "subsystem_role": "SIBLING_RESEARCH_SUBSYSTEM",
+    "owner": "ljw",
+    "relationship_to_lzx": "INDEPENDENT",
+    "phase1_permission": "KEEP_IN_PLACE",
+    "safe_to_refactor": false,
+    "safe_to_delete": false
+  },
+  "historical_build_config_paths": {
+    "status": "RESOLVED",
+    "resolution": "HISTORICAL_BUILD_PATH_REMOVED_INTENTIONALLY",
+    "phase1_permission": "KEEP_IN_PLACE"
+  }
+}

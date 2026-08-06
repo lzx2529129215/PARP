@@ -1,0 +1,60 @@
+{
+  "history_len": 5,
+  "duration_cap_s": 600.0,
+  "max_session_gap_s": 3600.0,
+  "anchor_mode": "event_plus_periodic",
+  "periodic_anchor_s": 180.0,
+  "debug_dwell_buckets_enabled": false,
+  "num_apps": 12,
+  "pad_id": 10,
+  "unknown_id": 11,
+  "horizons": [
+    3,
+    5,
+    10
+  ],
+  "split": "time_ordered_70_15_15",
+  "source": "modified LSApp",
+  "source_kind": "app_events_csv",
+  "source_path": "operation_predictor/data/test1/raw/lsapp/app_events.csv",
+  "label_mode": "both_persistence_and_switch",
+  "labels_persistence": [
+    "labels_3",
+    "labels_5",
+    "labels_10"
+  ],
+  "labels_switch": [
+    "labels_next_3",
+    "labels_next_5",
+    "labels_next_10"
+  ],
+  "no_repeated_token_for_duration": true,
+  "rows_loaded": 1674111,
+  "segments": 185876,
+  "samples": 577636,
+  "num_samples": 577636,
+  "train_samples": 404345,
+  "val_samples": 86645,
+  "test_samples": 86646,
+  "duration_stats": {
+    "min": 1.0,
+    "p50": 142.0,
+    "p90": 1980.0,
+    "p99": 5760.0,
+    "max": 25339.0
+  },
+  "users": 287,
+  "bad_timestamps": 0,
+  "last_segment_fallback_1s": 287,
+  "session_gap_cut_count": 8728,
+  "session_count": 9015,
+  "foreground_transition_anchor_count": 185876,
+  "periodic_refresh_anchor_count": 391760,
+  "dwell_bucket_cross_anchor_count": 0,
+  "current_app_in_labels_3_ratio": 1.0,
+  "non_empty_labels_next_3_ratio": 0.3061807089585829,
+  "current_app_in_labels_5_ratio": 1.0,
+  "non_empty_labels_next_5_ratio": 0.38004729622114963,
+  "current_app_in_labels_10_ratio": 1.0,
+  "non_empty_labels_next_10_ratio": 0.5103542715481723
+}

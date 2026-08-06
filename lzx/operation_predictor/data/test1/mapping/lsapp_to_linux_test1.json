@@ -1,0 +1,151 @@
+{
+  "schema_version": "test1-v1",
+  "description": "Map LSApp mobile apps to the installed Linux test1 whitelist by functional domain.",
+  "target_vocab": "data/vocab/test1/app_vocab.json",
+  "unmapped_policy": "keep_original_then_drop_during_prepare",
+  "mapping_rules": [
+    {
+      "mapped_app": "Firefox",
+      "confidence": "high",
+      "reason": "Desktop browser/search/web-service carrier on Linux.",
+      "lsapp_apps": [
+        "Google Chrome",
+        "Samsung Internet Browser",
+        "Brave Browser",
+        "Microsoft Bing Search",
+        "Google"
+      ]
+    },
+    {
+      "mapped_app": "Firefox",
+      "confidence": "medium",
+      "reason": "The corresponding service is normally used through a Linux web browser when no native client is in the whitelist.",
+      "lsapp_apps": [
+        "Facebook",
+        "Instagram",
+        "Twitter",
+        "Reddit",
+        "Pinterest",
+        "Quora",
+        "Maps",
+        "Amazon Shopping",
+        "OfferUp",
+        "eBay",
+        "Walmart",
+        "PayPal Mobile Cash",
+        "Robinhood",
+        "Samsung Pay",
+        "Google Play Store"
+      ]
+    },
+    {
+      "mapped_app": "VLC",
+      "confidence": "high",
+      "reason": "Video playback/streaming domain; VLC is the installed Linux video application.",
+      "lsapp_apps": [
+        "Swagbucks Watch (TV)",
+        "YouTube",
+        "Netflix",
+        "Hulu",
+        "Movie Play Box",
+        "EntertaiNow"
+      ]
+    },
+    {
+      "mapped_app": "Audacity",
+      "confidence": "medium",
+      "reason": "Music/audio/podcast domain; Audacity is the installed Linux audio application.",
+      "lsapp_apps": [
+        "Spotify Music",
+        "Pandora Music",
+        "Google Play Music",
+        "Podcast Addict"
+      ]
+    },
+    {
+      "mapped_app": "GIMP",
+      "confidence": "high",
+      "reason": "Photo/image capture, gallery, and raster editing domain.",
+      "lsapp_apps": [
+        "Samsung Gallery",
+        "Camera",
+        "Faceu",
+        "Google Photos",
+        "Pixlr",
+        "Flickr"
+      ]
+    },
+    {
+      "mapped_app": "Thunderbird",
+      "confidence": "high",
+      "reason": "Email client domain; Thunderbird is the installed Linux mail application.",
+      "lsapp_apps": [
+        "Gmail",
+        "Yahoo Mail",
+        "Microsoft Outlook",
+        "Samsung Email",
+        "AOL"
+      ]
+    },
+    {
+      "mapped_app": "Telegram",
+      "confidence": "high",
+      "reason": "Instant messaging/chat domain; Telegram Desktop is the installed Linux messaging application.",
+      "lsapp_apps": [
+        "Facebook Messenger",
+        "Messages",
+        "Verizon Messages",
+        "Messaging",
+        "Telegram",
+        "Telegram X",
+        "Hangouts",
+        "WeChat",
+        "Discord",
+        "imo",
+        "Messenger Lite",
+        "Kik",
+        "TextNow",
+        "Text One",
+        "Badoo"
+      ]
+    },
+    {
+      "mapped_app": "LibreOffice",
+      "confidence": "medium",
+      "reason": "Productivity/note-taking domain; LibreOffice is the installed Linux office suite.",
+      "lsapp_apps": [
+        "Samsung Notes",
+        "Calendar"
+      ]
+    },
+    {
+      "mapped_app": "Evince",
+      "confidence": "medium",
+      "reason": "Reading/document-viewing domain; Evince is the installed Linux document reader.",
+      "lsapp_apps": [
+        "Flipboard Briefing"
+      ]
+    },
+    {
+      "mapped_app": "Files",
+      "confidence": "high",
+      "reason": "Cloud/file management and storage domain; Nautilus is exposed as the Linux Files app.",
+      "lsapp_apps": [
+        "Google Drive",
+        "MAX Cleaner",
+        "Clean Master"
+      ]
+    },
+    {
+      "mapped_app": "Calculator",
+      "confidence": "high",
+      "reason": "Small utility/calculation/time/measurement domain.",
+      "lsapp_apps": [
+        "Calculator",
+        "Clock",
+        "Calorie Counter",
+        "DigiHUD Pro Speedometer"
+      ]
+    }
+  ]
+}

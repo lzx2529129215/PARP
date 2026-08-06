@@ -1,0 +1,39 @@
+{
+  "host_pytest": {
+    "status": "PASS",
+    "result": "138 passed, 7 subtests passed",
+    "environment": "host-only",
+    "evidence": "phase0_refresh/raw/evidence/pytest_host.log"
+  },
+  "harmony_pytest": {
+    "status": "PASS",
+    "result": "92 passed, 3 skipped",
+    "environment": "host-only; device cases skipped",
+    "evidence": "phase0_refresh/raw/evidence/pytest_harmony.log"
+  },
+  "python_syntax": {
+    "status": "PASS",
+    "result": "208 files",
+    "evidence": "phase0_refresh/raw/evidence/python_compileall.log"
+  },
+  "shell_syntax": {
+    "status": "PASS",
+    "result": "30 files",
+    "evidence": "phase0_refresh/raw/evidence/shell_syntax.log"
+  },
+  "json_parse": {
+    "status": "PASS",
+    "result": "28 files",
+    "evidence": "phase0_refresh/raw/evidence/json_validation.log"
+  },
+  "powershell": {
+    "status": "NOT_RUN_ENVIRONMENT_GATED",
+    "result": "pwsh not installed",
+    "evidence": "phase0_refresh/raw/evidence/pwsh_exit_code.txt"
+  },
+  "hdc_gui_root_kernel_training": {
+    "status": "NOT_RUN_ENVIRONMENT_GATED",
+    "result": "not executed by policy",
+    "evidence": "task constraints"
+  }
+}

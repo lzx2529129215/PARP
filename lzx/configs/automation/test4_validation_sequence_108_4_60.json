@@ -1,0 +1,202 @@
+{
+  "description": "Test4 continuous v3 split-derived foreground sequence; bootstrap is unscored.",
+  "validation_mode": true,
+  "variables": {
+    "FIREFOX_PROFILE": "${HOME}/firefox_profiles/test1",
+    "LIBREOFFICE_PROFILE": "${PROJECT_ROOT}/outputs/runtime_monitor/test1-libreoffice-profile",
+    "FIREFOX_BIN": "${PROJECT_ROOT}/tools/firefox/firefox/firefox",
+    "EVINCE_DOCUMENT": "${PROJECT_ROOT}/samples/wps/document_0070.pdf",
+    "NAUTILUS_DIR": "${PROJECT_ROOT}"
+  },
+  "actions": [
+    {
+      "type": "shell",
+      "name": "firefox",
+      "app_key": "FIREFOX",
+      "command": "mkdir -p \"${FIREFOX_PROFILE}\" && env -u WAYLAND_DISPLAY MOZ_ENABLE_WAYLAND=0 GDK_BACKEND=x11 \"${FIREFOX_BIN}\" --new-instance --no-remote -profile \"${FIREFOX_PROFILE}\" --new-window about:blank",
+      "label": "TEST4_BOOTSTRAP_OPEN_FIREFOX",
+      "optional": true
+    },
+    {
+      "type": "launch",
+      "name": "thunderbird",
+      "app_key": "THUNDERBIRD",
+      "command": "thunderbird --new-instance",
+      "label": "TEST4_BOOTSTRAP_OPEN_THUNDERBIRD",
+      "optional": true
+    },
+    {
+      "type": "wait",
+      "seconds": 3,
+      "label": "TEST4_BOOTSTRAP_NOT_SCORED"
+    },
+    {
+      "type": "switch",
+      "name": "firefox",
+      "app_key": "FIREFOX",
+      "class": "firefox|Firefox",
+      "title": "Mozilla Firefox|about:blank",
+      "label": "TEST4_VAL_00_FOREGROUND_FIREFOX",
+      "optional": true
+    },
+    {
+      "type": "wait",
+      "seconds": 1,
+      "label": "TEST4_VAL_00_DWELL_1S"
+    },
+    {
+      "type": "launch",
+      "name": "telegram",
+      "app_key": "TELEGRAM",
+      "command": "telegram-desktop",
+      "label": "TEST4_VAL_00_FIRST_LAUNCH_TELEGRAM",
+      "optional": true
+    },
+    {
+      "type": "wait",
+      "seconds": 5,
+      "label": "TEST4_VAL_01_DWELL_5S"
+    },
+    {
+      "type": "switch",
+      "name": "firefox",
+      "app_key": "FIREFOX",
+      "class": "firefox|Firefox",
+      "title": "Mozilla Firefox|about:blank",
+      "label": "TEST4_VAL_01_FOREGROUND_FIREFOX",
+      "optional": true
+    },
+    {
+      "type": "wait",
+      "seconds": 1,
+      "label": "TEST4_VAL_02_DWELL_1S"
+    },
+    {
+      "type": "switch",
+      "name": "telegram",
+      "app_key": "TELEGRAM",
+      "class": "telegramdesktop|TelegramDesktop|telegram-desktop",
+      "title": "Telegram",
+      "label": "TEST4_VAL_02_FOREGROUND_TELEGRAM",
+      "optional": true
+    },
+    {
+      "type": "wait",
+      "seconds": 5,
+      "label": "TEST4_VAL_03_DWELL_5S"
+    },
+    {
+      "type": "switch",
+      "name": "firefox",
+      "app_key": "FIREFOX",
+      "class": "firefox|Firefox",
+      "title": "Mozilla Firefox|about:blank",
+      "label": "TEST4_VAL_03_FOREGROUND_FIREFOX",
+      "optional": true
+    },
+    {
+      "type": "wait",
+      "seconds": 1,
+      "label": "TEST4_VAL_04_DWELL_1S"
+    },
+    {
+      "type": "switch",
+      "name": "telegram",
+      "app_key": "TELEGRAM",
+      "class": "telegramdesktop|TelegramDesktop|telegram-desktop",
+      "title": "Telegram",
+      "label": "TEST4_VAL_04_FOREGROUND_TELEGRAM",
+      "optional": true
+    },
+    {
+      "type": "wait",
+      "seconds": 3,
+      "label": "TEST4_VAL_05_DWELL_3S"
+    },
+    {
+      "type": "switch",
+      "name": "firefox",
+      "app_key": "FIREFOX",
+      "class": "firefox|Firefox",
+      "title": "Mozilla Firefox|about:blank",
+      "label": "TEST4_VAL_05_FOREGROUND_FIREFOX",
+      "optional": true
+    },
+    {
+      "type": "wait",
+      "seconds": 1,
+      "label": "TEST4_VAL_06_DWELL_1S"
+    },
+    {
+      "type": "switch",
+      "name": "telegram",
+      "app_key": "TELEGRAM",
+      "class": "telegramdesktop|TelegramDesktop|telegram-desktop",
+      "title": "Telegram",
+      "label": "TEST4_VAL_06_FOREGROUND_TELEGRAM",
+      "optional": true
+    },
+    {
+      "type": "wait",
+      "seconds": 2,
+      "label": "TEST4_VAL_07_DWELL_2S"
+    },
+    {
+      "type": "switch",
+      "name": "firefox",
+      "app_key": "FIREFOX",
+      "class": "firefox|Firefox",
+      "title": "Mozilla Firefox|about:blank",
+      "label": "TEST4_VAL_07_FOREGROUND_FIREFOX",
+      "optional": true
+    },
+    {
+      "type": "wait",
+      "seconds": 1,
+      "label": "TEST4_VAL_08_DWELL_1S"
+    },
+    {
+      "type": "switch",
+      "name": "telegram",
+      "app_key": "TELEGRAM",
+      "class": "telegramdesktop|TelegramDesktop|telegram-desktop",
+      "title": "Telegram",
+      "label": "TEST4_VAL_08_FOREGROUND_TELEGRAM",
+      "optional": true
+    },
+    {
+      "type": "close",
+      "name": "thunderbird",
+      "app_key": "THUNDERBIRD",
+      "process_names": [
+        "thunderbird"
+      ],
+      "force_after_seconds": 2,
+      "optional": true,
+      "label": "TEST1_CLOSE_THUNDERBIRD"
+    },
+    {
+      "type": "close",
+      "name": "telegram",
+      "app_key": "TELEGRAM",
+      "process_names": [
+        "telegram-desktop",
+        "telegramdesktop"
+      ],
+      "force_after_seconds": 2,
+      "optional": true,
+      "label": "TEST1_CLOSE_TELEGRAM"
+    },
+    {
+      "type": "close",
+      "name": "firefox",
+      "app_key": "FIREFOX",
+      "cmdline_contains": [
+        "${FIREFOX_PROFILE}"
+      ],
+      "force_after_seconds": 3,
+      "optional": true,
+      "label": "TEST1_CLOSE_FIREFOX"
+    }
+  ]
+}

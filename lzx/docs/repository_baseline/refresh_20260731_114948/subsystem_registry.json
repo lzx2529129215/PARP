@@ -1,0 +1,247 @@
+{
+  "count": 12,
+  "subsystems": [
+    {
+      "subsystem_id": "operation_predictor",
+      "owner": "lzx",
+      "role": "APPLICATION_PREDICTION",
+      "root_path": "operation_predictor",
+      "canonical_entrypoints": [
+        "operation_predictor/v3/infer/infer_app_lstm_duration.py"
+      ],
+      "inputs": [
+        "LSApp mapped events",
+        "vocabularies"
+      ],
+      "outputs": [
+        "operation_predictor/outputs"
+      ],
+      "dependencies": [
+        "PyTorch",
+        "LSApp"
+      ],
+      "protected_scope": [
+        "checkpoints",
+        "processed datasets"
+      ],
+      "phase1_permission": "KEEP_IN_PLACE"
+    },
+    {
+      "subsystem_id": "runtime_monitor",
+      "owner": "lzx",
+      "role": "RUNTIME_MONITORING",
+      "root_path": "runtime_monitor",
+      "canonical_entrypoints": [
+        "runtime_monitor/monitor.py"
+      ],
+      "inputs": [
+        "desktop events",
+        "cgroup counters",
+        "checkpoint"
+      ],
+      "outputs": [
+        "outputs/runtime_monitor"
+      ],
+      "dependencies": [
+        "Python",
+        "systemd user slice"
+      ],
+      "protected_scope": [
+        "runtime validation sessions"
+      ],
+      "phase1_permission": "KEEP_IN_PLACE"
+    },
+    {
+      "subsystem_id": "automation",
+      "owner": "lzx",
+      "role": "HOST_AUTOMATION",
+      "root_path": "automation",
+      "canonical_entrypoints": [
+        "automation/run_automation.sh",
+        "automation/app_automation.py"
+      ],
+      "inputs": [
+        "scenario JSON"
+      ],
+      "outputs": [
+        "outputs/automation"
+      ],
+      "dependencies": [
+        "desktop session"
+      ],
+      "protected_scope": [
+        "semantic smoke evidence"
+      ],
+      "phase1_permission": "KEEP_IN_PLACE"
+    },
+    {
+      "subsystem_id": "harmony_memory_analysis",
+      "owner": "lzx",
+      "role": "HARMONY_COLLECTION_AND_VMA_ANALYSIS",
+      "root_path": "mem/Harmony",
+      "canonical_entrypoints": [
+        "mem/Harmony/v6-Homeny/run_wps_workload.py",
+        "mem/Harmony/v6-Homeny/run_fixed_window_experiment.py"
+      ],
+      "inputs": [
+        "HDC raw data",
+        "device metadata"
+      ],
+      "outputs": [
+        "mem/Harmony/v6-Homeny/hdc_out",
+        "fixed-window reports"
+      ],
+      "dependencies": [
+        "HDC environment",
+        "Python"
+      ],
+      "protected_scope": [
+        "v6-Homeny/hdc_out",
+        "v6-python/hdc_out"
+      ],
+      "phase1_permission": "KEEP_IN_PLACE"
+    },
+    {
+      "subsystem_id": "mglru_kernel",
+      "owner": "lzx",
+      "role": "KERNEL_SOURCE_AND_VALIDATION",
+      "root_path": "MGLRU-test",
+      "canonical_entrypoints": [],
+      "inputs": [
+        "kernel source/config"
+      ],
+      "outputs": [
+        "boot assets",
+        "outputs/mglru"
+      ],
+      "dependencies": [
+        "Linux kernel toolchain"
+      ],
+      "protected_scope": [
+        "MGLRU-test/v0/mglru_kernel_transfer/linux-hwe-6.17-6.17.0"
+      ],
+      "phase1_permission": "KEEP_IN_PLACE"
+    },
+    {
+      "subsystem_id": "cache_ext",
+      "owner": "external_upstream_with_lzx_local_changes",
+      "role": "EXTERNAL_COMPONENT",
+      "root_path": "cache_ext",
+      "canonical_entrypoints": [],
+      "inputs": [
+        "upstream source",
+        "local diff"
+      ],
+      "outputs": [],
+      "dependencies": [
+        "Linux kernel interfaces"
+      ],
+      "protected_scope": [
+        "entire tree"
+      ],
+      "phase1_permission": "KEEP_IN_PLACE"
+    },
+    {
+      "subsystem_id": "shared_config_schema",
+      "owner": "lzx",
+      "role": "CONFIG_AND_SCHEMA",
+      "root_path": "configs",
+      "canonical_entrypoints": [],
+      "inputs": [
+        "scenario/vocab/config files"
+      ],
+      "outputs": [],
+      "dependencies": [],
+      "protected_scope": [
+        "runtime config"
+      ],
+      "phase1_permission": "KEEP_IN_PLACE"
+    },
+    {
+      "subsystem_id": "docs_design",
+      "owner": "project",
+      "role": "DOCUMENTATION_AND_DESIGN",
+      "root_path": "doc",
+      "canonical_entrypoints": [],
+      "inputs": [
+        "project decisions"
+      ],
+      "outputs": [
+        "design docs"
+      ],
+      "dependencies": [],
+      "protected_scope": [],
+      "phase1_permission": "CREATE_INDEX_ONLY"
+    },
+    {
+      "subsystem_id": "outputs",
+      "owner": "project",
+      "role": "GENERATED_AND_HISTORICAL_OUTPUTS",
+      "root_path": "outputs",
+      "canonical_entrypoints": [],
+      "inputs": [
+        "all runtime pipelines"
+      ],
+      "outputs": [
+        "sessions/reports/bundles"
+      ],
+      "dependencies": [],
+      "protected_scope": [
+        "unique sessions",
+        "validation evidence"
+      ],
+      "phase1_permission": "CONDITIONAL_WHITELIST_ONLY"
+    },
+    {
+      "subsystem_id": "lsapp_nested_repository",
+      "owner": "external_dataset",
+      "role": "INDEPENDENT_NESTED_GIT_REPOSITORY",
+      "root_path": "operation_predictor/data/raw/datasets/LSApp",
+      "canonical_entrypoints": [],
+      "inputs": [
+        "LSApp original data"
+      ],
+      "outputs": [
+        "mapped app events"
+      ],
+      "dependencies": [],
+      "protected_scope": [
+        "entire nested worktree",
+        "9 existing modifications"
+      ],
+      "phase1_permission": "KEEP_IN_PLACE"
+    },
+    {
+      "subsystem_id": "ljw_tracer_new",
+      "owner": "ljw",
+      "role": "SIBLING_RESEARCH_SUBSYSTEM",
+      "root_path": "../ljw/tracer_new",
+      "canonical_entrypoints": [],
+      "inputs": [
+        "tracer runtime"
+      ],
+      "outputs": [],
+      "dependencies": [
+        "BPF/cgroup research environment"
+      ],
+      "protected_scope": [
+        "entire sibling subsystem"
+      ],
+      "phase1_permission": "KEEP_IN_PLACE"
+    },
+    {
+      "subsystem_id": "project_test_cache",
+      "owner": "generated",
+      "role": "CACHE",
+      "root_path": ".pytest_cache",
+      "canonical_entrypoints": [],
+      "inputs": [
+        "pytest"
+      ],
+      "outputs": [],
+      "dependencies": [],
+      "protected_scope": [],
+      "phase1_permission": "CREATE_INDEX_ONLY"
+    }
+  ]
+}

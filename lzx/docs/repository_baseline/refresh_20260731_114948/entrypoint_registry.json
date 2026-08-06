@@ -1,0 +1,33 @@
+{
+  "count": 4,
+  "entrypoints": [
+    {
+      "entrypoint_id": "runtime_monitor_main",
+      "path": "runtime_monitor/monitor.py",
+      "role": "CANONICAL",
+      "subsystem_id": "runtime_monitor",
+      "confirmed_unchanged_since_old_phase0": true
+    },
+    {
+      "entrypoint_id": "runtime_monitor_online_compat",
+      "path": "runtime_monitor/online_monitor.py",
+      "role": "COMPATIBILITY",
+      "subsystem_id": "runtime_monitor",
+      "confirmed_unchanged_since_old_phase0": true
+    },
+    {
+      "entrypoint_id": "automation_host_wrapper",
+      "path": "automation/run_automation.sh",
+      "role": "WRAPPER",
+      "subsystem_id": "automation",
+      "confirmed_unchanged_since_old_phase0": true
+    },
+    {
+      "entrypoint_id": "automation_python_main",
+      "path": "automation/app_automation.py",
+      "role": "CANONICAL",
+      "subsystem_id": "automation",
+      "confirmed_unchanged_since_old_phase0": true
+    }
+  ]
+}

@@ -1,0 +1,107 @@
+{
+  "validation_mode": true,
+  "keep_alive_after_s": 60,
+  "actions": [
+    {
+      "type": "shell",
+      "label": "FILES_VALIDATION_SETUP",
+      "command": "mkdir -p /home/lzx/Desktop/huawei/huawei_mem/lzx/outputs/automation_validation/files_root/subdir_a /home/lzx/Desktop/huawei/huawei_mem/lzx/outputs/automation_validation/files_root/subdir_b && printf 'validation file access workload\\n' > /home/lzx/Desktop/huawei/huawei_mem/lzx/outputs/automation_validation/files_root/sample.txt && printf 'nested workload\\n' > /home/lzx/Desktop/huawei/huawei_mem/lzx/outputs/automation_validation/files_root/subdir_a/nested.txt"
+    },
+    {
+      "type": "shell",
+      "name": "files",
+      "label": "FILES_LAUNCH_VALIDATION_DIR",
+      "command": "nautilus --new-window /home/lzx/Desktop/huawei/huawei_mem/lzx/outputs/automation_validation/files_root",
+      "optional": true
+    },
+    {
+      "type": "wait",
+      "seconds": 5,
+      "name": "files",
+      "label": "FILES_WAIT_LAUNCH"
+    },
+    {
+      "type": "repeat",
+      "times": 3,
+      "actions": [
+        {
+          "type": "switch",
+          "name": "files",
+          "class": "org.gnome.Nautilus|Nautilus|nautilus",
+          "title": "files_root|文件|Home|主文件夹",
+          "command": "nautilus --new-window /home/lzx/Desktop/huawei/huawei_mem/lzx/outputs/automation_validation/files_root",
+          "optional": true,
+          "label": "FILES_FOCUS_ROOT"
+        },
+        {
+          "type": "key",
+          "name": "files",
+          "key": "ctrl+l",
+          "label": "FILES_LOCATION_BAR"
+        },
+        {
+          "type": "type",
+          "name": "files",
+          "text": "/home/lzx/Desktop/huawei/huawei_mem/lzx/outputs/automation_validation/files_root/subdir_a",
+          "delay_ms": 1,
+          "label": "FILES_TYPE_SUBDIR"
+        },
+        {
+          "type": "key",
+          "name": "files",
+          "key": "Return",
+          "label": "FILES_ENTER_SUBDIR"
+        },
+        {
+          "type": "wait",
+          "seconds": 4,
+          "name": "files",
+          "label": "FILES_WAIT_SUBDIR"
+        },
+        {
+          "type": "key",
+          "name": "files",
+          "key": "alt+Up",
+          "label": "FILES_PARENT_DIR"
+        },
+        {
+          "type": "wait",
+          "seconds": 3,
+          "name": "files",
+          "label": "FILES_WAIT_PARENT"
+        },
+        {
+          "type": "key",
+          "name": "files",
+          "key": "ctrl+f",
+          "label": "FILES_SEARCH_START"
+        },
+        {
+          "type": "type",
+          "name": "files",
+          "text": "sample",
+          "delay_ms": 1,
+          "label": "FILES_SEARCH_TEXT"
+        },
+        {
+          "type": "wait",
+          "seconds": 3,
+          "name": "files",
+          "label": "FILES_WAIT_SEARCH"
+        },
+        {
+          "type": "key",
+          "name": "files",
+          "key": "Escape",
+          "label": "FILES_SEARCH_CLOSE"
+        },
+        {
+          "type": "wait",
+          "seconds": 2,
+          "name": "files",
+          "label": "FILES_LOOP_PAUSE"
+        }
+      ]
+    }
+  ]
+}

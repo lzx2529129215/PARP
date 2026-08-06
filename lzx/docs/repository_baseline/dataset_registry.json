@@ -1,0 +1,343 @@
+{
+  "schema_version": "repository-dataset-registry-v1",
+  "generated_at": "2026-07-17T20:13:11.560759+08:00",
+  "count": 14,
+  "assets": [
+    {
+      "asset_id": "lsapp_original_nested",
+      "path": "operation_predictor/data/raw/datasets/LSApp",
+      "path_status": "EXISTS",
+      "category": "UNIQUE_IRREPRODUCIBLE",
+      "producer": "LSApp upstream/nested repository",
+      "consumer": "dataset builders",
+      "source_code": [],
+      "config": [],
+      "git_commit": "d11f626d7d33ceab2b82c1906b0959a204d0d55c",
+      "schema": "见schema_inventory与相邻metadata",
+      "size_bytes": 2498242856,
+      "checksum_policy": "METADATA_ONLY",
+      "reproduction_command": "UNRESOLVED_OR_REQUIRES_EXPLICIT_OWNER_APPROVAL",
+      "reproducibility": "UNIQUE_IRREPRODUCIBLE",
+      "validation": [
+        "outputs/repository_audit_20260717_175447/tables/artifacts.csv"
+      ],
+      "protection_level": "PRESERVE_HIGH_PRIORITY",
+      "migration_permission": "NOT_APPROVED",
+      "notes": [
+        "Phase 0不移动、不压缩、不重建"
+      ]
+    },
+    {
+      "asset_id": "lsapp_mapped_app_events",
+      "path": "operation_predictor/data/raw/lsapp/app_events.csv",
+      "path_status": "EXISTS",
+      "category": "REPRODUCIBLE_EXPENSIVE",
+      "producer": "LSApp mapping pipeline",
+      "consumer": "duration dataset builder",
+      "source_code": [],
+      "config": [],
+      "git_commit": "d11f626d7d33ceab2b82c1906b0959a204d0d55c",
+      "schema": "见schema_inventory与相邻metadata",
+      "size_bytes": 125237247,
+      "checksum_policy": "FULL",
+      "reproduction_command": "见对应README和producer",
+      "reproducibility": "REPRODUCIBLE_EXPENSIVE",
+      "validation": [
+        "outputs/repository_audit_20260717_175447/tables/artifacts.csv"
+      ],
+      "protection_level": "PRESERVE_HIGH_PRIORITY",
+      "migration_permission": "NOT_APPROVED",
+      "notes": [
+        "Phase 0不移动、不压缩、不重建"
+      ]
+    },
+    {
+      "asset_id": "duration_dataset_original",
+      "path": "operation_predictor/data/processed/app_lstm_duration",
+      "path_status": "EXISTS",
+      "category": "REPRODUCIBLE_EXPENSIVE",
+      "producer": "build_app_dataset_duration.py",
+      "consumer": "duration persistence model",
+      "source_code": [],
+      "config": [],
+      "git_commit": "d11f626d7d33ceab2b82c1906b0959a204d0d55c",
+      "schema": "见schema_inventory与相邻metadata",
+      "size_bytes": 439285251,
+      "checksum_policy": "MANIFEST_ONLY",
+      "reproduction_command": "见对应README和producer",
+      "reproducibility": "REPRODUCIBLE_EXPENSIVE",
+      "validation": [
+        "outputs/repository_audit_20260717_175447/tables/artifacts.csv"
+      ],
+      "protection_level": "PRESERVE",
+      "migration_permission": "NOT_APPROVED",
+      "notes": [
+        "Phase 0不移动、不压缩、不重建"
+      ]
+    },
+    {
+      "asset_id": "duration_switch_gap3600_periodic180",
+      "path": "operation_predictor/data/processed/app_lstm_duration_gap3600_periodic180",
+      "path_status": "EXISTS",
+      "category": "REPRODUCIBLE_EXPENSIVE",
+      "producer": "build_app_dataset_duration.py",
+      "consumer": "active duration switch model",
+      "source_code": [],
+      "config": [],
+      "git_commit": "d11f626d7d33ceab2b82c1906b0959a204d0d55c",
+      "schema": "见schema_inventory与相邻metadata",
+      "size_bytes": 518030226,
+      "checksum_policy": "MANIFEST_ONLY",
+      "reproduction_command": "见对应README和producer",
+      "reproducibility": "REPRODUCIBLE_EXPENSIVE",
+      "validation": [
+        "outputs/repository_audit_20260717_175447/tables/artifacts.csv"
+      ],
+      "protection_level": "PRESERVE_HIGH_PRIORITY",
+      "migration_permission": "NOT_APPROVED",
+      "notes": [
+        "Phase 0不移动、不压缩、不重建"
+      ]
+    },
+    {
+      "asset_id": "duration_app_vocab",
+      "path": "operation_predictor/data/vocab/app_vocab_duration.json",
+      "path_status": "EXISTS",
+      "category": "REPRODUCIBLE_CHEAP",
+      "producer": "curated LSApp mapping",
+      "consumer": "Runtime Monitor and v3 models",
+      "source_code": [],
+      "config": [],
+      "git_commit": "d11f626d7d33ceab2b82c1906b0959a204d0d55c",
+      "schema": "见schema_inventory与相邻metadata",
+      "size_bytes": 632,
+      "checksum_policy": "FULL",
+      "reproduction_command": "见对应README和producer",
+      "reproducibility": "REPRODUCIBLE_CHEAP",
+      "validation": [
+        "outputs/repository_audit_20260717_175447/tables/artifacts.csv"
+      ],
+      "protection_level": "PRESERVE_HIGH_PRIORITY",
+      "migration_permission": "NOT_APPROVED",
+      "notes": [
+        "Phase 0不移动、不压缩、不重建"
+      ]
+    },
+    {
+      "asset_id": "automation_scenarios",
+      "path": "configs/automation",
+      "path_status": "EXISTS",
+      "category": "REPRODUCIBLE_CHEAP",
+      "producer": "project configuration",
+      "consumer": "automation",
+      "source_code": [],
+      "config": [],
+      "git_commit": "d11f626d7d33ceab2b82c1906b0959a204d0d55c",
+      "schema": "见schema_inventory与相邻metadata",
+      "size_bytes": 66689,
+      "checksum_policy": "MANIFEST_ONLY",
+      "reproduction_command": "见对应README和producer",
+      "reproducibility": "REPRODUCIBLE_CHEAP",
+      "validation": [
+        "outputs/repository_audit_20260717_175447/tables/artifacts.csv"
+      ],
+      "protection_level": "PRESERVE",
+      "migration_permission": "NOT_APPROVED",
+      "notes": [
+        "Phase 0不移动、不压缩、不重建"
+      ]
+    },
+    {
+      "asset_id": "unified_runtime_session",
+      "path": "outputs/runtime_monitor/session_unified_pipeline_20260713_115505",
+      "path_status": "EXISTS",
+      "category": "DERIVED_REPORT",
+      "producer": "Runtime Monitor unified experiment",
+      "consumer": "pipeline audit",
+      "source_code": [],
+      "config": [],
+      "git_commit": "d11f626d7d33ceab2b82c1906b0959a204d0d55c",
+      "schema": "见schema_inventory与相邻metadata",
+      "size_bytes": 2210936,
+      "checksum_policy": "MANIFEST_ONLY",
+      "reproduction_command": "见对应README和producer",
+      "reproducibility": "DERIVED_REPORT",
+      "validation": [
+        "outputs/repository_audit_20260717_175447/tables/artifacts.csv"
+      ],
+      "protection_level": "PRESERVE",
+      "migration_permission": "NOT_APPROVED",
+      "notes": [
+        "Phase 0不移动、不压缩、不重建"
+      ]
+    },
+    {
+      "asset_id": "bindfix_runtime_session",
+      "path": "outputs/runtime_monitor/session_dual_markov_bindfix_runtime_20260714_103542",
+      "path_status": "EXISTS",
+      "category": "UNIQUE_IRREPRODUCIBLE",
+      "producer": "Runtime Monitor on bindfix kernel",
+      "consumer": "kernel runtime acceptance",
+      "source_code": [],
+      "config": [],
+      "git_commit": "d11f626d7d33ceab2b82c1906b0959a204d0d55c",
+      "schema": "见schema_inventory与相邻metadata",
+      "size_bytes": 3106783,
+      "checksum_policy": "MANIFEST_ONLY",
+      "reproduction_command": "UNRESOLVED_OR_REQUIRES_EXPLICIT_OWNER_APPROVAL",
+      "reproducibility": "UNIQUE_IRREPRODUCIBLE",
+      "validation": [
+        "outputs/repository_audit_20260717_175447/tables/artifacts.csv"
+      ],
+      "protection_level": "PRESERVE_HIGH_PRIORITY",
+      "migration_permission": "NOT_APPROVED",
+      "notes": [
+        "Phase 0不移动、不压缩、不重建"
+      ]
+    },
+    {
+      "asset_id": "bindfix_kernel_validation",
+      "path": "outputs/mglru/dual_markov_bindfix_20260714_092525",
+      "path_status": "EXISTS",
+      "category": "UNIQUE_IRREPRODUCIBLE",
+      "producer": "bindfix build/runtime validation",
+      "consumer": "kernel baseline",
+      "source_code": [],
+      "config": [],
+      "git_commit": "d11f626d7d33ceab2b82c1906b0959a204d0d55c",
+      "schema": "见schema_inventory与相邻metadata",
+      "size_bytes": 4940543,
+      "checksum_policy": "MANIFEST_ONLY",
+      "reproduction_command": "UNRESOLVED_OR_REQUIRES_EXPLICIT_OWNER_APPROVAL",
+      "reproducibility": "UNIQUE_IRREPRODUCIBLE",
+      "validation": [
+        "outputs/repository_audit_20260717_175447/tables/artifacts.csv"
+      ],
+      "protection_level": "PRESERVE_HIGH_PRIORITY",
+      "migration_permission": "NOT_APPROVED",
+      "notes": [
+        "Phase 0不移动、不压缩、不重建"
+      ]
+    },
+    {
+      "asset_id": "harmony_hdc_raw",
+      "path": "mem/Harmony/v6-Homeny/hdc_out",
+      "path_status": "EXISTS",
+      "category": "UNIQUE_IRREPRODUCIBLE",
+      "producer": "Harmony HDC collectors",
+      "consumer": "VMA/56-dimensional analysis",
+      "source_code": [],
+      "config": [],
+      "git_commit": "d11f626d7d33ceab2b82c1906b0959a204d0d55c",
+      "schema": "见schema_inventory与相邻metadata",
+      "size_bytes": 307376,
+      "checksum_policy": "METADATA_ONLY",
+      "reproduction_command": "UNRESOLVED_OR_REQUIRES_EXPLICIT_OWNER_APPROVAL",
+      "reproducibility": "UNIQUE_IRREPRODUCIBLE",
+      "validation": [
+        "outputs/repository_audit_20260717_175447/tables/artifacts.csv"
+      ],
+      "protection_level": "PRESERVE_HIGH_PRIORITY",
+      "migration_permission": "NOT_APPROVED",
+      "notes": [
+        "Phase 0不移动、不压缩、不重建"
+      ]
+    },
+    {
+      "asset_id": "harmony_python_raw",
+      "path": "mem/Harmony/v6-python/hdc_out",
+      "path_status": "EXISTS",
+      "category": "UNIQUE_IRREPRODUCIBLE",
+      "producer": "Harmony Python HDC collector",
+      "consumer": "VMA analysis",
+      "source_code": [],
+      "config": [],
+      "git_commit": "d11f626d7d33ceab2b82c1906b0959a204d0d55c",
+      "schema": "见schema_inventory与相邻metadata",
+      "size_bytes": 2463942,
+      "checksum_policy": "METADATA_ONLY",
+      "reproduction_command": "UNRESOLVED_OR_REQUIRES_EXPLICIT_OWNER_APPROVAL",
+      "reproducibility": "UNIQUE_IRREPRODUCIBLE",
+      "validation": [
+        "outputs/repository_audit_20260717_175447/tables/artifacts.csv"
+      ],
+      "protection_level": "PRESERVE_HIGH_PRIORITY",
+      "migration_permission": "NOT_APPROVED",
+      "notes": [
+        "Phase 0不移动、不压缩、不重建"
+      ]
+    },
+    {
+      "asset_id": "harmony_56d_feature_definition",
+      "path": "mem/Harmony/v6-Homeny/build_workload_feature_vector.py",
+      "path_status": "EXISTS",
+      "category": "REPRODUCIBLE_CHEAP",
+      "producer": "project source",
+      "consumer": "56-dimensional workload vectors",
+      "source_code": [],
+      "config": [],
+      "git_commit": "d11f626d7d33ceab2b82c1906b0959a204d0d55c",
+      "schema": "见schema_inventory与相邻metadata",
+      "size_bytes": 12518,
+      "checksum_policy": "FULL",
+      "reproduction_command": "见对应README和producer",
+      "reproducibility": "REPRODUCIBLE_CHEAP",
+      "validation": [
+        "outputs/repository_audit_20260717_175447/tables/artifacts.csv"
+      ],
+      "protection_level": "PRESERVE",
+      "migration_permission": "NOT_APPROVED",
+      "notes": [
+        "Phase 0不移动、不压缩、不重建"
+      ]
+    },
+    {
+      "asset_id": "damon_runtime_data",
+      "path": "outputs/mglru/damon_runtime_validation_20260715",
+      "path_status": "EXISTS",
+      "category": "UNIQUE_IRREPRODUCIBLE",
+      "producer": "DAMON Region Monitor validation",
+      "consumer": "region analysis",
+      "source_code": [],
+      "config": [],
+      "git_commit": "d11f626d7d33ceab2b82c1906b0959a204d0d55c",
+      "schema": "见schema_inventory与相邻metadata",
+      "size_bytes": 446690810,
+      "checksum_policy": "MANIFEST_ONLY",
+      "reproduction_command": "UNRESOLVED_OR_REQUIRES_EXPLICIT_OWNER_APPROVAL",
+      "reproducibility": "UNIQUE_IRREPRODUCIBLE",
+      "validation": [
+        "outputs/repository_audit_20260717_175447/tables/artifacts.csv"
+      ],
+      "protection_level": "PRESERVE_HIGH_PRIORITY",
+      "migration_permission": "NOT_APPROVED",
+      "notes": [
+        "Phase 0不移动、不压缩、不重建"
+      ]
+    },
+    {
+      "asset_id": "automation_gui_smoke_evidence",
+      "path": "outputs/automation/semantic_ui_smoke_gui_20260714_171443",
+      "path_status": "EXISTS",
+      "category": "DERIVED_REPORT",
+      "producer": "semantic automation smoke",
+      "consumer": "automation validation",
+      "source_code": [],
+      "config": [],
+      "git_commit": "d11f626d7d33ceab2b82c1906b0959a204d0d55c",
+      "schema": "见schema_inventory与相邻metadata",
+      "size_bytes": 5517,
+      "checksum_policy": "MANIFEST_ONLY",
+      "reproduction_command": "见对应README和producer",
+      "reproducibility": "DERIVED_REPORT",
+      "validation": [
+        "outputs/repository_audit_20260717_175447/tables/artifacts.csv"
+      ],
+      "protection_level": "PRESERVE",
+      "migration_permission": "NOT_APPROVED",
+      "notes": [
+        "Phase 0不移动、不压缩、不重建"
+      ]
+    }
+  ]
+}

@@ -1,0 +1,21 @@
+{
+  "enabled": true,
+  "mode": "observe",
+  "foreground_scan_factor": 0.70,
+  "high_probability_threshold": 0.90,
+  "neutral_probability_threshold": 0.50,
+  "low_probability_threshold": 0.20,
+  "high_probability_scan_factor": 0.75,
+  "neutral_probability_scan_factor": 1.00,
+  "low_probability_scan_factor": 1.10,
+  "very_low_probability_scan_factor": 1.25,
+  "minimum_scan_factor": 0.70,
+  "maximum_scan_factor": 1.30,
+  "missing_prediction_probability": 0.30,
+  "unknown_app_scan_factor": 1.00,
+  "expired_prediction_scan_factor": 1.00,
+  "prediction_ttl_ms": 180000,
+  "minimum_scan_pages": 1,
+  "maximum_extra_scan_pages_per_cycle": 4096,
+  "markov_min_app_probability": 0.00
+}

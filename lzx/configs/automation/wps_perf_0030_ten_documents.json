@@ -1,0 +1,218 @@
+{
+  "description": "Perf_WPS_0030 连续打开 10 个大文档并按 9 到 1 的顺序切换标签页。",
+  "variables": {
+    "WPS_DOC_01": "${PROJECT_ROOT}/samples/wps/document_01.docx",
+    "WPS_DOC_02": "${PROJECT_ROOT}/samples/wps/document_02.pptx",
+    "WPS_DOC_03": "${PROJECT_ROOT}/samples/wps/document_03.xlsx",
+    "WPS_DOC_04": "${PROJECT_ROOT}/samples/wps/document_04.docx",
+    "WPS_DOC_05": "${PROJECT_ROOT}/samples/wps/document_05.pptx",
+    "WPS_DOC_06": "${PROJECT_ROOT}/samples/wps/document_06.xlsx",
+    "WPS_DOC_07": "${PROJECT_ROOT}/samples/wps/document_07.docx",
+    "WPS_DOC_08": "${PROJECT_ROOT}/samples/wps/document_08.pptx",
+    "WPS_DOC_09": "${PROJECT_ROOT}/samples/wps/document_09.xlsx",
+    "WPS_DOC_10": "${PROJECT_ROOT}/samples/wps/document_10.docx",
+    "WPS_DOCUMENT_LOAD_SECONDS": "20"
+  },
+  "actions": [
+    {
+      "type": "shell",
+      "command": "mkdir -p \"${PROJECT_ROOT}/samples/wps\" && cp \"${PROJECT_ROOT}/outputs/wps/new_word.docx\" \"${WPS_DOC_01}\" && cp \"${PROJECT_ROOT}/outputs/wps/new_presentation.pptx\" \"${WPS_DOC_02}\" && cp \"${PROJECT_ROOT}/outputs/wps/new_spreadsheet.xlsx\" \"${WPS_DOC_03}\" && cp \"${PROJECT_ROOT}/outputs/wps/new_word.docx\" \"${WPS_DOC_04}\" && cp \"${PROJECT_ROOT}/outputs/wps/new_presentation.pptx\" \"${WPS_DOC_05}\" && cp \"${PROJECT_ROOT}/outputs/wps/new_spreadsheet.xlsx\" \"${WPS_DOC_06}\" && cp \"${PROJECT_ROOT}/outputs/wps/new_word.docx\" \"${WPS_DOC_07}\" && cp \"${PROJECT_ROOT}/outputs/wps/new_presentation.pptx\" \"${WPS_DOC_08}\" && cp \"${PROJECT_ROOT}/outputs/wps/new_spreadsheet.xlsx\" \"${WPS_DOC_09}\" && cp \"${PROJECT_ROOT}/outputs/wps/new_word.docx\" \"${WPS_DOC_10}\"",
+      "label": "WPS_PREPARE_TEN_DOCUMENTS"
+    },
+    {
+      "type": "assert_file",
+      "path": "${WPS_DOC_01}",
+      "label": "WPS_REQUIRE_DOC_01"
+    },
+    {
+      "type": "assert_file",
+      "path": "${WPS_DOC_02}",
+      "label": "WPS_REQUIRE_DOC_02"
+    },
+    {
+      "type": "assert_file",
+      "path": "${WPS_DOC_03}",
+      "label": "WPS_REQUIRE_DOC_03"
+    },
+    {
+      "type": "assert_file",
+      "path": "${WPS_DOC_04}",
+      "label": "WPS_REQUIRE_DOC_04"
+    },
+    {
+      "type": "assert_file",
+      "path": "${WPS_DOC_05}",
+      "label": "WPS_REQUIRE_DOC_05"
+    },
+    {
+      "type": "assert_file",
+      "path": "${WPS_DOC_06}",
+      "label": "WPS_REQUIRE_DOC_06"
+    },
+    {
+      "type": "assert_file",
+      "path": "${WPS_DOC_07}",
+      "label": "WPS_REQUIRE_DOC_07"
+    },
+    {
+      "type": "assert_file",
+      "path": "${WPS_DOC_08}",
+      "label": "WPS_REQUIRE_DOC_08"
+    },
+    {
+      "type": "assert_file",
+      "path": "${WPS_DOC_09}",
+      "label": "WPS_REQUIRE_DOC_09"
+    },
+    {
+      "type": "assert_file",
+      "path": "${WPS_DOC_10}",
+      "label": "WPS_REQUIRE_DOC_10"
+    },
+    {
+      "type": "launch",
+      "name": "wps",
+      "command": "wps",
+      "label": "WPS_LAUNCH"
+    },
+    {
+      "type": "wait_window",
+      "name": "wps",
+      "class": "wps|wpp|et|wpsoffice",
+      "timeout": 20
+    },
+    {
+      "type": "window_state",
+      "name": "wps",
+      "class": "wps|wpp|et|wpsoffice",
+      "state": "maximize"
+    },
+    {
+      "type": "open_file",
+      "name": "wps",
+      "class": "wps|wpp|et|wpsoffice",
+      "path": "${WPS_DOC_01}",
+      "wait_before": 1,
+      "wait_after": "${WPS_DOCUMENT_LOAD_SECONDS}",
+      "label": "WPS_OPEN_DOC_01"
+    },
+    {
+      "type": "open_file",
+      "name": "wps",
+      "class": "wps|wpp|et|wpsoffice",
+      "path": "${WPS_DOC_02}",
+      "wait_before": 1,
+      "wait_after": "${WPS_DOCUMENT_LOAD_SECONDS}",
+      "label": "WPS_OPEN_DOC_02"
+    },
+    {
+      "type": "open_file",
+      "name": "wps",
+      "class": "wps|wpp|et|wpsoffice",
+      "path": "${WPS_DOC_03}",
+      "wait_before": 1,
+      "wait_after": "${WPS_DOCUMENT_LOAD_SECONDS}",
+      "label": "WPS_OPEN_DOC_03"
+    },
+    {
+      "type": "open_file",
+      "name": "wps",
+      "class": "wps|wpp|et|wpsoffice",
+      "path": "${WPS_DOC_04}",
+      "wait_before": 1,
+      "wait_after": "${WPS_DOCUMENT_LOAD_SECONDS}",
+      "label": "WPS_OPEN_DOC_04"
+    },
+    {
+      "type": "open_file",
+      "name": "wps",
+      "class": "wps|wpp|et|wpsoffice",
+      "path": "${WPS_DOC_05}",
+      "wait_before": 1,
+      "wait_after": "${WPS_DOCUMENT_LOAD_SECONDS}",
+      "label": "WPS_OPEN_DOC_05"
+    },
+    {
+      "type": "open_file",
+      "name": "wps",
+      "class": "wps|wpp|et|wpsoffice",
+      "path": "${WPS_DOC_06}",
+      "wait_before": 1,
+      "wait_after": "${WPS_DOCUMENT_LOAD_SECONDS}",
+      "label": "WPS_OPEN_DOC_06"
+    },
+    {
+      "type": "open_file",
+      "name": "wps",
+      "class": "wps|wpp|et|wpsoffice",
+      "path": "${WPS_DOC_07}",
+      "wait_before": 1,
+      "wait_after": "${WPS_DOCUMENT_LOAD_SECONDS}",
+      "label": "WPS_OPEN_DOC_07"
+    },
+    {
+      "type": "open_file",
+      "name": "wps",
+      "class": "wps|wpp|et|wpsoffice",
+      "path": "${WPS_DOC_08}",
+      "wait_before": 1,
+      "wait_after": "${WPS_DOCUMENT_LOAD_SECONDS}",
+      "label": "WPS_OPEN_DOC_08"
+    },
+    {
+      "type": "open_file",
+      "name": "wps",
+      "class": "wps|wpp|et|wpsoffice",
+      "path": "${WPS_DOC_09}",
+      "wait_before": 1,
+      "wait_after": "${WPS_DOCUMENT_LOAD_SECONDS}",
+      "label": "WPS_OPEN_DOC_09"
+    },
+    {
+      "type": "open_file",
+      "name": "wps",
+      "class": "wps|wpp|et|wpsoffice",
+      "path": "${WPS_DOC_10}",
+      "wait_before": 1,
+      "wait_after": "${WPS_DOCUMENT_LOAD_SECONDS}",
+      "label": "WPS_OPEN_DOC_10"
+    },
+    {
+      "type": "key",
+      "key": "ctrl+shift+Tab",
+      "repeat": 9,
+      "interval": 2,
+      "name": "wps",
+      "label": "WPS_SWITCH_TABS_09_TO_01"
+    },
+    {
+      "type": "window_state",
+      "name": "wps",
+      "class": "wps|wpp|et|wpsoffice",
+      "state": "maximize",
+      "label": "WPS_MAXIMIZE"
+    },
+    {
+      "type": "wait",
+      "seconds": 10,
+      "label": "WPS_MAXIMIZED_WAIT"
+    },
+    {
+      "type": "close",
+      "name": "wps",
+      "class": "wps|wpp|et|wpsoffice",
+      "process_names": [
+        "wpsoffice",
+        "wps",
+        "wpp",
+        "et",
+        "wpspdf"
+      ],
+      "path_contains": [
+        "/opt/kingsoft/wps-office"
+      ],
+      "force_after_seconds": 3,
+      "label": "WPS_CLOSE"
+    }
+  ]
+}

@@ -1,0 +1,19 @@
+{
+  "description": "temporary 0060 open probe",
+  "variables": {
+    "WPS_EXCEL_FILE": "${PROJECT_ROOT}/samples/wps/spreadsheet_0060.xlsx"
+  },
+  "actions": [
+    {"type": "launch", "name": "et", "command": "et", "label": "LAUNCH"},
+    {"type": "wait_window", "name": "wps", "class": "wpsoffice", "timeout": 45},
+    {"type": "window_state", "name": "wps", "class": "wpsoffice", "state": "maximize"},
+    {"type": "wait", "seconds": 4},
+    {"type": "click_window", "name": "wps", "class": "wpsoffice", "x_ratio": 0.165, "y_ratio": 0.245, "label": "CLICK_OPEN"},
+    {"type": "dialog_path", "path": "${WPS_EXCEL_FILE}", "wait_before": 1, "wait_after": 15, "label": "DIALOG_PATH"},
+    {"type": "wait_window", "name": "wps", "class": "et|wpsoffice", "timeout": 45},
+    {"type": "window_state", "name": "wps", "class": "et|wpsoffice", "state": "maximize"},
+    {"type": "wait", "seconds": 4},
+    {"type": "shell", "command": "xwd -silent -root -out ${PROJECT_ROOT}/outputs/runtime_monitor/0060_debug_open.xwd"},
+    {"type": "wait", "seconds": 30}
+  ]
+}

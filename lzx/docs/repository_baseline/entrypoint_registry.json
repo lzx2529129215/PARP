@@ -1,0 +1,151 @@
+{
+  "schema_version": "repository-entrypoint-registry-v1",
+  "generated_at": "2026-07-17T20:13:11.560759+08:00",
+  "count": 4,
+  "entrypoints": [
+    {
+      "entrypoint_id": "runtime_monitor_main",
+      "path": "runtime_monitor/monitor.py",
+      "path_status": "EXISTS",
+      "subsystem": "runtime_monitor",
+      "role": "CANONICAL",
+      "purpose": "Runtime Monitor会话主编排，包含采集、在线duration-aware LSTM和可选内核sidecar。",
+      "runtime_requirements": [
+        "Linux",
+        "Python 3",
+        "按参数选择桌面/cgroup/内核能力"
+      ],
+      "arguments": [
+        "--session-id",
+        "--output-dir",
+        "--enable-online-lstm",
+        "--enable-cgroup-workload"
+      ],
+      "calls": [
+        "runtime_monitor collectors/core/scripts"
+      ],
+      "called_by": [
+        "runtime_monitor验证脚本",
+        "automation语义采集脚本"
+      ],
+      "produces": [
+        "outputs/runtime_monitor/<session>"
+      ],
+      "validation_evidence": [
+        "runtime_monitor/README.md:52",
+        "runtime_monitor/README.md:89",
+        "runtime_monitor/monitor.py:1251"
+      ],
+      "compatibility_commitment": "PRESERVE",
+      "migration_permission": "NOT_APPROVED",
+      "confidence": "HIGH"
+    },
+    {
+      "entrypoint_id": "runtime_monitor_online_compat",
+      "path": "runtime_monitor/online_monitor.py",
+      "path_status": "EXISTS",
+      "subsystem": "runtime_monitor",
+      "role": "COMPATIBILITY",
+      "purpose": "保留的GNOME D-Bus窗口事件与旧在线应用预测入口，具有独立兼容职责。",
+      "runtime_requirements": [
+        "GNOME D-Bus",
+        "Python 3"
+      ],
+      "arguments": [
+        "--checkpoint",
+        "窗口事件和输出参数"
+      ],
+      "calls": [
+        "runtime_monitor/predictor.py"
+      ],
+      "called_by": [],
+      "produces": [
+        "在线窗口事件和预测输出"
+      ],
+      "validation_evidence": [
+        "runtime_monitor/README.md:45",
+        "runtime_monitor/README.md:53",
+        "runtime_monitor/README.md:266"
+      ],
+      "compatibility_commitment": "PRESERVE",
+      "migration_permission": "NOT_APPROVED",
+      "confidence": "HIGH"
+    },
+    {
+      "entrypoint_id": "automation_host_wrapper",
+      "path": "automation/run_automation.sh",
+      "path_status": "EXISTS",
+      "subsystem": "automation",
+      "role": "WRAPPER",
+      "purpose": "宿主机正式包装入口，准备GUI环境和user slice后调用Python实现。",
+      "runtime_requirements": [
+        "Linux桌面",
+        "systemd --user",
+        "X11/Xwayland按场景需要"
+      ],
+      "arguments": [
+        "--scenario",
+        "--session-id",
+        "--trace-output",
+        "--test-slice",
+        "--dry-run"
+      ],
+      "calls": [
+        "automation/app_automation.py"
+      ],
+      "called_by": [
+        "Runtime/MGLRU实验脚本",
+        "人工命令"
+      ],
+      "produces": [
+        "automation_trace.csv",
+        "GUI诊断日志"
+      ],
+      "validation_evidence": [
+        "automation/run_automation.sh:204",
+        "automation/README.md:19",
+        "automation/README.md:192"
+      ],
+      "compatibility_commitment": "PRESERVE",
+      "migration_permission": "NOT_APPROVED",
+      "confidence": "HIGH"
+    },
+    {
+      "entrypoint_id": "automation_python_main",
+      "path": "automation/app_automation.py",
+      "path_status": "EXISTS",
+      "subsystem": "automation",
+      "role": "CANONICAL",
+      "purpose": "Automation Python主实现和可直接调用的CLI。",
+      "runtime_requirements": [
+        "Python 3",
+        "桌面操作依赖按场景启用"
+      ],
+      "arguments": [
+        "scenario",
+        "--dry-run",
+        "--session-id",
+        "--scenario-id",
+        "--trace-output"
+      ],
+      "calls": [
+        "xdotool/systemd-run等运行时工具"
+      ],
+      "called_by": [
+        "automation/run_automation.sh",
+        "automation语义编译链"
+      ],
+      "produces": [
+        "automation trace和操作状态"
+      ],
+      "validation_evidence": [
+        "automation/app_automation.py:1547",
+        "automation/app_automation.py:1599",
+        "automation/run_automation.sh:204"
+      ],
+      "compatibility_commitment": "PRESERVE",
+      "migration_permission": "NOT_APPROVED",
+      "confidence": "HIGH"
+    }
+  ]
+}

@@ -1,0 +1,26 @@
+{
+  "description": "KeePassXC 安全多场景：启动、打开/取消数据库选择、密码生成器、设置窗口、最小化/恢复；不读取真实密码库。",
+  "actions": [
+    {"type": "launch", "name": "keepassxc", "app_key": "KEEPASSXC", "command": "keepassxc", "label": "KEEPASS_LAUNCH"},
+    {"type": "wait_window", "name": "keepassxc", "app_key": "KEEPASSXC", "class": "keepassxc|KeePassXC", "title": "KeePassXC", "timeout": 25, "label": "KEEPASS_WAIT_WINDOW"},
+    {"type": "window_state", "name": "keepassxc", "app_key": "KEEPASSXC", "class": "keepassxc|KeePassXC", "state": "maximize", "label": "KEEPASS_MAXIMIZE"},
+    {"type": "verify_foreground", "name": "keepassxc", "app_key": "KEEPASSXC", "class": "keepassxc|KeePassXC", "label": "KEEPASS_VERIFY_START"},
+    {"type": "hotkey", "name": "keepassxc", "key": "ctrl+o", "label": "KEEPASS_OPEN_DATABASE_DIALOG"},
+    {"type": "wait", "seconds": 2, "label": "KEEPASS_OPEN_DIALOG_DWELL"},
+    {"type": "key", "name": "keepassxc", "key": "Escape", "label": "KEEPASS_CANCEL_OPEN_DIALOG"},
+    {"type": "hotkey", "name": "keepassxc", "key": "ctrl+shift+n", "optional": true, "label": "KEEPASS_NEW_DATABASE_WIZARD"},
+    {"type": "wait", "seconds": 2, "label": "KEEPASS_NEW_DATABASE_DWELL"},
+    {"type": "key", "name": "keepassxc", "key": "Escape", "optional": true, "label": "KEEPASS_CANCEL_NEW_DATABASE"},
+    {"type": "hotkey", "name": "keepassxc", "key": "ctrl+g", "optional": true, "label": "KEEPASS_PASSWORD_GENERATOR"},
+    {"type": "wait", "seconds": 3, "label": "KEEPASS_GENERATOR_DWELL"},
+    {"type": "key", "name": "keepassxc", "key": "Escape", "optional": true, "label": "KEEPASS_CLOSE_GENERATOR"},
+    {"type": "hotkey", "name": "keepassxc", "key": "ctrl+comma", "optional": true, "label": "KEEPASS_OPEN_SETTINGS"},
+    {"type": "wait", "seconds": 3, "label": "KEEPASS_SETTINGS_DWELL"},
+    {"type": "key", "name": "keepassxc", "key": "Escape", "optional": true, "label": "KEEPASS_CLOSE_SETTINGS"},
+    {"type": "window_state", "name": "keepassxc", "app_key": "KEEPASSXC", "class": "keepassxc|KeePassXC", "state": "minimize", "label": "KEEPASS_MINIMIZE"},
+    {"type": "wait", "seconds": 2, "label": "KEEPASS_MINIMIZED_DWELL"},
+    {"type": "window_state", "name": "keepassxc", "app_key": "KEEPASSXC", "class": "keepassxc|KeePassXC", "state": "restore", "label": "KEEPASS_RESTORE"},
+    {"type": "verify_foreground", "name": "keepassxc", "app_key": "KEEPASSXC", "class": "keepassxc|KeePassXC", "optional": true, "label": "KEEPASS_VERIFY_RESTORED"},
+    {"type": "close", "name": "keepassxc", "app_key": "KEEPASSXC", "class": "keepassxc|KeePassXC", "process_names": ["keepassxc"], "wait_after_window_close": 1, "force_after_seconds": 2, "label": "KEEPASS_CLOSE"}
+  ]
+}

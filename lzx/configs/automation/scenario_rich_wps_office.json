@@ -1,0 +1,54 @@
+{
+  "description": "WPS 三组件多场景办公流：Writer 编辑/搜索/另存，Spreadsheet 单元格定位/数据输入/另存，Presentation 新建幻灯片/输入/另存。",
+  "variables": {
+    "WPS_OUT": "${PROJECT_ROOT}/outputs/automation_rich/wps",
+    "WORD_SOURCE": "${PROJECT_ROOT}/samples/wps/word_0040_fixture.docx",
+    "SHEET_SOURCE": "${PROJECT_ROOT}/samples/wps/spreadsheet_0060.xlsx",
+    "PPT_SOURCE": "${PROJECT_ROOT}/samples/wps/presentation_200m.pptx"
+  },
+  "actions": [
+    {"type": "shell", "command": "mkdir -p \"${WPS_OUT}\"", "label": "WPS_PREPARE_OUTPUT"},
+    {"type": "assert_file", "path": "${WORD_SOURCE}", "label": "WPS_ASSERT_WORD_SOURCE"},
+    {"type": "assert_file", "path": "${SHEET_SOURCE}", "label": "WPS_ASSERT_SHEET_SOURCE"},
+    {"type": "assert_file", "path": "${PPT_SOURCE}", "label": "WPS_ASSERT_PPT_SOURCE"},
+
+    {"type": "launch", "name": "wps", "command": "wps ${WORD_SOURCE}", "label": "WPS_WRITER_LAUNCH"},
+    {"type": "wait_window", "name": "wps", "class": "wps|wpsoffice", "timeout": 35, "label": "WPS_WRITER_WAIT"},
+    {"type": "window_state", "name": "wps", "class": "wps|wpsoffice", "state": "maximize", "label": "WPS_WRITER_MAXIMIZE"},
+    {"type": "key", "name": "wps", "key": "ctrl+End", "label": "WPS_WRITER_GOTO_END"},
+    {"type": "key", "name": "wps", "key": "Return", "repeat": 2, "label": "WPS_WRITER_NEW_PARAGRAPH"},
+    {"type": "paste_text", "name": "wps", "text": "Automation multi-scene Writer note", "label": "WPS_WRITER_TYPE_NOTE"},
+    {"type": "hotkey", "name": "wps", "key": "ctrl+f", "label": "WPS_WRITER_SEARCH_OPEN"},
+    {"type": "paste_text", "name": "wps", "text": "Automation", "label": "WPS_WRITER_SEARCH_TEXT"},
+    {"type": "key", "name": "wps", "key": "Return", "label": "WPS_WRITER_SEARCH_NEXT"},
+    {"type": "key", "name": "wps", "key": "Escape", "label": "WPS_WRITER_SEARCH_CLOSE"},
+    {"type": "save_as", "name": "wps", "path": "${WPS_OUT}/writer_multi_scene.docx", "wait_after": 5, "label": "WPS_WRITER_SAVE_AS"},
+    {"type": "assert_file", "path": "${WPS_OUT}/writer_multi_scene.docx", "label": "WPS_WRITER_VERIFY_OUTPUT"},
+    {"type": "key", "name": "wps", "key": "ctrl+w", "label": "WPS_WRITER_CLOSE_TAB"},
+
+    {"type": "launch", "name": "wps_sheet", "command": "et ${SHEET_SOURCE}", "label": "WPS_SHEET_LAUNCH"},
+    {"type": "wait_window", "name": "wps", "class": "et|wpsoffice", "timeout": 35, "label": "WPS_SHEET_WAIT"},
+    {"type": "window_state", "name": "wps", "class": "et|wpsoffice", "state": "maximize", "label": "WPS_SHEET_MAXIMIZE"},
+    {"type": "goto_cell", "name": "wps", "reference": "A1", "label": "WPS_SHEET_GOTO_A1"},
+    {"type": "paste_text", "name": "wps", "text": "Scene", "label": "WPS_SHEET_HEADER_SCENE"},
+    {"type": "key", "name": "wps", "key": "Tab", "label": "WPS_SHEET_NEXT_COLUMN"},
+    {"type": "paste_text", "name": "wps", "text": "Status", "label": "WPS_SHEET_HEADER_STATUS"},
+    {"type": "key", "name": "wps", "key": "Return", "label": "WPS_SHEET_NEXT_ROW"},
+    {"type": "paste_text", "name": "wps", "text": "Files\tPASS\nQQ\tSAFE_DRAFT\nWPS\tPASS", "label": "WPS_SHEET_FILL_MATRIX"},
+    {"type": "save_as", "name": "wps", "path": "${WPS_OUT}/spreadsheet_multi_scene.xlsx", "wait_after": 5, "label": "WPS_SHEET_SAVE_AS"},
+    {"type": "assert_file", "path": "${WPS_OUT}/spreadsheet_multi_scene.xlsx", "label": "WPS_SHEET_VERIFY_OUTPUT"},
+    {"type": "key", "name": "wps", "key": "ctrl+w", "label": "WPS_SHEET_CLOSE_TAB"},
+
+    {"type": "launch", "name": "wps_ppt", "command": "wpp ${PPT_SOURCE}", "label": "WPS_PPT_LAUNCH"},
+    {"type": "wait_window", "name": "wps", "class": "wpp|wpsoffice", "timeout": 35, "label": "WPS_PPT_WAIT"},
+    {"type": "window_state", "name": "wps", "class": "wpp|wpsoffice", "state": "maximize", "label": "WPS_PPT_MAXIMIZE"},
+    {"type": "hotkey", "name": "wps", "key": "ctrl+m", "label": "WPS_PPT_NEW_SLIDE"},
+    {"type": "paste_text", "name": "wps", "text": "Automation multi-scene summary", "optional": true, "label": "WPS_PPT_TYPE_TITLE"},
+    {"type": "key", "name": "wps", "key": "F5", "optional": true, "label": "WPS_PPT_START_SLIDESHOW"},
+    {"type": "wait", "seconds": 3, "label": "WPS_PPT_SLIDESHOW_DWELL"},
+    {"type": "key", "name": "wps", "key": "Escape", "optional": true, "label": "WPS_PPT_END_SLIDESHOW"},
+    {"type": "save_as", "name": "wps", "path": "${WPS_OUT}/presentation_multi_scene.pptx", "wait_after": 5, "label": "WPS_PPT_SAVE_AS"},
+    {"type": "assert_file", "path": "${WPS_OUT}/presentation_multi_scene.pptx", "label": "WPS_PPT_VERIFY_OUTPUT"},
+    {"type": "close", "name": "wps", "class": "wps|wpp|et|wpsoffice", "process_names": ["wpsoffice", "wps", "wpp", "et", "wpspdf"], "path_contains": ["/opt/kingsoft/wps-office"], "wait_after_window_close": 2, "force_after_seconds": 3, "label": "WPS_CLOSE_ALL"}
+  ]
+}

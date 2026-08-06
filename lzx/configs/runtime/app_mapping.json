@@ -1,0 +1,67 @@
+{
+  "rules": [
+    {
+      "app": "火狐浏览器",
+      "gtk_app_id": ["firefox", "org.mozilla.firefox", "firefox.desktop"],
+      "wm_class": ["firefox", "Firefox"],
+      "process": ["firefox"],
+      "title_contains": ["Mozilla Firefox"]
+    },
+    {
+      "app": "WPS",
+      "gtk_app_id": ["wps-office", "wps"],
+      "wm_class": ["wps", "wpsoffice", "et", "wpp", "wpspdf"],
+      "process": ["wps", "et", "wpp", "wpspdf"],
+      "title_contains": ["WPS"]
+    },
+    {
+      "app": "腾讯QQ",
+      "gtk_app_id": ["qq", "linuxqq"],
+      "wm_class": ["qq", "linuxqq"],
+      "process": ["qq", "linuxqq"],
+      "title_contains": ["QQ"]
+    },
+    {
+      "app": "飞书",
+      "gtk_app_id": ["feishu", "lark"],
+      "wm_class": ["feishu", "lark"],
+      "process": ["feishu", "lark"],
+      "title_contains": ["飞书", "Lark", "Feishu"]
+    },
+    {
+      "app": "哔哩哔哩",
+      "gtk_app_id": ["bilibili"],
+      "wm_class": ["bilibili"],
+      "process": ["bilibili"],
+      "title_contains": ["哔哩哔哩", "bilibili"]
+    },
+    {
+      "app": "百度网盘",
+      "gtk_app_id": ["baidunetdisk"],
+      "wm_class": ["baidunetdisk"],
+      "process": ["baidunetdisk"],
+      "title_contains": ["百度网盘"]
+    },
+    {
+      "app": "同花顺",
+      "gtk_app_id": ["hexin", "ths"],
+      "wm_class": ["hexin", "ths"],
+      "process": ["hexin", "ths"],
+      "title_contains": ["同花顺"]
+    },
+    {
+      "app": "图库",
+      "gtk_app_id": ["org.gnome.eog", "org.gnome.photos"],
+      "wm_class": ["eog", "org.gnome.photos"],
+      "process": ["eog", "gnome-photos"],
+      "title_contains": ["图片查看器", "Photos"]
+    },
+    {
+      "app": "优酷视频",
+      "gtk_app_id": ["youku", "youku.desktop"],
+      "wm_class": ["youku"],
+      "process": ["youku"],
+      "title_contains": ["优酷", "youku", "Youku"]
+    }
+  ]
+}

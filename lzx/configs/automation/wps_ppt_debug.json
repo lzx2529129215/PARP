@@ -1,0 +1,17 @@
+{
+  "description": "Temporary probe for the WPS Presentation blank template.",
+  "actions": [
+    {"type": "launch", "name": "wps_ppt_debug", "command": "wps"},
+    {"type": "wait_window", "name": "wps", "class": "wps|wpsoffice", "timeout": 30},
+    {"type": "focus", "name": "wps", "class": "wps|wpsoffice"},
+    {"type": "window_state", "name": "wps", "class": "wps|wpsoffice", "state": "maximize"},
+    {"type": "wait", "seconds": 6},
+    {"type": "click_window", "name": "wps", "class": "wps|wpsoffice", "x_ratio": 0.16, "y_ratio": 0.13},
+    {"type": "wait", "seconds": 2},
+    {"type": "click_window", "name": "wps", "class": "wps|wpsoffice", "prefer_smallest_window": true, "x_ratio": 0.39, "y_ratio": 0.273},
+    {"type": "wait", "seconds": 6},
+    {"type": "click_window", "name": "wps", "class": "wps|wpsoffice", "x_ratio": 0.282, "y_ratio": 0.38},
+    {"type": "wait", "seconds": 40},
+    {"type": "close", "name": "wps_ppt_debug", "class": "wpp|wps|wpsoffice", "process_names": ["wpsoffice", "wps", "wpp"], "path_contains": ["/opt/kingsoft/wps-office"], "force_after_seconds": 2}
+  ]
+}

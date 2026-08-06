@@ -1,0 +1,35 @@
+{
+  "description": "QQ 多场景安全自动化：启动/自动登录、会话搜索、消息浏览、草稿输入与清理；默认不发送。",
+  "variables": {
+    "QQ_TEST_CONTACT": "我的电脑",
+    "QQ_DRAFT_TEXT": "QQ automation draft - safe mode, do not send"
+  },
+  "actions": [
+    {"type": "shell", "name": "qq", "command": "gtk-launch qq || gtk-launch linuxqq || linuxqq || qq", "label": "QQ_LAUNCH"},
+    {"type": "wait_window", "name": "qq", "class": "qq|QQ|linuxqq", "title": "QQ", "timeout": 25, "label": "QQ_WAIT_LOGIN_OR_MAIN"},
+    {"type": "switch", "name": "qq", "class": "qq|QQ|linuxqq", "title": "QQ", "command": "gtk-launch qq", "label": "QQ_SWITCH_MAIN"},
+    {"type": "verify_foreground", "name": "qq", "class": "qq|QQ|linuxqq", "title": "QQ", "label": "QQ_VERIFY_MAIN"},
+    {"type": "window_state", "name": "qq", "class": "qq|QQ|linuxqq", "state": "maximize", "optional": true, "label": "QQ_MAXIMIZE"},
+
+    {"type": "hotkey", "name": "qq", "key": "ctrl+f", "label": "QQ_OPEN_SEARCH"},
+    {"type": "paste_text", "name": "qq", "text": "${QQ_TEST_CONTACT}", "label": "QQ_SEARCH_TEST_CONTACT"},
+    {"type": "wait", "name": "qq", "seconds": 3, "label": "QQ_WAIT_SEARCH_RESULTS"},
+    {"type": "key", "name": "qq", "key": "Down", "optional": true, "label": "QQ_SELECT_SEARCH_RESULT"},
+    {"type": "key", "name": "qq", "key": "Return", "optional": true, "label": "QQ_OPEN_TEST_CONVERSATION"},
+    {"type": "wait", "name": "qq", "seconds": 3, "label": "QQ_WAIT_CONVERSATION"},
+    {"type": "verify_foreground", "name": "qq", "class": "qq|QQ|linuxqq", "title": "QQ", "label": "QQ_VERIFY_CONVERSATION"},
+
+    {"type": "scroll", "name": "qq", "class": "qq|QQ|linuxqq", "direction": "up", "amount": 4, "optional": true, "label": "QQ_BROWSE_OLDER_MESSAGES"},
+    {"type": "wait", "name": "qq", "seconds": 2, "label": "QQ_READ_OLDER_MESSAGES"},
+    {"type": "scroll", "name": "qq", "class": "qq|QQ|linuxqq", "direction": "down", "amount": 4, "optional": true, "label": "QQ_RETURN_LATEST_MESSAGES"},
+
+    {"type": "paste_text", "name": "qq", "text": "${QQ_DRAFT_TEXT}", "label": "QQ_TYPE_SAFE_DRAFT"},
+    {"type": "wait", "name": "qq", "seconds": 2, "label": "QQ_REVIEW_DRAFT_NO_SEND"},
+    {"type": "hotkey", "name": "qq", "key": "ctrl+a", "label": "QQ_SELECT_DRAFT"},
+    {"type": "key", "name": "qq", "key": "BackSpace", "label": "QQ_CLEAR_DRAFT"},
+    {"type": "window_state", "name": "qq", "class": "qq|QQ|linuxqq", "state": "minimize", "optional": true, "label": "QQ_MINIMIZE"},
+    {"type": "wait", "seconds": 1, "label": "QQ_MINIMIZED_DWELL"},
+    {"type": "window_state", "name": "qq", "class": "qq|QQ|linuxqq", "state": "restore", "optional": true, "label": "QQ_RESTORE"},
+    {"type": "verify_foreground", "name": "qq", "class": "qq|QQ|linuxqq", "title": "QQ", "optional": true, "label": "QQ_VERIFY_RESTORED"}
+  ]
+}

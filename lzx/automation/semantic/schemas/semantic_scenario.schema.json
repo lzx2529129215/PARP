@@ -1,0 +1,13 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "语义自动化场景",
+  "type": "object",
+  "required": ["scenario_id", "phases"],
+  "properties": {
+    "scenario_id": {"type": "string", "minLength": 1},
+    "description": {"type": "string"},
+    "variables": {"type": "object"},
+    "keep_alive_after_s": {"type": "number", "minimum": 0},
+    "phases": {"type": "array", "minItems": 1}
+  }
+}

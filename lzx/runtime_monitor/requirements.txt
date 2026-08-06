@@ -1,0 +1,2 @@
+# Native X11 event delivery for --direct-x11-events.
+python-xlib==0.33

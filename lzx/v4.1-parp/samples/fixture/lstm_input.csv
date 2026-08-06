@@ -1,0 +1,7 @@
+sample_id,timestamp,history_apps,opened_apps,user_group,current_foreground_app
+s001,2026-08-05 09:00:00,WPS|飞书,WPS|飞书|腾讯QQ,办公人群,WPS
+s002,2026-08-05 09:05:00,WPS|腾讯QQ,WPS|腾讯QQ,办公人群,腾讯QQ
+s003,2026-08-05 09:10:00,腾讯QQ|飞书,飞书|腾讯QQ,办公人群,飞书
+s004,2026-08-05 09:15:00,飞书|WPS,WPS|飞书,办公人群,WPS
+s005,2026-08-05 09:20:00,WPS|腾讯QQ,WPS|腾讯QQ|飞书,办公人群,腾讯QQ
+s006,2026-08-05 09:25:00,腾讯QQ|飞书,飞书|腾讯QQ,办公人群,飞书

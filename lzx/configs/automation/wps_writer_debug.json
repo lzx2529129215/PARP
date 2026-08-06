@@ -1,0 +1,22 @@
+{
+  "actions": [
+    {"type": "launch", "name": "wps_debug", "command": "wps"},
+    {"type": "wait_window", "name": "wps", "class": "wps|wpsoffice", "timeout": 30},
+    {"type": "focus", "name": "wps", "class": "wps|wpsoffice"},
+    {"type": "window_state", "name": "wps", "class": "wps|wpsoffice", "state": "maximize"},
+    {"type": "wait", "seconds": 6},
+    {"type": "click_window", "name": "wps", "class": "wps|wpsoffice", "x_ratio": 0.16, "y_ratio": 0.13},
+    {"type": "wait", "seconds": 2},
+    {"type": "click_window", "name": "wps", "class": "wps|wpsoffice", "prefer_smallest_window": true, "x_ratio": 0.187, "y_ratio": 0.273},
+    {"type": "wait", "seconds": 6},
+    {"type": "click_window", "name": "wps", "class": "wps|wpsoffice", "x_ratio": 0.406, "y_ratio": 0.47},
+    {"type": "wait", "seconds": 30},
+    {"type": "click", "x": 350, "y": 250},
+    {"type": "type", "text": "DEBUG123"},
+    {"type": "paste_text", "text": "调试中文输入", "name": "wps"},
+    {"type": "save_as", "path": "${PROJECT_ROOT}/outputs/wps/debug_writer.docx", "shortcut": "ctrl+s", "location_shortcut": "", "wait_after": 8},
+    {"type": "assert_file", "path": "${PROJECT_ROOT}/outputs/wps/debug_writer.docx"},
+    {"type": "wait", "seconds": 5},
+    {"type": "close", "name": "wps_debug", "class": "wps|wpsoffice", "process_names": ["wpsoffice", "wps"], "path_contains": ["/opt/kingsoft/wps-office"], "force_after_seconds": 2}
+  ]
+}

@@ -1,0 +1,101 @@
+{
+  "validation_mode": true,
+  "keep_alive_after_s": 120,
+  "actions": [
+    {
+      "type": "shell",
+      "label": "PREDICTION_HIT_VALIDATION_SETUP",
+      "command": "mkdir -p /home/lzx/Desktop/huawei/huawei_mem/lzx/outputs/automation_validation/prediction_hit/root/subdir && printf 'prediction hit workload\\n' > /home/lzx/Desktop/huawei/huawei_mem/lzx/outputs/automation_validation/prediction_hit/root/sample.txt && printf 'nested prediction workload\\n' > /home/lzx/Desktop/huawei/huawei_mem/lzx/outputs/automation_validation/prediction_hit/root/subdir/nested.txt"
+    },
+    {
+      "type": "shell",
+      "name": "files",
+      "label": "PREDICTION_HIT_FILES_LAUNCH",
+      "command": "nautilus --new-window /home/lzx/Desktop/huawei/huawei_mem/lzx/outputs/automation_validation/prediction_hit/root",
+      "optional": true
+    },
+    {
+      "type": "wait",
+      "seconds": 5,
+      "name": "files",
+      "label": "PREDICTION_HIT_WAIT_FILES"
+    },
+    {
+      "type": "repeat",
+      "times": 4,
+      "actions": [
+        {
+          "type": "switch",
+          "name": "files",
+          "class": "org.gnome.Nautilus|Nautilus|nautilus",
+          "title": "root|文件|Home|主文件夹",
+          "command": "nautilus --new-window /home/lzx/Desktop/huawei/huawei_mem/lzx/outputs/automation_validation/prediction_hit/root",
+          "optional": true,
+          "label": "PREDICTION_HIT_FILES_FOCUS"
+        },
+        {
+          "type": "key",
+          "name": "files",
+          "key": "ctrl+l",
+          "label": "PREDICTION_HIT_LOCATION"
+        },
+        {
+          "type": "type",
+          "name": "files",
+          "text": "/home/lzx/Desktop/huawei/huawei_mem/lzx/outputs/automation_validation/prediction_hit/root/subdir",
+          "delay_ms": 1,
+          "label": "PREDICTION_HIT_TYPE_SUBDIR"
+        },
+        {
+          "type": "key",
+          "name": "files",
+          "key": "Return",
+          "label": "PREDICTION_HIT_ENTER"
+        },
+        {
+          "type": "wait",
+          "seconds": 3,
+          "name": "files",
+          "label": "PREDICTION_HIT_DWELL_SUBDIR"
+        },
+        {
+          "type": "key",
+          "name": "files",
+          "key": "alt+Up",
+          "label": "PREDICTION_HIT_PARENT"
+        },
+        {
+          "type": "wait",
+          "seconds": 3,
+          "name": "files",
+          "label": "PREDICTION_HIT_DWELL_PARENT"
+        },
+        {
+          "type": "key",
+          "name": "files",
+          "key": "ctrl+f",
+          "label": "PREDICTION_HIT_SEARCH"
+        },
+        {
+          "type": "type",
+          "name": "files",
+          "text": "nested",
+          "delay_ms": 1,
+          "label": "PREDICTION_HIT_SEARCH_TEXT"
+        },
+        {
+          "type": "wait",
+          "seconds": 3,
+          "name": "files",
+          "label": "PREDICTION_HIT_SEARCH_DWELL"
+        },
+        {
+          "type": "key",
+          "name": "files",
+          "key": "Escape",
+          "label": "PREDICTION_HIT_SEARCH_CLOSE"
+        }
+      ]
+    }
+  ]
+}

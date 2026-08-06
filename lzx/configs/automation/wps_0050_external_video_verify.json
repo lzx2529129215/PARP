@@ -1,0 +1,8 @@
+{
+  "description": "Temporary local video-player verification.",
+  "variables": {"VIDEO": "${PROJECT_ROOT}/samples/wps/video_5s_test.mp4"},
+  "actions": [
+    {"type": "launch", "name": "video_player", "command": "gst-play-1.0 ${VIDEO}"},
+    {"type": "wait", "seconds": 4}
+  ]
+}

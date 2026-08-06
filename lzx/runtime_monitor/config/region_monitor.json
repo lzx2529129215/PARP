@@ -1,0 +1,31 @@
+{
+  "enabled": false,
+  "target_apps": ["WPS"],
+  "pid_refresh_ms": 1000,
+  "vma_refresh_ms": 1000,
+  "region_bucket_bytes": 262144,
+  "damon": {
+    "sample_us": 5000,
+    "aggr_us": 100000,
+    "update_us": 1000000,
+    "min_nr_regions": 10,
+    "max_nr_regions": 1000
+  },
+  "windows": {
+    "region_window_ms": 500,
+    "cgroup_window_ms": 1000
+  },
+  "anonymous_regions": {
+    "enabled": true,
+    "protection_eligible": false
+  },
+  "file_regions": {
+    "enabled": true,
+    "protection_eligible": false
+  },
+  "process_role_rules": {
+    "WPS_MAIN": ["wpsoffice", "/wps", "/wpp", "/et", "kingsoft"],
+    "WPS_CLOUD_SERVICE": ["wpscloud", "wpscloudsvr"],
+    "WPS_LIBADAPTER": ["libadapter"]
+  }
+}

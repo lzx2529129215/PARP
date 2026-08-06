@@ -1,0 +1,50 @@
+{
+  "description": "Thunderbird、VLC、GIMP、KeePassXC、LibreOffice 五应用启动、两轮切换、前台验证和安全关闭。",
+  "variables": {
+    "VLC_MEDIA": "${PROJECT_ROOT}/samples/wps/video_5s_test.mp4",
+    "GIMP_IMAGE": "${PROJECT_ROOT}/samples/wps/visible_paste_test.png"
+  },
+  "actions": [
+    {"type": "assert_file", "path": "${VLC_MEDIA}", "label": "MULTI_ASSERT_MEDIA"},
+    {"type": "assert_file", "path": "${GIMP_IMAGE}", "label": "MULTI_ASSERT_IMAGE"},
+    {"type": "launch", "name": "thunderbird", "app_key": "THUNDERBIRD", "command": "thunderbird", "label": "MULTI_LAUNCH_THUNDERBIRD"},
+    {"type": "launch", "name": "vlc", "app_key": "VLC", "command": "vlc --no-video-title-show ${VLC_MEDIA}", "label": "MULTI_LAUNCH_VLC"},
+    {"type": "launch", "name": "gimp", "app_key": "GIMP", "command": "gimp ${GIMP_IMAGE}", "label": "MULTI_LAUNCH_GIMP"},
+    {"type": "launch", "name": "keepassxc", "app_key": "KEEPASSXC", "command": "keepassxc", "label": "MULTI_LAUNCH_KEEPASS"},
+    {"type": "launch", "name": "libreoffice", "app_key": "LIBREOFFICE", "command": "libreoffice --writer", "label": "MULTI_LAUNCH_LIBREOFFICE"},
+    {"type": "wait", "seconds": 12, "label": "MULTI_WAIT_ALL_APPS"},
+    {"type": "repeat", "times": 2, "actions": [
+      {"type": "switch", "name": "thunderbird", "app_key": "THUNDERBIRD", "class": "thunderbird|Thunderbird", "title": "Thunderbird|邮件", "command": "thunderbird", "label": "MULTI_SWITCH_THUNDERBIRD"},
+      {"type": "verify_foreground", "name": "thunderbird", "app_key": "THUNDERBIRD", "class": "thunderbird|Thunderbird", "label": "MULTI_VERIFY_THUNDERBIRD"},
+      {"type": "hotkey", "name": "thunderbird", "key": "ctrl+k", "label": "MULTI_THUNDERBIRD_SEARCH"},
+      {"type": "key", "name": "thunderbird", "key": "Escape", "label": "MULTI_THUNDERBIRD_ESCAPE"},
+      {"type": "wait", "seconds": 2, "label": "MULTI_THUNDERBIRD_DWELL"},
+
+      {"type": "switch", "name": "vlc", "app_key": "VLC", "class": "vlc|Vlc", "title": "VLC|video_5s_test", "command": "vlc ${VLC_MEDIA}", "label": "MULTI_SWITCH_VLC"},
+      {"type": "verify_foreground", "name": "vlc", "app_key": "VLC", "class": "vlc|Vlc", "label": "MULTI_VERIFY_VLC"},
+      {"type": "key", "name": "vlc", "key": "space", "label": "MULTI_VLC_PLAY_PAUSE"},
+      {"type": "wait", "seconds": 2, "label": "MULTI_VLC_DWELL"},
+
+      {"type": "switch", "name": "gimp", "app_key": "GIMP", "class": "gimp|Gimp", "title": "GIMP|visible_paste_test", "command": "gimp ${GIMP_IMAGE}", "label": "MULTI_SWITCH_GIMP"},
+      {"type": "verify_foreground", "name": "gimp", "app_key": "GIMP", "class": "gimp|Gimp", "label": "MULTI_VERIFY_GIMP"},
+      {"type": "key", "name": "gimp", "key": "plus", "label": "MULTI_GIMP_ZOOM"},
+      {"type": "wait", "seconds": 2, "label": "MULTI_GIMP_DWELL"},
+
+      {"type": "switch", "name": "keepassxc", "app_key": "KEEPASSXC", "class": "keepassxc|KeePassXC", "title": "KeePassXC", "command": "keepassxc", "label": "MULTI_SWITCH_KEEPASS"},
+      {"type": "verify_foreground", "name": "keepassxc", "app_key": "KEEPASSXC", "class": "keepassxc|KeePassXC", "label": "MULTI_VERIFY_KEEPASS"},
+      {"type": "hotkey", "name": "keepassxc", "key": "ctrl+g", "optional": true, "label": "MULTI_KEEPASS_GENERATOR"},
+      {"type": "key", "name": "keepassxc", "key": "Escape", "optional": true, "label": "MULTI_KEEPASS_ESCAPE"},
+      {"type": "wait", "seconds": 2, "label": "MULTI_KEEPASS_DWELL"},
+
+      {"type": "switch", "name": "libreoffice", "app_key": "LIBREOFFICE", "class": "libreoffice-writer|soffice", "title": "Writer|LibreOffice", "command": "libreoffice --writer", "label": "MULTI_SWITCH_LIBREOFFICE"},
+      {"type": "verify_foreground", "name": "libreoffice", "app_key": "LIBREOFFICE", "class": "libreoffice-writer|soffice", "label": "MULTI_VERIFY_LIBREOFFICE"},
+      {"type": "paste_text", "name": "libreoffice", "text": "multi app switch ", "label": "MULTI_LIBREOFFICE_TYPE"},
+      {"type": "wait", "seconds": 2, "label": "MULTI_LIBREOFFICE_DWELL"}
+    ]},
+    {"type": "close", "name": "vlc", "app_key": "VLC", "class": "vlc|Vlc", "process_names": ["vlc"], "force_after_seconds": 2, "optional": true, "label": "MULTI_CLOSE_VLC"},
+    {"type": "close", "name": "gimp", "app_key": "GIMP", "class": "gimp|Gimp", "process_names": ["gimp", "gimp-2.10"], "force_after_seconds": 2, "optional": true, "label": "MULTI_CLOSE_GIMP"},
+    {"type": "close", "name": "keepassxc", "app_key": "KEEPASSXC", "class": "keepassxc|KeePassXC", "process_names": ["keepassxc"], "force_after_seconds": 2, "optional": true, "label": "MULTI_CLOSE_KEEPASS"},
+    {"type": "close", "name": "libreoffice", "app_key": "LIBREOFFICE", "class": "libreoffice-writer|soffice", "process_names": ["soffice.bin", "soffice"], "force_after_seconds": 2, "optional": true, "label": "MULTI_CLOSE_LIBREOFFICE"},
+    {"type": "close", "name": "thunderbird", "app_key": "THUNDERBIRD", "class": "thunderbird|Thunderbird", "process_names": ["thunderbird"], "force_after_seconds": 2, "optional": true, "label": "MULTI_CLOSE_THUNDERBIRD"}
+  ]
+}

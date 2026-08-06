@@ -1,0 +1,7 @@
+{
+  "uuid": "runtime-app-monitor@huawei.local",
+  "name": "Runtime App Monitor",
+  "description": "Emits GNOME Shell window lifecycle events for the operation predictor runtime monitor.",
+  "shell-version": ["42", "43", "44"],
+  "version": 1
+}

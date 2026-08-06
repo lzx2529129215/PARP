@@ -1,0 +1,89 @@
+--- a/mm/parp/control/debugfs.c
++++ b/mm/parp/control/debugfs.c
+@@ -2,6 +2,7 @@
+ #include <linux/debugfs.h>
+ #include <linux/fs.h>
+ #include <linux/init.h>
+ #include <linux/module.h>
++#include <linux/seq_file.h>
+ #include <linux/uaccess.h>
+ #include "../internal.h"
+@@ -94,8 +95,70 @@
+ static const struct file_operations prior_fops = {
+ 	.owner = THIS_MODULE,
+ 	.write = prior_write,
+ 	.llseek = noop_llseek,
+ };
++
++static int snapshot_show(struct seq_file *m, void *v)
++{
++	const struct parp_snapshot *snapshot = parp_snapshot_acquire();
++
++	if (!snapshot) {
++		seq_puts(m, "version=0\ncreated_ns=0\nexpires_ns=0\n"
++			 "nr_priors=0\nnr_bindings=0\n");
++		parp_snapshot_release();
++		return 0;
++	}
++
++	seq_printf(m, "version=%llu\ncreated_ns=%llu\nexpires_ns=%llu\n"
++		   "nr_priors=%u\nnr_bindings=%u\n",
++		   snapshot->version, snapshot->created_ns, snapshot->expires_ns,
++		   snapshot->nr_priors, snapshot->nr_bindings);
++	parp_snapshot_release();
++	return 0;
++}
++
++static int snapshot_open(struct inode *inode, struct file *file)
++{
++	return single_open(file, snapshot_show, inode->i_private);
++}
++
++static const struct file_operations snapshot_fops = {
++	.owner = THIS_MODULE,
++	.open = snapshot_open,
++	.read = seq_read,
++	.llseek = seq_lseek,
++	.release = single_release,
++};
++
++static int stats_show(struct seq_file *m, void *v)
++{
++	unsigned int i;
++
++	seq_printf(m, "prepare=%lld\nscored=%lld\nfinish=%lld\n",
++		   atomic64_read(&parp_stats.prepare),
++		   atomic64_read(&parp_stats.scored),
++		   atomic64_read(&parp_stats.finish));
++	for (i = 0; i < ARRAY_SIZE(parp_stats.proposed); i++)
++		seq_printf(m, "proposed[%u]=%lld\n", i,
++			   atomic64_read(&parp_stats.proposed[i]));
++	for (i = 0; i < ARRAY_SIZE(parp_stats.fallback); i++)
++		seq_printf(m, "fallback[%u]=%lld\n", i,
++			   atomic64_read(&parp_stats.fallback[i]));
++	return 0;
++}
++
++static int stats_open(struct inode *inode, struct file *file)
++{
++	return single_open(file, stats_show, inode->i_private);
++}
++
++static const struct file_operations stats_fops = {
++	.owner = THIS_MODULE,
++	.open = stats_open,
++	.read = seq_read,
++	.llseek = seq_lseek,
++	.release = single_release,
++};
+ 
+ static int __init parp_init(void)
+ {
+@@ -103,5 +166,7 @@
+ 	debugfs_create_file("mode", 0600, parp_dir, NULL, &mode_fops);
+ 	debugfs_create_file("app_bind", 0200, parp_dir, NULL, &bind_fops);
+ 	debugfs_create_file("app_prior", 0200, parp_dir, NULL, &prior_fops);
++	debugfs_create_file("snapshot", 0400, parp_dir, NULL, &snapshot_fops);
++	debugfs_create_file("stats", 0400, parp_dir, NULL, &stats_fops);
+ 	return 0;
+ }

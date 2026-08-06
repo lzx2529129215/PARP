@@ -1,0 +1,37 @@
+{
+  "description": "Files/Nautilus 多场景自动化：隔离素材准备、路径导航、搜索、视图切换、新建目录和多层返回。",
+  "variables": {
+    "FILES_ROOT": "${PROJECT_ROOT}/outputs/automation_rich/files_workspace"
+  },
+  "actions": [
+    {"type": "shell", "command": "mkdir -p \"${FILES_ROOT}/documents\" \"${FILES_ROOT}/images\" \"${FILES_ROOT}/archive/2026\" && printf 'automation report alpha\\n' > \"${FILES_ROOT}/documents/report_alpha.txt\" && printf 'automation report beta\\n' > \"${FILES_ROOT}/documents/report_beta.txt\" && printf 'image placeholder\\n' > \"${FILES_ROOT}/images/cover.txt\" && printf 'archived record\\n' > \"${FILES_ROOT}/archive/2026/record.txt\"", "label": "FILES_PREPARE_ISOLATED_WORKSPACE"},
+    {"type": "shell", "name": "files", "command": "nautilus --new-window \"${FILES_ROOT}\"", "label": "FILES_LAUNCH_WORKSPACE"},
+    {"type": "wait_window", "name": "files", "class": "org.gnome.Nautilus|Nautilus|nautilus", "title": "files_workspace|Files|文件", "timeout": 20, "label": "FILES_WAIT_WINDOW"},
+    {"type": "window_state", "name": "files", "class": "org.gnome.Nautilus|Nautilus|nautilus", "state": "maximize", "optional": true, "label": "FILES_MAXIMIZE"},
+    {"type": "verify_foreground", "name": "files", "class": "org.gnome.Nautilus|Nautilus|nautilus", "label": "FILES_VERIFY_ROOT"},
+
+    {"type": "hotkey", "name": "files", "key": "ctrl+l", "label": "FILES_OPEN_LOCATION"},
+    {"type": "paste_text", "name": "files", "text": "${FILES_ROOT}/documents", "label": "FILES_ENTER_DOCUMENTS_PATH"},
+    {"type": "key", "name": "files", "key": "Return", "label": "FILES_NAVIGATE_DOCUMENTS"},
+    {"type": "wait", "seconds": 2, "label": "FILES_DOCUMENTS_DWELL"},
+    {"type": "hotkey", "name": "files", "key": "ctrl+f", "label": "FILES_OPEN_SEARCH"},
+    {"type": "paste_text", "name": "files", "text": "report", "label": "FILES_SEARCH_REPORTS"},
+    {"type": "wait", "seconds": 3, "label": "FILES_SEARCH_RESULTS_DWELL"},
+    {"type": "key", "name": "files", "key": "Escape", "label": "FILES_CLOSE_SEARCH"},
+
+    {"type": "hotkey", "name": "files", "key": "ctrl+1", "optional": true, "label": "FILES_LIST_VIEW"},
+    {"type": "wait", "seconds": 1, "label": "FILES_LIST_VIEW_DWELL"},
+    {"type": "hotkey", "name": "files", "key": "ctrl+2", "optional": true, "label": "FILES_GRID_VIEW"},
+    {"type": "hotkey", "name": "files", "key": "ctrl+shift+n", "optional": true, "label": "FILES_NEW_FOLDER_DIALOG"},
+    {"type": "paste_text", "name": "files", "text": "generated_by_automation", "optional": true, "label": "FILES_NEW_FOLDER_NAME"},
+    {"type": "key", "name": "files", "key": "Return", "optional": true, "label": "FILES_CREATE_FOLDER"},
+    {"type": "wait", "seconds": 2, "label": "FILES_FOLDER_CREATED_DWELL"},
+
+    {"type": "hotkey", "name": "files", "key": "ctrl+l", "label": "FILES_OPEN_ARCHIVE_LOCATION"},
+    {"type": "paste_text", "name": "files", "text": "${FILES_ROOT}/archive/2026", "label": "FILES_ENTER_ARCHIVE_PATH"},
+    {"type": "key", "name": "files", "key": "Return", "label": "FILES_NAVIGATE_ARCHIVE"},
+    {"type": "key", "name": "files", "key": "alt+Up", "repeat": 2, "interval": 0.5, "label": "FILES_RETURN_ROOT_TWO_LEVELS"},
+    {"type": "verify_foreground", "name": "files", "class": "org.gnome.Nautilus|Nautilus|nautilus", "label": "FILES_VERIFY_FINAL"},
+    {"type": "close", "name": "files", "class": "org.gnome.Nautilus|Nautilus|nautilus", "process_names": ["nautilus"], "wait_after_window_close": 1, "force_after_seconds": 0, "optional": true, "label": "FILES_CLOSE"}
+  ]
+}

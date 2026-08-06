@@ -1,0 +1,30 @@
+{
+  "phase": "PHASE05_COMPLETE_WITH_CONSERVATIVE_EXCLUSIONS",
+  "ur_statuses": {
+    "UR-001": "OPEN",
+    "UR-002": "PARTIALLY_RESOLVED",
+    "UR-003": "RESOLVED",
+    "UR-004": "RESOLVED",
+    "UR-005": "OPEN",
+    "UR-006": "OPEN",
+    "UR-007": "OPEN",
+    "UR-008": "OPEN",
+    "UR-009": "OPEN",
+    "UR-010": "OPEN",
+    "UR-011": "PARTIALLY_RESOLVED",
+    "UR-012": "PARTIALLY_RESOLVED",
+    "UR-013": "RESOLVED",
+    "UR-014": "RESOLVED"
+  },
+  "output_records": 13,
+  "backup_records": 206,
+  "backup_archive_candidates": 0,
+  "safe_to_start_phase_1": true,
+  "safe_to_move_generated_outputs": false,
+  "safe_to_archive_backups": false,
+  "safe_to_delete_anything": false,
+  "safe_to_modify_kernel_layout": false,
+  "safe_to_refactor_runtime_monitor": false,
+  "safe_to_refactor_harmony_pipeline": false,
+  "ready_for_apply": false
+}
