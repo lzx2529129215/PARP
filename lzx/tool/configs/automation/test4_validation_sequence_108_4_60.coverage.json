@@ -1,6 +1,6 @@
 {
   "split": "val",
-  "dataset": "/home/lzx/Desktop/huawei_mem/lzx/operation_predictor/data/test1/processed/app_lstm_duration_switch/val.csv",
+  "dataset": "/home/lzx/Desktop/myself-kswapd/lzx/tool/operation_predictor/data/test1/processed/app_lstm_duration_switch/val.csv",
   "session_id": "108:4",
   "start_index": 60,
   "transition_count": 9,

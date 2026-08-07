@@ -4,7 +4,7 @@
 
 - Python 3.10.12
 - CPU-only PyTorch 2.3.1
-- checkpoint：`operation_predictor/outputs/checkpoints/app_lstm/lsapp_app_lstm.pt`
+- checkpoint：`tool/operation_predictor/outputs/checkpoints/app_lstm/lsapp_app_lstm.pt`
 - model version：401
 - 评估 horizon：5 分钟（300000 ms）
 - PARP Apply：关闭
@@ -12,11 +12,11 @@
 ## 运行内容
 
 ```bash
-cd /home/lzx/Desktop/huawei_mem/lzx/MGLRU-test/v4.1-parp
+cd /home/lzx/Desktop/myself-kswapd/lzx/kernel/v4.1-parp
 python3 tools/make_fixture.py
 python3 tools/run_app_lstm.py \
   --input samples/fixture/lstm_input.csv \
-  --checkpoint ../../operation_predictor/outputs/checkpoints/app_lstm/lsapp_app_lstm.pt \
+  --checkpoint ../../tool/operation_predictor/outputs/checkpoints/app_lstm/lsapp_app_lstm.pt \
   --output outputs/fixture/lstm_predictions_real.csv \
   --score-mode softmax --model-version 401 --device cpu
 python3 tools/evaluate_app_lstm_effect.py \

@@ -25,6 +25,18 @@ v4.1-parp/outputs/
 # Legacy local kernel trees are retained only in the old workspace during migration.
 /MGLRU-test/
 
+# Relocated user-space workspace payloads.
+/tool/outputs/
+/tool/mem/
+/tool/operation_predictor/data/
+/tool/operation_predictor/outputs/
+
+# Relocated v4.1-PARP local kernel source and build assets.
+/kernel/v4.1-parp/kernel/downloads/
+/kernel/v4.1-parp/kernel/build/
+/kernel/v4.1-parp/kernel/src/
+/kernel/v4.1-parp/outputs/
+
 # PARP local kernel workspaces: track portable patches/configuration only.  #lzx
 kernel/v4-parp/build/
 kernel/v4-parp/outputs/

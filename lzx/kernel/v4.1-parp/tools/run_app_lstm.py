@@ -22,7 +22,7 @@ from typing import Any
 
 HERE = Path(__file__).resolve()
 LZX_ROOT = HERE.parents[3]
-OP_ROOT = LZX_ROOT / "operation_predictor"
+OP_ROOT = LZX_ROOT / "tool" / "operation_predictor"
 if str(OP_ROOT) not in sys.path:
     sys.path.insert(0, str(OP_ROOT))
 

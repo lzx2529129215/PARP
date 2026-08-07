@@ -23,7 +23,7 @@ v4.1 的评估是用户态、只读、反事实计算：不会写 debugfs，不�
 ## 快速运行可复现 fixture
 
 ```bash
-cd /home/lzx/Desktop/huawei_mem/lzx/MGLRU-test/v4.1-parp
+cd /home/lzx/Desktop/myself-kswapd/lzx/kernel/v4.1-parp
 python3 tools/make_fixture.py
 python3 tools/evaluate_app_lstm_effect.py \
   --samples samples/fixture/samples.csv \
@@ -53,7 +53,7 @@ python3 tools/emit_parp_commands.py \
 ```bash
 python3 tools/run_app_lstm.py \
   --input samples/fixture/lstm_input.csv \
-  --checkpoint ../../operation_predictor/outputs/checkpoints/app_lstm/lsapp_app_lstm.pt \
+  --checkpoint ../../tool/operation_predictor/outputs/checkpoints/app_lstm/lsapp_app_lstm.pt \
   --output outputs/fixture/lstm_predictions_real.csv \
   --score-mode softmax \
   --model-version 401
