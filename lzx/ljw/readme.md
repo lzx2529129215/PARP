@@ -1,0 +1,1 @@
+基于myself-kswapd/lzx/kernel/v4.1-parp内核（无法编译就编译v4-parp内核），设计实验，验证应用间预测结果主动触发memory.reclaim是否能提升前台应用效率，并分析实验结果。
