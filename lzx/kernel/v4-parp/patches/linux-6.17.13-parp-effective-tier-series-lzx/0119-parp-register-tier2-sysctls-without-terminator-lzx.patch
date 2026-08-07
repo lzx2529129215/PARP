@@ -1,0 +1,26 @@
+From 066b9202ec892fd2f2eded2eebca392885badce7 Mon Sep 17 00:00:00 2001
+From: Codex PARP Reproduction <codex@localhost>
+Date: Wed, 5 Aug 2026 17:20:53 +0800
+Subject: [PATCH 119/124] parp: register tier2 sysctls without terminator
+
+---
+ mm/parp/core/watermark.c | 3 +--
+ 1 file changed, 1 insertion(+), 2 deletions(-)
+
+diff --git a/mm/parp/core/watermark.c b/mm/parp/core/watermark.c
+index fb85fa0e0..8a38ac44b 100644
+--- a/mm/parp/core/watermark.c
++++ b/mm/parp/core/watermark.c
+@@ -64,8 +64,7 @@ static const struct ctl_table parp_tier2_sysctls[] = {
+ 		.extra1 = SYSCTL_ZERO,
+ 		.extra2 = &parp_tier2_hundred,
+ 	},
+-	{}
+-};
++}; /* #lzx */
+ 
+ u64 parp_tier2_scaled_wmark(u64 limit_bytes, u32 scale, u64 floor)
+ {
+-- 
+2.25.1
+

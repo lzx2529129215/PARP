@@ -1,0 +1,50 @@
+From 402d6455f5de6ba4251a0743f0526ca2f77d2c21 Mon Sep 17 00:00:00 2001
+From: Codex PARP Reproduction <codex@localhost>
+Date: Wed, 5 Aug 2026 10:37:01 +0800
+Subject: [PATCH 115/124] parp: harden KUnit boundary coverage
+
+---
+ mm/parp/core/scan_budget.c | 4 ++++
+ mm/parp/tests/parp_test.c  | 4 ++--
+ 2 files changed, 6 insertions(+), 2 deletions(-)
+
+diff --git a/mm/parp/core/scan_budget.c b/mm/parp/core/scan_budget.c
+index b72859d80..69785e57f 100644
+--- a/mm/parp/core/scan_budget.c
++++ b/mm/parp/core/scan_budget.c
+@@ -92,6 +92,10 @@ static u64 parp_scale_scan_units(u64 native, u32 multiplier)
+ 	u64 scaled;
+ 	u64 remainder;
+ 
++	/* mul_u64_u32_div() requires its quotient to fit in u64. */
++	if (multiplier > PARP_Q15_SCALE &&
++	    native > mul_u64_u32_div(U64_MAX, PARP_Q15_SCALE, multiplier))
++		return U64_MAX;
+ 	scaled = mul_u64_u32_div(native, multiplier, PARP_Q15_SCALE);
+ 	remainder = ((native & (PARP_Q15_SCALE - 1)) * multiplier) &
+ 		(PARP_Q15_SCALE - 1);
+diff --git a/mm/parp/tests/parp_test.c b/mm/parp/tests/parp_test.c
+index a7cefb55e..267e10f57 100644
+--- a/mm/parp/tests/parp_test.c
++++ b/mm/parp/tests/parp_test.c
+@@ -135,7 +135,7 @@ static void parp_region_alignment_test(struct kunit *test)
+ 
+ static void parp_evidence_window_test(struct kunit *test)
+ {
+-	u64 now = ktime_get_mono_fast_ns();
++	u64 now = max_t(u64, ktime_get_mono_fast_ns(), 60 * NSEC_PER_SEC);
+ 	struct parp_app_prior prior = {
+ 		.app_id = 2,
+ 		.use_score_q15 = 20000,
+@@ -634,7 +634,7 @@ static void parp_scan_budget_bounds_mode_test(struct kunit *test)
+ 			  BIT(PARP_SCAN_REASON_CLAMP_MAX));
+ 	input.native_nr_to_scan = U64_MAX;
+ 	KUNIT_ASSERT_EQ(test, parp_compute_scan_budget(&input, &decision), 0);
+-	KUNIT_EXPECT_LE(test, decision.proposed_nr_to_scan, U64_MAX);
++	KUNIT_EXPECT_EQ(test, decision.proposed_nr_to_scan, U64_MAX);
+ 	input.native_nr_to_scan = 1000;
+ 	input.app_use_score_q15 = 30000;
+ 	parp_set_scan_budget_apply_domain(input.domain_id);
+-- 
+2.25.1
+

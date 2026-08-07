@@ -1,0 +1,3786 @@
+From a7447a42ad7331798f5203e2bd04a851df87190c Mon Sep 17 00:00:00 2001
+From: Codex PARP Reproduction <codex@localhost>
+Date: Tue, 4 Aug 2026 16:06:30 +0800
+Subject: [PATCH 106/124] parp: add controlled effective tier experiment
+ harness
+
+---
+ tools/parp/effective_tier/README.phase_e.md   | 147 +++
+ tools/parp/effective_tier/analyze.py          | 945 ++++++++++++++++++
+ tools/parp/effective_tier/collector.py        | 711 +++++++++++++
+ tools/parp/effective_tier/contracts.py        | 481 +++++++++
+ .../experiment_manifest.schema.json           |  91 ++
+ .../experiment_manifest.template.json         | 161 +++
+ tools/parp/effective_tier/experiment_plan.py  | 280 ++++++
+ tools/parp/effective_tier/feature_schema.json | 137 +++
+ .../labeled_candidate.schema.json             |  37 +
+ .../effective_tier/observability.schema.json  | 122 +++
+ .../parp/effective_tier/raw_event.schema.json | 107 ++
+ .../session_metadata.schema.json              |  57 ++
+ .../parp/effective_tier/tests/test_phase_e.py | 394 ++++++++
+ 13 files changed, 3670 insertions(+)
+ create mode 100644 tools/parp/effective_tier/README.phase_e.md
+ create mode 100644 tools/parp/effective_tier/analyze.py
+ create mode 100644 tools/parp/effective_tier/collector.py
+ create mode 100644 tools/parp/effective_tier/contracts.py
+ create mode 100644 tools/parp/effective_tier/experiment_manifest.schema.json
+ create mode 100644 tools/parp/effective_tier/experiment_manifest.template.json
+ create mode 100644 tools/parp/effective_tier/experiment_plan.py
+ create mode 100644 tools/parp/effective_tier/feature_schema.json
+ create mode 100644 tools/parp/effective_tier/labeled_candidate.schema.json
+ create mode 100644 tools/parp/effective_tier/observability.schema.json
+ create mode 100644 tools/parp/effective_tier/raw_event.schema.json
+ create mode 100644 tools/parp/effective_tier/session_metadata.schema.json
+ create mode 100644 tools/parp/effective_tier/tests/test_phase_e.py
+
+diff --git a/tools/parp/effective_tier/README.phase_e.md b/tools/parp/effective_tier/README.phase_e.md
+new file mode 100644
+index 000000000..2af18e77b
+--- /dev/null
++++ b/tools/parp/effective_tier/README.phase_e.md
+@@ -0,0 +1,147 @@
++# Phase E: offline effective-tier experiment harness
++
++This appendix defines the Phase-E stopping point:
++`PARP_EFFECTIVE_TIER_LIVE_AUTH_REQUIRED`. It adds contracts and offline tools;
++it does not install or boot a kernel, read live tracefs/debugfs, write a cgroup,
++start memory pressure, or enable any PARP mode. No real SHADOW or APPLY result is
++implied by these files.
++
++## Data boundary
++
++`raw_event.schema.json` covers two exported event types:
++
++- `tier_gate_candidate`: every folio that reaches the native MGLRU tier gate,
++  including native-reclaim, native-protect, and special-native-protect folios;
++- `real_access`: a strictly later `PTE_YOUNG`, `MARK_ACCESSED`, or
++  `FD_REFERENCE` observation for the same experiment, session, folio cookie,
++  and lifetime epoch.
++
++Native generation movement, native tier promotion, and PARP policy movement
++are not real-access labels. The labels describe future access, not refault.
++True refault analysis uses exported `workingset_refault_file` and
++`workingset_refault_anon` counter deltas in `observability.schema.json`.
++
++For each candidate, `collector.py` creates four posterior labels:
++`reuse_within_100ms`, `reuse_within_500ms`, `reuse_within_1s`, and
++`reuse_within_5s`. A negative label is emitted only when its entire future
++window was observed. A truncated window is `null`; a positive real access that
++arrives before truncation is still a valid positive.
++
++`session_metadata.schema.json` supplies the independently exported session
++boundary, candidate counter, and trace-loss before/after measurement. Complete
++tier-gate coverage is claimed only when:
++
++1. the measured gate-counter delta equals the number of candidate records;
++2. trace loss was measured from a named source; and
++3. measured trace loss is zero.
++
++Otherwise the rows remain available for diagnostics, but the collection and
++training gate is marked incomplete.
++
++## Offline flow
++
++All input paths must point to previously exported ordinary files. `/sys`,
++`/proc`, `/dev`, and `/run` paths are rejected.
++
++`collector.py` also accepts `--trace-text` for an already-exported text dump of
++the four `parp_effective_tier_{decision,access,outcome,batch}` tracepoints. It
++normalizes the numeric kernel enums, joins outcome records, ignores explicitly
++non-real access/movement events, infers an access session only when the folio
++cookie/lifetime has one unambiguous owner, and imports measured batch model
++time. It does not open a live trace source. Session metadata remains mandatory
++because a per-record trace flag cannot prove trace-buffer loss.
++
++```sh
++python3 tools/parp/effective_tier/collector.py \
++  --events exported-events.jsonl \
++  --sessions exported-sessions.json \
++  --output-dir offline-dataset
++
++# Equivalent input adapter for a previously exported kernel trace text file:
++python3 tools/parp/effective_tier/collector.py \
++  --trace-text exported-effective-tier-trace.txt \
++  --sessions exported-sessions.json \
++  --output-dir offline-dataset
++
++python3 tools/parp/effective_tier/analyze.py \
++  --samples offline-dataset/labeled_candidates.jsonl \
++  --telemetry offline-dataset/observability.jsonl \
++  --output-dir offline-analysis
++
++python3 tools/parp/effective_tier/experiment_plan.py \
++  --manifest tools/parp/effective_tier/experiment_manifest.template.json \
++  --output-dir offline-plan
++```
++
++The plan renderer has no execute option and emits no shell command. Every live
++matrix cell is marked `NOT_EXECUTED_PLAN_ONLY`.
++
++## Required decisions and metrics
++
++Special native protection is forced into the effective protected state and is
++reported separately. The remaining native/effective combinations are:
++
++| Native | Effective | Quadrant |
++|---|---|---|
++| reclaim | reclaim | `KEEP_RECLAIM` |
++| reclaim | protect | `PREDICTIVE_UPGRADE` |
++| protect | protect | `KEEP_PROTECT` |
++| protect | reclaim | `PREDICTIVE_DOWNGRADE` |
++
++Counts and rates are weighted by `folio_nr_pages`, not by folio records.
++Upgrade hit/waste and downgrade mistake/cold precision are reported for all
++four label windows. The offline bidirectional direction gate requires both:
++
++- reuse among `PREDICTIVE_UPGRADE` is above `KEEP_RECLAIM`; and
++- reuse among `PREDICTIVE_DOWNGRADE` is below `KEEP_PROTECT`.
++
++The observability contract covers score/effective-tier/quadrant/batch timing,
++`lru_lock` hold/wait/IRQ-disabled timing, direct and memcg reclaim, kswapd,
++isolation and shrink timing, reclaim efficiency, VM/PSI/memory event deltas,
++and App operation latency and failures. Analysis emits P50/P95/P99/P99.9/max
++where raw latency samples exist.
++
++## GLOBAL model training and ablations
++
++Splits are assigned to whole sessions. An explicit session split is preserved;
++otherwise the experiment and session IDs are deterministically hashed into
++70% train, 15% validation, and 15% test. Page-row random splitting is rejected.
++
++The trainer uses offline smoothed log-odds to fit and immediately quantize
++integer additive lookup tables. Floating point is confined to offline analysis;
++the emitted runtime candidate has only integer bias, bins, weights, and
++thresholds. Training rows must come from complete SHADOW sessions. It performs exactly three
++offline ablations:
++
++1. the six real-history features without native tier;
++2. those features plus `native_tier`;
++3. those features plus `native_tier` and `native_tier_idx`.
++
++Every ablation remains one `GLOBAL_REUSE_MODEL`; App, workload, and session are
++reporting dimensions, never model features. The seven- and eight-feature
++variants are marked offline-only because the version-1 kernel scorer has six
++feature slots. They are used to decide whether native inputs merit a later,
++explicitly reviewed kernel schema change, not loaded into the current kernel.
++The analyzer also replays maximum upgrades of +1, +2, and +3 tiers while
++retaining the -1 boundary-only downgrade rule.
++
++## Outputs
++
++The collector writes `labeled_candidates.jsonl`, `observability.jsonl`,
++`collection_summary.json`, and `session_splits.json`. The analyzer writes:
++
++- `tier_reclassification.json`;
++- `upgrade_analysis.json` and `downgrade_analysis.json`;
++- `dataset_stability.json` and `model_quality.json`;
++- `global_model.json`, explicitly marked as an unselected offline candidate;
++- `latency.json`, `lock_latency.json`, `reclaim_efficiency.json`,
++  `app_latency.json`, and `vm_counter_deltas.json`;
++- `summary.json`, which explicitly records that this tool ran no live SHADOW,
++  APPLY, cgroup, or pressure action.
++
++Run the Phase-E tests from the kernel tree root:
++
++```sh
++python3 -m unittest -v tools.parp.effective_tier.tests.test_phase_e
++python3 -m compileall -q tools/parp/effective_tier
++```
+diff --git a/tools/parp/effective_tier/analyze.py b/tools/parp/effective_tier/analyze.py
+new file mode 100644
+index 000000000..a44ce3f30
+--- /dev/null
++++ b/tools/parp/effective_tier/analyze.py
+@@ -0,0 +1,945 @@
++#!/usr/bin/env python3
++# SPDX-License-Identifier: GPL-2.0
++"""Offline Phase-E quality, quadrant, ablation, and latency analysis."""
++
++from __future__ import annotations
++
++import argparse
++import bisect
++import math
++import sys
++from collections import Counter, defaultdict
++from pathlib import Path
++from typing import DefaultDict, Dict, Iterable, List, Mapping, Optional, Sequence, Tuple
++
++try:
++    from .contracts import (
++        BASE_FEATURES,
++        FEATURE_EDGES,
++        LABEL_WINDOWS_NS,
++        MODEL_ABLATIONS,
++        PRIMARY_LABEL,
++        QUADRANTS,
++        SPLITS,
++        ContractError,
++        folio_key,
++        normalized_id,
++        read_jsonl,
++        reject_live_path,
++        session_key,
++        validate_candidate,
++        validate_telemetry,
++        write_json,
++    )
++except ImportError:  # Direct execution from this directory.
++    from contracts import (  # type: ignore
++        BASE_FEATURES,
++        FEATURE_EDGES,
++        LABEL_WINDOWS_NS,
++        MODEL_ABLATIONS,
++        PRIMARY_LABEL,
++        QUADRANTS,
++        SPLITS,
++        ContractError,
++        folio_key,
++        normalized_id,
++        read_jsonl,
++        reject_live_path,
++        session_key,
++        validate_candidate,
++        validate_telemetry,
++        write_json,
++    )
++
++
++Scored = Tuple[int, bool, int, Mapping[str, object]]
++
++
++def validate_labeled(row: Mapping[str, object]) -> None:
++    validate_candidate(row)
++    required = (
++        "quadrant", "split", "app", "workload", "mode",
++        "pressure_level", "labels", "label_semantics",
++        "trace_lost_measured", "trace_lost",
++        "tier_gate_coverage_measured", "tier_gate_coverage_complete",
++    )
++    missing = [name for name in required if name not in row]
++    if missing:
++        raise ContractError("labeled candidate missing: %s" %
++                            ", ".join(sorted(missing)))
++    if row["quadrant"] not in QUADRANTS:
++        raise ContractError("invalid quadrant")
++    if row["split"] not in SPLITS:
++        raise ContractError("invalid session split")
++    if row["label_semantics"] != "FUTURE_REAL_ACCESS_NOT_REFAULT":
++        raise ContractError("future access labels cannot be called refaults")
++    labels = row["labels"]
++    if not isinstance(labels, Mapping):
++        raise ContractError("labels must be an object")
++    for name, _window in LABEL_WINDOWS_NS:
++        if name not in labels or labels[name] not in (True, False, None):
++            raise ContractError("invalid or missing label %s" % name)
++    if not isinstance(row["trace_lost_measured"], bool):
++        raise ContractError("trace_lost_measured must be boolean")
++    if row["trace_lost_measured"]:
++        if isinstance(row["trace_lost"], bool) or not isinstance(
++                row["trace_lost"], int):
++            raise ContractError("measured trace_lost must be an integer")
++    elif row["trace_lost"] is not None:
++        raise ContractError("unmeasured trace_lost must be null")
++
++
++def _label(row: Mapping[str, object], name: str) -> Optional[bool]:
++    labels = row["labels"]
++    assert isinstance(labels, Mapping)
++    value = labels[name]
++    return value if value is None else bool(value)
++
++
++def _pages(row: Mapping[str, object]) -> int:
++    return int(row["folio_nr_pages"])
++
++
++def _rate(rows: Iterable[Mapping[str, object]], label_name: str) -> Dict[str, object]:
++    positive = 0
++    negative = 0
++    records = 0
++    for row in rows:
++        value = _label(row, label_name)
++        if value is None:
++            continue
++        records += 1
++        if value:
++            positive += _pages(row)
++        else:
++            negative += _pages(row)
++    total = positive + negative
++    rate = positive / total if total else None
++    low, high = _wilson(positive, total)
++    return {
++        "known_records": records,
++        "known_base_pages": total,
++        "positive_base_pages": positive,
++        "negative_base_pages": negative,
++        "reuse_rate": rate,
++        "reuse_rate_ci95": [low, high] if low is not None else None,
++    }
++
++
++def _wilson(positive: int, total: int) -> Tuple[Optional[float], Optional[float]]:
++    if not total:
++        return None, None
++    z = 1.959963984540054
++    p = positive / total
++    denominator = 1.0 + z * z / total
++    centre = (p + z * z / (2.0 * total)) / denominator
++    radius = (z * math.sqrt((p * (1.0 - p) + z * z /
++                            (4.0 * total)) / total)) / denominator
++    return max(0.0, centre - radius), min(1.0, centre + radius)
++
++
++def quadrant_analysis(rows: Sequence[Mapping[str, object]]) -> Dict[str, object]:
++    quadrants: Dict[str, object] = {}
++    for name in QUADRANTS:
++        selected = [row for row in rows if row["quadrant"] == name]
++        quadrants[name] = {
++            "records": len(selected),
++            "base_pages": sum(_pages(row) for row in selected),
++            "special_native_protect_records": sum(
++                1 for row in selected if row["special_native_protect"]),
++        }
++    return {
++        "candidate_scope": "ALL_NATIVE_TIER_GATE_FOLIOS",
++        "total_records": len(rows),
++        "total_base_pages": sum(_pages(row) for row in rows),
++        "quadrants": quadrants,
++    }
++
++
++def action_analysis(rows: Sequence[Mapping[str, object]]) -> Tuple[Dict[str, object],
++                                                                    Dict[str, object]]:
++    upgrades = [row for row in rows
++                if row["quadrant"] == "PREDICTIVE_UPGRADE"]
++    keep_reclaim = [row for row in rows if row["quadrant"] == "KEEP_RECLAIM"]
++    downgrades = [row for row in rows
++                  if row["quadrant"] == "PREDICTIVE_DOWNGRADE"]
++    keep_protect = [row for row in rows if row["quadrant"] == "KEEP_PROTECT"]
++    upgrade_windows: Dict[str, object] = {}
++    downgrade_windows: Dict[str, object] = {}
++    for label_name, _window in LABEL_WINDOWS_NS:
++        upgrade = _rate(upgrades, label_name)
++        reclaim = _rate(keep_reclaim, label_name)
++        downgrade = _rate(downgrades, label_name)
++        protect = _rate(keep_protect, label_name)
++        upgrade_rate = upgrade["reuse_rate"]
++        downgrade_rate = downgrade["reuse_rate"]
++        upgrade_windows[label_name] = {
++            "predictive_upgrade": upgrade,
++            "keep_reclaim": reclaim,
++            "upgrade_hit_rate": upgrade_rate,
++            "upgrade_waste_rate": (1.0 - upgrade_rate
++                                   if upgrade_rate is not None else None),
++            "direction_holds": (
++                upgrade_rate > reclaim["reuse_rate"]
++                if upgrade_rate is not None and
++                reclaim["reuse_rate"] is not None else None),
++        }
++        downgrade_windows[label_name] = {
++            "predictive_downgrade": downgrade,
++            "keep_protect": protect,
++            "downgrade_mistake_rate": downgrade_rate,
++            "downgrade_cold_precision": (1.0 - downgrade_rate
++                                          if downgrade_rate is not None
++                                          else None),
++            "direction_holds": (
++                downgrade_rate < protect["reuse_rate"]
++                if downgrade_rate is not None and
++                protect["reuse_rate"] is not None else None),
++        }
++    primary_up = upgrade_windows[PRIMARY_LABEL]
++    primary_down = downgrade_windows[PRIMARY_LABEL]
++    return ({
++        "label_semantics": "FUTURE_REAL_ACCESS_NOT_REFAULT",
++        "primary_label": PRIMARY_LABEL,
++        "windows": upgrade_windows,
++        "primary": primary_up,
++    }, {
++        "label_semantics": "FUTURE_REAL_ACCESS_NOT_REFAULT",
++        "primary_label": PRIMARY_LABEL,
++        "special_native_protect_downgrades": sum(
++            1 for row in downgrades if row["special_native_protect"]),
++        "non_boundary_downgrades": sum(
++            1 for row in downgrades
++            if int(row["native_tier"]) != int(row["native_tier_idx"]) + 1),
++        "windows": downgrade_windows,
++        "primary": primary_down,
++    })
++
++
++def _feature_value(row: Mapping[str, object], name: str) -> Optional[int]:
++    if name == "native_tier" or name == "native_tier_idx":
++        return int(row[name])
++    features = row["features"]
++    assert isinstance(features, Mapping)
++    value = features[name]
++    return int(value) if value is not None else None
++
++
++def _bin(value: int, edges: Sequence[int]) -> int:
++    # Equality belongs to the lower bin, matching the kernel/Python oracle.
++    return bisect.bisect_left(edges, value)
++
++
++def _eligible(rows: Iterable[Mapping[str, object]], features: Sequence[str],
++              split: Optional[str] = None) -> List[Mapping[str, object]]:
++    result = []
++    for row in rows:
++        if split is not None and row["split"] != split:
++            continue
++        if row["mode"] != "SHADOW_EFFECTIVE_TIER":
++            continue
++        if _label(row, PRIMARY_LABEL) is None:
++            continue
++        if not row["tier_gate_coverage_complete"]:
++            continue
++        if any(_feature_value(row, name) is None for name in features):
++            continue
++        result.append(row)
++    return result
++
++
++def _logit(probability: float) -> float:
++    clipped = min(max(probability, 1e-6), 1.0 - 1e-6)
++    return math.log(clipped / (1.0 - clipped))
++
++
++def _train_weights(rows: Sequence[Mapping[str, object]],
++                   features: Sequence[str], scale: int = 32) -> Tuple[int, List[List[int]]]:
++    total = sum(_pages(row) for row in rows)
++    positive = sum(_pages(row) for row in rows
++                   if _label(row, PRIMARY_LABEL))
++    prior = (positive + 1.0) / (total + 2.0)
++    bias = int(round(scale * _logit(prior)))
++    all_weights: List[List[int]] = []
++    for feature in features:
++        edges = FEATURE_EDGES[feature]
++        counts = [[0, 0] for _index in range(len(edges) + 1)]
++        for row in rows:
++            value = _feature_value(row, feature)
++            assert value is not None
++            index = _bin(value, edges)
++            pages = _pages(row)
++            counts[index][1] += pages
++            if _label(row, PRIMARY_LABEL):
++                counts[index][0] += pages
++        weights: List[int] = []
++        for positives, bin_total in counts:
++            probability = (positives + 2.0 * prior) / (bin_total + 2.0)
++            weight = int(round(scale * (_logit(probability) - _logit(prior))))
++            weights.append(min(max(weight, -32768), 32767))
++        all_weights.append(weights)
++    return bias, all_weights
++
++
++def _score(row: Mapping[str, object], features: Sequence[str], bias: int,
++           weights: Sequence[Sequence[int]]) -> int:
++    result = bias
++    for feature, feature_weights in zip(features, weights):
++        value = _feature_value(row, feature)
++        if value is None:
++            raise ContractError("cannot score a missing ablation feature")
++        result += int(feature_weights[_bin(value, FEATURE_EDGES[feature])])
++    return result
++
++
++def _scored(rows: Sequence[Mapping[str, object]], features: Sequence[str],
++            bias: int, weights: Sequence[Sequence[int]]) -> List[Scored]:
++    return [(_score(row, features, bias, weights),
++             bool(_label(row, PRIMARY_LABEL)), _pages(row), row)
++            for row in rows]
++
++
++def _thresholds(validation: Sequence[Scored],
++                max_cold_mistake: float = 0.10,
++                hot_precision_1: float = 0.60,
++                hot_precision_2: float = 0.75) -> Tuple[int, int, int, Dict[str, object]]:
++    scores = sorted(set(item[0] for item in validation))
++    if not scores:
++        raise ContractError("threshold selection requires validation scores")
++
++    cold = scores[0] - 1
++    cold_pages = 0
++    for threshold in scores:
++        selected = [item for item in validation if item[0] <= threshold]
++        pages = sum(item[2] for item in selected)
++        mistakes = sum(item[2] for item in selected if item[1])
++        if pages and mistakes / pages <= max_cold_mistake and pages >= cold_pages:
++            cold = threshold
++            cold_pages = pages
++
++    def hot_threshold(target: float, lower: int) -> Tuple[int, int]:
++        best = scores[-1] + 1
++        best_pages = 0
++        for threshold in scores:
++            if threshold < lower:
++                continue
++            selected = [item for item in validation if item[0] >= threshold]
++            pages = sum(item[2] for item in selected)
++            hits = sum(item[2] for item in selected if item[1])
++            if pages and hits / pages >= target and pages > best_pages:
++                best = threshold
++                best_pages = pages
++        return best, best_pages
++
++    hot1, hot1_pages = hot_threshold(hot_precision_1, cold + 1)
++    hot2, hot2_pages = hot_threshold(hot_precision_2, hot1 + 1)
++    if hot1 <= cold:
++        hot1 = cold + 1
++    if hot2 <= hot1:
++        hot2 = hot1 + 1
++    return cold, hot1, hot2, {
++        "cold_max_mistake_target": max_cold_mistake,
++        "hot_precision_1_target": hot_precision_1,
++        "hot_precision_2_target": hot_precision_2,
++        "validation_cold_selected_pages": cold_pages,
++        "validation_hot_1_selected_pages": hot1_pages,
++        "validation_hot_2_selected_pages": hot2_pages,
++    }
++
++
++def _quality(values: Sequence[Scored]) -> Dict[str, object]:
++    positive = sum(item[2] for item in values if item[1])
++    negative = sum(item[2] for item in values if not item[1])
++    buckets = _score_buckets(values)
++    reuse_rates = [item["reuse_rate"] for item in buckets
++                   if item["reuse_rate"] is not None]
++    violations = sum(1 for left, right in zip(reuse_rates, reuse_rates[1:])
++                     if right < left)
++    return {
++        "records": len(values),
++        "base_pages": positive + negative,
++        "positive_base_pages": positive,
++        "positive_rate": (positive / (positive + negative)
++                          if positive + negative else None),
++        "roc_auc": _roc_auc(values),
++        "pr_auc_average_precision": _average_precision(values),
++        "ndcg": _ndcg(values),
++        "score_bucket_reuse": buckets,
++        "score_bucket_monotonic_non_decreasing": (
++            violations == 0 if reuse_rates else None),
++        "score_bucket_monotonicity_violations": violations,
++    }
++
++
++def _roc_auc(values: Sequence[Scored]) -> Optional[float]:
++    positive = sum(item[2] for item in values if item[1])
++    negative = sum(item[2] for item in values if not item[1])
++    if not positive or not negative:
++        return None
++    groups: DefaultDict[int, List[int]] = defaultdict(lambda: [0, 0])
++    for score, label, weight, _row in values:
++        groups[score][0 if label else 1] += weight
++    negatives_below = 0
++    favorable = 0.0
++    for score in sorted(groups):
++        positives, negatives = groups[score]
++        favorable += positives * negatives_below + 0.5 * positives * negatives
++        negatives_below += negatives
++    return favorable / (positive * negative)
++
++
++def _average_precision(values: Sequence[Scored]) -> Optional[float]:
++    total_positive = sum(item[2] for item in values if item[1])
++    if not total_positive:
++        return None
++    groups: DefaultDict[int, List[int]] = defaultdict(lambda: [0, 0])
++    for score, label, weight, _row in values:
++        groups[score][0 if label else 1] += weight
++    seen = 0
++    hits = 0
++    result = 0.0
++    for score in sorted(groups, reverse=True):
++        positives, negatives = groups[score]
++        seen += positives + negatives
++        hits += positives
++        if positives:
++            result += (positives / total_positive) * (hits / seen)
++    return result
++
++
++def _ndcg(values: Sequence[Scored]) -> Optional[float]:
++    if not values or not any(item[1] for item in values):
++        return None
++    ranked = sorted(values, key=lambda item: item[0], reverse=True)
++    dcg = sum((weight if label else 0) / math.log2(index + 2)
++              for index, (_score_value, label, weight, _row) in
++              enumerate(ranked))
++    ideal = sorted(values, key=lambda item: (item[1], item[2]), reverse=True)
++    idcg = sum((weight if label else 0) / math.log2(index + 2)
++               for index, (_score_value, label, weight, _row) in
++               enumerate(ideal))
++    return dcg / idcg if idcg else None
++
++
++def _score_buckets(values: Sequence[Scored]) -> List[Dict[str, object]]:
++    if not values:
++        return []
++    ordered = sorted(values, key=lambda item: item[0])
++    bucket_count = min(10, len(ordered))
++    result = []
++    for bucket in range(bucket_count):
++        start = bucket * len(ordered) // bucket_count
++        end = (bucket + 1) * len(ordered) // bucket_count
++        selected = ordered[start:end]
++        pages = sum(item[2] for item in selected)
++        hits = sum(item[2] for item in selected if item[1])
++        result.append({
++            "bucket": bucket,
++            "score_min": min(item[0] for item in selected),
++            "score_max": max(item[0] for item in selected),
++            "base_pages": pages,
++            "reuse_rate": hits / pages if pages else None,
++        })
++    return result
++
++
++def _simulate_quadrant(score: int, row: Mapping[str, object], cold: int,
++                       hot1: int, hot2: int, max_upgrade: int) -> str:
++    native = int(row["native_tier"])
++    tier_idx = int(row["native_tier_idx"])
++    special = bool(row["special_native_protect"])
++    if score <= cold:
++        delta = -1
++    elif score >= hot2:
++        delta = max_upgrade
++    elif score >= hot1:
++        delta = 1
++    else:
++        delta = 0
++    # First-version downgrade safety: only the tier_idx+1 boundary is mutable.
++    if delta < 0 and (special or native != tier_idx + 1):
++        delta = 0
++    effective = min(max(native + delta, 0), 3)
++    native_actual = special or native > tier_idx
++    effective_actual = special or effective > tier_idx
++    if not native_actual and not effective_actual:
++        return "KEEP_RECLAIM"
++    if not native_actual and effective_actual:
++        return "PREDICTIVE_UPGRADE"
++    if native_actual and effective_actual:
++        return "KEEP_PROTECT"
++    return "PREDICTIVE_DOWNGRADE"
++
++
++def _simulation_metrics(scored: Sequence[Scored], cold: int, hot1: int,
++                        hot2: int, max_upgrade: int) -> Dict[str, object]:
++    copied: List[Dict[str, object]] = []
++    for score, _label_value, _weight, row in scored:
++        value = dict(row)
++        value["quadrant"] = _simulate_quadrant(
++            score, row, cold, hot1, hot2, max_upgrade)
++        copied.append(value)
++    up, down = action_analysis(copied)
++    return {
++        "max_upgrade_tiers": max_upgrade,
++        "quadrants": quadrant_analysis(copied),
++        "upgrade": up["primary"],
++        "downgrade": down["primary"],
++    }
++
++
++def train_ablations(rows: Sequence[Mapping[str, object]]) -> Dict[str, object]:
++    """Train three GLOBAL additive-table ablations using session splits."""
++
++    result: Dict[str, object] = {
++        "model_family": "GLOBAL_REUSE_MODEL",
++        "app_routing_enabled": False,
++        "split_unit": "session",
++        "training_mode": "SHADOW_EFFECTIVE_TIER",
++        "primary_label": PRIMARY_LABEL,
++        "ablations": {},
++    }
++    ablations = result["ablations"]
++    assert isinstance(ablations, dict)
++    for ablation_id, feature_tuple in MODEL_ABLATIONS:
++        train = _eligible(rows, feature_tuple, "train")
++        validation = _eligible(rows, feature_tuple, "validation")
++        test = _eligible(rows, feature_tuple, "test")
++        if not train:
++            ablations[ablation_id] = {
++                "status": "INSUFFICIENT_TRAIN_SESSIONS",
++                "features": list(feature_tuple),
++            }
++            continue
++        if not validation:
++            ablations[ablation_id] = {
++                "status": "INSUFFICIENT_VALIDATION_SESSIONS",
++                "features": list(feature_tuple),
++            }
++            continue
++        if not test:
++            ablations[ablation_id] = {
++                "status": "INSUFFICIENT_TEST_SESSIONS",
++                "features": list(feature_tuple),
++            }
++            continue
++        bias, weights = _train_weights(train, feature_tuple)
++        threshold_scores = _scored(validation, feature_tuple,
++                                   bias, weights)
++        cold, hot1, hot2, selection = _thresholds(threshold_scores)
++        split_quality: Dict[str, object] = {}
++        scored_splits: Dict[str, List[Scored]] = {}
++        for split_name, split_rows in (("train", train),
++                                       ("validation", validation),
++                                       ("test", test)):
++            values = _scored(split_rows, feature_tuple, bias, weights)
++            scored_splits[split_name] = values
++            split_quality[split_name] = _quality(values)
++
++        test_scored = scored_splits["test"]
++        per_app: Dict[str, object] = {}
++        per_type: Dict[str, object] = {}
++        per_session: Dict[str, object] = {}
++        for app in sorted(set(str(item[3]["app"]) for item in test_scored)):
++            per_app[app] = _quality([item for item in test_scored
++                                     if item[3]["app"] == app])
++        for page_type in ("anon", "file"):
++            selected = [item for item in test_scored
++                        if item[3]["page_type"] == page_type]
++            per_type[page_type] = _quality(selected)
++        for item in test_scored:
++            key = "%s/%s" % session_key(item[3])
++            per_session.setdefault(key, [])
++            per_session[key].append(item)  # type: ignore[union-attr]
++        per_session = {key: _quality(value)  # type: ignore[arg-type]
++                       for key, value in per_session.items()}
++
++        evaluated = test_scored or scored_splits["validation"]
++        ablations[ablation_id] = {
++            "status": "TRAINED_OFFLINE",
++            "model_name": "GLOBAL_REUSE_MODEL",
++            "features": list(feature_tuple),
++            "kernel_shape_compatible_v1": len(feature_tuple) <= 6,
++            "model": {
++                "model_name": "GLOBAL_REUSE_MODEL",
++                "model_version": 1,
++                "feature_schema_version": 1,
++                "bias": bias,
++                "cold_threshold": cold,
++                "hot_threshold_1": hot1,
++                "hot_threshold_2": hot2,
++                "max_upgrade_tiers": 2,
++                "max_downgrade_tiers": 1,
++                "bin_edges": [list(FEATURE_EDGES[name])
++                              for name in feature_tuple],
++                "weights": weights,
++            },
++            "threshold_selection": selection,
++            "quality": split_quality,
++            "test_stability": {
++                "per_app": per_app,
++                "per_page_type": per_type,
++                "per_session": per_session,
++            },
++            "upgrade_cap_ablation": [
++                _simulation_metrics(evaluated, cold, hot1, hot2, cap)
++                for cap in (1, 2, 3)
++            ],
++        }
++    return result
++
++
++def _percentile(values: Sequence[int], percentile: float) -> Optional[float]:
++    if not values:
++        return None
++    ordered = sorted(values)
++    if len(ordered) == 1:
++        return float(ordered[0])
++    position = percentile * (len(ordered) - 1)
++    lower = int(math.floor(position))
++    upper = int(math.ceil(position))
++    if lower == upper:
++        return float(ordered[lower])
++    fraction = position - lower
++    return ordered[lower] * (1.0 - fraction) + ordered[upper] * fraction
++
++
++def _distribution(values: Sequence[int]) -> Dict[str, object]:
++    return {
++        "samples": len(values),
++        "p50": _percentile(values, 0.50),
++        "p95": _percentile(values, 0.95),
++        "p99": _percentile(values, 0.99),
++        "p99_9": _percentile(values, 0.999),
++        "max": max(values) if values else None,
++    }
++
++
++def analyze_telemetry(records: Sequence[Mapping[str, object]]) -> Dict[str, object]:
++    score_groups: DefaultDict[str, List[int]] = defaultdict(list)
++    lock_groups: DefaultDict[str, List[int]] = defaultdict(list)
++    lock_per_second: DefaultDict[str, Dict[int, int]] = defaultdict(dict)
++    reclaim_groups: DefaultDict[str, List[int]] = defaultdict(list)
++    app_groups: DefaultDict[str, List[int]] = defaultdict(list)
++    app_failures: Counter[str] = Counter()
++    app_sessions: DefaultDict[str, Counter[str]] = defaultdict(Counter)
++    efficiency: DefaultDict[str, Counter[str]] = defaultdict(Counter)
++    vm_counters: DefaultDict[str, Counter[str]] = defaultdict(Counter)
++    trace_loss: List[Dict[str, object]] = []
++
++    for record in records:
++        validate_telemetry(record)
++        kind = str(record["event_kind"])
++        mode = str(record["mode"])
++        if kind == "score_latency":
++            key = "%s/%s" % (mode, record["component"])
++            score_groups[key].append(int(record["duration_ns"]))
++        elif kind == "lock_latency":
++            base = "%s/%s" % (mode, record["scope"])
++            for field in ("held_ns", "wait_ns", "irq_disabled_ns"):
++                if record[field] is not None:
++                    lock_groups[base + "/" + field].append(int(record[field]))
++            second = int(record["timestamp_ns"]) // 1_000_000_000
++            held = int(record["held_ns"])
++            previous = lock_per_second[base].get(second)
++            if previous is None or held > previous:
++                lock_per_second[base][second] = held
++        elif kind == "reclaim_latency":
++            key = "%s/%s" % (mode, record["scope"])
++            reclaim_groups[key].append(int(record["duration_ns"]))
++        elif kind == "app_latency":
++            key = "%s/%s/%s" % (mode, record["app"], record["operation"])
++            app_groups[key].append(int(record["duration_ns"]))
++            if not record["success"]:
++                app_failures[key] += 1
++        elif kind == "app_session_summary":
++            key = "%s/%s" % (mode, record["app"])
++            target = app_sessions[key]
++            target["sessions"] += 1
++            for field in ("total_duration_ns", "stalls", "timeouts",
++                          "failures"):
++                target[field] += int(record[field])
++        elif kind == "reclaim_efficiency":
++            target = efficiency[mode]
++            for field in (
++                    "scanned", "isolated", "reclaimed", "native_protected",
++                    "predictive_upgraded", "predictive_downgraded", "pgscan",
++                    "pgsteal", "no_progress_rounds", "priority_drops",
++                    "younger_generation_moves"):
++                target[field] += int(record[field])
++        elif kind == "vm_counter_delta":
++            vm_counters[mode][str(record["counter"])] += int(record["delta"])
++        elif kind == "trace_loss":
++            trace_loss.append(dict(record))
++
++    efficiency_output: Dict[str, object] = {}
++    for mode, counter in efficiency.items():
++        values = dict(counter)
++        values["reclaimed_per_scanned"] = (
++            counter["reclaimed"] / counter["scanned"]
++            if counter["scanned"] else None)
++        values["reclaimed_per_isolated"] = (
++            counter["reclaimed"] / counter["isolated"]
++            if counter["isolated"] else None)
++        efficiency_output[mode] = values
++    return {
++        "latency": {
++            "score_and_effective_tier_ns": {
++                key: _distribution(values) for key, values in score_groups.items()
++            },
++            "reclaim_ns": {
++                key: _distribution(values) for key, values in reclaim_groups.items()
++            },
++        },
++        "lock_latency": {
++            "lru_lock_ns": {
++                key: _distribution(values) for key, values in lock_groups.items()
++            },
++            "per_second_max_held_ns": {
++                key: {
++                    "distribution": _distribution(list(values.values())),
++                    "seconds": [
++                        {
++                            "second_start_ns": second * 1_000_000_000,
++                            "max_held_ns": maximum,
++                        }
++                        for second, maximum in sorted(values.items())
++                    ],
++                }
++                for key, values in lock_per_second.items()
++            },
++        },
++        "reclaim_efficiency": efficiency_output,
++        "app_latency": {
++            "operations": {
++                key: dict(_distribution(values), failures=app_failures[key])
++                for key, values in app_groups.items()
++            },
++            "sessions": {
++                key: dict(values) for key, values in app_sessions.items()
++            },
++        },
++        "vm_counter_deltas": {
++            mode: dict(values) for mode, values in vm_counters.items()
++        },
++        "trace_loss": trace_loss,
++    }
++
++
++def dataset_stability(rows: Sequence[Mapping[str, object]]) -> Dict[str, object]:
++    def grouped(field: str) -> Dict[str, object]:
++        values: DefaultDict[str, List[Mapping[str, object]]] = defaultdict(list)
++        for row in rows:
++            values[str(row[field])].append(row)
++        return {key: _rate(selected, PRIMARY_LABEL)
++                for key, selected in sorted(values.items())}
++
++    sessions: DefaultDict[str, List[Mapping[str, object]]] = defaultdict(list)
++    for row in rows:
++        sessions["%s/%s" % session_key(row)].append(row)
++    positive_by_app = {
++        key: value["positive_base_pages"]
++        for key, value in grouped("app").items()  # type: ignore[union-attr]
++    }
++    total_positive = sum(int(value) for value in positive_by_app.values())
++    dominance = (max(positive_by_app.values()) / total_positive
++                 if total_positive and positive_by_app else None)
++    return {
++        "primary_label": PRIMARY_LABEL,
++        "per_session": {key: _rate(value, PRIMARY_LABEL)
++                        for key, value in sorted(sessions.items())},
++        "per_app": grouped("app"),
++        "per_page_type": grouped("page_type"),
++        "per_split": grouped("split"),
++        "positive_base_pages_by_app": positive_by_app,
++        "largest_app_positive_share": dominance,
++    }
++
++
++def candidate_latency(rows: Sequence[Mapping[str, object]]) -> Dict[str, object]:
++    """Summarize durations carried by every tier-gate decision record."""
++
++    groups: DefaultDict[str, List[int]] = defaultdict(list)
++    for row in rows:
++        mode = str(row["mode"])
++        score_ns = int(row["score_duration_ns"])
++        groups[mode + "/score"].append(score_ns)
++        decision_raw = row.get("decision_duration_ns")
++        if isinstance(decision_raw, int) and not isinstance(decision_raw, bool):
++            decision_ns = int(decision_raw)
++            groups[mode + "/complete_decision"].append(decision_ns)
++            groups[mode + "/non_score_decision_overhead"].append(
++                max(0, decision_ns - score_ns))
++    return {key: _distribution(values) for key, values in groups.items()}
++
++
++def analyze(rows: Sequence[Mapping[str, object]],
++            telemetry: Sequence[Mapping[str, object]]) -> Dict[str, object]:
++    for row in rows:
++        validate_labeled(row)
++    if not rows:
++        raise ContractError("no labeled candidates were supplied")
++
++    # Prove that every experiment/session belongs to exactly one split.
++    split_by_session: Dict[Tuple[str, str], str] = {}
++    for row in rows:
++        key = session_key(row)
++        split = str(row["split"])
++        if key in split_by_session and split_by_session[key] != split:
++            raise ContractError("session split leakage for %s/%s" % key)
++        split_by_session[key] = split
++
++    tier = quadrant_analysis(rows)
++    upgrade, downgrade = action_analysis(rows)
++    tier_by_mode: Dict[str, object] = {}
++    upgrade_by_mode: Dict[str, object] = {}
++    downgrade_by_mode: Dict[str, object] = {}
++    for mode in sorted(set(str(row["mode"]) for row in rows)):
++        selected = [row for row in rows if row["mode"] == mode]
++        mode_upgrade, mode_downgrade = action_analysis(selected)
++        tier_by_mode[mode] = quadrant_analysis(selected)
++        upgrade_by_mode[mode] = mode_upgrade
++        downgrade_by_mode[mode] = mode_downgrade
++    tier["by_mode"] = tier_by_mode
++    upgrade["by_mode"] = upgrade_by_mode
++    downgrade["by_mode"] = downgrade_by_mode
++    models = train_ablations(rows)
++    observation = analyze_telemetry(telemetry)
++    observation["latency"]["tier_gate_candidate_ns"] = candidate_latency(rows)
++    all_trace_measured = all(bool(row["trace_lost_measured"]) for row in rows)
++    trace_lost_sessions = {
++        session_key(row): row["trace_lost"] for row in rows
++    }
++    trace_lost = (sum(int(value or 0) for value in trace_lost_sessions.values())
++                  if all_trace_measured else None)
++    coverage_complete = all(bool(row["tier_gate_coverage_complete"])
++                            for row in rows)
++    primary_up = upgrade["primary"]
++    primary_down = downgrade["primary"]
++    bidirectional_quality = bool(
++        primary_up["direction_holds"] is True and
++        primary_down["direction_holds"] is True)
++    summary = {
++        "status": "PARP_EFFECTIVE_TIER_OFFLINE_ANALYSIS_COMPLETE",
++        "candidate_scope": "ALL_NATIVE_TIER_GATE_FOLIOS",
++        "label_semantics": "FUTURE_REAL_ACCESS_NOT_REFAULT",
++        "session_split_only": True,
++        "sessions": len(split_by_session),
++        "session_split_counts": dict(Counter(split_by_session.values())),
++        "candidate_records": len(rows),
++        "candidate_base_pages": sum(_pages(row) for row in rows),
++        "quadrant_base_pages": {
++            name: tier["quadrants"][name]["base_pages"]
++            for name in QUADRANTS
++        },
++        "predictive_upgrade_pages": tier["quadrants"][
++            "PREDICTIVE_UPGRADE"]["base_pages"],
++        "predictive_downgrade_pages": tier["quadrants"][
++            "PREDICTIVE_DOWNGRADE"]["base_pages"],
++        "upgrade_hit_rate_1s": primary_up["upgrade_hit_rate"],
++        "upgrade_waste_rate_1s": primary_up["upgrade_waste_rate"],
++        "downgrade_mistake_rate_1s":
++            primary_down["downgrade_mistake_rate"],
++        "downgrade_cold_precision_1s":
++            primary_down["downgrade_cold_precision"],
++        "score_latency_ns": _distribution([
++            int(row["score_duration_ns"]) for row in rows
++        ]),
++        "trace_lost_measured": all_trace_measured,
++        "trace_lost": trace_lost,
++        "tier_gate_coverage_complete": coverage_complete,
++        "bidirectional_offline_direction_gate": bidirectional_quality,
++        "global_model_only": True,
++        "app_routing_enabled": False,
++        "live_shadow_collected_by_this_tool": False,
++        "protect_apply_executed_by_this_tool": False,
++        "bidirectional_apply_executed_by_this_tool": False,
++        "pressure_executed_by_this_tool": False,
++        "next_status": "PARP_EFFECTIVE_TIER_LIVE_AUTH_REQUIRED",
++    }
++    return {
++        "summary": summary,
++        "tier_reclassification": tier,
++        "upgrade_analysis": upgrade,
++        "downgrade_analysis": downgrade,
++        "dataset_stability": dataset_stability(rows),
++        "model_quality": models,
++        "observability": observation,
++    }
++
++
++def parse_args(argv: Optional[Sequence[str]] = None) -> argparse.Namespace:
++    parser = argparse.ArgumentParser(
++        description="Analyze an exported effective-tier dataset offline")
++    parser.add_argument("--samples", required=True, type=Path,
++                        help="collector labeled_candidates.jsonl")
++    parser.add_argument("--telemetry", type=Path,
++                        help="optional exported observability JSONL")
++    parser.add_argument("--output-dir", required=True, type=Path)
++    return parser.parse_args(argv)
++
++
++def main(argv: Optional[Sequence[str]] = None) -> int:
++    args = parse_args(argv)
++    try:
++        paths = [args.samples, args.output_dir]
++        if args.telemetry is not None:
++            paths.append(args.telemetry)
++        for path in paths:
++            reject_live_path(path)
++        rows = read_jsonl([args.samples])
++        telemetry = read_jsonl([args.telemetry]) if args.telemetry else []
++        result = analyze(rows, telemetry)
++        args.output_dir.mkdir(parents=True, exist_ok=True)
++        write_json(args.output_dir / "summary.json", result["summary"])
++        write_json(args.output_dir / "tier_reclassification.json",
++                   result["tier_reclassification"])
++        write_json(args.output_dir / "upgrade_analysis.json",
++                   result["upgrade_analysis"])
++        write_json(args.output_dir / "downgrade_analysis.json",
++                   result["downgrade_analysis"])
++        write_json(args.output_dir / "dataset_stability.json",
++                   result["dataset_stability"])
++        write_json(args.output_dir / "model_quality.json",
++                   result["model_quality"])
++        model_quality = result["model_quality"]
++        assert isinstance(model_quality, Mapping)
++        ablations = model_quality["ablations"]
++        assert isinstance(ablations, Mapping)
++        base_ablation = ablations["global_no_native_tier"]
++        assert isinstance(base_ablation, Mapping)
++        write_json(args.output_dir / "global_model.json", {
++            "status": ("OFFLINE_CANDIDATE_NOT_LIVE_AUTHORIZED"
++                       if base_ablation.get("status") == "TRAINED_OFFLINE"
++                       else base_ablation.get("status")),
++            "model_name": "GLOBAL_REUSE_MODEL",
++            "app_routing_enabled": False,
++            "selected_for_live_use": False,
++            "model": base_ablation.get("model"),
++            "selection_requires": [
++                "complete session-split quality review",
++                "live SHADOW authorization and collection",
++                "lock and reclaim latency gates",
++            ],
++        })
++        observation = result["observability"]
++        assert isinstance(observation, Mapping)
++        write_json(args.output_dir / "latency.json", observation["latency"])
++        write_json(args.output_dir / "lock_latency.json",
++                   observation["lock_latency"])
++        write_json(args.output_dir / "reclaim_efficiency.json",
++                   observation["reclaim_efficiency"])
++        write_json(args.output_dir / "app_latency.json",
++                   observation["app_latency"])
++        write_json(args.output_dir / "vm_counter_deltas.json", {
++            "vm_counter_deltas": observation["vm_counter_deltas"],
++            "trace_loss": observation["trace_loss"],
++        })
++    except ContractError as exc:
++        print("analyze: %s" % exc, file=sys.stderr)
++        return 2
++    return 0
++
++
++if __name__ == "__main__":
++    raise SystemExit(main())
+diff --git a/tools/parp/effective_tier/collector.py b/tools/parp/effective_tier/collector.py
+new file mode 100644
+index 000000000..84355fb78
+--- /dev/null
++++ b/tools/parp/effective_tier/collector.py
+@@ -0,0 +1,711 @@
++#!/usr/bin/env python3
++# SPDX-License-Identifier: GPL-2.0
++"""Build a future-real-access dataset from already-exported Phase-E events.
++
++The collector is deliberately offline-only.  It cannot read tracefs/debugfs,
++write cgroups, set a PARP mode, start pressure, install a kernel, or reboot.
++"""
++
++from __future__ import annotations
++
++import argparse
++import bisect
++import re
++import sys
++from collections import Counter, defaultdict
++from pathlib import Path
++from typing import DefaultDict, Dict, List, Mapping, Optional, Sequence, Tuple
++
++try:
++    from .contracts import (
++        BASE_FEATURES,
++        LABEL_WINDOWS_NS,
++        SCHEMA_VERSION,
++        TELEMETRY_KINDS,
++        ContractError,
++        assign_session_split,
++        folio_key,
++        normalized_id,
++        quadrant,
++        read_json,
++        read_jsonl,
++        reject_live_path,
++        session_key,
++        validate_access,
++        validate_candidate,
++        validate_session,
++        validate_telemetry,
++        write_json,
++        write_jsonl,
++    )
++except ImportError:  # Direct execution from this directory.
++    from contracts import (  # type: ignore
++        BASE_FEATURES,
++        LABEL_WINDOWS_NS,
++        SCHEMA_VERSION,
++        TELEMETRY_KINDS,
++        ContractError,
++        assign_session_split,
++        folio_key,
++        normalized_id,
++        quadrant,
++        read_json,
++        read_jsonl,
++        reject_live_path,
++        session_key,
++        validate_access,
++        validate_candidate,
++        validate_session,
++        validate_telemetry,
++        write_json,
++        write_jsonl,
++    )
++
++
++AccessPoint = Tuple[int, str]
++SessionKey = Tuple[str, str]
++
++TRACE_EVENT_PATTERN = re.compile(
++    r"\bparp_effective_tier_(decision|access|outcome|batch):\s+(.*)$")
++TRACE_MODES = {
++    0: "OFF",
++    1: "SHADOW_EFFECTIVE_TIER",
++    2: "APPLY_PROTECT_ONLY",
++    3: "APPLY_BIDIRECTIONAL",
++    4: "APPLY_RANDOM_MATCHED",
++    5: "APPLY_RECENCY_BASELINE",
++}
++TRACE_ACTIONS = {
++    0: "KEEP_RECLAIM",
++    1: "PREDICTIVE_UPGRADE",
++    2: "KEEP_PROTECT",
++    3: "PREDICTIVE_DOWNGRADE",
++    4: "SPECIAL_NATIVE_PROTECT",
++}
++TRACE_BYPASS = {
++    0: "NONE",
++    1: "DISABLED",
++    2: "MODEL_INVALID",
++    3: "METADATA_MISSING",
++    4: "STATE_UNSTABLE",
++    5: "NOT_BOUNDARY",
++    6: "STRONG_NATIVE",
++    7: "UPGRADE_BUDGET",
++    8: "DOWNGRADE_BUDGET",
++    9: "REPEAT_UPGRADE",
++    10: "REPEAT_DOWNGRADE",
++    11: "PRESSURE",
++    12: "NO_PROGRESS",
++    13: "GENERATION_RACE",
++    14: "RANDOM_UNSELECTED",
++}
++TRACE_ACCESS = {
++    0: "PTE_YOUNG",
++    1: "MARK_ACCESSED",
++    2: "FD_REFERENCE",
++}
++TRACE_OUTCOME = {
++    0: "reclaimed",
++    1: "putback",
++    2: "activated",
++    3: "demote_attempt",
++}
++
++
++def _trace_fields(payload: str, context: str) -> Dict[str, str]:
++    fields: Dict[str, str] = {}
++    for token in payload.split():
++        if "=" not in token:
++            continue
++        name, value = token.split("=", 1)
++        if name in fields:
++            raise ContractError("duplicate %s field %s" % (context, name))
++        fields[name] = value
++    return fields
++
++
++def _trace_int(fields: Mapping[str, str], name: str, context: str) -> int:
++    if name not in fields:
++        raise ContractError("%s trace is missing %s" % (context, name))
++    try:
++        return int(fields[name], 0)
++    except ValueError as exc:
++        raise ContractError("invalid %s.%s" % (context, name)) from exc
++
++
++def _trace_enum(table: Mapping[int, str], value: int, name: str) -> str:
++    try:
++        return table[value]
++    except KeyError as exc:
++        raise ContractError("unknown trace %s value %d" % (name, value)) from exc
++
++
++def _trace_decision(fields: Mapping[str, str]) -> Dict[str, object]:
++    context = "effective-tier decision"
++    thresholds = fields.get("thresholds", "").split("/")
++    features = fields.get("features", "").split(",")
++    if len(thresholds) != 3 or len(features) != len(BASE_FEATURES):
++        raise ContractError("invalid decision threshold/feature vectors")
++    try:
++        threshold_values = [int(value, 0) for value in thresholds]
++        feature_values = [int(value, 0) for value in features]
++    except ValueError as exc:
++        raise ContractError("invalid numeric decision vector") from exc
++    action = _trace_enum(TRACE_ACTIONS, _trace_int(fields, "action", context),
++                         "action")
++    native_protect = bool(_trace_int(fields, "native_protect", context))
++    special = bool(_trace_int(fields, "special", context))
++    isolate_attempted = bool(_trace_int(fields, "isolate_attempted", context))
++    isolate_succeeded = bool(_trace_int(fields, "isolate_result", context))
++    result: Dict[str, object] = {
++        "schema_version": SCHEMA_VERSION,
++        "event_kind": "tier_gate_candidate",
++        "timestamp_ns": _trace_int(fields, "time", context),
++        "experiment_id": fields.get("experiment"),
++        "session_id": fields.get("session"),
++        "folio_cookie": fields.get("cookie"),
++        "folio_lifetime_epoch": _trace_int(fields, "lifetime", context),
++        "memcg_anon_id": fields.get("memcg"),
++        "nid": _trace_int(fields, "nid", context),
++        "page_type": ("file" if _trace_int(fields, "type", context)
++                      else "anon"),
++        "source_seq": _trace_int(fields, "source_seq", context),
++        "generation_index": _trace_int(fields, "gen", context),
++        "native_tier": _trace_int(fields, "native_tier", context),
++        "native_tier_idx": _trace_int(fields, "tier_idx", context),
++        "special_native_protect": special,
++        "native_protect": native_protect,
++        "features": dict(zip(BASE_FEATURES, feature_values)),
++        "reuse_score": _trace_int(fields, "score", context),
++        "cold_threshold": threshold_values[0],
++        "hot_threshold_1": threshold_values[1],
++        "hot_threshold_2": threshold_values[2],
++        "delta_tier_q8": _trace_int(fields, "delta_q8", context),
++        "effective_tier_q8": _trace_int(fields, "effective_q8", context),
++        "effective_protect": bool(_trace_int(fields, "effective_protect",
++                                              context)),
++        "action": action,
++        "bypass_reason": _trace_enum(
++            TRACE_BYPASS, _trace_int(fields, "bypass", context), "bypass"),
++        "folio_nr_pages": _trace_int(fields, "pages", context),
++        "batch_id": fields.get("batch"),
++        "reclaim_epoch": fields.get("epoch"),
++        "priority": _trace_int(fields, "priority", context),
++        "score_duration_ns": _trace_int(fields, "score_ns", context),
++        "decision_duration_ns": _trace_int(fields, "decision_ns", context),
++        "actual_native_behavior": ("protect" if special or native_protect
++                                   else "reclaim"),
++        "isolate_result": ("not_attempted" if not isolate_attempted else
++                           "succeeded" if isolate_succeeded else "failed"),
++        "reclaimed": None,
++        "putback": None,
++        "activated": None,
++        "gate_reached": True,
++        "candidate_scope": "ALL_NATIVE_TIER_GATE_FOLIOS",
++        "actual_tier_protect": bool(_trace_int(
++            fields, "actual_tier_protect", context)),
++        "sort_result": bool(_trace_int(fields, "sort", context)),
++        "raw_trace_lost_flag": bool(_trace_int(fields, "trace_lost", context)),
++    }
++    if "mode" in fields:
++        result["mode"] = _trace_enum(
++            TRACE_MODES, _trace_int(fields, "mode", context), "mode")
++    return result
++
++
++def parse_exported_trace(paths: Sequence[Path]) -> Tuple[List[Dict[str, object]],
++                                                         Dict[str, int]]:
++    """Normalize already-exported Linux trace text; never open tracefs itself."""
++
++    decisions: List[Dict[str, object]] = []
++    raw_accesses: List[Dict[str, object]] = []
++    outcomes: List[Dict[str, object]] = []
++    batches: List[Dict[str, object]] = []
++    stats: Counter[str] = Counter()
++    for path in paths:
++        try:
++            with path.open("r", encoding="utf-8", errors="replace") as stream:
++                for line in stream:
++                    match = TRACE_EVENT_PATTERN.search(line)
++                    if not match:
++                        continue
++                    kind, payload = match.groups()
++                    fields = _trace_fields(payload, kind)
++                    stats["matched_trace_lines"] += 1
++                    if kind == "decision":
++                        decisions.append(_trace_decision(fields))
++                    elif kind == "access":
++                        context = "effective-tier access"
++                        raw_accesses.append({
++                            "timestamp_ns": _trace_int(fields, "time", context),
++                            "folio_cookie": fields.get("cookie"),
++                            "folio_lifetime_epoch": _trace_int(
++                                fields, "lifetime", context),
++                            "event": _trace_int(fields, "event", context),
++                            "real": bool(_trace_int(fields, "real", context)),
++                        })
++                    elif kind == "outcome":
++                        context = "effective-tier outcome"
++                        outcomes.append({
++                            "timestamp_ns": _trace_int(fields, "time", context),
++                            "folio_cookie": fields.get("cookie"),
++                            "folio_lifetime_epoch": _trace_int(
++                                fields, "lifetime", context),
++                            "action": _trace_int(fields, "action", context),
++                            "outcome": _trace_int(fields, "outcome", context),
++                        })
++                    elif kind == "batch":
++                        context = "effective-tier batch"
++                        batches.append({
++                            "timestamp_ns": _trace_int(fields, "time", context),
++                            "batch_id": fields.get("batch"),
++                            "mode": _trace_int(fields, "mode", context),
++                            "model_time_ns": _trace_int(fields, "model_ns", context),
++                        })
++        except OSError as exc:
++            raise ContractError("cannot read exported trace %s: %s" %
++                                (path, exc)) from exc
++    if not decisions:
++        raise ContractError("exported trace contains no effective-tier decisions")
++
++    owners: DefaultDict[Tuple[str, int], set] = defaultdict(set)
++    batch_owners: DefaultDict[str, set] = defaultdict(set)
++    for decision in decisions:
++        owner = (normalized_id(decision, "experiment_id"),
++                 normalized_id(decision, "session_id"))
++        owners[(normalized_id(decision, "folio_cookie"),
++                int(decision["folio_lifetime_epoch"]))].add(owner)
++        batch_owners[normalized_id(decision, "batch_id")].add(owner)
++
++    # Attach outcome truth to the latest preceding matching decision.
++    for raw in sorted(outcomes, key=lambda item: int(item["timestamp_ns"])):
++        action = _trace_enum(TRACE_ACTIONS, int(raw["action"]), "action")
++        candidates = [
++            decision for decision in decisions
++            if normalized_id(decision, "folio_cookie") == str(raw["folio_cookie"])
++            and int(decision["folio_lifetime_epoch"]) ==
++            int(raw["folio_lifetime_epoch"])
++            and decision["action"] == action
++            and int(decision["timestamp_ns"]) <= int(raw["timestamp_ns"])
++        ]
++        if not candidates:
++            stats["unmatched_outcomes"] += 1
++            continue
++        target = max(candidates, key=lambda item: int(item["timestamp_ns"]))
++        outcome = _trace_enum(TRACE_OUTCOME, int(raw["outcome"]), "outcome")
++        if outcome in ("reclaimed", "putback", "activated"):
++            target["reclaimed"] = outcome == "reclaimed"
++            target["putback"] = outcome == "putback"
++            target["activated"] = outcome == "activated"
++        stats["matched_outcomes"] += 1
++
++    records: List[Dict[str, object]] = list(decisions)
++    for raw in raw_accesses:
++        if not raw["real"]:
++            stats["policy_move_access_events_ignored"] += 1
++            continue
++        source = _trace_enum(TRACE_ACCESS, int(raw["event"]), "real access")
++        key = (str(raw["folio_cookie"]), int(raw["folio_lifetime_epoch"]))
++        possible = owners.get(key, set())
++        if not possible:
++            stats["unmatched_real_access_events"] += 1
++            continue
++        if len(possible) != 1:
++            raise ContractError("real-access session owner is ambiguous")
++        experiment_id, session_id = next(iter(possible))
++        records.append({
++            "schema_version": SCHEMA_VERSION,
++            "event_kind": "real_access",
++            "timestamp_ns": int(raw["timestamp_ns"]),
++            "experiment_id": experiment_id,
++            "session_id": session_id,
++            "folio_cookie": str(raw["folio_cookie"]),
++            "folio_lifetime_epoch": int(raw["folio_lifetime_epoch"]),
++            "access_source": source,
++            "is_real_access": True,
++        })
++        stats["real_access_events"] += 1
++
++    # Batch model time is directly measured.  Do not invent lock wait/IRQ or
++    # whole-reclaim counters that the trace does not contain.
++    for raw in batches:
++        possible = batch_owners.get(str(raw["batch_id"]), set())
++        if len(possible) != 1:
++            stats["unmatched_or_ambiguous_batches"] += 1
++            continue
++        experiment_id, session_id = next(iter(possible))
++        records.append({
++            "schema_version": SCHEMA_VERSION,
++            "event_kind": "score_latency",
++            "timestamp_ns": int(raw["timestamp_ns"]),
++            "experiment_id": experiment_id,
++            "session_id": session_id,
++            "mode": _trace_enum(TRACE_MODES, int(raw["mode"]), "mode"),
++            "component": "batch_model_total",
++            "duration_ns": int(raw["model_time_ns"]),
++            "batch_id": str(raw["batch_id"]),
++        })
++        stats["batch_model_latency_events"] += 1
++    stats["decision_events"] = len(decisions)
++    return records, dict(stats)
++
++
++def load_sessions(path: Path) -> Dict[SessionKey, Dict[str, object]]:
++    document = read_json(path)
++    if not isinstance(document, Mapping):
++        raise ContractError("session metadata must be an object")
++    if document.get("schema_version") != SCHEMA_VERSION:
++        raise ContractError("unsupported session metadata document")
++    raw_sessions = document.get("sessions")
++    if not isinstance(raw_sessions, list):
++        raise ContractError("session metadata requires a sessions array")
++
++    result: Dict[SessionKey, Dict[str, object]] = {}
++    for raw in raw_sessions:
++        if not isinstance(raw, dict):
++            raise ContractError("session metadata entries must be objects")
++        validate_session(raw)
++        key = session_key(raw)
++        if key in result:
++            raise ContractError("duplicate session metadata for %s/%s" % key)
++        result[key] = dict(raw)
++    if not result:
++        raise ContractError("session metadata cannot be empty")
++    return result
++
++
++def _session_split(meta: Mapping[str, object], seed: str) -> str:
++    explicit = meta.get("split")
++    if explicit is not None:
++        return str(explicit)
++    return assign_session_split(normalized_id(meta, "experiment_id"),
++                                normalized_id(meta, "session_id"), seed)
++
++
++def _measurement_value(meta: Mapping[str, object], measurement: str,
++                       value: str) -> Optional[int]:
++    block = meta[measurement]
++    assert isinstance(block, Mapping)
++    raw = block[value]
++    return int(raw) if raw is not None else None
++
++
++def _coverage(meta: Mapping[str, object], collected: int) -> Dict[str, object]:
++    gate = meta["tier_gate_counter"]
++    trace = meta["trace_loss"]
++    assert isinstance(gate, Mapping) and isinstance(trace, Mapping)
++    gate_measured = bool(gate["measured"])
++    loss_measured = bool(trace["measured"])
++    gate_delta = _measurement_value(meta, "tier_gate_counter", "delta")
++    trace_lost = _measurement_value(meta, "trace_loss", "lost")
++    if gate_measured and gate_delta is not None and collected > gate_delta:
++        raise ContractError(
++            "collected candidates exceed measured gate count for %s/%s" %
++            session_key(meta))
++    complete = bool(gate_measured and loss_measured and trace_lost == 0 and
++                    gate_delta == collected)
++    reasons: List[str] = []
++    if not gate_measured:
++        reasons.append("tier_gate_counter_not_measured")
++    elif gate_delta != collected:
++        reasons.append("candidate_count_does_not_match_tier_gate_counter")
++    if not loss_measured:
++        reasons.append("trace_lost_not_measured")
++    elif trace_lost:
++        reasons.append("trace_lost_nonzero")
++    return {
++        "candidate_records": collected,
++        "tier_gate_counter_measured": gate_measured,
++        "tier_gate_counter_delta": gate_delta,
++        "trace_lost_measured": loss_measured,
++        "trace_lost": trace_lost,
++        "complete": complete,
++        "incomplete_reasons": reasons,
++    }
++
++
++def _next_access(accesses: Mapping[Tuple[str, str, str, int],
++                                   Sequence[AccessPoint]],
++                 candidate: Mapping[str, object],
++                 observation_end_ns: int) -> Optional[AccessPoint]:
++    points = accesses.get(folio_key(candidate), ())
++    timestamps = [point[0] for point in points]
++    index = bisect.bisect_right(timestamps, int(candidate["timestamp_ns"]))
++    if index >= len(points) or points[index][0] > observation_end_ns:
++        return None
++    return points[index]
++
++
++def _future_labels(candidate_ns: int, observation_end_ns: int,
++                   access: Optional[AccessPoint]) -> Tuple[Dict[str, object],
++                                                           Optional[int],
++                                                           Optional[str]]:
++    delay = access[0] - candidate_ns if access is not None else None
++    source = access[1] if access is not None else None
++    if delay is not None and delay <= 0:
++        raise ContractError("future access must be strictly after its candidate")
++    labels: Dict[str, object] = {}
++    for name, window_ns in LABEL_WINDOWS_NS:
++        if delay is not None and delay <= window_ns:
++            labels[name] = True
++        elif candidate_ns + window_ns <= observation_end_ns:
++            labels[name] = False
++        else:
++            labels[name] = None
++    return labels, delay, source
++
++
++def build_dataset(
++        records: Sequence[Mapping[str, object]],
++        sessions: Mapping[SessionKey, Mapping[str, object]],
++        split_seed: str = "parp-effective-tier-v1",
++) -> Tuple[List[Dict[str, object]], List[Dict[str, object]], Dict[str, object]]:
++    """Validate, join, label, and session-split exported observations."""
++
++    candidates: List[Dict[str, object]] = []
++    telemetry: List[Dict[str, object]] = []
++    accesses: DefaultDict[Tuple[str, str, str, int], List[AccessPoint]] = (
++        defaultdict(list))
++    access_count = 0
++
++    for record in records:
++        kind = record.get("event_kind")
++        if kind == "tier_gate_candidate":
++            validate_candidate(record)
++            candidates.append(dict(record))
++        elif kind == "real_access":
++            validate_access(record)
++            accesses[folio_key(record)].append(
++                (int(record["timestamp_ns"]), str(record["access_source"])))
++            access_count += 1
++        elif kind in TELEMETRY_KINDS:
++            validate_telemetry(record)
++            telemetry.append(dict(record))
++        else:
++            raise ContractError("unsupported event_kind %r" % kind)
++
++    if not candidates:
++        raise ContractError("no tier-gate candidates were supplied")
++    candidate_identities = set()
++    for candidate in candidates:
++        identity = (session_key(candidate), folio_key(candidate),
++                    int(candidate["timestamp_ns"]),
++                    normalized_id(candidate, "batch_id"))
++        if identity in candidate_identities:
++            raise ContractError("duplicate tier-gate candidate record")
++        candidate_identities.add(identity)
++    for points in accesses.values():
++        points.sort(key=lambda item: item[0])
++
++    per_session_candidates: Counter[SessionKey] = Counter(
++        session_key(candidate) for candidate in candidates)
++    for key in per_session_candidates:
++        if key not in sessions:
++            raise ContractError("candidate has no session metadata: %s/%s" % key)
++    for observation in telemetry:
++        key = session_key(observation)
++        if key not in sessions:
++            raise ContractError("telemetry has no session metadata: %s/%s" % key)
++        if observation["mode"] != sessions[key]["mode"]:
++            raise ContractError("telemetry mode disagrees with session metadata")
++    coverage = {
++        key: _coverage(meta, per_session_candidates.get(key, 0))
++        for key, meta in sessions.items()
++    }
++
++    labeled: List[Dict[str, object]] = []
++    for candidate in sorted(
++            candidates,
++            key=lambda item: (session_key(item), int(item["timestamp_ns"]),
++                              int(item["source_seq"]))):
++        key = session_key(candidate)
++        meta = sessions[key]
++        candidate_ns = int(candidate["timestamp_ns"])
++        start_ns = int(meta["start_ns"])
++        end_ns = int(meta["observation_end_ns"])
++        if not start_ns <= candidate_ns <= end_ns:
++            raise ContractError("candidate timestamp outside session observation")
++        if "mode" in candidate and candidate["mode"] != meta["mode"]:
++            raise ContractError("candidate mode disagrees with session metadata")
++
++        classified = quadrant(bool(candidate["native_protect"]),
++                              bool(candidate["effective_protect"]),
++                              bool(candidate["special_native_protect"]))
++        recorded = str(candidate["action"])
++        if recorded != classified and not (
++                recorded == "SPECIAL_NATIVE_PROTECT" and
++                bool(candidate["special_native_protect"]) and
++                classified == "KEEP_PROTECT"):
++            raise ContractError(
++                "recorded action %s disagrees with decision quadrant %s" %
++                (recorded, classified))
++        if classified == "PREDICTIVE_DOWNGRADE" and (
++                bool(candidate["special_native_protect"]) or
++                int(candidate["native_tier"]) !=
++                int(candidate["native_tier_idx"]) + 1):
++            raise ContractError("unsafe predictive downgrade in exported data")
++
++        next_access = _next_access(accesses, candidate, end_ns)
++        labels, delay, source = _future_labels(candidate_ns, end_ns,
++                                                next_access)
++        session_coverage = coverage[key]
++        trace_lost = session_coverage["trace_lost"]
++
++        row = dict(candidate)
++        row.update({
++            "quadrant": classified,
++            "split": _session_split(meta, split_seed),
++            "app": meta["app"],
++            "workload": meta["workload"],
++            "mode": meta["mode"],
++            "pressure_level": meta["pressure_level"],
++            "labels": labels,
++            "next_real_access_delay_ns": delay,
++            "next_real_access_source": source,
++            "label_semantics": "FUTURE_REAL_ACCESS_NOT_REFAULT",
++            "trace_lost_measured": session_coverage["trace_lost_measured"],
++            "trace_lost": trace_lost,
++            "tier_gate_coverage_measured":
++                session_coverage["tier_gate_counter_measured"],
++            "tier_gate_coverage_complete": session_coverage["complete"],
++        })
++        labeled.append(row)
++
++    session_rows = []
++    for key, meta in sorted(sessions.items()):
++        session_rows.append({
++            "experiment_id": key[0],
++            "session_id": key[1],
++            "app": meta["app"],
++            "workload": meta["workload"],
++            "mode": meta["mode"],
++            "pressure_level": meta["pressure_level"],
++            "split": _session_split(meta, split_seed),
++            "coverage": coverage[key],
++        })
++
++    label_counts: Dict[str, Dict[str, int]] = {}
++    for name, _window_ns in LABEL_WINDOWS_NS:
++        known_pages = 0
++        positive_pages = 0
++        censored_pages = 0
++        for row in labeled:
++            pages = int(row["folio_nr_pages"])
++            value = row["labels"][name]  # type: ignore[index]
++            if value is None:
++                censored_pages += pages
++            else:
++                known_pages += pages
++                if value:
++                    positive_pages += pages
++        label_counts[name] = {
++            "known_base_pages": known_pages,
++            "positive_base_pages": positive_pages,
++            "censored_base_pages": censored_pages,
++        }
++
++    trace_measured = all(bool(item["coverage"]["trace_lost_measured"])
++                         for item in session_rows)
++    trace_lost_total = (sum(int(item["coverage"]["trace_lost"] or 0)
++                            for item in session_rows)
++                        if trace_measured else None)
++    all_complete = all(bool(item["coverage"]["complete"])
++                       for item in session_rows)
++    warnings: List[str] = []
++    if not trace_measured:
++        warnings.append("trace_lost was not measured for every session")
++    if trace_lost_total:
++        warnings.append("trace_lost is nonzero; dataset completeness is not proven")
++    if not all_complete:
++        warnings.append("full native tier-gate candidate coverage is not proven")
++
++    summary: Dict[str, object] = {
++        "schema_version": SCHEMA_VERSION,
++        "status": ("PARP_EFFECTIVE_TIER_OFFLINE_DATASET_READY"
++                   if all_complete else
++                   "PARP_EFFECTIVE_TIER_OFFLINE_DATASET_INCOMPLETE"),
++        "offline_only": True,
++        "candidate_scope": "ALL_NATIVE_TIER_GATE_FOLIOS",
++        "label_semantics": "FUTURE_REAL_ACCESS_NOT_REFAULT",
++        "candidate_records": len(labeled),
++        "candidate_base_pages": sum(int(row["folio_nr_pages"])
++                                    for row in labeled),
++        "real_access_events": access_count,
++        "telemetry_records": len(telemetry),
++        "session_count": len(session_rows),
++        "session_splits": dict(Counter(str(item["split"])
++                                       for item in session_rows)),
++        "trace_lost_measured": trace_measured,
++        "trace_lost": trace_lost_total,
++        "tier_gate_coverage_complete": all_complete,
++        "labels": label_counts,
++        "sessions": session_rows,
++        "warnings": warnings,
++        "safety": {
++            "live_interfaces_read": False,
++            "cgroup_writes": False,
++            "mode_writes": False,
++            "pressure_started": False,
++            "apply_enabled": False,
++        },
++    }
++    return labeled, telemetry, summary
++
++
++def parse_args(argv: Optional[Sequence[str]] = None) -> argparse.Namespace:
++    parser = argparse.ArgumentParser(
++        description="Label exported effective-tier events; offline files only")
++    parser.add_argument("--events", action="append", type=Path,
++                        help="exported candidate/access/telemetry JSONL")
++    parser.add_argument("--trace-text", action="append", type=Path,
++                        help="already-exported Linux trace text (never tracefs)")
++    parser.add_argument("--sessions", required=True, type=Path,
++                        help="exported session metadata JSON")
++    parser.add_argument("--output-dir", required=True, type=Path)
++    parser.add_argument("--split-seed", default="parp-effective-tier-v1")
++    return parser.parse_args(argv)
++
++
++def main(argv: Optional[Sequence[str]] = None) -> int:
++    args = parse_args(argv)
++    try:
++        if not args.events and not args.trace_text:
++            raise ContractError("at least one --events or --trace-text is required")
++        input_paths = list(args.events or []) + list(args.trace_text or [])
++        for path in input_paths + [args.sessions, args.output_dir]:
++            reject_live_path(path)
++        sessions = load_sessions(args.sessions)
++        records = read_jsonl(args.events or [])
++        trace_normalization = None
++        if args.trace_text:
++            normalized, trace_normalization = parse_exported_trace(args.trace_text)
++            records.extend(normalized)
++        labeled, telemetry, summary = build_dataset(
++            records, sessions, split_seed=args.split_seed)
++        if trace_normalization is not None:
++            summary["exported_trace_normalization"] = trace_normalization
++        args.output_dir.mkdir(parents=True, exist_ok=True)
++        write_jsonl(args.output_dir / "labeled_candidates.jsonl", labeled)
++        write_jsonl(args.output_dir / "observability.jsonl", telemetry)
++        write_json(args.output_dir / "collection_summary.json", summary)
++        write_json(args.output_dir / "session_splits.json", {
++            "schema_version": SCHEMA_VERSION,
++            "split_unit": "session",
++            "split_seed": args.split_seed,
++            "sessions": [
++                {
++                    "experiment_id": item["experiment_id"],
++                    "session_id": item["session_id"],
++                    "split": item["split"],
++                }
++                for item in summary["sessions"]  # type: ignore[union-attr]
++            ],
++        })
++    except ContractError as exc:
++        print("collector: %s" % exc, file=sys.stderr)
++        return 2
++    return 0
++
++
++if __name__ == "__main__":
++    raise SystemExit(main())
+diff --git a/tools/parp/effective_tier/contracts.py b/tools/parp/effective_tier/contracts.py
+new file mode 100644
+index 000000000..61760c54f
+--- /dev/null
++++ b/tools/parp/effective_tier/contracts.py
+@@ -0,0 +1,481 @@
++#!/usr/bin/env python3
++# SPDX-License-Identifier: GPL-2.0
++"""Phase-E offline contracts for PARP effective-tier experiments.
++
++This module intentionally has no tracefs, debugfs, cgroup, pressure-generator,
++or mode-setter integration.  It validates already-exported records only.
++"""
++
++from __future__ import annotations
++
++import hashlib
++import json
++from pathlib import Path
++from typing import Dict, Iterable, List, Mapping, Optional, Sequence, Tuple
++
++
++SCHEMA_VERSION = 1
++FEATURE_SCHEMA_VERSION = 1
++
++BASE_FEATURES = (
++    "time_since_last_real_access_ms",
++    "previous_real_access_interval_ms",
++    "reuse_interval_ema_ms",
++    "consecutive_reclaim_candidate_count",
++    "time_in_current_generation_ms",
++    "access_ema_q8",
++)
++NATIVE_TIER_FEATURE = "native_tier"
++TIER_IDX_FEATURE = "native_tier_idx"
++
++FEATURE_EDGES = {
++    "time_since_last_real_access_ms": (10, 100, 500, 2000, 10000),
++    "previous_real_access_interval_ms": (10, 100, 500, 2000, 10000),
++    "reuse_interval_ema_ms": (10, 100, 500, 2000, 10000),
++    "consecutive_reclaim_candidate_count": (0, 1, 2, 4, 8),
++    "time_in_current_generation_ms": (10, 100, 500, 2000, 10000),
++    "access_ema_q8": (8, 32, 96, 160, 224),
++    NATIVE_TIER_FEATURE: (0, 1, 2),
++    TIER_IDX_FEATURE: (0, 1, 2),
++}
++
++MODEL_ABLATIONS = (
++    ("global_no_native_tier", BASE_FEATURES),
++    ("global_plus_native_tier", BASE_FEATURES + (NATIVE_TIER_FEATURE,)),
++    ("global_plus_native_tier_and_tier_idx",
++     BASE_FEATURES + (NATIVE_TIER_FEATURE, TIER_IDX_FEATURE)),
++)
++
++LABEL_WINDOWS_NS = (
++    ("reuse_within_100ms", 100_000_000),
++    ("reuse_within_500ms", 500_000_000),
++    ("reuse_within_1s", 1_000_000_000),
++    ("reuse_within_5s", 5_000_000_000),
++)
++PRIMARY_LABEL = "reuse_within_1s"
++
++REAL_ACCESS_SOURCES = frozenset((
++    "PTE_YOUNG",
++    "MARK_ACCESSED",
++    "FD_REFERENCE",
++))
++
++QUADRANTS = (
++    "KEEP_RECLAIM",
++    "PREDICTIVE_UPGRADE",
++    "KEEP_PROTECT",
++    "PREDICTIVE_DOWNGRADE",
++)
++
++RECORDED_ACTIONS = frozenset(QUADRANTS + ("SPECIAL_NATIVE_PROTECT",))
++MODES = frozenset((
++    "OFF",
++    "SHADOW_EFFECTIVE_TIER",
++    "APPLY_PROTECT_ONLY",
++    "APPLY_BIDIRECTIONAL",
++    "APPLY_RANDOM_MATCHED",
++    "APPLY_RECENCY_BASELINE",
++    "PRODUCT_ABLATION",
++    "ORACLE_OFFLINE_ONLY",
++))
++PAGE_TYPES = frozenset(("anon", "file"))
++SPLITS = frozenset(("train", "validation", "test"))
++
++TELEMETRY_KINDS = frozenset((
++    "score_latency",
++    "lock_latency",
++    "reclaim_latency",
++    "reclaim_efficiency",
++    "app_latency",
++    "app_session_summary",
++    "vm_counter_delta",
++    "trace_loss",
++))
++
++
++class ContractError(ValueError):
++    """An input cannot safely be used as a Phase-E offline record."""
++
++
++def _require(record: Mapping[str, object], names: Iterable[str],
++             context: str) -> None:
++    missing = [name for name in names if name not in record]
++    if missing:
++        raise ContractError("%s missing fields: %s" %
++                            (context, ", ".join(sorted(missing))))
++
++
++def _integer(value: object, name: str, minimum: Optional[int] = None) -> int:
++    if isinstance(value, bool) or not isinstance(value, int):
++        raise ContractError("%s must be an integer" % name)
++    if minimum is not None and value < minimum:
++        raise ContractError("%s must be >= %d" % (name, minimum))
++    return value
++
++
++def _boolean(value: object, name: str) -> bool:
++    if not isinstance(value, bool):
++        raise ContractError("%s must be a boolean" % name)
++    return value
++
++
++def _identifier(value: object, name: str) -> str:
++    if isinstance(value, bool) or not isinstance(value, (str, int)):
++        raise ContractError("%s must be a string or integer identifier" % name)
++    result = str(value)
++    if not result:
++        raise ContractError("%s cannot be empty" % name)
++    return result
++
++
++def validate_candidate(record: Mapping[str, object]) -> None:
++    """Validate one record emitted for a folio reaching the native tier gate."""
++
++    required = (
++        "schema_version", "event_kind", "timestamp_ns", "experiment_id",
++        "session_id", "folio_cookie", "folio_lifetime_epoch",
++        "memcg_anon_id", "nid", "page_type", "source_seq",
++        "generation_index", "native_tier", "native_tier_idx",
++        "special_native_protect", "native_protect", "features",
++        "reuse_score", "cold_threshold", "hot_threshold_1",
++        "hot_threshold_2", "delta_tier_q8", "effective_tier_q8",
++        "effective_protect", "action", "bypass_reason",
++        "folio_nr_pages", "batch_id", "reclaim_epoch", "priority",
++        "score_duration_ns", "actual_native_behavior", "isolate_result",
++        "reclaimed", "putback", "activated", "gate_reached",
++        "candidate_scope",
++    )
++    _require(record, required, "tier candidate")
++    if record["schema_version"] != SCHEMA_VERSION:
++        raise ContractError("unsupported candidate schema_version")
++    if record["event_kind"] != "tier_gate_candidate":
++        raise ContractError("candidate event_kind must be tier_gate_candidate")
++    _integer(record["timestamp_ns"], "timestamp_ns", 0)
++    for field in ("experiment_id", "session_id", "folio_cookie",
++                  "memcg_anon_id", "batch_id", "reclaim_epoch"):
++        _identifier(record[field], field)
++    _integer(record["folio_lifetime_epoch"], "folio_lifetime_epoch", 0)
++    _integer(record["nid"], "nid", 0)
++    _integer(record["source_seq"], "source_seq", 0)
++    _integer(record["generation_index"], "generation_index", 0)
++    native_tier = _integer(record["native_tier"], "native_tier", 0)
++    tier_idx = _integer(record["native_tier_idx"], "native_tier_idx", 0)
++    if native_tier > 3 or tier_idx > 3:
++        raise ContractError("native tier values must be in [0, 3]")
++    if record["page_type"] not in PAGE_TYPES:
++        raise ContractError("page_type must be anon or file")
++    if record["candidate_scope"] != "ALL_NATIVE_TIER_GATE_FOLIOS":
++        raise ContractError("candidate scope does not cover the full tier gate")
++    if _boolean(record["gate_reached"], "gate_reached") is not True:
++        raise ContractError("candidate did not reach the native tier gate")
++    for field in ("special_native_protect", "native_protect",
++                  "effective_protect"):
++        _boolean(record[field], field)
++    for field in ("reclaimed", "putback", "activated"):
++        if record[field] is not None:
++            _boolean(record[field], field)
++    for field in ("reuse_score", "delta_tier_q8", "effective_tier_q8"):
++        if record[field] is not None:
++            _integer(record[field], field)
++    for field in ("cold_threshold", "hot_threshold_1", "hot_threshold_2",
++                  "priority"):
++        _integer(record[field], field)
++    if not (record["cold_threshold"] < record["hot_threshold_1"] <
++            record["hot_threshold_2"]):
++        raise ContractError("tier thresholds must be strictly increasing")
++    _integer(record["folio_nr_pages"], "folio_nr_pages", 1)
++    _integer(record["score_duration_ns"], "score_duration_ns", 0)
++    if record["action"] not in RECORDED_ACTIONS:
++        raise ContractError("unknown effective-tier action")
++    if not isinstance(record["bypass_reason"], str):
++        raise ContractError("bypass_reason must be a string")
++    if record["actual_native_behavior"] not in ("protect", "reclaim",
++                                                 "unknown"):
++        raise ContractError("invalid actual_native_behavior")
++    if record["isolate_result"] not in ("not_attempted", "succeeded",
++                                        "failed", "unknown"):
++        raise ContractError("invalid isolate_result")
++
++    features = record["features"]
++    if not isinstance(features, Mapping):
++        raise ContractError("features must be an object")
++    _require(features, BASE_FEATURES, "candidate features")
++    for name in BASE_FEATURES:
++        value = features[name]
++        if value is not None:
++            _integer(value, "features.%s" % name, 0)
++
++
++def validate_access(record: Mapping[str, object]) -> None:
++    """Validate a post-candidate real-access event used for future labels."""
++
++    _require(record, (
++        "schema_version", "event_kind", "timestamp_ns", "experiment_id",
++        "session_id", "folio_cookie", "folio_lifetime_epoch",
++        "access_source", "is_real_access",
++    ), "real access")
++    if record["schema_version"] != SCHEMA_VERSION:
++        raise ContractError("unsupported access schema_version")
++    if record["event_kind"] != "real_access":
++        raise ContractError("access event_kind must be real_access")
++    _integer(record["timestamp_ns"], "timestamp_ns", 0)
++    for field in ("experiment_id", "session_id", "folio_cookie"):
++        _identifier(record[field], field)
++    _integer(record["folio_lifetime_epoch"], "folio_lifetime_epoch", 0)
++    if _boolean(record["is_real_access"], "is_real_access") is not True:
++        raise ContractError("future labels require a real access signal")
++    if record["access_source"] not in REAL_ACCESS_SOURCES:
++        raise ContractError("policy/generation moves cannot label future reuse")
++
++
++def validate_session(record: Mapping[str, object]) -> None:
++    """Validate per-session coverage and measured trace-loss provenance."""
++
++    _require(record, (
++        "schema_version", "experiment_id", "session_id", "app",
++        "workload", "mode", "pressure_level", "start_ns",
++        "observation_end_ns", "tier_gate_counter", "trace_loss",
++    ), "session")
++    if record["schema_version"] != SCHEMA_VERSION:
++        raise ContractError("unsupported session schema_version")
++    for field in ("experiment_id", "session_id"):
++        _identifier(record[field], field)
++    if record["app"] not in ("WPS", "FILES", "QQ", "OTHER"):
++        raise ContractError("app must be WPS, FILES, QQ, or OTHER")
++    if not isinstance(record["workload"], str) or not record["workload"]:
++        raise ContractError("workload must be a non-empty string")
++    if record["mode"] not in MODES:
++        raise ContractError("unknown session mode")
++    if record["pressure_level"] not in ("P0", "P1", "P2", "P3", "P4"):
++        raise ContractError("unknown pressure level")
++    start = _integer(record["start_ns"], "start_ns", 0)
++    end = _integer(record["observation_end_ns"], "observation_end_ns", 0)
++    if end <= start:
++        raise ContractError("observation_end_ns must be after start_ns")
++
++    gate = record["tier_gate_counter"]
++    trace = record["trace_loss"]
++    if not isinstance(gate, Mapping) or not isinstance(trace, Mapping):
++        raise ContractError("coverage measurements must be objects")
++    _validate_delta_measurement(gate, "tier_gate_counter", "delta")
++    _validate_delta_measurement(trace, "trace_loss", "lost")
++    _validate_per_cpu_loss(trace, "trace_loss")
++    if "split" in record and record["split"] not in SPLITS:
++        raise ContractError("session split must be train, validation, or test")
++
++
++def _validate_delta_measurement(measurement: Mapping[str, object],
++                                name: str, delta_field: str) -> None:
++    _require(measurement, ("measured", "source", "before", "after",
++                           delta_field), name)
++    measured = _boolean(measurement["measured"], "%s.measured" % name)
++    if not measured:
++        if any(measurement[field] is not None for field in
++               ("before", "after", delta_field)):
++            raise ContractError("unmeasured %s values must be null" % name)
++        return
++    if not isinstance(measurement["source"], str) or not measurement["source"]:
++        raise ContractError("measured %s requires a source" % name)
++    before = _integer(measurement["before"], "%s.before" % name, 0)
++    after = _integer(measurement["after"], "%s.after" % name, 0)
++    delta = _integer(measurement[delta_field],
++                     "%s.%s" % (name, delta_field), 0)
++    if after < before or delta != after - before:
++        raise ContractError("%s delta does not match before/after" % name)
++
++
++def _validate_per_cpu_loss(measurement: Mapping[str, object], name: str) -> None:
++    per_cpu = measurement.get("per_cpu")
++    if per_cpu is None:
++        return
++    if not isinstance(per_cpu, Mapping):
++        raise ContractError("%s.per_cpu must be an object" % name)
++    total = 0
++    for cpu, value in per_cpu.items():
++        if not str(cpu):
++            raise ContractError("%s.per_cpu has an empty CPU identifier" % name)
++        total += _integer(value, "%s.per_cpu.%s" % (name, cpu), 0)
++    if measurement.get("measured") and total != measurement.get("lost"):
++        raise ContractError("%s per-CPU total does not match lost" % name)
++
++
++def validate_telemetry(record: Mapping[str, object]) -> None:
++    """Validate one offline latency/counter observation."""
++
++    _require(record, ("schema_version", "event_kind", "timestamp_ns",
++                      "experiment_id", "session_id", "mode"), "telemetry")
++    if record["schema_version"] != SCHEMA_VERSION:
++        raise ContractError("unsupported telemetry schema_version")
++    kind = record["event_kind"]
++    if kind not in TELEMETRY_KINDS:
++        raise ContractError("unknown telemetry event_kind")
++    _integer(record["timestamp_ns"], "timestamp_ns", 0)
++    _identifier(record["experiment_id"], "experiment_id")
++    _identifier(record["session_id"], "session_id")
++    if record["mode"] not in MODES:
++        raise ContractError("unknown telemetry mode")
++
++    if kind == "score_latency":
++        _require(record, ("component", "duration_ns"), kind)
++        if record["component"] not in ("score", "effective_tier",
++                                       "quadrant_classification",
++                                       "batch_model_total"):
++            raise ContractError("unknown score latency component")
++        _integer(record["duration_ns"], "duration_ns", 0)
++    elif kind == "lock_latency":
++        _require(record, ("lock_name", "scope", "held_ns", "wait_ns",
++                          "irq_disabled_ns"), kind)
++        if record["lock_name"] != "lru_lock":
++            raise ContractError("only lru_lock is in the Phase-E contract")
++        if record["scope"] not in ("scan_folios", "batch"):
++            raise ContractError("invalid lock latency scope")
++        _integer(record["held_ns"], "held_ns", 0)
++        for field in ("wait_ns", "irq_disabled_ns"):
++            if record[field] is not None:
++                _integer(record[field], field, 0)
++    elif kind == "reclaim_latency":
++        _require(record, ("scope", "duration_ns"), kind)
++        if record["scope"] not in (
++                "direct_reclaim", "memcg_reclaim", "kswapd_round",
++                "isolate_batch", "shrink_folio_list", "full_request"):
++            raise ContractError("invalid reclaim latency scope")
++        _integer(record["duration_ns"], "duration_ns", 0)
++    elif kind == "reclaim_efficiency":
++        required = (
++            "scanned", "isolated", "reclaimed", "native_protected",
++            "predictive_upgraded", "predictive_downgraded", "pgscan",
++            "pgsteal", "no_progress_rounds", "priority_drops",
++            "younger_generation_moves",
++        )
++        _require(record, required, kind)
++        for field in required:
++            _integer(record[field], field, 0)
++    elif kind == "app_latency":
++        _require(record, ("app", "operation", "duration_ns", "success"),
++                 kind)
++        if record["app"] not in ("WPS", "FILES", "QQ", "OTHER"):
++            raise ContractError("invalid app latency app")
++        if not isinstance(record["operation"], str) or not record["operation"]:
++            raise ContractError("operation must be a non-empty string")
++        _integer(record["duration_ns"], "duration_ns", 0)
++        _boolean(record["success"], "success")
++    elif kind == "app_session_summary":
++        _require(record, ("app", "total_duration_ns", "stalls", "timeouts",
++                          "failures"), kind)
++        if record["app"] not in ("WPS", "FILES", "QQ", "OTHER"):
++            raise ContractError("invalid App session summary app")
++        for field in ("total_duration_ns", "stalls", "timeouts", "failures"):
++            _integer(record[field], field, 0)
++    elif kind == "vm_counter_delta":
++        _require(record, ("counter", "delta"), kind)
++        if record["counter"] not in (
++                "workingset_refault_file", "workingset_refault_anon",
++                "pgfault", "pgmajfault", "swapin", "swapout",
++                "psi_some_us", "psi_full_us", "memory_high",
++                "memory_oom", "memory_oom_kill"):
++            raise ContractError("invalid VM counter")
++        _integer(record["delta"], "delta")
++    elif kind == "trace_loss":
++        _require(record, ("measured", "source", "before", "after", "lost"),
++                 kind)
++        _validate_delta_measurement(record, kind, "lost")
++        _validate_per_cpu_loss(record, kind)
++
++
++def normalized_id(record: Mapping[str, object], field: str) -> str:
++    """Return an identifier in a precision-preserving comparison form."""
++
++    return _identifier(record[field], field)
++
++
++def session_key(record: Mapping[str, object]) -> Tuple[str, str]:
++    return (normalized_id(record, "experiment_id"),
++            normalized_id(record, "session_id"))
++
++
++def folio_key(record: Mapping[str, object]) -> Tuple[str, str, str, int]:
++    return (normalized_id(record, "experiment_id"),
++            normalized_id(record, "session_id"),
++            normalized_id(record, "folio_cookie"),
++            _integer(record["folio_lifetime_epoch"],
++                     "folio_lifetime_epoch", 0))
++
++
++def quadrant(native_protect: bool, effective_protect: bool,
++             special_native_protect: bool) -> str:
++    """Classify ordinary and special protection into the required quadrants."""
++
++    native_actual = native_protect or special_native_protect
++    effective_actual = effective_protect or special_native_protect
++    if not native_actual and not effective_actual:
++        return "KEEP_RECLAIM"
++    if not native_actual and effective_actual:
++        return "PREDICTIVE_UPGRADE"
++    if native_actual and effective_actual:
++        return "KEEP_PROTECT"
++    return "PREDICTIVE_DOWNGRADE"
++
++
++def assign_session_split(experiment_id: str, session_id: str,
++                         seed: str = "parp-effective-tier-v1") -> str:
++    """Deterministically split whole sessions, never individual folio rows."""
++
++    payload = (seed + "\x00" + experiment_id + "\x00" + session_id).encode(
++        "utf-8")
++    bucket = int.from_bytes(hashlib.sha256(payload).digest()[:8], "big") % 10000
++    if bucket < 7000:
++        return "train"
++    if bucket < 8500:
++        return "validation"
++    return "test"
++
++
++def read_json(path: Path) -> object:
++    try:
++        return json.loads(path.read_text(encoding="utf-8"))
++    except (OSError, json.JSONDecodeError) as exc:
++        raise ContractError("cannot read JSON %s: %s" % (path, exc)) from exc
++
++
++def read_jsonl(paths: Sequence[Path]) -> List[Dict[str, object]]:
++    records: List[Dict[str, object]] = []
++    for path in paths:
++        try:
++            with path.open("r", encoding="utf-8") as stream:
++                for line_number, line in enumerate(stream, 1):
++                    if not line.strip():
++                        continue
++                    value = json.loads(line)
++                    if not isinstance(value, dict):
++                        raise ContractError("%s:%d is not an object" %
++                                            (path, line_number))
++                    records.append(value)
++        except ContractError:
++            raise
++        except (OSError, json.JSONDecodeError) as exc:
++            raise ContractError("cannot read JSONL %s: %s" % (path, exc)) from exc
++    return records
++
++
++def write_json(path: Path, value: object) -> None:
++    path.write_text(json.dumps(value, indent=2, sort_keys=True) + "\n",
++                    encoding="utf-8")
++
++
++def write_jsonl(path: Path, records: Iterable[Mapping[str, object]]) -> None:
++    with path.open("w", encoding="utf-8") as stream:
++        for record in records:
++            stream.write(json.dumps(record, sort_keys=True) + "\n")
++
++
++def reject_live_path(path: Path) -> None:
++    """Reject interfaces that could turn this offline tool into a live actor."""
++
++    resolved = path.expanduser().resolve()
++    forbidden = (Path("/sys"), Path("/proc"), Path("/dev"), Path("/run"))
++    for prefix in forbidden:
++        try:
++            resolved.relative_to(prefix)
++        except ValueError:
++            continue
++        raise ContractError("live kernel/control paths are forbidden: %s" % path)
+diff --git a/tools/parp/effective_tier/experiment_manifest.schema.json b/tools/parp/effective_tier/experiment_manifest.schema.json
+new file mode 100644
+index 000000000..f21111ae2
+--- /dev/null
++++ b/tools/parp/effective_tier/experiment_manifest.schema.json
+@@ -0,0 +1,91 @@
++{
++  "$schema": "https://json-schema.org/draft/2020-12/schema",
++  "$id": "https://parp.invalid/effective-tier/experiment-manifest-v1",
++  "title": "PARP effective-tier controlled experiment manifest",
++  "type": "object",
++  "required": ["schema_version", "experiment_id", "phase", "status", "safety", "collection", "session_split", "global_model_ablations", "experiment_groups", "pressure_levels", "workloads", "repetitions", "gates", "artifacts"],
++  "properties": {
++    "schema_version": { "const": 1 },
++    "experiment_id": { "type": "string", "minLength": 1 },
++    "phase": { "const": "E" },
++    "status": { "const": "PARP_EFFECTIVE_TIER_LIVE_AUTH_REQUIRED" },
++    "safety": {
++      "type": "object",
++      "required": ["harness_capability", "dry_run_default", "live_reads_executed", "cgroup_writes_authorized", "pressure_authorized", "apply_authorized", "kernel_install_authorized", "reboot_authorized"],
++      "properties": {
++        "harness_capability": { "const": "PLAN_ONLY" },
++        "dry_run_default": { "const": true },
++        "live_reads_executed": { "const": false },
++        "cgroup_writes_authorized": { "const": false },
++        "pressure_authorized": { "const": false },
++        "apply_authorized": { "const": false },
++        "kernel_install_authorized": { "const": false },
++        "reboot_authorized": { "const": false }
++      }
++    },
++    "collection": {
++      "type": "object",
++      "required": ["candidate_scope", "shadow_behavior", "label_semantics", "label_windows", "trace_lost_required", "tier_gate_counter_required", "observability"],
++      "properties": {
++        "candidate_scope": { "const": "ALL_NATIVE_TIER_GATE_FOLIOS" },
++        "shadow_behavior": { "const": "NATIVE_ONLY" },
++        "label_semantics": { "const": "FUTURE_REAL_ACCESS_NOT_REFAULT" },
++        "label_windows": { "const": ["100ms", "500ms", "1s", "5s"] },
++        "trace_lost_required": { "const": true },
++        "tier_gate_counter_required": { "const": true },
++        "observability": { "type": "array", "minItems": 4 }
++      }
++    },
++    "session_split": {
++      "type": "object",
++      "required": ["unit", "train_percent", "validation_percent", "test_percent", "random_page_row_split_forbidden"],
++      "properties": {
++        "unit": { "const": "session" },
++        "train_percent": { "const": 70 },
++        "validation_percent": { "const": 15 },
++        "test_percent": { "const": 15 },
++        "random_page_row_split_forbidden": { "const": true }
++      }
++    },
++    "global_model_ablations": {
++      "type": "array",
++      "minItems": 3,
++      "maxItems": 3,
++      "items": {
++        "type": "object",
++        "required": ["id", "model_name", "features"],
++        "properties": {
++          "id": { "enum": ["global_no_native_tier", "global_plus_native_tier", "global_plus_native_tier_and_tier_idx"] },
++          "model_name": { "const": "GLOBAL_REUSE_MODEL" },
++          "features": { "type": "array", "minItems": 6 }
++        }
++      }
++    },
++    "experiment_groups": {
++      "type": "array",
++      "minItems": 8,
++      "items": {
++        "type": "object",
++        "required": ["id", "mode", "execution", "requires_explicit_authorization"],
++        "properties": {
++          "execution": { "const": "PLAN_ONLY" },
++          "requires_explicit_authorization": { "type": "boolean" }
++        }
++      }
++    },
++    "pressure_levels": { "type": "array", "minItems": 5 },
++    "workloads": { "const": ["WPS", "FILES", "QQ"] },
++    "repetitions": {
++      "type": "object",
++      "required": ["minimum", "recommended", "paired", "randomized_or_interleaved"],
++      "properties": {
++        "minimum": { "minimum": 5 },
++        "recommended": { "minimum": 10 },
++        "paired": { "const": true },
++        "randomized_or_interleaved": { "const": true }
++      }
++    },
++    "gates": { "type": "object" },
++    "artifacts": { "type": "array", "minItems": 8 }
++  }
++}
+diff --git a/tools/parp/effective_tier/experiment_manifest.template.json b/tools/parp/effective_tier/experiment_manifest.template.json
+new file mode 100644
+index 000000000..2d982cc18
+--- /dev/null
++++ b/tools/parp/effective_tier/experiment_manifest.template.json
+@@ -0,0 +1,161 @@
++{
++  "schema_version": 1,
++  "experiment_id": "REPLACE_WITH_UNIQUE_EXPERIMENT_ID",
++  "phase": "E",
++  "status": "PARP_EFFECTIVE_TIER_LIVE_AUTH_REQUIRED",
++  "safety": {
++    "harness_capability": "PLAN_ONLY",
++    "dry_run_default": true,
++    "live_reads_executed": false,
++    "cgroup_writes_authorized": false,
++    "pressure_authorized": false,
++    "apply_authorized": false,
++    "kernel_install_authorized": false,
++    "reboot_authorized": false
++  },
++  "collection": {
++    "candidate_scope": "ALL_NATIVE_TIER_GATE_FOLIOS",
++    "shadow_behavior": "NATIVE_ONLY",
++    "label_semantics": "FUTURE_REAL_ACCESS_NOT_REFAULT",
++    "label_windows": ["100ms", "500ms", "1s", "5s"],
++    "trace_lost_required": true,
++    "tier_gate_counter_required": true,
++    "observability": [
++      "score/effective-tier/quadrant/batch latency",
++      "lru_lock held/wait/IRQ-disabled latency",
++      "direct/memcg/kswapd/isolate/shrink/full reclaim latency",
++      "reclaim efficiency and no-progress counters",
++      "workingset_refault_file/anon and VM/PSI/memory.events deltas",
++      "WPS/FILES/QQ operation latency, failures, and session duration"
++    ]
++  },
++  "session_split": {
++    "unit": "session",
++    "train_percent": 70,
++    "validation_percent": 15,
++    "test_percent": 15,
++    "random_page_row_split_forbidden": true
++  },
++  "global_model_ablations": [
++    {
++      "id": "global_no_native_tier",
++      "model_name": "GLOBAL_REUSE_MODEL",
++      "features": [
++        "time_since_last_real_access_ms",
++        "previous_real_access_interval_ms",
++        "reuse_interval_ema_ms",
++        "consecutive_reclaim_candidate_count",
++        "time_in_current_generation_ms",
++        "access_ema_q8"
++      ]
++    },
++    {
++      "id": "global_plus_native_tier",
++      "model_name": "GLOBAL_REUSE_MODEL",
++      "features": [
++        "time_since_last_real_access_ms",
++        "previous_real_access_interval_ms",
++        "reuse_interval_ema_ms",
++        "consecutive_reclaim_candidate_count",
++        "time_in_current_generation_ms",
++        "access_ema_q8",
++        "native_tier"
++      ]
++    },
++    {
++      "id": "global_plus_native_tier_and_tier_idx",
++      "model_name": "GLOBAL_REUSE_MODEL",
++      "features": [
++        "time_since_last_real_access_ms",
++        "previous_real_access_interval_ms",
++        "reuse_interval_ema_ms",
++        "consecutive_reclaim_candidate_count",
++        "time_in_current_generation_ms",
++        "access_ema_q8",
++        "native_tier",
++        "native_tier_idx"
++      ]
++    }
++  ],
++  "policy_ablations": {
++    "upgrade_ratio_percent": [1, 5, 10],
++    "downgrade_ratio_percent": [0.5, 1, 2],
++    "max_upgrade_tiers": [1, 2, 3],
++    "max_downgrade_tiers": [1],
++    "special_native_protect_mutable": false,
++    "strong_native_tier_protect_mutable": false
++  },
++  "experiment_groups": [
++    { "id": "A", "mode": "OFF", "execution": "PLAN_ONLY", "requires_explicit_authorization": true },
++    { "id": "B", "mode": "SHADOW_EFFECTIVE_TIER", "execution": "PLAN_ONLY", "requires_explicit_authorization": true },
++    { "id": "C", "mode": "APPLY_PROTECT_ONLY", "execution": "PLAN_ONLY", "requires_explicit_authorization": true },
++    { "id": "D", "mode": "APPLY_BIDIRECTIONAL", "execution": "PLAN_ONLY", "requires_explicit_authorization": true },
++    { "id": "E", "mode": "APPLY_RANDOM_MATCHED", "execution": "PLAN_ONLY", "requires_explicit_authorization": true },
++    { "id": "F", "mode": "APPLY_RECENCY_BASELINE", "execution": "PLAN_ONLY", "requires_explicit_authorization": true },
++    { "id": "G", "mode": "PRODUCT_ABLATION", "execution": "PLAN_ONLY", "requires_explicit_authorization": true },
++    { "id": "H", "mode": "ORACLE_OFFLINE_ONLY", "execution": "PLAN_ONLY", "requires_explicit_authorization": false }
++  ],
++  "comparisons": [
++    { "left": "C", "right": "A", "question": "Does protect-only beat Native?" },
++    { "left": "D", "right": "C", "question": "Does conservative downgrade improve reclaim without extra mistakes?" },
++    { "left": "D", "right": "E", "question": "Does the model beat matched random decisions?" },
++    { "left": "D", "right": "F", "question": "Does the full model beat recency?" },
++    { "left": "D", "right": "G", "question": "Does additive effective tier beat calibrated product gating?" }
++  ],
++  "pressure_levels": [
++    { "id": "P0", "purpose": "near-zero reclaim; plan only", "formal_benefit_run": false },
++    { "id": "P1", "purpose": "light reclaim; plan only", "formal_benefit_run": false },
++    { "id": "P2", "purpose": "stable reclaim; plan only", "formal_benefit_run": true },
++    { "id": "P3", "purpose": "sustained controlled reclaim; plan only", "formal_benefit_run": true },
++    { "id": "P4", "purpose": "stop-boundary discovery only; plan only", "formal_benefit_run": false }
++  ],
++  "workloads": ["WPS", "FILES", "QQ"],
++  "repetitions": {
++    "minimum": 5,
++    "recommended": 10,
++    "paired": true,
++    "randomized_or_interleaved": true,
++    "same_kernel_script_initial_state_cgroup_pressure_time_seed": true,
++    "restore_stable_state_between_runs": true
++  },
++  "gates": {
++    "protect_only": [
++      "at least four complete SHADOW sessions per App",
++      "trace_lost measured and acceptable",
++      "upgrade hit rate exceeds KEEP_RECLAIM reuse rate",
++      "not weaker than Recent+Frequency",
++      "lru_lock and direct-reclaim tails acceptable",
++      "runtime KUnit passed"
++    ],
++    "bidirectional": [
++      "protect-only gate passed",
++      "enough native-protected boundary candidates",
++      "downgrade reuse below KEEP_PROTECT across sessions",
++      "cold threshold not dominated by one App",
++      "downgrade mistake confidence interval acceptable",
++      "zero special-native-protect overrides"
++    ]
++  },
++  "stop_conditions": [
++    "OOM or oom_kill",
++    "severe PSI or no-progress regression",
++    "unexpected cgroup or mode state",
++    "trace-loss or tier-gate coverage failure",
++    "special native protection override",
++    "App failure, timeout, or unacceptable P95/P99 regression"
++  ],
++  "artifacts": [
++    "collection_summary.json",
++    "session_splits.json",
++    "feature_schema.json",
++    "model_quality.json",
++    "tier_reclassification.json",
++    "upgrade_analysis.json",
++    "downgrade_analysis.json",
++    "latency.json",
++    "lock_latency.json",
++    "reclaim_efficiency.json",
++    "app_latency.json",
++    "experiment_manifest.json"
++  ]
++}
+diff --git a/tools/parp/effective_tier/experiment_plan.py b/tools/parp/effective_tier/experiment_plan.py
+new file mode 100644
+index 000000000..f5ba07ac8
+--- /dev/null
++++ b/tools/parp/effective_tier/experiment_plan.py
+@@ -0,0 +1,280 @@
++#!/usr/bin/env python3
++# SPDX-License-Identifier: GPL-2.0
++"""Render the Phase-E controlled experiment matrix as a non-executable plan."""
++
++from __future__ import annotations
++
++import argparse
++import sys
++from pathlib import Path
++from typing import Dict, Iterable, List, Mapping, Optional, Sequence
++
++try:
++    from .contracts import ContractError, read_json, reject_live_path, write_json
++except ImportError:  # Direct execution from this directory.
++    from contracts import ContractError, read_json, reject_live_path, write_json  # type: ignore
++
++
++FORBIDDEN_EXECUTION_KEYS = frozenset((
++    "command", "commands", "argv", "shell", "subprocess", "execute",
++    "apply_now", "pressure_command", "cgroup_write",
++))
++
++
++def _walk_keys(value: object) -> Iterable[str]:
++    if isinstance(value, Mapping):
++        for key, child in value.items():
++            yield str(key)
++            yield from _walk_keys(child)
++    elif isinstance(value, list):
++        for child in value:
++            yield from _walk_keys(child)
++
++
++def validate_manifest(manifest: Mapping[str, object]) -> None:
++    required = (
++        "schema_version", "experiment_id", "phase", "status", "safety",
++        "collection", "session_split", "global_model_ablations",
++        "experiment_groups", "pressure_levels", "workloads", "repetitions",
++        "gates", "artifacts",
++    )
++    missing = [name for name in required if name not in manifest]
++    if missing:
++        raise ContractError("manifest missing: %s" % ", ".join(missing))
++    if manifest["schema_version"] != 1 or manifest["phase"] != "E":
++        raise ContractError("only the Phase-E v1 manifest is supported")
++    if manifest["status"] != "PARP_EFFECTIVE_TIER_LIVE_AUTH_REQUIRED":
++        raise ContractError("Phase E must stop at the live authorization gate")
++
++    safety = manifest["safety"]
++    if not isinstance(safety, Mapping):
++        raise ContractError("safety must be an object")
++    expected = {
++        "harness_capability": "PLAN_ONLY",
++        "dry_run_default": True,
++        "live_reads_executed": False,
++        "cgroup_writes_authorized": False,
++        "pressure_authorized": False,
++        "apply_authorized": False,
++        "kernel_install_authorized": False,
++        "reboot_authorized": False,
++    }
++    for name, value in expected.items():
++        if safety.get(name) != value:
++            raise ContractError("unsafe manifest safety.%s" % name)
++
++    collection = manifest["collection"]
++    split = manifest["session_split"]
++    if not isinstance(collection, Mapping) or not isinstance(split, Mapping):
++        raise ContractError("collection and session_split must be objects")
++    if collection.get("candidate_scope") != "ALL_NATIVE_TIER_GATE_FOLIOS":
++        raise ContractError("experiment must collect the full tier-gate set")
++    if collection.get("shadow_behavior") != "NATIVE_ONLY":
++        raise ContractError("SHADOW must preserve Native behavior")
++    if collection.get("label_semantics") != "FUTURE_REAL_ACCESS_NOT_REFAULT":
++        raise ContractError("future access must not be represented as refault")
++    if collection.get("label_windows") != ["100ms", "500ms", "1s", "5s"]:
++        raise ContractError("all four future reuse windows are required")
++    if not collection.get("trace_lost_required"):
++        raise ContractError("trace_lost must be measured")
++    if split.get("unit") != "session" or not split.get(
++            "random_page_row_split_forbidden"):
++        raise ContractError("training splits must be session-only")
++
++    ablations = manifest["global_model_ablations"]
++    if not isinstance(ablations, list):
++        raise ContractError("global_model_ablations must be an array")
++    expected_ids = {
++        "global_no_native_tier",
++        "global_plus_native_tier",
++        "global_plus_native_tier_and_tier_idx",
++    }
++    actual_ids = set()
++    for item in ablations:
++        if not isinstance(item, Mapping):
++            raise ContractError("ablation entries must be objects")
++        if item.get("model_name") != "GLOBAL_REUSE_MODEL":
++            raise ContractError("App/workload model routing is forbidden")
++        actual_ids.add(item.get("id"))
++        features = item.get("features")
++        if not isinstance(features, list):
++            raise ContractError("ablation features must be an array")
++        prohibited = {"app", "app_id", "session_id", "workload",
++                      "future_access", "future_label"}
++        if prohibited.intersection(features):
++            raise ContractError("ablation contains routed or future features")
++    if actual_ids != expected_ids:
++        raise ContractError("the three required GLOBAL ablations are mandatory")
++
++    groups = manifest["experiment_groups"]
++    if not isinstance(groups, list) or len(groups) < 8:
++        raise ContractError("all eight controlled groups are required")
++    for group in groups:
++        if not isinstance(group, Mapping) or group.get("execution") != "PLAN_ONLY":
++            raise ContractError("experiment groups may only be planned")
++
++    dangerous_keys = FORBIDDEN_EXECUTION_KEYS.intersection(_walk_keys(manifest))
++    if dangerous_keys:
++        raise ContractError("manifest contains executable keys: %s" %
++                            ", ".join(sorted(dangerous_keys)))
++
++
++def build_plan(manifest: Mapping[str, object]) -> Dict[str, object]:
++    """Expand cells without executing or constructing shell commands."""
++
++    validate_manifest(manifest)
++    groups = manifest["experiment_groups"]
++    pressures = manifest["pressure_levels"]
++    workloads = manifest["workloads"]
++    repetitions = manifest["repetitions"]
++    assert isinstance(groups, list) and isinstance(pressures, list)
++    assert isinstance(workloads, list) and isinstance(repetitions, Mapping)
++    minimum = int(repetitions["minimum"])
++    cells: List[Dict[str, object]] = []
++    for group in groups:
++        assert isinstance(group, Mapping)
++        if group["mode"] == "ORACLE_OFFLINE_ONLY":
++            cells.append({
++                "group": group["id"],
++                "mode": group["mode"],
++                "workload": "MERGED_OFFLINE_DATA",
++                "pressure_level": "OFFLINE_ONLY",
++                "repetition": 1,
++                "execution_status": "NOT_EXECUTED_PLAN_ONLY",
++                "authorization_required": False,
++            })
++            continue
++        for pressure in pressures:
++            assert isinstance(pressure, Mapping)
++            for workload in workloads:
++                for repetition in range(1, minimum + 1):
++                    cells.append({
++                        "group": group["id"],
++                        "mode": group["mode"],
++                        "workload": workload,
++                        "pressure_level": pressure["id"],
++                        "repetition": repetition,
++                        "execution_status": "NOT_EXECUTED_PLAN_ONLY",
++                        "authorization_required": True,
++                    })
++    return {
++        "schema_version": 1,
++        "experiment_id": manifest["experiment_id"],
++        "phase": "E",
++        "status": "PARP_EFFECTIVE_TIER_LIVE_AUTH_REQUIRED",
++        "generated_plan_only": True,
++        "runtime_actions_executed": 0,
++        "cgroup_writes_executed": 0,
++        "pressure_actions_executed": 0,
++        "apply_actions_executed": 0,
++        "kernel_install_actions_executed": 0,
++        "reboot_actions_executed": 0,
++        "planned_cells": len(cells),
++        "cells": cells,
++        "authorization_boundaries": [
++            {
++                "next_phase": "F",
++                "purpose": "live SHADOW and GLOBAL model training",
++                "state": "EXPLICIT_AUTHORIZATION_REQUIRED",
++            },
++            {
++                "next_phase": "G",
++                "purpose": "protect-only live APPLY",
++                "state": "SEPARATE_EXPLICIT_AUTHORIZATION_REQUIRED",
++            },
++            {
++                "next_phase": "H",
++                "purpose": "bidirectional live APPLY after all gates",
++                "state": "THIRD_EXPLICIT_AUTHORIZATION_REQUIRED",
++            },
++        ],
++    }
++
++
++def checklist_markdown(manifest: Mapping[str, object],
++                       plan: Mapping[str, object]) -> str:
++    """Return a human checklist containing descriptions, never commands."""
++
++    lines = [
++        "# PARP effective-tier controlled experiment checklist",
++        "",
++        "Status: `PARP_EFFECTIVE_TIER_LIVE_AUTH_REQUIRED`",
++        "",
++        "This file is a plan, not an execution script. No live interface was "
++        "read or written while generating it.",
++        "",
++        "## Phase-E offline prerequisites",
++        "",
++        "- [ ] Every exported candidate reached the native tier gate.",
++        "- [ ] Candidate count matches the independently measured tier-gate counter.",
++        "- [ ] Trace loss has before/after provenance for every session.",
++        "- [ ] Future labels use only real access and cover 100ms/500ms/1s/5s.",
++        "- [ ] Whole sessions, rather than page rows, are assigned to splits.",
++        "- [ ] All three GLOBAL model ablations are reported per App and page type.",
++        "- [ ] Four quadrants and page-weighted upgrade/downgrade metrics are present.",
++        "- [ ] Score, lru_lock, reclaim, efficiency, true refault, and App latency schemas are populated.",
++        "",
++        "## Runtime authorization boundaries",
++        "",
++        "- [ ] Obtain explicit Phase-F authorization before any live SHADOW activity.",
++        "- [ ] Obtain separate Phase-G authorization before protect-only APPLY.",
++        "- [ ] Pass downgrade gates and obtain third authorization before bidirectional APPLY.",
++        "- [ ] Treat cgroup changes, pressure generation, install, and reboot as unauthorized.",
++        "",
++        "## Planned matrix",
++        "",
++        "- Planned cells: %s" % plan["planned_cells"],
++        "- Minimum repetitions per live cell: %s" %
++        manifest["repetitions"]["minimum"],  # type: ignore[index]
++        "- Workloads: %s" % ", ".join(manifest["workloads"]),  # type: ignore[arg-type]
++        "- Every live cell remains `NOT_EXECUTED_PLAN_ONLY`.",
++        "",
++        "## Stop conditions",
++        "",
++    ]
++    for condition in manifest.get("stop_conditions", []):
++        lines.append("- [ ] Stop on %s." % condition)
++    lines.extend((
++        "",
++        "## Required statistical report",
++        "",
++        "- [ ] Median, mean, P95, P99, paired difference, and 95% bootstrap CI.",
++        "- [ ] Upgrade hit/waste and downgrade mistake/cold precision by window.",
++        "- [ ] OFF/SHADOW/PROTECT_ONLY/BIDIRECTIONAL/RANDOM/RECENCY lock and reclaim tails.",
++        "- [ ] True workingset refault counters kept distinct from future access labels.",
++        "- [ ] App P50/P95/P99, duration, stalls, timeouts, and failures.",
++        "",
++    ))
++    return "\n".join(lines)
++
++
++def parse_args(argv: Optional[Sequence[str]] = None) -> argparse.Namespace:
++    parser = argparse.ArgumentParser(
++        description="Render a non-executable effective-tier experiment plan")
++    parser.add_argument("--manifest", required=True, type=Path)
++    parser.add_argument("--output-dir", required=True, type=Path)
++    return parser.parse_args(argv)
++
++
++def main(argv: Optional[Sequence[str]] = None) -> int:
++    args = parse_args(argv)
++    try:
++        reject_live_path(args.manifest)
++        reject_live_path(args.output_dir)
++        raw = read_json(args.manifest)
++        if not isinstance(raw, Mapping):
++            raise ContractError("manifest must be an object")
++        plan = build_plan(raw)
++        args.output_dir.mkdir(parents=True, exist_ok=True)
++        write_json(args.output_dir / "experiment_manifest.json", raw)
++        write_json(args.output_dir / "experiment_plan.json", plan)
++        (args.output_dir / "EXPERIMENT_CHECKLIST.md").write_text(
++            checklist_markdown(raw, plan), encoding="utf-8")
++    except ContractError as exc:
++        print("experiment_plan: %s" % exc, file=sys.stderr)
++        return 2
++    return 0
++
++
++if __name__ == "__main__":
++    raise SystemExit(main())
+diff --git a/tools/parp/effective_tier/feature_schema.json b/tools/parp/effective_tier/feature_schema.json
+new file mode 100644
+index 000000000..f49401877
+--- /dev/null
++++ b/tools/parp/effective_tier/feature_schema.json
+@@ -0,0 +1,137 @@
++{
++  "$schema": "https://json-schema.org/draft/2020-12/schema",
++  "$id": "https://parp.invalid/effective-tier/feature-schema-v1",
++  "schema_name": "parp_effective_tier_offline_features_v1",
++  "feature_schema_version": 1,
++  "candidate_scope": "ALL_NATIVE_TIER_GATE_FOLIOS",
++  "model_family": "GLOBAL_REUSE_MODEL",
++  "online_constraints": {
++    "integer_only": true,
++    "app_routing": false,
++    "future_information": false,
++    "native_tier_field_modified": false,
++    "frontier_features": false
++  },
++  "runtime_base_features": [
++    {
++      "name": "time_since_last_real_access_ms",
++      "type": "u32",
++      "unit": "ms",
++      "bin_edges": [10, 100, 500, 2000, 10000],
++      "source": "page real-access state before the tier-gate timestamp"
++    },
++    {
++      "name": "previous_real_access_interval_ms",
++      "type": "u32",
++      "unit": "ms",
++      "bin_edges": [10, 100, 500, 2000, 10000],
++      "source": "two prior real accesses before the tier-gate timestamp"
++    },
++    {
++      "name": "reuse_interval_ema_ms",
++      "type": "u32",
++      "unit": "ms",
++      "bin_edges": [10, 100, 500, 2000, 10000],
++      "source": "real-access interval state before the tier-gate timestamp"
++    },
++    {
++      "name": "consecutive_reclaim_candidate_count",
++      "type": "u8",
++      "unit": "candidates",
++      "bin_edges": [0, 1, 2, 4, 8],
++      "source": "past tier-gate candidate history"
++    },
++    {
++      "name": "time_in_current_generation_ms",
++      "type": "u32",
++      "unit": "ms",
++      "bin_edges": [10, 100, 500, 2000, 10000],
++      "source": "native generation-entry state before the tier-gate timestamp"
++    },
++    {
++      "name": "access_ema_q8",
++      "type": "u8",
++      "unit": "Q8",
++      "bin_edges": [8, 32, 96, 160, 224],
++      "source": "real-access-only EMA before the tier-gate timestamp"
++    }
++  ],
++  "offline_ablations": [
++    {
++      "id": "global_no_native_tier",
++      "model_name": "GLOBAL_REUSE_MODEL",
++      "features": [
++        "time_since_last_real_access_ms",
++        "previous_real_access_interval_ms",
++        "reuse_interval_ema_ms",
++        "consecutive_reclaim_candidate_count",
++        "time_in_current_generation_ms",
++        "access_ema_q8"
++      ],
++      "kernel_shape_compatible_v1": true
++    },
++    {
++      "id": "global_plus_native_tier",
++      "model_name": "GLOBAL_REUSE_MODEL",
++      "features": [
++        "time_since_last_real_access_ms",
++        "previous_real_access_interval_ms",
++        "reuse_interval_ema_ms",
++        "consecutive_reclaim_candidate_count",
++        "time_in_current_generation_ms",
++        "access_ema_q8",
++        "native_tier"
++      ],
++      "kernel_shape_compatible_v1": false
++    },
++    {
++      "id": "global_plus_native_tier_and_tier_idx",
++      "model_name": "GLOBAL_REUSE_MODEL",
++      "features": [
++        "time_since_last_real_access_ms",
++        "previous_real_access_interval_ms",
++        "reuse_interval_ema_ms",
++        "consecutive_reclaim_candidate_count",
++        "time_in_current_generation_ms",
++        "access_ema_q8",
++        "native_tier",
++        "native_tier_idx"
++      ],
++      "kernel_shape_compatible_v1": false
++    }
++  ],
++  "offline_only_feature_edges": {
++    "native_tier": [0, 1, 2],
++    "native_tier_idx": [0, 1, 2]
++  },
++  "labels": {
++    "primary": "reuse_within_1s",
++    "secondary": [
++      "reuse_within_100ms",
++      "reuse_within_500ms",
++      "reuse_within_5s"
++    ],
++    "windows_ns": {
++      "reuse_within_100ms": 100000000,
++      "reuse_within_500ms": 500000000,
++      "reuse_within_1s": 1000000000,
++      "reuse_within_5s": 5000000000
++    },
++    "source": "strictly later real-access event with matching experiment, session, folio cookie, and lifetime epoch",
++    "not_refault": true,
++    "censoring": "null unless the complete window was observed or a positive real access occurred"
++  },
++  "prohibited_model_features": [
++    "app",
++    "app_id",
++    "process_name",
++    "file_path",
++    "user_operation",
++    "session_id",
++    "workload",
++    "future_access",
++    "future_label",
++    "frontier_seq",
++    "frontier_headroom"
++  ]
++}
+diff --git a/tools/parp/effective_tier/labeled_candidate.schema.json b/tools/parp/effective_tier/labeled_candidate.schema.json
+new file mode 100644
+index 000000000..6d11df022
+--- /dev/null
++++ b/tools/parp/effective_tier/labeled_candidate.schema.json
+@@ -0,0 +1,37 @@
++{
++  "$schema": "https://json-schema.org/draft/2020-12/schema",
++  "$id": "https://parp.invalid/effective-tier/labeled-candidate-v1",
++  "title": "PARP effective-tier offline labeled candidate",
++  "allOf": [
++    { "$ref": "raw_event.schema.json#/$defs/tier_gate_candidate" },
++    {
++      "type": "object",
++      "required": ["quadrant", "split", "app", "workload", "pressure_level", "labels", "next_real_access_delay_ns", "next_real_access_source", "trace_lost_measured", "trace_lost", "tier_gate_coverage_measured", "tier_gate_coverage_complete"],
++      "properties": {
++        "quadrant": { "enum": ["KEEP_RECLAIM", "PREDICTIVE_UPGRADE", "KEEP_PROTECT", "PREDICTIVE_DOWNGRADE"] },
++        "split": { "enum": ["train", "validation", "test"] },
++        "app": { "enum": ["WPS", "FILES", "QQ", "OTHER"] },
++        "workload": { "type": "string", "minLength": 1 },
++        "pressure_level": { "enum": ["P0", "P1", "P2", "P3", "P4"] },
++        "labels": {
++          "type": "object",
++          "additionalProperties": false,
++          "required": ["reuse_within_100ms", "reuse_within_500ms", "reuse_within_1s", "reuse_within_5s"],
++          "properties": {
++            "reuse_within_100ms": { "type": ["boolean", "null"] },
++            "reuse_within_500ms": { "type": ["boolean", "null"] },
++            "reuse_within_1s": { "type": ["boolean", "null"] },
++            "reuse_within_5s": { "type": ["boolean", "null"] }
++          }
++        },
++        "next_real_access_delay_ns": { "type": ["integer", "null"], "minimum": 1 },
++        "next_real_access_source": { "enum": ["PTE_YOUNG", "MARK_ACCESSED", "FD_REFERENCE", null] },
++        "label_semantics": { "const": "FUTURE_REAL_ACCESS_NOT_REFAULT" },
++        "trace_lost_measured": { "type": "boolean" },
++        "trace_lost": { "type": ["integer", "null"], "minimum": 0 },
++        "tier_gate_coverage_measured": { "type": "boolean" },
++        "tier_gate_coverage_complete": { "type": "boolean" }
++      }
++    }
++  ]
++}
+diff --git a/tools/parp/effective_tier/observability.schema.json b/tools/parp/effective_tier/observability.schema.json
+new file mode 100644
+index 000000000..98d6753e8
+--- /dev/null
++++ b/tools/parp/effective_tier/observability.schema.json
+@@ -0,0 +1,122 @@
++{
++  "$schema": "https://json-schema.org/draft/2020-12/schema",
++  "$id": "https://parp.invalid/effective-tier/observability-v1",
++  "title": "PARP effective-tier exported observability record",
++  "type": "object",
++  "required": ["schema_version", "event_kind", "timestamp_ns", "experiment_id", "session_id", "mode"],
++  "properties": {
++    "schema_version": { "const": 1 },
++    "event_kind": { "enum": ["score_latency", "lock_latency", "reclaim_latency", "reclaim_efficiency", "app_latency", "app_session_summary", "vm_counter_delta", "trace_loss"] },
++    "timestamp_ns": { "type": "integer", "minimum": 0 },
++    "experiment_id": { "type": ["string", "integer"] },
++    "session_id": { "type": ["string", "integer"] },
++    "mode": { "enum": ["OFF", "SHADOW_EFFECTIVE_TIER", "APPLY_PROTECT_ONLY", "APPLY_BIDIRECTIONAL", "APPLY_RANDOM_MATCHED", "APPLY_RECENCY_BASELINE", "PRODUCT_ABLATION", "ORACLE_OFFLINE_ONLY"] }
++  },
++  "allOf": [
++    {
++      "if": { "properties": { "event_kind": { "const": "score_latency" } } },
++      "then": {
++        "required": ["component", "duration_ns"],
++        "properties": {
++          "component": { "enum": ["score", "effective_tier", "quadrant_classification", "batch_model_total"] },
++          "duration_ns": { "type": "integer", "minimum": 0 },
++          "batch_id": { "type": ["string", "integer", "null"] }
++        }
++      }
++    },
++    {
++      "if": { "properties": { "event_kind": { "const": "lock_latency" } } },
++      "then": {
++        "required": ["lock_name", "scope", "held_ns", "wait_ns", "irq_disabled_ns"],
++        "properties": {
++          "lock_name": { "const": "lru_lock" },
++          "scope": { "enum": ["scan_folios", "batch"] },
++          "held_ns": { "type": "integer", "minimum": 0 },
++          "wait_ns": { "type": ["integer", "null"], "minimum": 0 },
++          "irq_disabled_ns": { "type": ["integer", "null"], "minimum": 0 },
++          "wait_measured": { "type": "boolean" },
++          "irq_disabled_measured": { "type": "boolean" }
++        }
++      }
++    },
++    {
++      "if": { "properties": { "event_kind": { "const": "reclaim_latency" } } },
++      "then": {
++        "required": ["scope", "duration_ns"],
++        "properties": {
++          "scope": { "enum": ["direct_reclaim", "memcg_reclaim", "kswapd_round", "isolate_batch", "shrink_folio_list", "full_request"] },
++          "duration_ns": { "type": "integer", "minimum": 0 }
++        }
++      }
++    },
++    {
++      "if": { "properties": { "event_kind": { "const": "reclaim_efficiency" } } },
++      "then": {
++        "required": ["scanned", "isolated", "reclaimed", "native_protected", "predictive_upgraded", "predictive_downgraded", "pgscan", "pgsteal", "no_progress_rounds", "priority_drops", "younger_generation_moves"],
++        "properties": {
++          "scanned": { "type": "integer", "minimum": 0 },
++          "isolated": { "type": "integer", "minimum": 0 },
++          "reclaimed": { "type": "integer", "minimum": 0 },
++          "native_protected": { "type": "integer", "minimum": 0 },
++          "predictive_upgraded": { "type": "integer", "minimum": 0 },
++          "predictive_downgraded": { "type": "integer", "minimum": 0 },
++          "pgscan": { "type": "integer", "minimum": 0 },
++          "pgsteal": { "type": "integer", "minimum": 0 },
++          "no_progress_rounds": { "type": "integer", "minimum": 0 },
++          "priority_drops": { "type": "integer", "minimum": 0 },
++          "younger_generation_moves": { "type": "integer", "minimum": 0 }
++        }
++      }
++    },
++    {
++      "if": { "properties": { "event_kind": { "const": "app_latency" } } },
++      "then": {
++        "required": ["app", "operation", "duration_ns", "success"],
++        "properties": {
++          "app": { "enum": ["WPS", "FILES", "QQ", "OTHER"] },
++          "operation": { "type": "string", "minLength": 1 },
++          "duration_ns": { "type": "integer", "minimum": 0 },
++          "success": { "type": "boolean" },
++          "failure_kind": { "type": ["string", "null"] }
++        }
++      }
++    },
++    {
++      "if": { "properties": { "event_kind": { "const": "app_session_summary" } } },
++      "then": {
++        "required": ["app", "total_duration_ns", "stalls", "timeouts", "failures"],
++        "properties": {
++          "app": { "enum": ["WPS", "FILES", "QQ", "OTHER"] },
++          "total_duration_ns": { "type": "integer", "minimum": 0 },
++          "stalls": { "type": "integer", "minimum": 0 },
++          "timeouts": { "type": "integer", "minimum": 0 },
++          "failures": { "type": "integer", "minimum": 0 }
++        }
++      }
++    },
++    {
++      "if": { "properties": { "event_kind": { "const": "vm_counter_delta" } } },
++      "then": {
++        "required": ["counter", "delta"],
++        "properties": {
++          "counter": { "enum": ["workingset_refault_file", "workingset_refault_anon", "pgfault", "pgmajfault", "swapin", "swapout", "psi_some_us", "psi_full_us", "memory_high", "memory_oom", "memory_oom_kill"] },
++          "delta": { "type": "integer" }
++        }
++      }
++    },
++    {
++      "if": { "properties": { "event_kind": { "const": "trace_loss" } } },
++      "then": {
++        "required": ["measured", "source", "before", "after", "lost"],
++        "properties": {
++          "measured": { "type": "boolean" },
++          "source": { "type": ["string", "null"] },
++          "before": { "type": ["integer", "null"], "minimum": 0 },
++          "after": { "type": ["integer", "null"], "minimum": 0 },
++          "lost": { "type": ["integer", "null"], "minimum": 0 },
++          "per_cpu": { "type": "object", "additionalProperties": { "type": "integer", "minimum": 0 } }
++        }
++      }
++    }
++  ]
++}
+diff --git a/tools/parp/effective_tier/raw_event.schema.json b/tools/parp/effective_tier/raw_event.schema.json
+new file mode 100644
+index 000000000..27bc2cd02
+--- /dev/null
++++ b/tools/parp/effective_tier/raw_event.schema.json
+@@ -0,0 +1,107 @@
++{
++  "$schema": "https://json-schema.org/draft/2020-12/schema",
++  "$id": "https://parp.invalid/effective-tier/raw-event-v1",
++  "title": "PARP effective-tier exported raw event",
++  "oneOf": [
++    { "$ref": "#/$defs/tier_gate_candidate" },
++    { "$ref": "#/$defs/real_access" }
++  ],
++  "$defs": {
++    "identifier": { "type": ["string", "integer"] },
++    "nullableBoolean": { "type": ["boolean", "null"] },
++    "nullableInteger": { "type": ["integer", "null"] },
++    "features": {
++      "type": "object",
++      "additionalProperties": false,
++      "required": [
++        "time_since_last_real_access_ms",
++        "previous_real_access_interval_ms",
++        "reuse_interval_ema_ms",
++        "consecutive_reclaim_candidate_count",
++        "time_in_current_generation_ms",
++        "access_ema_q8"
++      ],
++      "properties": {
++        "time_since_last_real_access_ms": { "type": ["integer", "null"], "minimum": 0 },
++        "previous_real_access_interval_ms": { "type": ["integer", "null"], "minimum": 0 },
++        "reuse_interval_ema_ms": { "type": ["integer", "null"], "minimum": 0 },
++        "consecutive_reclaim_candidate_count": { "type": ["integer", "null"], "minimum": 0 },
++        "time_in_current_generation_ms": { "type": ["integer", "null"], "minimum": 0 },
++        "access_ema_q8": { "type": ["integer", "null"], "minimum": 0, "maximum": 255 }
++      }
++    },
++    "tier_gate_candidate": {
++      "type": "object",
++      "additionalProperties": true,
++      "required": [
++        "schema_version", "event_kind", "timestamp_ns", "experiment_id",
++        "session_id", "folio_cookie", "folio_lifetime_epoch",
++        "memcg_anon_id", "nid", "page_type", "source_seq",
++        "generation_index", "native_tier", "native_tier_idx",
++        "special_native_protect", "native_protect", "features",
++        "reuse_score", "cold_threshold", "hot_threshold_1",
++        "hot_threshold_2", "delta_tier_q8", "effective_tier_q8",
++        "effective_protect", "action", "bypass_reason", "folio_nr_pages",
++        "batch_id", "reclaim_epoch", "priority", "score_duration_ns",
++        "actual_native_behavior", "isolate_result", "reclaimed", "putback",
++        "activated", "gate_reached", "candidate_scope"
++      ],
++      "properties": {
++        "schema_version": { "const": 1 },
++        "event_kind": { "const": "tier_gate_candidate" },
++        "timestamp_ns": { "type": "integer", "minimum": 0 },
++        "experiment_id": { "$ref": "#/$defs/identifier" },
++        "session_id": { "$ref": "#/$defs/identifier" },
++        "folio_cookie": { "$ref": "#/$defs/identifier" },
++        "folio_lifetime_epoch": { "type": "integer", "minimum": 0 },
++        "memcg_anon_id": { "$ref": "#/$defs/identifier" },
++        "nid": { "type": "integer", "minimum": 0 },
++        "page_type": { "enum": ["anon", "file"] },
++        "source_seq": { "type": "integer", "minimum": 0 },
++        "generation_index": { "type": "integer", "minimum": 0 },
++        "native_tier": { "type": "integer", "minimum": 0, "maximum": 3 },
++        "native_tier_idx": { "type": "integer", "minimum": 0, "maximum": 3 },
++        "special_native_protect": { "type": "boolean" },
++        "native_protect": { "type": "boolean" },
++        "features": { "$ref": "#/$defs/features" },
++        "reuse_score": { "$ref": "#/$defs/nullableInteger" },
++        "cold_threshold": { "type": "integer" },
++        "hot_threshold_1": { "type": "integer" },
++        "hot_threshold_2": { "type": "integer" },
++        "delta_tier_q8": { "$ref": "#/$defs/nullableInteger" },
++        "effective_tier_q8": { "$ref": "#/$defs/nullableInteger" },
++        "effective_protect": { "type": "boolean" },
++        "action": { "enum": ["KEEP_RECLAIM", "PREDICTIVE_UPGRADE", "KEEP_PROTECT", "PREDICTIVE_DOWNGRADE", "SPECIAL_NATIVE_PROTECT"] },
++        "bypass_reason": { "type": "string" },
++        "folio_nr_pages": { "type": "integer", "minimum": 1 },
++        "batch_id": { "$ref": "#/$defs/identifier" },
++        "reclaim_epoch": { "$ref": "#/$defs/identifier" },
++        "priority": { "type": "integer" },
++        "score_duration_ns": { "type": "integer", "minimum": 0 },
++        "actual_native_behavior": { "enum": ["protect", "reclaim", "unknown"] },
++        "isolate_result": { "enum": ["not_attempted", "succeeded", "failed", "unknown"] },
++        "reclaimed": { "$ref": "#/$defs/nullableBoolean" },
++        "putback": { "$ref": "#/$defs/nullableBoolean" },
++        "activated": { "$ref": "#/$defs/nullableBoolean" },
++        "gate_reached": { "const": true },
++        "candidate_scope": { "const": "ALL_NATIVE_TIER_GATE_FOLIOS" }
++      }
++    },
++    "real_access": {
++      "type": "object",
++      "additionalProperties": true,
++      "required": ["schema_version", "event_kind", "timestamp_ns", "experiment_id", "session_id", "folio_cookie", "folio_lifetime_epoch", "access_source", "is_real_access"],
++      "properties": {
++        "schema_version": { "const": 1 },
++        "event_kind": { "const": "real_access" },
++        "timestamp_ns": { "type": "integer", "minimum": 0 },
++        "experiment_id": { "$ref": "#/$defs/identifier" },
++        "session_id": { "$ref": "#/$defs/identifier" },
++        "folio_cookie": { "$ref": "#/$defs/identifier" },
++        "folio_lifetime_epoch": { "type": "integer", "minimum": 0 },
++        "access_source": { "enum": ["PTE_YOUNG", "MARK_ACCESSED", "FD_REFERENCE"] },
++        "is_real_access": { "const": true }
++      }
++    }
++  }
++}
+diff --git a/tools/parp/effective_tier/session_metadata.schema.json b/tools/parp/effective_tier/session_metadata.schema.json
+new file mode 100644
+index 000000000..162aa9ded
+--- /dev/null
++++ b/tools/parp/effective_tier/session_metadata.schema.json
+@@ -0,0 +1,57 @@
++{
++  "$schema": "https://json-schema.org/draft/2020-12/schema",
++  "$id": "https://parp.invalid/effective-tier/session-metadata-v1",
++  "title": "PARP effective-tier session metadata",
++  "type": "object",
++  "required": ["schema_version", "sessions"],
++  "properties": {
++    "schema_version": { "const": 1 },
++    "sessions": {
++      "type": "array",
++      "items": {
++        "type": "object",
++        "additionalProperties": true,
++        "required": ["schema_version", "experiment_id", "session_id", "app", "workload", "mode", "pressure_level", "start_ns", "observation_end_ns", "tier_gate_counter", "trace_loss"],
++        "properties": {
++          "schema_version": { "const": 1 },
++          "experiment_id": { "type": ["string", "integer"] },
++          "session_id": { "type": ["string", "integer"] },
++          "app": { "enum": ["WPS", "FILES", "QQ", "OTHER"] },
++          "workload": { "type": "string", "minLength": 1 },
++          "mode": { "enum": ["OFF", "SHADOW_EFFECTIVE_TIER", "APPLY_PROTECT_ONLY", "APPLY_BIDIRECTIONAL", "APPLY_RANDOM_MATCHED", "APPLY_RECENCY_BASELINE", "PRODUCT_ABLATION", "ORACLE_OFFLINE_ONLY"] },
++          "pressure_level": { "enum": ["P0", "P1", "P2", "P3", "P4"] },
++          "start_ns": { "type": "integer", "minimum": 0 },
++          "observation_end_ns": { "type": "integer", "minimum": 1 },
++          "split": { "enum": ["train", "validation", "test"] },
++          "tier_gate_counter": { "$ref": "#/$defs/counterMeasurement" },
++          "trace_loss": { "$ref": "#/$defs/lossMeasurement" }
++        }
++      }
++    }
++  },
++  "$defs": {
++    "counterMeasurement": {
++      "type": "object",
++      "required": ["measured", "source", "before", "after", "delta"],
++      "properties": {
++        "measured": { "type": "boolean" },
++        "source": { "type": ["string", "null"] },
++        "before": { "type": ["integer", "null"], "minimum": 0 },
++        "after": { "type": ["integer", "null"], "minimum": 0 },
++        "delta": { "type": ["integer", "null"], "minimum": 0 }
++      }
++    },
++    "lossMeasurement": {
++      "type": "object",
++      "required": ["measured", "source", "before", "after", "lost"],
++      "properties": {
++        "measured": { "type": "boolean" },
++        "source": { "type": ["string", "null"] },
++        "before": { "type": ["integer", "null"], "minimum": 0 },
++        "after": { "type": ["integer", "null"], "minimum": 0 },
++        "lost": { "type": ["integer", "null"], "minimum": 0 },
++        "per_cpu": { "type": "object", "additionalProperties": { "type": "integer", "minimum": 0 } }
++      }
++    }
++  }
++}
+diff --git a/tools/parp/effective_tier/tests/test_phase_e.py b/tools/parp/effective_tier/tests/test_phase_e.py
+new file mode 100644
+index 000000000..abe84f4a9
+--- /dev/null
++++ b/tools/parp/effective_tier/tests/test_phase_e.py
+@@ -0,0 +1,394 @@
++#!/usr/bin/env python3
++# SPDX-License-Identifier: GPL-2.0
++from __future__ import annotations
++
++import json
++import tempfile
++import unittest
++from copy import deepcopy
++from pathlib import Path
++
++from tools.parp.effective_tier.analyze import analyze, analyze_telemetry
++from tools.parp.effective_tier.collector import build_dataset, parse_exported_trace
++from tools.parp.effective_tier.contracts import (
++    BASE_FEATURES,
++    ContractError,
++    session_key,
++    validate_access,
++)
++from tools.parp.effective_tier.experiment_plan import (
++    build_plan,
++    checklist_markdown,
++    validate_manifest,
++)
++
++
++HERE = Path(__file__).resolve().parents[1]
++
++
++def candidate(session: str, cookie: str, action: str, timestamp_ns: int,
++              pages: int = 1, source_seq: int = 1) -> dict:
++    decisions = {
++        "KEEP_RECLAIM": (0, 0, False, False, False, 0, 0),
++        "PREDICTIVE_UPGRADE": (0, 0, False, False, True, 256, 256),
++        "KEEP_PROTECT": (1, 0, False, True, True, 0, 256),
++        "PREDICTIVE_DOWNGRADE": (1, 0, False, True, False, -256, 0),
++        "SPECIAL_NATIVE_PROTECT": (0, 0, True, False, False, 0, 0),
++    }
++    native, tier_idx, special, native_protect, effective_protect, delta, effective = decisions[action]
++    return {
++        "schema_version": 1,
++        "event_kind": "tier_gate_candidate",
++        "timestamp_ns": timestamp_ns,
++        "experiment_id": "exp",
++        "session_id": session,
++        "folio_cookie": cookie,
++        "folio_lifetime_epoch": 7,
++        "memcg_anon_id": "memcg-1",
++        "nid": 0,
++        "page_type": "file" if source_seq % 2 else "anon",
++        "source_seq": source_seq,
++        "generation_index": 0,
++        "native_tier": native,
++        "native_tier_idx": tier_idx,
++        "special_native_protect": special,
++        "native_protect": native_protect,
++        "features": {
++            "time_since_last_real_access_ms": 10 + source_seq * 100,
++            "previous_real_access_interval_ms": 20 + source_seq * 90,
++            "reuse_interval_ema_ms": 30 + source_seq * 80,
++            "consecutive_reclaim_candidate_count": source_seq % 5,
++            "time_in_current_generation_ms": 40 + source_seq * 70,
++            "access_ema_q8": min(255, source_seq * 20),
++        },
++        "reuse_score": 100 - source_seq * 10,
++        "cold_threshold": -48,
++        "hot_threshold_1": 48,
++        "hot_threshold_2": 96,
++        "delta_tier_q8": delta,
++        "effective_tier_q8": effective,
++        "effective_protect": effective_protect,
++        "action": action,
++        "bypass_reason": "NONE",
++        "folio_nr_pages": pages,
++        "batch_id": "batch-1",
++        "reclaim_epoch": "epoch-1",
++        "priority": 12,
++        "score_duration_ns": 17 + source_seq,
++        "actual_native_behavior": "protect" if (special or native_protect) else "reclaim",
++        "isolate_result": "not_attempted" if (special or native_protect) else "succeeded",
++        "reclaimed": None,
++        "putback": None,
++        "activated": None,
++        "gate_reached": True,
++        "candidate_scope": "ALL_NATIVE_TIER_GATE_FOLIOS",
++    }
++
++
++def access(session: str, cookie: str, timestamp_ns: int,
++           lifetime: int = 7, source: str = "PTE_YOUNG") -> dict:
++    return {
++        "schema_version": 1,
++        "event_kind": "real_access",
++        "timestamp_ns": timestamp_ns,
++        "experiment_id": "exp",
++        "session_id": session,
++        "folio_cookie": cookie,
++        "folio_lifetime_epoch": lifetime,
++        "access_source": source,
++        "is_real_access": True,
++    }
++
++
++def session(session_id: str, split: str, count: int,
++            end_ns: int = 10_000_000_000, lost: int = 0) -> dict:
++    return {
++        "schema_version": 1,
++        "experiment_id": "exp",
++        "session_id": session_id,
++        "app": {"train": "WPS", "validation": "FILES", "test": "QQ"}[split],
++        "workload": "fixture-" + split,
++        "mode": "SHADOW_EFFECTIVE_TIER",
++        "pressure_level": "P2",
++        "start_ns": 1,
++        "observation_end_ns": end_ns,
++        "split": split,
++        "tier_gate_counter": {
++            "measured": True,
++            "source": "exported_debug_counter",
++            "before": 100,
++            "after": 100 + count,
++            "delta": count,
++        },
++        "trace_loss": {
++            "measured": True,
++            "source": "exported_trace_per_cpu_stats",
++            "before": 3,
++            "after": 3 + lost,
++            "lost": lost,
++            "per_cpu": {"0": lost},
++        },
++    }
++
++
++def dataset_fixture():
++    actions = ["KEEP_RECLAIM", "PREDICTIVE_UPGRADE", "KEEP_PROTECT",
++               "PREDICTIVE_DOWNGRADE"]
++    records = []
++    sessions = {}
++    sequence = 1
++    for split in ("train", "validation", "test"):
++        session_id = "s-" + split
++        sessions[("exp", session_id)] = session(session_id, split, 8)
++        for repeat in range(2):
++            for action_name in actions:
++                cookie = "%s-%d-%s" % (split, repeat, action_name)
++                timestamp = 1_000_000_000 + sequence * 10_000_000
++                pages = 4 if action_name in ("PREDICTIVE_UPGRADE",
++                                             "PREDICTIVE_DOWNGRADE") else 1
++                records.append(candidate(session_id, cookie, action_name,
++                                         timestamp, pages, sequence))
++                # Make upgrades hot and downgrades cold; keep classes mixed.
++                should_reuse = action_name == "PREDICTIVE_UPGRADE" or (
++                    action_name == "KEEP_PROTECT" and repeat == 0) or (
++                    action_name == "KEEP_RECLAIM" and repeat == 1)
++                if should_reuse:
++                    records.append(access(session_id, cookie,
++                                          timestamp + 50_000_000))
++                sequence += 1
++    return records, sessions
++
++
++class PhaseECollectorTests(unittest.TestCase):
++    def test_exported_kernel_trace_is_normalized_offline(self):
++        lines = [
++            "task: parp_effective_tier_decision: time=1000000000 "
++            "experiment=1 session=2 cookie=99 lifetime=7 memcg=3 nid=0 "
++            "type=1 source_seq=8 gen=0 native_tier=0 tier_idx=0 special=0 "
++            "native_protect=0 effective_protect=1 actual_tier_protect=0 "
++            "score=100 thresholds=-48/48/96 delta_q8=256 effective_q8=256 "
++            "action=1 bypass=0 pages=4 batch=11 epoch=12 priority=10 "
++            "score_ns=20 decision_ns=30 sort=0 isolate_attempted=1 "
++            "isolate_result=1 features=10,20,30,1,40,50 trace_lost=0",
++            "task: parp_effective_tier_access: time=1050000000 cookie=99 "
++            "lifetime=7 gen=0 type=1 event=0 real=1",
++            "task: parp_effective_tier_access: time=1055000000 cookie=99 "
++            "lifetime=7 gen=1 type=1 event=6 real=0",
++            "task: parp_effective_tier_outcome: time=1060000000 cookie=99 "
++            "lifetime=7 action=1 outcome=0",
++            "task: parp_effective_tier_batch: time=1100000000 batch=11 "
++            "epoch=12 type=1 mode=1 candidates=4 upgrades=4 downgrades=0 "
++            "isolated=4 reclaimed=4 model_ns=80 lock_ns=100",
++        ]
++        with tempfile.TemporaryDirectory() as directory:
++            path = Path(directory) / "trace.txt"
++            path.write_text("\n".join(lines) + "\n", encoding="utf-8")
++            records, stats = parse_exported_trace([path])
++        meta = session("2", "train", 1)
++        meta["experiment_id"] = "1"
++        labeled, telemetry, summary = build_dataset(
++            records, {("1", "2"): meta})
++        self.assertTrue(labeled[0]["labels"]["reuse_within_100ms"])
++        self.assertTrue(labeled[0]["reclaimed"])
++        self.assertEqual(stats["policy_move_access_events_ignored"], 1)
++        self.assertEqual(telemetry[0]["component"], "batch_model_total")
++        self.assertTrue(summary["tier_gate_coverage_complete"])
++
++    def test_real_access_labels_lifetime_and_all_windows(self):
++        row = candidate("s", "f", "PREDICTIVE_UPGRADE", 1_000_000_000)
++        meta = session("s", "train", 1)
++        records = [
++            row,
++            access("s", "f", 1_010_000_000, lifetime=8),
++            access("s", "f", 1_200_000_000, lifetime=7,
++                   source="MARK_ACCESSED"),
++        ]
++        labeled, telemetry, summary = build_dataset(records, {("exp", "s"): meta})
++        labels = labeled[0]["labels"]
++        self.assertFalse(labels["reuse_within_100ms"])
++        self.assertTrue(labels["reuse_within_500ms"])
++        self.assertTrue(labels["reuse_within_1s"])
++        self.assertTrue(labels["reuse_within_5s"])
++        self.assertEqual(labeled[0]["next_real_access_source"], "MARK_ACCESSED")
++        self.assertEqual(summary["trace_lost"], 0)
++        self.assertTrue(summary["tier_gate_coverage_complete"])
++        self.assertEqual(telemetry, [])
++
++    def test_right_censoring_is_null_not_cold(self):
++        row = candidate("s", "f", "KEEP_RECLAIM", 1_000_000_000)
++        meta = session("s", "train", 1, end_ns=1_250_000_000)
++        labeled, _telemetry, _summary = build_dataset(
++            [row], {("exp", "s"): meta})
++        labels = labeled[0]["labels"]
++        self.assertFalse(labels["reuse_within_100ms"])
++        self.assertIsNone(labels["reuse_within_500ms"])
++        self.assertIsNone(labels["reuse_within_1s"])
++        self.assertIsNone(labels["reuse_within_5s"])
++
++    def test_policy_move_cannot_be_a_real_access_label(self):
++        event = access("s", "f", 123, source="NATIVE_GENERATION_MOVE")
++        with self.assertRaises(ContractError):
++            validate_access(event)
++
++    def test_trace_loss_is_measured_not_inferred(self):
++        row = candidate("s", "f", "KEEP_RECLAIM", 1_000_000_000)
++        meta = session("s", "train", 1, lost=2)
++        labeled, _telemetry, summary = build_dataset(
++            [row], {("exp", "s"): meta})
++        self.assertEqual(labeled[0]["trace_lost"], 2)
++        self.assertFalse(labeled[0]["tier_gate_coverage_complete"])
++        self.assertEqual(summary["status"],
++                         "PARP_EFFECTIVE_TIER_OFFLINE_DATASET_INCOMPLETE")
++
++    def test_special_native_protection_normalizes_to_keep_protect(self):
++        row = candidate("s", "f", "SPECIAL_NATIVE_PROTECT", 1_000_000_000)
++        labeled, _telemetry, _summary = build_dataset(
++            [row], {("exp", "s"): session("s", "train", 1)})
++        self.assertEqual(labeled[0]["quadrant"], "KEEP_PROTECT")
++
++
++class PhaseEAnalysisTests(unittest.TestCase):
++    def setUp(self):
++        records, sessions = dataset_fixture()
++        self.rows, _telemetry, _summary = build_dataset(records, sessions)
++
++    def test_session_split_has_no_page_row_leakage(self):
++        result = analyze(self.rows, [])
++        self.assertTrue(result["summary"]["session_split_only"])
++        seen = {}
++        for row in self.rows:
++            key = session_key(row)
++            seen.setdefault(key, row["split"])
++            self.assertEqual(seen[key], row["split"])
++
++    def test_four_quadrants_and_page_weighted_action_metrics(self):
++        result = analyze(self.rows, [])
++        quadrants = result["tier_reclassification"]["quadrants"]
++        self.assertEqual(set(quadrants), {
++            "KEEP_RECLAIM", "PREDICTIVE_UPGRADE", "KEEP_PROTECT",
++            "PREDICTIVE_DOWNGRADE",
++        })
++        upgrade = result["upgrade_analysis"]["primary"]
++        downgrade = result["downgrade_analysis"]["primary"]
++        self.assertEqual(upgrade["upgrade_hit_rate"], 1.0)
++        self.assertEqual(upgrade["upgrade_waste_rate"], 0.0)
++        self.assertEqual(downgrade["downgrade_mistake_rate"], 0.0)
++        self.assertEqual(downgrade["downgrade_cold_precision"], 1.0)
++
++    def test_three_global_ablations_never_route_by_app(self):
++        result = analyze(self.rows, [])
++        quality = result["model_quality"]
++        self.assertFalse(quality["app_routing_enabled"])
++        expected = {
++            "global_no_native_tier",
++            "global_plus_native_tier",
++            "global_plus_native_tier_and_tier_idx",
++        }
++        self.assertEqual(set(quality["ablations"]), expected)
++        prohibited = {"app", "app_id", "session_id", "workload"}
++        for value in quality["ablations"].values():
++            self.assertEqual(value["status"], "TRAINED_OFFLINE")
++            self.assertFalse(prohibited.intersection(value["features"]))
++            self.assertEqual(value["model"]["model_name"],
++                             "GLOBAL_REUSE_MODEL")
++            self.assertEqual(len(value["upgrade_cap_ablation"]), 3)
++
++    def test_session_split_leakage_is_rejected(self):
++        broken = deepcopy(self.rows)
++        broken[1]["session_id"] = broken[0]["session_id"]
++        broken[1]["split"] = "test" if broken[0]["split"] != "test" else "train"
++        with self.assertRaises(ContractError):
++            analyze(broken, [])
++
++    def test_observability_latency_efficiency_and_app_schema(self):
++        base = {
++            "schema_version": 1,
++            "timestamp_ns": 1,
++            "experiment_id": "exp",
++            "session_id": "s",
++            "mode": "SHADOW_EFFECTIVE_TIER",
++        }
++        telemetry = [
++            dict(base, event_kind="score_latency", component="score",
++                 duration_ns=value) for value in (10, 20, 30, 40)
++        ]
++        telemetry.extend((
++            dict(base, event_kind="lock_latency", lock_name="lru_lock",
++                 scope="scan_folios", held_ns=100, wait_ns=10,
++                 irq_disabled_ns=90),
++            dict(base, event_kind="reclaim_latency", scope="direct_reclaim",
++                 duration_ns=1000),
++            dict(base, event_kind="reclaim_efficiency", scanned=100,
++                 isolated=50, reclaimed=25, native_protected=10,
++                 predictive_upgraded=2, predictive_downgraded=1,
++                 pgscan=100, pgsteal=25, no_progress_rounds=0,
++                 priority_drops=1, younger_generation_moves=2),
++            dict(base, event_kind="app_latency", app="WPS", operation="save",
++                 duration_ns=5000, success=False),
++            dict(base, event_kind="app_session_summary", app="WPS",
++                 total_duration_ns=50_000, stalls=2, timeouts=1, failures=1),
++            dict(base, event_kind="vm_counter_delta",
++                 counter="workingset_refault_file", delta=3),
++        ))
++        result = analyze_telemetry(telemetry)
++        score = result["latency"]["score_and_effective_tier_ns"][
++            "SHADOW_EFFECTIVE_TIER/score"]
++        self.assertEqual(score["p50"], 25.0)
++        efficiency = result["reclaim_efficiency"]["SHADOW_EFFECTIVE_TIER"]
++        self.assertEqual(efficiency["reclaimed_per_scanned"], 0.25)
++        app = result["app_latency"]["operations"][
++            "SHADOW_EFFECTIVE_TIER/WPS/save"]
++        self.assertEqual(app["failures"], 1)
++        session_summary = result["app_latency"]["sessions"][
++            "SHADOW_EFFECTIVE_TIER/WPS"]
++        self.assertEqual(session_summary["timeouts"], 1)
++        per_second = result["lock_latency"]["per_second_max_held_ns"][
++            "SHADOW_EFFECTIVE_TIER/scan_folios"]
++        self.assertEqual(per_second["seconds"][0]["max_held_ns"], 100)
++
++
++class PhaseEPlanTests(unittest.TestCase):
++    def setUp(self):
++        self.manifest = json.loads(
++            (HERE / "experiment_manifest.template.json").read_text(
++                encoding="utf-8"))
++
++    def test_plan_is_non_executable_and_stops_at_authorization(self):
++        plan = build_plan(self.manifest)
++        self.assertTrue(plan["generated_plan_only"])
++        self.assertEqual(plan["runtime_actions_executed"], 0)
++        self.assertEqual(plan["apply_actions_executed"], 0)
++        self.assertTrue(all(cell["execution_status"] ==
++                            "NOT_EXECUTED_PLAN_ONLY"
++                            for cell in plan["cells"]))
++        checklist = checklist_markdown(self.manifest, plan)
++        self.assertIn("PARP_EFFECTIVE_TIER_LIVE_AUTH_REQUIRED", checklist)
++
++    def test_unsafe_manifest_is_rejected(self):
++        unsafe = deepcopy(self.manifest)
++        unsafe["safety"]["apply_authorized"] = True
++        with self.assertRaises(ContractError):
++            validate_manifest(unsafe)
++        unsafe = deepcopy(self.manifest)
++        unsafe["command"] = "write something"
++        with self.assertRaises(ContractError):
++            validate_manifest(unsafe)
++
++    def test_all_json_contracts_are_parseable(self):
++        names = (
++            "feature_schema.json",
++            "raw_event.schema.json",
++            "session_metadata.schema.json",
++            "labeled_candidate.schema.json",
++            "observability.schema.json",
++            "experiment_manifest.schema.json",
++            "experiment_manifest.template.json",
++        )
++        for name in names:
++            with self.subTest(name=name):
++                value = json.loads((HERE / name).read_text(encoding="utf-8"))
++                self.assertIsInstance(value, dict)
++
++
++if __name__ == "__main__":
++    unittest.main()
+-- 
+2.25.1
+

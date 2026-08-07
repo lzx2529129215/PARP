@@ -1,0 +1,184 @@
+From 01995ef7e5e523edb44b26aa84015bf09e385776 Mon Sep 17 00:00:00 2001
+From: Codex PARP Reproduction <codex@localhost>
+Date: Sun, 2 Aug 2026 22:42:44 +0800
+Subject: [PATCH 045/124] parp: expand real learnability analysis
+
+---
+ .../parp/intra_app_prediction/real_models.py  | 124 +++++++++++++++++-
+ 1 file changed, 121 insertions(+), 3 deletions(-)
+
+diff --git a/tools/parp/intra_app_prediction/real_models.py b/tools/parp/intra_app_prediction/real_models.py
+index c0fd9bd73..9aa8dc7d8 100644
+--- a/tools/parp/intra_app_prediction/real_models.py
++++ b/tools/parp/intra_app_prediction/real_models.py
+@@ -277,6 +277,7 @@ class RealModelPipeline:
+         self.monotonic = Counter()
+         self.selected_recent = {}
+         self.selected_thresholds = {}
++        self.learning_stats = {}
+         self.training_started = time.monotonic_ns()
+ 
+     def close(self):
+@@ -587,6 +588,88 @@ class RealModelPipeline:
+         return {row[0]: row[1] for row in self.connection.execute(
+             "SELECT file_id,file_class FROM files")}
+ 
++    def _resolution_learning_stats(self, resolution, active, observed,
++                                   global_scores):
++        payload = {"resolution": resolution, "applications": {},
++                   "future_reuse": {}, "operation_feature_gain": {}}
++        for app, sessions in (("WPS", ("wps_01", "wps_02", "wps_03")),
++                              ("FILES", ("files_01", "files_02"))):
++            same, different, active_counts = [], [], []
++            for session in sessions:
++                rows = self.session_rows[session]
++                active_counts.extend(len(active[row["window_id"]]) for row in rows)
++                for left, right in zip(rows, rows[1:]):
++                    left_set = active[left["window_id"]]
++                    right_set = active[right["window_id"]]
++                    value = _safe(len(left_set & right_set), len(left_set | right_set))
++                    target = same if left["dominant_operation"] == right["dominant_operation"] else different
++                    target.append(value)
++            payload["applications"][app] = {
++                "complete_windows": len(active_counts),
++                "active_segments_mean": _safe(sum(active_counts), len(active_counts)),
++                "active_segments_p50": percentile(active_counts, .5),
++                "active_segments_p95": percentile(active_counts, .95),
++                "active_segments_p99": percentile(active_counts, .99),
++                "same_operation_adjacent_jaccard_mean": _safe(sum(same), len(same)),
++                "same_operation_adjacent_pairs": len(same),
++                "different_operation_adjacent_jaccard_mean": _safe(
++                    sum(different), len(different)),
++                "different_operation_adjacent_pairs": len(different),
++            }
++        for horizon in HORIZONS:
++            ratios = []
++            steps = horizon // 10
++            for session in SESSION_ORDER:
++                rows = self.session_rows[session]
++                for position in range(len(rows) - steps):
++                    current = active[rows[position]["window_id"]]
++                    future = set().union(*(active[row["window_id"]]
++                                           for row in rows[position + 1:position + steps + 1]))
++                    ratios.append(_safe(len(current & future), len(future)))
++            payload["future_reuse"][str(horizon)] = {
++                "current_covers_future_active_mean": _safe(sum(ratios), len(ratios)),
++                "samples": len(ratios),
++            }
++        operation_counts = defaultdict(Counter)
++        operation_totals = Counter()
++        for window_id in self.train_ids:
++            operation = self.window_by_id[window_id]["dominant_operation"]
++            operation_totals[operation] += 1
++            operation_counts[operation].update(active[window_id])
++        operation_scores = {
++            operation: {segment: count / operation_totals[operation]
++                        for segment, count in counts.items()}
++            for operation, counts in operation_counts.items()
++        }
++        for horizon in HORIZONS:
++            samples_global, samples_operation = [], []
++            steps = horizon // 10
++            rows = self.session_rows["wps_03"]
++            for position in range(6, len(rows) - steps):
++                current = rows[position]
++                future = rows[position + 1:position + steps + 1]
++                actual = set().union(*(active[row["window_id"]] for row in future))
++                known = set().union(*(observed[row["window_id"]] for row in future))
++                candidate = observed[current["window_id"]]
++                common = {"window_id": current["window_id"], "actual": actual,
++                          "future_known": known, "candidate": candidate,
++                          "unknown": False}
++                samples_global.append({**common, "scores": global_scores})
++                samples_operation.append({**common, "scores": operation_scores.get(
++                    current["dominant_operation"], {})})
++            global_result = metrics_for(samples_global, 10)
++            operation_result = metrics_for(samples_operation, 10)
++            payload["operation_feature_gain"][str(horizon)] = {
++                "global_frequency_average_precision": global_result["average_precision"],
++                "operation_conditioned_average_precision": operation_result["average_precision"],
++                "average_precision_delta": operation_result["average_precision"] -
++                                           global_result["average_precision"],
++                "global_frequency_micro_f1_at_10": global_result["micro_f1"],
++                "operation_conditioned_micro_f1_at_10": operation_result["micro_f1"],
++                "evaluation_only": True,
++            }
++        return payload
++
+     def train_evaluate(self):
+         started = time.monotonic_ns()
+         resolution_runtime = {}
+@@ -597,6 +680,8 @@ class RealModelPipeline:
+             wps_global = self._global_scores(self.train_ids, active)
+             distribution = self._state_distribution(self.train_ids, active,
+                                                      self.states)
++            self.learning_stats[str(resolution)] = self._resolution_learning_stats(
++                resolution, active, observed, wps_global)
+             self._select_recent_and_threshold(resolution, active, observed,
+                                               wps_global, distribution)
+             self._evaluate_app("WPS", "wps_01", "wps_03", resolution,
+@@ -839,6 +924,12 @@ class RealModelPipeline:
+                         "- Level %s adjacent-window Jaccard mean: %.4f" %
+                         (resolution, values["adjacent_jaccard_mean"])
+                         for resolution, values in reuse.items()) + "\n")
++        atomic_json(self.analysis / "learnability_analysis.json", {
++            "schema_version": 1, "resolutions": self.learning_stats,
++            "same_vs_different_operation_scope": "adjacent complete windows",
++            "operation_conditioned_scores_fit_source": "wps_01_only",
++            "operation_gain_evaluation_source": "wps_03_only",
++        })
+         self._write_learning_analyses(reuse, file_class_summary)
+         atomic_json(self.analysis / "performance_audit.json", {
+             "schema_version": 1, "training_evaluation_elapsed_ns": elapsed_ns,
+@@ -880,7 +971,10 @@ class RealModelPipeline:
+         operations = Counter(row["dominant_operation"] for row in self.windows)
+         atomic_json(self.analysis / "operation_segment_patterns.json", {
+             "schema_version": 1, "window_counts": operations,
+-            "per_operation_evaluation_rows": len(self.operation_rows)})
++            "per_operation_evaluation_rows": len(self.operation_rows),
++            "per_resolution_learnability": {
++                key: value["operation_feature_gain"]
++                for key, value in self.learning_stats.items()}})
+         atomic_text(self.analysis / "operation_segment_patterns.md",
+                     "# Operation/segment patterns\n\n" + "\n".join(
+                         "- %s: %d complete windows" % item
+@@ -910,10 +1004,34 @@ class RealModelPipeline:
+             val = [[self.scaled[key][index] for index in indexes]
+                    for key in self.val_ids]
+             model = LightweightKMeans(self.selected_k).fit(train)
++            states = {key: model.predict_one(
++                [self.scaled[key][index] for index in indexes])
++                for key in self.scaled}
++            markov = self._fit_markov(states)
++            def transition_accuracy(session_ids):
++                correct = total = 0
++                for session in session_ids:
++                    sequence = self.session_rows[session]
++                    for current, following in zip(sequence, sequence[1:]):
++                        predicted = markov.predict(
++                            states[current["window_id"]], duration_bin(10))
++                        if not predicted:
++                            continue
++                        selected = max(predicted, key=lambda key: (predicted[key], -key))
++                        correct += selected == states[following["window_id"]]
++                        total += 1
++                return _safe(correct, total), total
++            val_accuracy, val_transitions = transition_accuracy(("wps_02",))
++            test_accuracy, test_transitions = transition_accuracy(("wps_03",))
+             rows.append({"features": name, "feature_count": len(indexes),
+-                         "validation_inertia_per_row": model.inertia(val) / len(val)})
++                         "validation_inertia_per_row": model.inertia(val) / len(val),
++                         "validation_markov_top1_state_accuracy": val_accuracy,
++                         "validation_transitions": val_transitions,
++                         "test_markov_top1_state_accuracy": test_accuracy,
++                         "test_transitions": test_transitions})
+         return {"schema_version": 1, "selection_data": "wps_02_validation",
+-                "rows": rows, "note": "small pilot; ablation stability is limited"}
++                "rows": rows, "markov_semantics": "state_t_to_state_t_plus_1",
++                "note": "small pilot; ablation stability is limited"}
+ 
+ 
+ def main():
+-- 
+2.25.1
+

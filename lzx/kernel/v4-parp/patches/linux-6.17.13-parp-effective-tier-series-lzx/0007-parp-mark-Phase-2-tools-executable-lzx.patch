@@ -1,0 +1,61 @@
+From 852416cbf6e1ad63c43299ae19033833b2012538 Mon Sep 17 00:00:00 2001
+From: Codex PARP Reproduction <codex@localhost>
+Date: Fri, 31 Jul 2026 19:25:36 +0800
+Subject: [PATCH 007/124] parp: mark Phase 2 tools executable
+
+---
+ tools/parp/alignment_analyze.py           | 0
+ tools/parp/damon_collect.py               | 0
+ tools/parp/dataset_export.py              | 0
+ tools/parp/plot_summary.py                | 0
+ tools/parp/region_decode.py               | 0
+ tools/parp/region_schema.py               | 0
+ tools/parp/tests/test_app_alignment.py    | 0
+ tools/parp/tests/test_region_alignment.py | 0
+ tools/parp/tests/test_windows.py          | 0
+ tools/parp/window_analyze.py              | 0
+ 10 files changed, 0 insertions(+), 0 deletions(-)
+ mode change 100644 => 100755 tools/parp/alignment_analyze.py
+ mode change 100644 => 100755 tools/parp/damon_collect.py
+ mode change 100644 => 100755 tools/parp/dataset_export.py
+ mode change 100644 => 100755 tools/parp/plot_summary.py
+ mode change 100644 => 100755 tools/parp/region_decode.py
+ mode change 100644 => 100755 tools/parp/region_schema.py
+ mode change 100644 => 100755 tools/parp/tests/test_app_alignment.py
+ mode change 100644 => 100755 tools/parp/tests/test_region_alignment.py
+ mode change 100644 => 100755 tools/parp/tests/test_windows.py
+ mode change 100644 => 100755 tools/parp/window_analyze.py
+
+diff --git a/tools/parp/alignment_analyze.py b/tools/parp/alignment_analyze.py
+old mode 100644
+new mode 100755
+diff --git a/tools/parp/damon_collect.py b/tools/parp/damon_collect.py
+old mode 100644
+new mode 100755
+diff --git a/tools/parp/dataset_export.py b/tools/parp/dataset_export.py
+old mode 100644
+new mode 100755
+diff --git a/tools/parp/plot_summary.py b/tools/parp/plot_summary.py
+old mode 100644
+new mode 100755
+diff --git a/tools/parp/region_decode.py b/tools/parp/region_decode.py
+old mode 100644
+new mode 100755
+diff --git a/tools/parp/region_schema.py b/tools/parp/region_schema.py
+old mode 100644
+new mode 100755
+diff --git a/tools/parp/tests/test_app_alignment.py b/tools/parp/tests/test_app_alignment.py
+old mode 100644
+new mode 100755
+diff --git a/tools/parp/tests/test_region_alignment.py b/tools/parp/tests/test_region_alignment.py
+old mode 100644
+new mode 100755
+diff --git a/tools/parp/tests/test_windows.py b/tools/parp/tests/test_windows.py
+old mode 100644
+new mode 100755
+diff --git a/tools/parp/window_analyze.py b/tools/parp/window_analyze.py
+old mode 100644
+new mode 100755
+-- 
+2.25.1
+

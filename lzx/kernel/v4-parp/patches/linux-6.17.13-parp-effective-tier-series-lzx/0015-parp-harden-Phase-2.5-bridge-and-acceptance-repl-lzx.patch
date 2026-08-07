@@ -1,0 +1,190 @@
+From 7a4acf09240b0d7c999815656207f2d649076354 Mon Sep 17 00:00:00 2001
+From: Codex PARP Reproduction <codex@localhost>
+Date: Fri, 31 Jul 2026 22:15:06 +0800
+Subject: [PATCH 015/124] parp: harden Phase 2.5 bridge and acceptance replay
+
+---
+ tools/parp/check_phase25_architecture.sh   | 29 ++++++++++++
+ tools/parp/lstm_prior_bridge.py            | 12 ++++-
+ tools/parp/scan_budget_reference.py        |  6 +--
+ tools/parp/scan_budget_replay.py           | 53 ++++++++++++++++++++++
+ tools/parp/tests/test_lstm_prior_bridge.py | 11 +++++
+ 5 files changed, 106 insertions(+), 5 deletions(-)
+ create mode 100755 tools/parp/check_phase25_architecture.sh
+ create mode 100755 tools/parp/scan_budget_replay.py
+
+diff --git a/tools/parp/check_phase25_architecture.sh b/tools/parp/check_phase25_architecture.sh
+new file mode 100755
+index 000000000..d209ad792
+--- /dev/null
++++ b/tools/parp/check_phase25_architecture.sh
+@@ -0,0 +1,29 @@
++#!/bin/sh
++# SPDX-License-Identifier: GPL-2.0
++set -eu
++
++base=${1:-63d1eedfd5da3e226e05de0799c329451b1f2df7}
++core=mm/parp/core/scan_budget.c
++
++reject()
++{
++	pattern=$1
++	shift
++	if grep -rnE "$pattern" "$@"; then
++		echo "forbidden pattern: $pattern" >&2
++		exit 1
++	fi
++}
++
++reject 'scan_control|lruvec|mem_cgroup' "$core"
++reject 'kmalloc|kzalloc|vmalloc|netlink|vfs_|kernel_(read|write)|rmap_walk' \
++	mm/parp/adapter/scan_budget_adapter.c "$core"
++reject 'CONTINUE|REENTRY|workload[_ -]?hint|suggestion[_ -]?mask' \
++	--exclude=check_phase25_architecture.sh mm/parp include/linux/parp.h tools/parp
++
++test "$(git diff --name-only "$base"..HEAD -- mm/vmscan.c mm/memcontrol.c mm/damon/core.c)" = "mm/vmscan.c"
++test -z "$(git diff --name-only "$base"..HEAD -- include/linux/mm_types.h include/linux/mmzone.h include/linux/memcontrol.h)"
++grep -q 'PARP_SCAN_BUDGET_OBSERVE' "$core"
++grep -q 'PARP_RECLAIM_SCOPE_TARGET_MEMCG' "$core"
++grep -q 'decision->applied_nr_to_scan' mm/parp/adapter/scan_budget_adapter.c
++echo "PASS: Phase 2.5 architecture constraints"
+diff --git a/tools/parp/lstm_prior_bridge.py b/tools/parp/lstm_prior_bridge.py
+index 0484a870a..17d15aaaa 100644
+--- a/tools/parp/lstm_prior_bridge.py
++++ b/tools/parp/lstm_prior_bridge.py
+@@ -13,6 +13,8 @@ Q15_ONE = 32767
+ SCHEMA_VERSION = 1
+ DEFAULT_HORIZON_NS = 5 * 60 * 1_000_000_000
+ DEFAULT_TTL_NS = 60 * 1_000_000_000
++MAX_HORIZON_NS = 60 * 60 * 1_000_000_000
++MAX_TTL_NS = 10 * 60 * 1_000_000_000
+ 
+ 
+ def score_to_q15(score):
+@@ -36,6 +38,12 @@ class BatchBuilder:
+ 
+     def build(self, rows, foreground_app, timestamp_ns=None,
+               horizon_ns=DEFAULT_HORIZON_NS, ttl_ns=DEFAULT_TTL_NS):
++        horizon_ns = int(horizon_ns)
++        ttl_ns = int(ttl_ns)
++        if not 0 < horizon_ns <= MAX_HORIZON_NS:
++            raise ValueError("horizon is outside the kernel contract")
++        if not 0 < ttl_ns <= MAX_TTL_NS:
++            raise ValueError("TTL is outside the kernel contract")
+         timestamp_ns = time.monotonic_ns() if timestamp_ns is None else int(timestamp_ns)
+         scores = {key: 0.0 for key in self.whitelist}
+         for row in rows:
+@@ -61,8 +69,8 @@ class BatchBuilder:
+             "model_version": self.model_version,
+             "prediction_generation": self._next_generation(),
+             "timestamp_ns": timestamp_ns,
+-            "horizon_ns": int(horizon_ns),
+-            "expiry_ns": timestamp_ns + int(ttl_ns),
++            "horizon_ns": horizon_ns,
++            "expiry_ns": timestamp_ns + ttl_ns,
+             "entries": entries,
+         }
+ 
+diff --git a/tools/parp/scan_budget_reference.py b/tools/parp/scan_budget_reference.py
+index 2522b1895..59282a9fd 100644
+--- a/tools/parp/scan_budget_reference.py
++++ b/tools/parp/scan_budget_reference.py
+@@ -38,11 +38,11 @@ def compute_scan_budget(native, score, foreground, pressure, mode,
+         return _native(native, "DISABLED")
+     if scope != "TARGET_MEMCG":
+         return _native(native, "NOT_TARGET_MEMCG")
+-    for valid, reason in ((bind_valid, "STALE_BIND"),
++    for valid, reason in ((circuit_ok, "CIRCUIT_BREAKER"),
++                          (bind_valid, "STALE_BIND"),
+                           (prior_valid, "EXPIRED_PRIOR"),
+                           (generation_valid, "STALE_GENERATION"),
+-                          (model_compatible, "MODEL_VERSION"),
+-                          (circuit_ok, "CIRCUIT_BREAKER")):
++                          (model_compatible, "MODEL_VERSION")):
+         if not valid:
+             return _native(native, reason)
+     if native == 0:
+diff --git a/tools/parp/scan_budget_replay.py b/tools/parp/scan_budget_replay.py
+new file mode 100755
+index 000000000..4001178a2
+--- /dev/null
++++ b/tools/parp/scan_budget_replay.py
+@@ -0,0 +1,53 @@
++#!/usr/bin/env python3
++# SPDX-License-Identifier: GPL-2.0
++"""Offline Phase 2.5 acceptance replay for scenarios A through H."""
++
++import argparse
++import json
++
++from scan_budget_reference import compute_scan_budget
++
++
++def replay():
++    cases = {
++        "A": compute_scan_budget(1000, 30000, True, "NORMAL", "OBSERVE"),
++        "B": compute_scan_budget(1000, 30000, False, "NORMAL", "OBSERVE"),
++        "C": compute_scan_budget(1000, 1000, False, "NORMAL", "OBSERVE"),
++        "D": compute_scan_budget(1000, 30000, False, "NORMAL", "OBSERVE",
++                                 prior_valid=False),
++        "E": compute_scan_budget(1000, 30000, False, "NORMAL", "OBSERVE",
++                                 scope="GLOBAL_KSWAPD"),
++        "F": compute_scan_budget(1000, 30000, False, "NORMAL", "OBSERVE",
++                                 scope="GLOBAL_DIRECT"),
++        "G": compute_scan_budget(1000, 30000, True, "EMERGENCY", "OBSERVE"),
++        "H": compute_scan_budget(1000, 30000, False, "NORMAL", "APPLY"),
++    }
++    checks = {
++        "A": 0 < cases["A"]["proposed"] < 1000 and cases["A"]["applied"] == 1000,
++        "B": cases["A"]["proposed"] <= cases["B"]["proposed"] < 1000 and cases["B"]["applied"] == 1000,
++        "C": 1000 < cases["C"]["proposed"] <= 1500 and cases["C"]["applied"] == 1000,
++        "D": cases["D"]["proposed"] == cases["D"]["applied"] == 1000,
++        "E": cases["E"]["proposed"] == cases["E"]["applied"] == 1000,
++        "F": cases["F"]["proposed"] == cases["F"]["applied"] == 1000,
++        "G": cases["G"]["proposed"] == cases["G"]["applied"] == 1000,
++        "H": cases["H"]["applied"] == cases["H"]["proposed"] < 1000,
++    }
++    return {"passed": all(checks.values()), "checks": checks, "cases": cases}
++
++
++def main():
++    parser = argparse.ArgumentParser()
++    parser.add_argument("--output")
++    args = parser.parse_args()
++    result = replay()
++    payload = json.dumps(result, indent=2, sort_keys=True) + "\n"
++    if args.output:
++        with open(args.output, "w", encoding="utf-8") as stream:
++            stream.write(payload)
++    else:
++        print(payload, end="")
++    raise SystemExit(0 if result["passed"] else 1)
++
++
++if __name__ == "__main__":
++    main()
+diff --git a/tools/parp/tests/test_lstm_prior_bridge.py b/tools/parp/tests/test_lstm_prior_bridge.py
+index 223eb9d8d..cd42f79e9 100644
+--- a/tools/parp/tests/test_lstm_prior_bridge.py
++++ b/tools/parp/tests/test_lstm_prior_bridge.py
+@@ -68,6 +68,17 @@ class LSTMPriorBridgeTest(unittest.TestCase):
+         self.assertEqual(line.count("\n"), 1)
+         self.assertTrue(line.startswith("1 1 "))
+ 
++    def test_ttl_horizon_and_foreground_contract(self):
++        builder = BatchBuilder(self.whitelist, 1)
++        with self.assertRaises(ValueError):
++            builder.build(self.rows, "WPS", horizon_ns=0)
++        with self.assertRaises(ValueError):
++            builder.build(self.rows, "WPS", ttl_ns=0)
++        batch = builder.build(self.rows, "OUTSIDE", timestamp_ns=10,
++                              horizon_ns=20, ttl_ns=30)
++        self.assertEqual(sum(row["foreground"]
++                             for row in batch["entries"]), 0)
++
+ 
+ if __name__ == "__main__":
+     unittest.main()
+-- 
+2.25.1
+

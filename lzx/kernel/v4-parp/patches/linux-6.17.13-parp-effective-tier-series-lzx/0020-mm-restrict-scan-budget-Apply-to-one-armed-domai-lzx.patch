@@ -1,0 +1,290 @@
+From 582e643312f47767ea17ada572880f1434666a21 Mon Sep 17 00:00:00 2001
+From: Codex PARP Reproduction <codex@localhost>
+Date: Sat, 1 Aug 2026 01:11:21 +0800
+Subject: [PATCH 020/124] mm: restrict scan budget Apply to one armed domain
+
+---
+ include/linux/parp.h       |  1 +
+ mm/parp/control/debugfs.c  | 36 ++++++++++++++++++++++++++++++++++++
+ mm/parp/core/scan_budget.c | 31 ++++++++++++++++++++++++++++---
+ mm/parp/internal.h         |  3 +++
+ mm/parp/tests/parp_test.c  | 28 ++++++++++++++++++++++++++++
+ tools/parp/parpctl.py      | 13 +++++++++++++
+ 6 files changed, 109 insertions(+), 3 deletions(-)
+
+diff --git a/include/linux/parp.h b/include/linux/parp.h
+index 19aba1b9f..5c8461a6d 100644
+--- a/include/linux/parp.h
++++ b/include/linux/parp.h
+@@ -92,6 +92,7 @@ enum parp_scan_budget_reason {
+ 	PARP_SCAN_REASON_CIRCUIT_BREAKER,
+ 	PARP_SCAN_REASON_CLAMP_MIN,
+ 	PARP_SCAN_REASON_CLAMP_MAX,
++	PARP_SCAN_REASON_APPLY_DOMAIN,
+ 	PARP_SCAN_REASON_DISABLED,
+ };
+ 
+diff --git a/mm/parp/control/debugfs.c b/mm/parp/control/debugfs.c
+index 0f8953071..045ad426f 100644
+--- a/mm/parp/control/debugfs.c
++++ b/mm/parp/control/debugfs.c
+@@ -157,6 +157,38 @@ static const struct file_operations scan_budget_mode_fops = {
+ 	.llseek = default_llseek,
+ };
+ 
++static ssize_t scan_budget_apply_domain_read(struct file *file,
++		char __user *buf, size_t len, loff_t *ppos)
++{
++	char text[32];
++	int size = scnprintf(text, sizeof(text), "%llu\n",
++			     parp_get_scan_budget_apply_domain());
++
++	return simple_read_from_buffer(buf, len, ppos, text, size);
++}
++
++static ssize_t scan_budget_apply_domain_write(struct file *file,
++		const char __user *buf, size_t len, loff_t *ppos)
++{
++	char text[32];
++	u64 domain_id;
++
++	if (!len || len >= sizeof(text) || copy_from_user(text, buf, len))
++		return -EINVAL;
++	text[len] = '\0';
++	if (kstrtou64(strim(text), 0, &domain_id) ||
++	    parp_set_scan_budget_apply_domain(domain_id))
++		return -EINVAL;
++	return len;
++}
++
++static const struct file_operations scan_budget_apply_domain_fops = {
++	.owner = THIS_MODULE,
++	.read = scan_budget_apply_domain_read,
++	.write = scan_budget_apply_domain_write,
++	.llseek = default_llseek,
++};
++
+ static ssize_t scan_budget_stats_read(struct file *file, char __user *buf,
+ 				      size_t len, loff_t *ppos)
+ {
+@@ -176,6 +208,7 @@ static ssize_t scan_budget_stats_read(struct file *file, char __user *buf,
+ 		"medium_prior_decisions %lld\nlow_prior_decisions %lld\n"
+ 		"pressure_bypass %lld\nclamp_min %lld\nclamp_max %lld\n"
+ 		"observe_count %lld\napply_count %lld\n"
++		"apply_domain_bypass %lld\n"
+ 		"native_units_total %lld\nproposed_units_total %lld\n"
+ 		"applied_units_total %lld\ndouble_scaling_reject %lld\n"
+ 		"invalid_batch %lld\nstale_batch %lld\n"
+@@ -200,6 +233,7 @@ static ssize_t scan_budget_stats_read(struct file *file, char __user *buf,
+ 		atomic64_read(&parp_scan_budget_stats.clamp_max),
+ 		atomic64_read(&parp_scan_budget_stats.observe_count),
+ 		atomic64_read(&parp_scan_budget_stats.apply_count),
++		atomic64_read(&parp_scan_budget_stats.apply_domain_bypass),
+ 		atomic64_read(&parp_scan_budget_stats.native_units_total),
+ 		atomic64_read(&parp_scan_budget_stats.proposed_units_total),
+ 		atomic64_read(&parp_scan_budget_stats.applied_units_total),
+@@ -439,6 +473,8 @@ static int __init parp_init(void)
+ 			    &evidence_stats_fops);
+ 	debugfs_create_file("scan_budget_mode", 0600, parp_dir, NULL,
+ 			    &scan_budget_mode_fops);
++	debugfs_create_file("scan_budget_apply_domain", 0600, parp_dir, NULL,
++			    &scan_budget_apply_domain_fops);
+ 	debugfs_create_file("scan_budget_stats", 0400, parp_dir, NULL,
+ 			    &scan_budget_stats_fops);
+ 	debugfs_create_file("app_prior_batch", 0600, parp_dir, NULL,
+diff --git a/mm/parp/core/scan_budget.c b/mm/parp/core/scan_budget.c
+index 698e0b56a..fb9d2fc84 100644
+--- a/mm/parp/core/scan_budget.c
++++ b/mm/parp/core/scan_budget.c
+@@ -19,6 +19,7 @@ static unsigned long minimum_scan_units = 1;
+ static unsigned long maximum_extra_scan_units = 4096;
+ static enum parp_scan_budget_mode scan_budget_mode =
+ 	PARP_SCAN_BUDGET_OBSERVE;
++static u64 scan_budget_apply_domain;
+ 
+ module_param(foreground_multiplier_q15, uint, 0644);
+ module_param(high_probability_multiplier_q15, uint, 0644);
+@@ -53,10 +54,26 @@ int parp_set_scan_budget_mode(enum parp_scan_budget_mode mode)
+ 	if (mode < PARP_SCAN_BUDGET_DISABLED ||
+ 	    mode > PARP_SCAN_BUDGET_APPLY)
+ 		return -EINVAL;
++	if (mode == PARP_SCAN_BUDGET_APPLY &&
++	    !parp_get_scan_budget_apply_domain())
++		return -EPERM;
+ 	WRITE_ONCE(scan_budget_mode, mode);
+ 	return 0;
+ }
+ 
++u64 parp_get_scan_budget_apply_domain(void)
++{
++	return READ_ONCE(scan_budget_apply_domain);
++}
++
++int parp_set_scan_budget_apply_domain(u64 domain_id)
++{
++	if (parp_get_scan_budget_mode() == PARP_SCAN_BUDGET_APPLY)
++		return -EBUSY;
++	WRITE_ONCE(scan_budget_apply_domain, domain_id);
++	return 0;
++}
++
+ static bool parp_scan_config_valid(void)
+ {
+ 	return minimum_multiplier_q15 <= maximum_multiplier_q15 &&
+@@ -189,9 +206,15 @@ int parp_compute_scan_budget(const struct parp_scan_budget_input *input,
+ 		decision->proposed_nr_to_scan = max_units;
+ 		decision->reason_flags |= BIT(PARP_SCAN_REASON_CLAMP_MAX);
+ 	}
+-	decision->applied_nr_to_scan =
+-		parp_get_scan_budget_mode() == PARP_SCAN_BUDGET_APPLY ?
+-		decision->proposed_nr_to_scan : input->native_nr_to_scan;
++	decision->applied_nr_to_scan = input->native_nr_to_scan;
++	if (parp_get_scan_budget_mode() == PARP_SCAN_BUDGET_APPLY) {
++		if (input->domain_id == parp_get_scan_budget_apply_domain())
++			decision->applied_nr_to_scan =
++				decision->proposed_nr_to_scan;
++		else
++			decision->reason_flags |=
++				BIT(PARP_SCAN_REASON_APPLY_DOMAIN);
++	}
+ 	return 0;
+ }
+ 
+@@ -330,6 +353,8 @@ void parp_scan_budget_account(const struct parp_scan_budget_input *input,
+ 		atomic64_inc(&parp_scan_budget_stats.clamp_min);
+ 	if (decision->reason_flags & BIT(PARP_SCAN_REASON_CLAMP_MAX))
+ 		atomic64_inc(&parp_scan_budget_stats.clamp_max);
++	if (decision->reason_flags & BIT(PARP_SCAN_REASON_APPLY_DOMAIN))
++		atomic64_inc(&parp_scan_budget_stats.apply_domain_bypass);
+ 	if (parp_get_scan_budget_mode() == PARP_SCAN_BUDGET_APPLY &&
+ 	    decision->applied_nr_to_scan != decision->native_nr_to_scan)
+ 		atomic64_inc(&parp_scan_budget_stats.apply_count);
+diff --git a/mm/parp/internal.h b/mm/parp/internal.h
+index c022483f5..dd616903d 100644
+--- a/mm/parp/internal.h
++++ b/mm/parp/internal.h
+@@ -398,6 +398,7 @@ struct parp_scan_budget_stats {
+ 	atomic64_t clamp_max;
+ 	atomic64_t observe_count;
+ 	atomic64_t apply_count;
++	atomic64_t apply_domain_bypass;
+ 	atomic64_t native_units_total;
+ 	atomic64_t proposed_units_total;
+ 	atomic64_t applied_units_total;
+@@ -452,6 +453,8 @@ int parp_compute_scan_budget(const struct parp_scan_budget_input *input,
+ 			     struct parp_scan_budget_decision *decision);
+ enum parp_scan_budget_mode parp_get_scan_budget_mode(void);
+ int parp_set_scan_budget_mode(enum parp_scan_budget_mode mode);
++u64 parp_get_scan_budget_apply_domain(void);
++int parp_set_scan_budget_apply_domain(u64 domain_id);
+ bool parp_scan_budget_guard(u64 domain_id, u32 generation, bool valid);
+ void parp_scan_budget_guard_clear(u64 domain_id);
+ unsigned int parp_scan_budget_guard_snapshot(
+diff --git a/mm/parp/tests/parp_test.c b/mm/parp/tests/parp_test.c
+index a5af6349c..66420cdb7 100644
+--- a/mm/parp/tests/parp_test.c
++++ b/mm/parp/tests/parp_test.c
+@@ -471,6 +471,7 @@ static void parp_scan_budget_gate_matrix_test(struct kunit *test)
+ 	};
+ 	unsigned int i;
+ 
++	parp_set_scan_budget_apply_domain(input.domain_id);
+ 	parp_set_scan_budget_mode(PARP_SCAN_BUDGET_APPLY);
+ 	for (i = 0; i < ARRAY_SIZE(gates); i++) {
+ 		input = parp_budget_input();
+@@ -487,6 +488,7 @@ static void parp_scan_budget_gate_matrix_test(struct kunit *test)
+ 	KUNIT_EXPECT_EQ(test, decision.reason,
+ 			(enum parp_scan_budget_reason)PARP_SCAN_REASON_STALE_BIND);
+ 	parp_set_scan_budget_mode(PARP_SCAN_BUDGET_OBSERVE);
++	parp_set_scan_budget_apply_domain(0);
+ }
+ 
+ static void parp_scan_budget_monotonic_repeat_test(struct kunit *test)
+@@ -590,6 +592,7 @@ static void parp_scan_budget_bounds_mode_test(struct kunit *test)
+ 	KUNIT_EXPECT_LE(test, decision.proposed_nr_to_scan, U64_MAX);
+ 	input.native_nr_to_scan = 1000;
+ 	input.app_use_score_q15 = 30000;
++	parp_set_scan_budget_apply_domain(input.domain_id);
+ 	parp_set_scan_budget_mode(PARP_SCAN_BUDGET_APPLY);
+ 	KUNIT_ASSERT_EQ(test, parp_compute_scan_budget(&input, &decision), 0);
+ 	KUNIT_EXPECT_EQ(test, decision.applied_nr_to_scan,
+@@ -597,6 +600,30 @@ static void parp_scan_budget_bounds_mode_test(struct kunit *test)
+ 	first = parp_adapter_apply_scan_budget(&decision);
+ 	KUNIT_EXPECT_EQ(test, parp_adapter_apply_scan_budget(&decision), first);
+ 	parp_set_scan_budget_mode(PARP_SCAN_BUDGET_OBSERVE);
++	parp_set_scan_budget_apply_domain(0);
++}
++
++static void parp_scan_budget_apply_domain_test(struct kunit *test)
++{
++	struct parp_scan_budget_input input = parp_budget_input();
++	struct parp_scan_budget_decision decision;
++
++	parp_set_scan_budget_mode(PARP_SCAN_BUDGET_OBSERVE);
++	parp_set_scan_budget_apply_domain(0);
++	KUNIT_EXPECT_EQ(test,
++			parp_set_scan_budget_mode(PARP_SCAN_BUDGET_APPLY), -EPERM);
++	KUNIT_ASSERT_EQ(test,
++			parp_set_scan_budget_apply_domain(input.domain_id), 0);
++	KUNIT_ASSERT_EQ(test,
++			parp_set_scan_budget_mode(PARP_SCAN_BUDGET_APPLY), 0);
++	input.domain_id++;
++	KUNIT_ASSERT_EQ(test, parp_compute_scan_budget(&input, &decision), 0);
++	KUNIT_EXPECT_EQ(test, decision.applied_nr_to_scan,
++			decision.native_nr_to_scan);
++	KUNIT_EXPECT_TRUE(test, decision.reason_flags &
++			  BIT(PARP_SCAN_REASON_APPLY_DOMAIN));
++	parp_set_scan_budget_mode(PARP_SCAN_BUDGET_OBSERVE);
++	parp_set_scan_budget_apply_domain(0);
+ }
+ 
+ static void parp_prior_batch_test(struct kunit *test)
+@@ -701,6 +728,7 @@ static struct kunit_case parp_cases[] = {
+ 	KUNIT_CASE(parp_scan_budget_basic_test),
+ 	KUNIT_CASE(parp_scan_budget_gate_pressure_test),
+ 	KUNIT_CASE(parp_scan_budget_bounds_mode_test),
++	KUNIT_CASE(parp_scan_budget_apply_domain_test),
+ 	KUNIT_CASE(parp_prior_batch_test),
+ 	KUNIT_CASE(parp_prior_batch_validation_test),
+ 	KUNIT_CASE(parp_scan_budget_circuit_test),
+diff --git a/tools/parp/parpctl.py b/tools/parp/parpctl.py
+index 81d5fdd52..27d7373ed 100755
+--- a/tools/parp/parpctl.py
++++ b/tools/parp/parpctl.py
+@@ -10,6 +10,8 @@ from lstm_prior_bridge import DebugfsTransport
+ MODE = {"disabled": "0", "observe": "1", "apply": "2"}
+ MODE_PATH = Path("/sys/kernel/debug/parp/mode")
+ SCAN_BUDGET_MODE_PATH = Path("/sys/kernel/debug/parp/scan_budget_mode")
++SCAN_BUDGET_APPLY_DOMAIN_PATH = Path(
++    "/sys/kernel/debug/parp/scan_budget_apply_domain")
+ 
+ 
+ def main():
+@@ -21,6 +23,9 @@ def main():
+     sub.add_parser("scan-budget-mode-get")
+     budget_set = sub.add_parser("scan-budget-mode-set")
+     budget_set.add_argument("mode", choices=MODE)
++    sub.add_parser("scan-budget-apply-domain-get")
++    apply_domain = sub.add_parser("scan-budget-apply-domain-set")
++    apply_domain.add_argument("domain_id", type=int)
+     batch = sub.add_parser("prior-batch-submit")
+     batch.add_argument("json_file", type=Path)
+     batch.add_argument("--debugfs", type=Path,
+@@ -36,6 +41,14 @@ def main():
+     elif args.command == "scan-budget-mode-set":
+         SCAN_BUDGET_MODE_PATH.write_text(MODE[args.mode] + "\n",
+                                          encoding="ascii")
++    elif args.command == "scan-budget-apply-domain-get":
++        print(SCAN_BUDGET_APPLY_DOMAIN_PATH.read_text(
++            encoding="ascii").strip())
++    elif args.command == "scan-budget-apply-domain-set":
++        if args.domain_id < 0:
++            parser.error("domain_id must be non-negative")
++        SCAN_BUDGET_APPLY_DOMAIN_PATH.write_text(
++            str(args.domain_id) + "\n", encoding="ascii")
+     else:
+         payload = json.loads(args.json_file.read_text(encoding="utf-8"))
+         line = DebugfsTransport.encode_batch(payload)
+-- 
+2.25.1
+

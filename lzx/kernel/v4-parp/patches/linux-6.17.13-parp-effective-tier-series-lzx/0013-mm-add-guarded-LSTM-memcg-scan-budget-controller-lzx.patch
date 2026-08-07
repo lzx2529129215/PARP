@@ -1,0 +1,1519 @@
+From 50d43894106f4b58ea14bcd4a25c96cde18ec991 Mon Sep 17 00:00:00 2001
+From: Codex PARP Reproduction <codex@localhost>
+Date: Fri, 31 Jul 2026 22:05:37 +0800
+Subject: [PATCH 013/124] mm: add guarded LSTM memcg scan budget controller
+
+---
+ include/linux/parp.h                  |  83 +++++++
+ include/trace/events/parp.h           |  66 +++++
+ mm/parp/Makefile                      |   3 +-
+ mm/parp/adapter/scan_budget_adapter.c |  93 +++++++
+ mm/parp/control/debugfs.c             | 254 +++++++++++++++++++
+ mm/parp/core/scan_budget.c            | 343 ++++++++++++++++++++++++++
+ mm/parp/core/snapshot.c               | 177 ++++++++++++-
+ mm/parp/internal.h                    | 104 ++++++++
+ mm/parp/tests/parp_test.c             | 147 +++++++++++
+ mm/vmscan.c                           |   5 +
+ 10 files changed, 1269 insertions(+), 6 deletions(-)
+ create mode 100644 mm/parp/adapter/scan_budget_adapter.c
+ create mode 100644 mm/parp/core/scan_budget.c
+
+diff --git a/include/linux/parp.h b/include/linux/parp.h
+index e0633775e..19aba1b9f 100644
+--- a/include/linux/parp.h
++++ b/include/linux/parp.h
+@@ -7,6 +7,7 @@
+ struct folio;
+ struct lruvec;
+ struct scan_control;
++struct mem_cgroup;
+ struct damon_ctx;
+ struct damon_target;
+ struct damon_region;
+@@ -52,6 +53,60 @@ struct parp_reclaim_ctx {
+ 	bool rcu_held;
+ };
+ 
++enum parp_scan_budget_mode {
++	PARP_SCAN_BUDGET_DISABLED,
++	PARP_SCAN_BUDGET_OBSERVE,
++	PARP_SCAN_BUDGET_APPLY,
++};
++
++enum parp_reclaim_scope {
++	PARP_RECLAIM_SCOPE_UNKNOWN,
++	PARP_RECLAIM_SCOPE_GLOBAL_KSWAPD,
++	PARP_RECLAIM_SCOPE_GLOBAL_DIRECT,
++	PARP_RECLAIM_SCOPE_TARGET_MEMCG,
++	PARP_RECLAIM_SCOPE_PROACTIVE_MEMCG,
++	PARP_RECLAIM_SCOPE_MEMCG_HIGH,
++};
++
++enum parp_pressure_level {
++	PARP_PRESSURE_NORMAL,
++	PARP_PRESSURE_ELEVATED,
++	PARP_PRESSURE_HIGH,
++	PARP_PRESSURE_EMERGENCY,
++};
++
++enum parp_scan_budget_reason {
++	PARP_SCAN_REASON_NATIVE,
++	PARP_SCAN_REASON_FOREGROUND,
++	PARP_SCAN_REASON_HIGH_PRIOR,
++	PARP_SCAN_REASON_MEDIUM_PRIOR,
++	PARP_SCAN_REASON_LOW_PRIOR,
++	PARP_SCAN_REASON_NO_BIND,
++	PARP_SCAN_REASON_STALE_BIND,
++	PARP_SCAN_REASON_NO_PRIOR,
++	PARP_SCAN_REASON_EXPIRED_PRIOR,
++	PARP_SCAN_REASON_STALE_GENERATION,
++	PARP_SCAN_REASON_MODEL_VERSION,
++	PARP_SCAN_REASON_NOT_TARGET_MEMCG,
++	PARP_SCAN_REASON_PRESSURE_BYPASS,
++	PARP_SCAN_REASON_CIRCUIT_BREAKER,
++	PARP_SCAN_REASON_CLAMP_MIN,
++	PARP_SCAN_REASON_CLAMP_MAX,
++	PARP_SCAN_REASON_DISABLED,
++};
++
++struct parp_scan_budget_decision {
++	bool valid;
++	u64 native_nr_to_scan;
++	u64 proposed_nr_to_scan;
++	u64 applied_nr_to_scan;
++	u32 multiplier_q15;
++	u16 confidence_q15;
++	enum parp_scan_budget_reason reason;
++	u32 reason_flags;
++	u64 budget_sequence;
++};
++
+ #ifdef CONFIG_PARP
+ void parp_adapter_prepare(struct parp_reclaim_ctx *ctx,
+ 			  struct lruvec *lruvec, struct scan_control *sc);
+@@ -63,6 +118,14 @@ void parp_adapter_apply_decision(struct parp_reclaim_ctx *ctx,
+ 				 struct parp_decision *decision);
+ void parp_adapter_finish(struct parp_reclaim_ctx *ctx,
+ 			 unsigned long scanned, unsigned long isolated);
++bool parp_adapter_prepare_scan_budget(struct lruvec *lruvec,
++				      struct mem_cgroup *target_memcg,
++				      bool global_kswapd, bool proactive,
++				      int reclaim_priority,
++				      unsigned long native_nr_to_scan,
++				      struct parp_scan_budget_decision *decision);
++unsigned long parp_adapter_apply_scan_budget(
++				const struct parp_scan_budget_decision *decision);
+ #ifdef CONFIG_PARP_DAMON_ALIGNMENT
+ void parp_damon_aggregate(struct damon_ctx *ctx, struct damon_target *target,
+ 			  struct damon_region *region);
+@@ -105,6 +168,26 @@ static inline void parp_adapter_finish(struct parp_reclaim_ctx *ctx,
+ 				       unsigned long isolated)
+ {
+ }
++static inline bool parp_adapter_prepare_scan_budget(
++		struct lruvec *lruvec, struct mem_cgroup *target_memcg,
++		bool global_kswapd, bool proactive, int reclaim_priority,
++		unsigned long native_nr_to_scan,
++		struct parp_scan_budget_decision *decision)
++{
++	*decision = (struct parp_scan_budget_decision) {
++		.native_nr_to_scan = native_nr_to_scan,
++		.proposed_nr_to_scan = native_nr_to_scan,
++		.applied_nr_to_scan = native_nr_to_scan,
++		.reason = PARP_SCAN_REASON_DISABLED,
++	};
++	return false;
++}
++
++static inline unsigned long parp_adapter_apply_scan_budget(
++		const struct parp_scan_budget_decision *decision)
++{
++	return decision->native_nr_to_scan;
++}
+ static inline void parp_damon_aggregate(struct damon_ctx *ctx,
+ 					struct damon_target *target,
+ 					struct damon_region *region)
+diff --git a/include/trace/events/parp.h b/include/trace/events/parp.h
+index 6725f04c7..808f94d95 100644
+--- a/include/trace/events/parp.h
++++ b/include/trace/events/parp.h
+@@ -87,5 +87,71 @@ TRACE_EVENT(parp_region_evidence,
+ 		  __entry->confidence_q15, __entry->reason_flags)
+ );
+ 
++TRACE_EVENT(parp_scan_budget_decision,
++	TP_PROTO(u64 timestamp_ns, u64 budget_sequence, u8 reclaim_scope,
++		u64 domain_id, u32 app_id, bool foreground, u16 app_score_q15,
++		u16 app_rank, u32 prediction_generation, u32 model_version,
++		u64 prediction_age_ms, u64 native_nr_to_scan,
++		u64 proposed_nr_to_scan, u64 applied_nr_to_scan,
++		u32 multiplier_q15, u8 pressure_level, s32 reclaim_priority,
++		u8 reason, u8 mode),
++	TP_ARGS(timestamp_ns, budget_sequence, reclaim_scope, domain_id, app_id,
++		foreground, app_score_q15, app_rank, prediction_generation,
++		model_version, prediction_age_ms, native_nr_to_scan,
++		proposed_nr_to_scan, applied_nr_to_scan, multiplier_q15,
++		pressure_level, reclaim_priority, reason, mode),
++	TP_STRUCT__entry(
++		__field(u64, timestamp_ns)
++		__field(u64, budget_sequence)
++		__field(u8, reclaim_scope)
++		__field(u64, domain_id)
++		__field(u32, app_id)
++		__field(bool, foreground)
++		__field(u16, app_score_q15)
++		__field(u16, app_rank)
++		__field(u32, prediction_generation)
++		__field(u32, model_version)
++		__field(u64, prediction_age_ms)
++		__field(u64, native_nr_to_scan)
++		__field(u64, proposed_nr_to_scan)
++		__field(u64, applied_nr_to_scan)
++		__field(u32, multiplier_q15)
++		__field(u8, pressure_level)
++		__field(s32, reclaim_priority)
++		__field(u8, reason)
++		__field(u8, mode)
++	),
++	TP_fast_assign(
++		__entry->timestamp_ns = timestamp_ns;
++		__entry->budget_sequence = budget_sequence;
++		__entry->reclaim_scope = reclaim_scope;
++		__entry->domain_id = domain_id;
++		__entry->app_id = app_id;
++		__entry->foreground = foreground;
++		__entry->app_score_q15 = app_score_q15;
++		__entry->app_rank = app_rank;
++		__entry->prediction_generation = prediction_generation;
++		__entry->model_version = model_version;
++		__entry->prediction_age_ms = prediction_age_ms;
++		__entry->native_nr_to_scan = native_nr_to_scan;
++		__entry->proposed_nr_to_scan = proposed_nr_to_scan;
++		__entry->applied_nr_to_scan = applied_nr_to_scan;
++		__entry->multiplier_q15 = multiplier_q15;
++		__entry->pressure_level = pressure_level;
++		__entry->reclaim_priority = reclaim_priority;
++		__entry->reason = reason;
++		__entry->mode = mode;
++	),
++	TP_printk("time=%llu sequence=%llu scope=%u domain=%llu app=%u foreground=%d score_q15=%u rank=%u generation=%u model=%u age_ms=%llu native_units=%llu proposed_units=%llu applied_units=%llu multiplier_q15=%u pressure=%u priority=%d reason=%u mode=%u",
++		  __entry->timestamp_ns, __entry->budget_sequence,
++		  __entry->reclaim_scope, __entry->domain_id, __entry->app_id,
++		  __entry->foreground, __entry->app_score_q15, __entry->app_rank,
++		  __entry->prediction_generation, __entry->model_version,
++		  __entry->prediction_age_ms, __entry->native_nr_to_scan,
++		  __entry->proposed_nr_to_scan, __entry->applied_nr_to_scan,
++		  __entry->multiplier_q15, __entry->pressure_level,
++		  __entry->reclaim_priority, __entry->reason, __entry->mode)
++);
++
+ #endif
+ #include <trace/define_trace.h>
+diff --git a/mm/parp/Makefile b/mm/parp/Makefile
+index 24deccdb3..1e296e89d 100644
+--- a/mm/parp/Makefile
++++ b/mm/parp/Makefile
+@@ -1,13 +1,14 @@
+ # SPDX-License-Identifier: GPL-2.0
+ obj-y += parp.o
+ parp-y := core/engine.o core/domain.o core/snapshot.o core/policy.o \
+-	  core/budget.o core/fallback.o core/stats.o core/evidence.o \
++	  core/budget.o core/scan_budget.o core/fallback.o core/stats.o core/evidence.o \
+ 	  model/model_store.o model/app_prior.o model/state_assigner.o \
+ 	  model/state_predictor.o model/file_predictor.o model/anon_predictor.o \
+ 	  mapping/file_region.o mapping/anon_region.o mapping/lifecycle.o \
+ 	  mapping/region_alignment.o \
+ 	  adapter/memcg_adapter.o adapter/mglru_adapter.o \
+ 	  adapter/file_adapter.o adapter/anon_adapter.o adapter/feedback_adapter.o \
++	  adapter/scan_budget_adapter.o \
+ 	  control/debugfs.o control/sysfs.o control/genl.o control/trace.o
+ parp-$(CONFIG_PARP_DAMON_ALIGNMENT) += adapter/damon_adapter.o
+ obj-$(CONFIG_PARP_KUNIT_TEST) += tests/parp_test.o
+diff --git a/mm/parp/adapter/scan_budget_adapter.c b/mm/parp/adapter/scan_budget_adapter.c
+new file mode 100644
+index 000000000..aa22df1f8
+--- /dev/null
++++ b/mm/parp/adapter/scan_budget_adapter.c
+@@ -0,0 +1,93 @@
++// SPDX-License-Identifier: GPL-2.0
++#include <linux/memcontrol.h>
++#include <linux/mm.h>
++#include <linux/parp.h>
++#include <trace/events/parp.h>
++#include "../internal.h"
++
++static atomic64_t parp_budget_sequence = ATOMIC64_INIT(0);
++
++static enum parp_reclaim_scope
++parp_reclaim_scope(struct mem_cgroup *target_memcg, bool global_kswapd,
++		   bool proactive)
++{
++	if (!target_memcg || mem_cgroup_is_root(target_memcg))
++		return global_kswapd ? PARP_RECLAIM_SCOPE_GLOBAL_KSWAPD :
++			PARP_RECLAIM_SCOPE_GLOBAL_DIRECT;
++	if (proactive)
++		return PARP_RECLAIM_SCOPE_PROACTIVE_MEMCG;
++	/* Linux 6.17.13 does not retain a distinct memory.high origin in sc. */
++	return PARP_RECLAIM_SCOPE_TARGET_MEMCG;
++}
++
++static enum parp_pressure_level parp_pressure_from_priority(int priority)
++{
++	if (priority <= 1)
++		return PARP_PRESSURE_EMERGENCY;
++	if (priority <= 4)
++		return PARP_PRESSURE_HIGH;
++	if (priority <= 8)
++		return PARP_PRESSURE_ELEVATED;
++	return PARP_PRESSURE_NORMAL;
++}
++
++bool parp_adapter_prepare_scan_budget(struct lruvec *lruvec,
++				      struct mem_cgroup *target_memcg,
++				      bool global_kswapd, bool proactive,
++				      int reclaim_priority,
++				      unsigned long native_nr_to_scan,
++				      struct parp_scan_budget_decision *decision)
++{
++	struct parp_scan_budget_input input = {
++		.reclaim_scope = parp_reclaim_scope(target_memcg, global_kswapd,
++						     proactive),
++		.pressure = parp_pressure_from_priority(reclaim_priority),
++		.native_nr_to_scan = native_nr_to_scan,
++		.reclaim_priority = reclaim_priority,
++		.now_ns = ktime_get_mono_fast_ns(),
++	};
++	bool context_valid;
++	u64 prediction_age_ms = 0;
++
++	if (target_memcg && !mem_cgroup_is_root(target_memcg))
++		input.domain_id = mem_cgroup_id(target_memcg);
++	parp_snapshot_fill_scan_budget_input(input.domain_id, input.now_ns,
++					     &input);
++	context_valid = (input.flags & (PARP_SCAN_INPUT_BIND_VALID |
++			 PARP_SCAN_INPUT_PRIOR_VALID |
++			 PARP_SCAN_INPUT_GENERATION_VALID |
++			 PARP_SCAN_INPUT_MODEL_COMPATIBLE)) ==
++			(PARP_SCAN_INPUT_BIND_VALID |
++			 PARP_SCAN_INPUT_PRIOR_VALID |
++			 PARP_SCAN_INPUT_GENERATION_VALID |
++			 PARP_SCAN_INPUT_MODEL_COMPATIBLE);
++	if (parp_scan_budget_guard(input.domain_id,
++				   input.prediction_generation, context_valid))
++		input.flags |= PARP_SCAN_INPUT_CIRCUIT_OK;
++	parp_compute_scan_budget(&input, decision);
++	if (decision->reason == PARP_SCAN_REASON_CIRCUIT_BREAKER &&
++	    (input.flags & PARP_SCAN_INPUT_CIRCUIT_OK))
++		parp_scan_budget_guard(input.domain_id,
++				       input.prediction_generation, false);
++	decision->budget_sequence = atomic64_inc_return(&parp_budget_sequence);
++	parp_scan_budget_account(&input, decision);
++	if (input.prediction_timestamp_ns &&
++	    input.now_ns >= input.prediction_timestamp_ns)
++		prediction_age_ms = div_u64(input.now_ns -
++			input.prediction_timestamp_ns, NSEC_PER_MSEC);
++	trace_parp_scan_budget_decision(input.now_ns,
++		decision->budget_sequence, input.reclaim_scope, input.domain_id,
++		input.app_id, input.foreground, input.app_use_score_q15,
++		input.app_rank, input.prediction_generation, input.model_version,
++		prediction_age_ms, decision->native_nr_to_scan,
++		decision->proposed_nr_to_scan, decision->applied_nr_to_scan,
++		decision->multiplier_q15, input.pressure, input.reclaim_priority,
++		decision->reason, parp_get_scan_budget_mode());
++	return decision->valid;
++}
++
++unsigned long parp_adapter_apply_scan_budget(
++				const struct parp_scan_budget_decision *decision)
++{
++	return min_t(u64, decision->applied_nr_to_scan, ULONG_MAX);
++}
+diff --git a/mm/parp/control/debugfs.c b/mm/parp/control/debugfs.c
+index ea4b0a664..cd03fea22 100644
+--- a/mm/parp/control/debugfs.c
++++ b/mm/parp/control/debugfs.c
+@@ -123,6 +123,250 @@ static const struct file_operations evidence_stats_fops = {
+ 	.llseek = default_llseek,
+ };
+ 
++static ssize_t scan_budget_mode_read(struct file *file, char __user *buf,
++				     size_t len, loff_t *ppos)
++{
++	char text[16];
++	int size = scnprintf(text, sizeof(text), "%u\n",
++			     parp_get_scan_budget_mode());
++
++	return simple_read_from_buffer(buf, len, ppos, text, size);
++}
++
++static ssize_t scan_budget_mode_write(struct file *file,
++				      const char __user *buf, size_t len,
++				      loff_t *ppos)
++{
++	char text[16];
++	unsigned int mode;
++
++	if (!len || len >= sizeof(text) || copy_from_user(text, buf, len))
++		return -EINVAL;
++	text[len] = '\0';
++	if (kstrtouint(strim(text), 0, &mode) ||
++	    parp_set_scan_budget_mode(mode))
++		return -EINVAL;
++	return len;
++}
++
++static const struct file_operations scan_budget_mode_fops = {
++	.owner = THIS_MODULE,
++	.read = scan_budget_mode_read,
++	.write = scan_budget_mode_write,
++	.llseek = default_llseek,
++};
++
++static ssize_t scan_budget_stats_read(struct file *file, char __user *buf,
++				      size_t len, loff_t *ppos)
++{
++	char text[1536];
++	int size;
++
++	size = scnprintf(text, sizeof(text),
++		"scan_budget_queries %lld\n"
++		"target_memcg_queries %lld\n"
++		"global_kswapd_bypass %lld\n"
++		"global_direct_bypass %lld\n"
++		"unknown_scope_bypass %lld\n"
++		"no_appbind %lld\nstale_bind %lld\nno_prior %lld\n"
++		"expired_prior %lld\nstale_generation %lld\n"
++		"model_version_mismatch %lld\n"
++		"foreground_decisions %lld\nhigh_prior_decisions %lld\n"
++		"medium_prior_decisions %lld\nlow_prior_decisions %lld\n"
++		"pressure_bypass %lld\nclamp_min %lld\nclamp_max %lld\n"
++		"observe_count %lld\napply_count %lld\n"
++		"native_units_total %lld\nproposed_units_total %lld\n"
++		"applied_units_total %lld\ndouble_scaling_reject %lld\n"
++		"invalid_batch %lld\nstale_batch %lld\n"
++		"circuit_breaker_count %lld\n",
++		atomic64_read(&parp_scan_budget_stats.scan_budget_queries),
++		atomic64_read(&parp_scan_budget_stats.target_memcg_queries),
++		atomic64_read(&parp_scan_budget_stats.global_kswapd_bypass),
++		atomic64_read(&parp_scan_budget_stats.global_direct_bypass),
++		atomic64_read(&parp_scan_budget_stats.unknown_scope_bypass),
++		atomic64_read(&parp_scan_budget_stats.no_appbind),
++		atomic64_read(&parp_scan_budget_stats.stale_bind),
++		atomic64_read(&parp_scan_budget_stats.no_prior),
++		atomic64_read(&parp_scan_budget_stats.expired_prior),
++		atomic64_read(&parp_scan_budget_stats.stale_generation),
++		atomic64_read(&parp_scan_budget_stats.model_version_mismatch),
++		atomic64_read(&parp_scan_budget_stats.foreground_decisions),
++		atomic64_read(&parp_scan_budget_stats.high_prior_decisions),
++		atomic64_read(&parp_scan_budget_stats.medium_prior_decisions),
++		atomic64_read(&parp_scan_budget_stats.low_prior_decisions),
++		atomic64_read(&parp_scan_budget_stats.pressure_bypass),
++		atomic64_read(&parp_scan_budget_stats.clamp_min),
++		atomic64_read(&parp_scan_budget_stats.clamp_max),
++		atomic64_read(&parp_scan_budget_stats.observe_count),
++		atomic64_read(&parp_scan_budget_stats.apply_count),
++		atomic64_read(&parp_scan_budget_stats.native_units_total),
++		atomic64_read(&parp_scan_budget_stats.proposed_units_total),
++		atomic64_read(&parp_scan_budget_stats.applied_units_total),
++		atomic64_read(&parp_scan_budget_stats.double_scaling_reject),
++		atomic64_read(&parp_scan_budget_stats.invalid_batch),
++		atomic64_read(&parp_scan_budget_stats.stale_batch),
++		atomic64_read(&parp_scan_budget_stats.circuit_breaker_count));
++	return simple_read_from_buffer(buf, len, ppos, text, size);
++}
++
++static const struct file_operations scan_budget_stats_fops = {
++	.owner = THIS_MODULE,
++	.read = scan_budget_stats_read,
++	.llseek = default_llseek,
++};
++
++static int parp_parse_prior_entry(char **argv, struct parp_app_prior *entry)
++{
++	unsigned int foreground, valid;
++	int error;
++
++	error = kstrtou32(argv[0], 0, &entry->app_id);
++	error |= kstrtou16(argv[1], 0, &entry->use_score_q15);
++	error |= kstrtou16(argv[2], 0, &entry->rank);
++	error |= kstrtouint(argv[3], 0, &foreground);
++	error |= kstrtouint(argv[4], 0, &valid);
++	error |= kstrtou32(argv[5], 0, &entry->flags);
++	if (error || foreground > 1 || valid != 1)
++		return -EINVAL;
++	entry->foreground = foreground;
++	entry->valid = valid;
++	return 0;
++}
++
++static ssize_t prior_batch_write(struct file *file, const char __user *buf,
++				 size_t len, loff_t *ppos)
++{
++	struct parp_app_prior_batch *batch;
++	char **argv;
++	char *text;
++	int argc, error = 0;
++	unsigned int i;
++
++	if (!len || len > 4095)
++		return -E2BIG;
++	text = memdup_user_nul(buf, len);
++	if (IS_ERR(text))
++		return PTR_ERR(text);
++	argv = argv_split(GFP_KERNEL, text, &argc);
++	if (!argv) {
++		kfree(text);
++		return -ENOMEM;
++	}
++	batch = kzalloc(sizeof(*batch), GFP_KERNEL);
++	if (!batch) {
++		error = -ENOMEM;
++		goto out;
++	}
++	if (argc < 7) {
++		error = -EINVAL;
++		goto free_batch;
++	}
++	error = kstrtou32(argv[0], 0, &batch->schema_version);
++	error |= kstrtou32(argv[1], 0, &batch->model_version);
++	error |= kstrtou32(argv[2], 0, &batch->prediction_generation);
++	error |= kstrtou64(argv[3], 0, &batch->timestamp_ns);
++	error |= kstrtou64(argv[4], 0, &batch->horizon_ns);
++	error |= kstrtou64(argv[5], 0, &batch->expiry_ns);
++	error |= kstrtou32(argv[6], 0, &batch->nr_entries);
++	if (error || batch->nr_entries > PARP_MAX_APPS ||
++	    argc != 7 + batch->nr_entries * 6) {
++		error = -EINVAL;
++		goto free_batch;
++	}
++	for (i = 0; i < batch->nr_entries; i++) {
++		error = parp_parse_prior_entry(&argv[7 + i * 6],
++					       &batch->entries[i]);
++		if (error)
++			goto free_batch;
++	}
++	error = parp_snapshot_replace_prior_batch(batch);
++free_batch:
++	kfree(batch);
++out:
++	argv_free(argv);
++	kfree(text);
++	return error ? error : len;
++}
++
++static ssize_t prior_batch_read(struct file *file, char __user *buf,
++				size_t len, loff_t *ppos)
++{
++	const struct parp_snapshot *snapshot;
++	char text[160];
++	int size = 0;
++
++	snapshot = parp_snapshot_acquire();
++	if (snapshot)
++		size = scnprintf(text, sizeof(text),
++			"schema=%u model=%u generation=%u timestamp_ns=%llu horizon_ns=%llu expiry_ns=%llu entries=%u\n",
++			snapshot->prediction_schema_version,
++			snapshot->prediction_model_version,
++			snapshot->prediction_generation,
++			snapshot->prediction_timestamp_ns,
++			snapshot->prediction_horizon_ns,
++			snapshot->prediction_expiry_ns, snapshot->nr_priors);
++	parp_snapshot_release();
++	return simple_read_from_buffer(buf, len, ppos, text, size);
++}
++
++static const struct file_operations prior_batch_fops = {
++	.owner = THIS_MODULE,
++	.read = prior_batch_read,
++	.write = prior_batch_write,
++	.llseek = default_llseek,
++};
++
++static ssize_t scan_budget_clear_write(struct file *file,
++				       const char __user *buf, size_t len,
++				       loff_t *ppos)
++{
++	char text[32];
++	u64 domain_id;
++
++	if (!len || len >= sizeof(text) || copy_from_user(text, buf, len))
++		return -EINVAL;
++	text[len] = '\0';
++	if (kstrtou64(strim(text), 0, &domain_id) || !domain_id)
++		return -EINVAL;
++	parp_scan_budget_guard_clear(domain_id);
++	return len;
++}
++
++static const struct file_operations scan_budget_clear_fops = {
++	.owner = THIS_MODULE,
++	.write = scan_budget_clear_write,
++	.llseek = noop_llseek,
++};
++
++static ssize_t scan_budget_circuits_read(struct file *file, char __user *buf,
++					 size_t len, loff_t *ppos)
++{
++	struct parp_scan_guard_view views[PARP_MAX_DOMAINS];
++	char *text;
++	unsigned int i, nr;
++	int size = 0;
++	ssize_t result;
++
++	text = kzalloc(PAGE_SIZE, GFP_KERNEL);
++	if (!text)
++		return -ENOMEM;
++	nr = parp_scan_budget_guard_snapshot(views, ARRAY_SIZE(views));
++	for (i = 0; i < nr && size < PAGE_SIZE; i++)
++		size += scnprintf(text + size, PAGE_SIZE - size,
++			"domain=%llu generation=%u failures=%u tripped=%u\n",
++			views[i].domain_id, views[i].generation,
++			views[i].failures, views[i].tripped);
++	result = simple_read_from_buffer(buf, len, ppos, text, size);
++	kfree(text);
++	return result;
++}
++
++static const struct file_operations scan_budget_circuits_fops = {
++	.owner = THIS_MODULE,
++	.read = scan_budget_circuits_read,
++	.llseek = default_llseek,
++};
++
+ static ssize_t bind_write(struct file *file, const char __user *buf,
+ 			  size_t len, loff_t *ppos)
+ {
+@@ -190,6 +434,16 @@ static int __init parp_init(void)
+ 			    &evidence_mode_fops);
+ 	debugfs_create_file("evidence_stats", 0400, parp_dir, NULL,
+ 			    &evidence_stats_fops);
++	debugfs_create_file("scan_budget_mode", 0600, parp_dir, NULL,
++			    &scan_budget_mode_fops);
++	debugfs_create_file("scan_budget_stats", 0400, parp_dir, NULL,
++			    &scan_budget_stats_fops);
++	debugfs_create_file("app_prior_batch", 0600, parp_dir, NULL,
++			    &prior_batch_fops);
++	debugfs_create_file("scan_budget_circuit_clear", 0200, parp_dir, NULL,
++			    &scan_budget_clear_fops);
++	debugfs_create_file("scan_budget_circuits", 0400, parp_dir, NULL,
++			    &scan_budget_circuits_fops);
+ 	debugfs_create_file("app_bind", 0200, parp_dir, NULL, &bind_fops);
+ 	debugfs_create_file("app_prior", 0200, parp_dir, NULL, &prior_fops);
+ 	return 0;
+diff --git a/mm/parp/core/scan_budget.c b/mm/parp/core/scan_budget.c
+new file mode 100644
+index 000000000..719da673c
+--- /dev/null
++++ b/mm/parp/core/scan_budget.c
+@@ -0,0 +1,343 @@
++// SPDX-License-Identifier: GPL-2.0
++#include <linux/math64.h>
++#include <linux/moduleparam.h>
++#include <linux/overflow.h>
++#include "../internal.h"
++
++#define PARP_Q15_SCALE		32768U
++#define PARP_SCAN_GUARD_FAILURES 3U
++
++static unsigned int foreground_multiplier_q15 = 16384;
++static unsigned int high_probability_multiplier_q15 = 19661;
++static unsigned int medium_probability_multiplier_q15 = 26214;
++static unsigned int low_probability_multiplier_q15 = 39321;
++static unsigned int minimum_multiplier_q15 = 16384;
++static unsigned int maximum_multiplier_q15 = 49152;
++static unsigned int high_probability_threshold_q15 = 24576;
++static unsigned int medium_probability_threshold_q15 = 12288;
++static unsigned long minimum_scan_units = 1;
++static unsigned long maximum_extra_scan_units = 4096;
++static enum parp_scan_budget_mode scan_budget_mode =
++	PARP_SCAN_BUDGET_OBSERVE;
++
++module_param(foreground_multiplier_q15, uint, 0644);
++module_param(high_probability_multiplier_q15, uint, 0644);
++module_param(medium_probability_multiplier_q15, uint, 0644);
++module_param(low_probability_multiplier_q15, uint, 0644);
++module_param(minimum_multiplier_q15, uint, 0644);
++module_param(maximum_multiplier_q15, uint, 0644);
++module_param(high_probability_threshold_q15, uint, 0644);
++module_param(medium_probability_threshold_q15, uint, 0644);
++module_param(minimum_scan_units, ulong, 0644);
++module_param(maximum_extra_scan_units, ulong, 0644);
++
++struct parp_scan_guard {
++	u64 domain_id;
++	u32 generation;
++	u32 failures;
++	bool tripped;
++};
++
++static DEFINE_SPINLOCK(parp_scan_guard_lock);
++static struct parp_scan_guard parp_scan_guards[PARP_MAX_DOMAINS];
++
++struct parp_scan_budget_stats parp_scan_budget_stats;
++
++enum parp_scan_budget_mode parp_get_scan_budget_mode(void)
++{
++	return READ_ONCE(scan_budget_mode);
++}
++
++int parp_set_scan_budget_mode(enum parp_scan_budget_mode mode)
++{
++	if (mode > PARP_SCAN_BUDGET_APPLY)
++		return -EINVAL;
++	WRITE_ONCE(scan_budget_mode, mode);
++	return 0;
++}
++
++static bool parp_scan_config_valid(void)
++{
++	return minimum_multiplier_q15 <= maximum_multiplier_q15 &&
++	       maximum_multiplier_q15 <= 2 * PARP_Q15_SCALE &&
++	       foreground_multiplier_q15 <= maximum_multiplier_q15 &&
++	       high_probability_multiplier_q15 <= maximum_multiplier_q15 &&
++	       medium_probability_multiplier_q15 <= maximum_multiplier_q15 &&
++	       low_probability_multiplier_q15 <= maximum_multiplier_q15 &&
++	       high_probability_threshold_q15 <= PARP_Q15_ONE &&
++	       medium_probability_threshold_q15 <=
++			high_probability_threshold_q15;
++}
++
++static u64 parp_scale_scan_units(u64 native, u32 multiplier)
++{
++	u64 scaled;
++	u64 remainder;
++
++	scaled = mul_u64_u32_div(native, multiplier, PARP_Q15_SCALE);
++	remainder = ((native & (PARP_Q15_SCALE - 1)) * multiplier) &
++		(PARP_Q15_SCALE - 1);
++	if (remainder >= PARP_Q15_SCALE / 2 && scaled != U64_MAX)
++		scaled++;
++	if (multiplier > PARP_Q15_SCALE && scaled < native)
++		return U64_MAX;
++	return scaled;
++}
++
++static void parp_native_decision(const struct parp_scan_budget_input *input,
++				 struct parp_scan_budget_decision *decision,
++				 enum parp_scan_budget_reason reason)
++{
++	decision->valid = false;
++	decision->native_nr_to_scan = input->native_nr_to_scan;
++	decision->proposed_nr_to_scan = input->native_nr_to_scan;
++	decision->applied_nr_to_scan = input->native_nr_to_scan;
++	decision->multiplier_q15 = PARP_Q15_SCALE;
++	decision->reason = reason;
++}
++
++static enum parp_scan_budget_reason
++parp_validate_scan_input(const struct parp_scan_budget_input *input)
++{
++	if (parp_get_scan_budget_mode() == PARP_SCAN_BUDGET_DISABLED)
++		return PARP_SCAN_REASON_DISABLED;
++	if (input->reclaim_scope != PARP_RECLAIM_SCOPE_TARGET_MEMCG)
++		return PARP_SCAN_REASON_NOT_TARGET_MEMCG;
++	if (!(input->flags & PARP_SCAN_INPUT_CIRCUIT_OK))
++		return PARP_SCAN_REASON_CIRCUIT_BREAKER;
++	if (!(input->flags & PARP_SCAN_INPUT_BIND_PRESENT))
++		return PARP_SCAN_REASON_NO_BIND;
++	if (!(input->flags & PARP_SCAN_INPUT_BIND_VALID) ||
++	    input->now_ns >= input->bind_expiry_ns)
++		return PARP_SCAN_REASON_STALE_BIND;
++	if (!(input->flags & PARP_SCAN_INPUT_PRIOR_PRESENT))
++		return PARP_SCAN_REASON_NO_PRIOR;
++	if (!(input->flags & PARP_SCAN_INPUT_PRIOR_VALID) ||
++	    input->now_ns >= input->prediction_expiry_ns)
++		return PARP_SCAN_REASON_EXPIRED_PRIOR;
++	if (!(input->flags & PARP_SCAN_INPUT_GENERATION_VALID))
++		return PARP_SCAN_REASON_STALE_GENERATION;
++	if (!(input->flags & PARP_SCAN_INPUT_MODEL_COMPATIBLE))
++		return PARP_SCAN_REASON_MODEL_VERSION;
++	if (!parp_scan_config_valid())
++		return PARP_SCAN_REASON_CIRCUIT_BREAKER;
++	return PARP_SCAN_REASON_NATIVE;
++}
++
++int parp_compute_scan_budget(const struct parp_scan_budget_input *input,
++			     struct parp_scan_budget_decision *decision)
++{
++	enum parp_scan_budget_reason invalid;
++	u32 multiplier;
++	u64 max_units;
++
++	if (!input || !decision)
++		return -EINVAL;
++	memset(decision, 0, sizeof(*decision));
++	invalid = parp_validate_scan_input(input);
++	if (invalid != PARP_SCAN_REASON_NATIVE) {
++		parp_native_decision(input, decision, invalid);
++		return 0;
++	}
++	if (!input->native_nr_to_scan) {
++		parp_native_decision(input, decision, PARP_SCAN_REASON_NATIVE);
++		decision->valid = true;
++		return 0;
++	}
++	if (input->pressure == PARP_PRESSURE_EMERGENCY) {
++		parp_native_decision(input, decision,
++				     PARP_SCAN_REASON_PRESSURE_BYPASS);
++		return 0;
++	}
++	if (input->foreground) {
++		multiplier = foreground_multiplier_q15;
++		decision->reason = PARP_SCAN_REASON_FOREGROUND;
++	} else if (input->app_use_score_q15 >=
++		   high_probability_threshold_q15) {
++		multiplier = high_probability_multiplier_q15;
++		decision->reason = PARP_SCAN_REASON_HIGH_PRIOR;
++	} else if (input->app_use_score_q15 >=
++		   medium_probability_threshold_q15) {
++		multiplier = medium_probability_multiplier_q15;
++		decision->reason = PARP_SCAN_REASON_MEDIUM_PRIOR;
++	} else {
++		multiplier = low_probability_multiplier_q15;
++		decision->reason = PARP_SCAN_REASON_LOW_PRIOR;
++	}
++	multiplier = clamp(multiplier, minimum_multiplier_q15,
++			   maximum_multiplier_q15);
++	if (input->pressure == PARP_PRESSURE_ELEVATED)
++		multiplier = (multiplier + PARP_Q15_SCALE + 1) / 2;
++	else if (input->pressure == PARP_PRESSURE_HIGH)
++		multiplier = max(multiplier, 3 * PARP_Q15_SCALE / 4);
++	decision->valid = true;
++	decision->native_nr_to_scan = input->native_nr_to_scan;
++	decision->multiplier_q15 = multiplier;
++	decision->confidence_q15 = PARP_Q15_ONE;
++	decision->proposed_nr_to_scan =
++		parp_scale_scan_units(input->native_nr_to_scan, multiplier);
++	if (decision->proposed_nr_to_scan < minimum_scan_units) {
++		decision->proposed_nr_to_scan =
++			min_t(u64, input->native_nr_to_scan, minimum_scan_units);
++		decision->reason_flags |= BIT(PARP_SCAN_REASON_CLAMP_MIN);
++	}
++	if (check_add_overflow(input->native_nr_to_scan,
++			       (u64)maximum_extra_scan_units, &max_units))
++		max_units = U64_MAX;
++	if (decision->proposed_nr_to_scan > max_units) {
++		decision->proposed_nr_to_scan = max_units;
++		decision->reason_flags |= BIT(PARP_SCAN_REASON_CLAMP_MAX);
++	}
++	decision->applied_nr_to_scan =
++		parp_get_scan_budget_mode() == PARP_SCAN_BUDGET_APPLY ?
++		decision->proposed_nr_to_scan : input->native_nr_to_scan;
++	return 0;
++}
++
++static struct parp_scan_guard *parp_scan_guard_find(u64 domain_id)
++{
++	struct parp_scan_guard *free = NULL;
++	unsigned int i;
++
++	for (i = 0; i < ARRAY_SIZE(parp_scan_guards); i++) {
++		if (parp_scan_guards[i].domain_id == domain_id)
++			return &parp_scan_guards[i];
++		if (!parp_scan_guards[i].domain_id && !free)
++			free = &parp_scan_guards[i];
++	}
++	return free;
++}
++
++bool parp_scan_budget_guard(u64 domain_id, u32 generation, bool valid)
++{
++	struct parp_scan_guard *guard;
++	bool allowed = false;
++
++	if (!domain_id)
++		return false;
++	spin_lock(&parp_scan_guard_lock);
++	guard = parp_scan_guard_find(domain_id);
++	if (!guard)
++		goto out;
++	if (!guard->domain_id)
++		guard->domain_id = domain_id;
++	if (valid && generation > guard->generation) {
++		guard->generation = generation;
++		guard->failures = 0;
++		guard->tripped = false;
++	} else if (!valid && !guard->tripped) {
++		guard->failures++;
++		if (guard->failures >= PARP_SCAN_GUARD_FAILURES) {
++			guard->tripped = true;
++			atomic64_inc(&parp_scan_budget_stats.circuit_breaker_count);
++		}
++	}
++	allowed = !guard->tripped;
++out:
++	spin_unlock(&parp_scan_guard_lock);
++	return allowed;
++}
++
++void parp_scan_budget_guard_clear(u64 domain_id)
++{
++	struct parp_scan_guard *guard;
++
++	spin_lock(&parp_scan_guard_lock);
++	guard = parp_scan_guard_find(domain_id);
++	if (guard && guard->domain_id == domain_id)
++		memset(guard, 0, sizeof(*guard));
++	spin_unlock(&parp_scan_guard_lock);
++}
++
++unsigned int parp_scan_budget_guard_snapshot(
++		struct parp_scan_guard_view *views, unsigned int max_views)
++{
++	unsigned int i, count = 0;
++
++	spin_lock(&parp_scan_guard_lock);
++	for (i = 0; i < ARRAY_SIZE(parp_scan_guards) && count < max_views; i++) {
++		if (!parp_scan_guards[i].domain_id)
++			continue;
++		views[count++] = (struct parp_scan_guard_view) {
++			.domain_id = parp_scan_guards[i].domain_id,
++			.generation = parp_scan_guards[i].generation,
++			.failures = parp_scan_guards[i].failures,
++			.tripped = parp_scan_guards[i].tripped,
++		};
++	}
++	spin_unlock(&parp_scan_guard_lock);
++	return count;
++}
++
++void parp_scan_budget_guard_reset_all_for_test(void)
++{
++	spin_lock(&parp_scan_guard_lock);
++	memset(parp_scan_guards, 0, sizeof(parp_scan_guards));
++	spin_unlock(&parp_scan_guard_lock);
++}
++
++void parp_scan_budget_account(const struct parp_scan_budget_input *input,
++			      const struct parp_scan_budget_decision *decision)
++{
++	atomic64_inc(&parp_scan_budget_stats.scan_budget_queries);
++	if (input->reclaim_scope == PARP_RECLAIM_SCOPE_TARGET_MEMCG)
++		atomic64_inc(&parp_scan_budget_stats.target_memcg_queries);
++	else if (input->reclaim_scope == PARP_RECLAIM_SCOPE_GLOBAL_KSWAPD)
++		atomic64_inc(&parp_scan_budget_stats.global_kswapd_bypass);
++	else if (input->reclaim_scope == PARP_RECLAIM_SCOPE_GLOBAL_DIRECT)
++		atomic64_inc(&parp_scan_budget_stats.global_direct_bypass);
++	else
++		atomic64_inc(&parp_scan_budget_stats.unknown_scope_bypass);
++	switch (decision->reason) {
++	case PARP_SCAN_REASON_FOREGROUND:
++		atomic64_inc(&parp_scan_budget_stats.foreground_decisions);
++		break;
++	case PARP_SCAN_REASON_HIGH_PRIOR:
++		atomic64_inc(&parp_scan_budget_stats.high_prior_decisions);
++		break;
++	case PARP_SCAN_REASON_MEDIUM_PRIOR:
++		atomic64_inc(&parp_scan_budget_stats.medium_prior_decisions);
++		break;
++	case PARP_SCAN_REASON_LOW_PRIOR:
++		atomic64_inc(&parp_scan_budget_stats.low_prior_decisions);
++		break;
++	case PARP_SCAN_REASON_NO_BIND:
++		atomic64_inc(&parp_scan_budget_stats.no_appbind);
++		break;
++	case PARP_SCAN_REASON_STALE_BIND:
++		atomic64_inc(&parp_scan_budget_stats.stale_bind);
++		break;
++	case PARP_SCAN_REASON_NO_PRIOR:
++		atomic64_inc(&parp_scan_budget_stats.no_prior);
++		break;
++	case PARP_SCAN_REASON_EXPIRED_PRIOR:
++		atomic64_inc(&parp_scan_budget_stats.expired_prior);
++		break;
++	case PARP_SCAN_REASON_STALE_GENERATION:
++		atomic64_inc(&parp_scan_budget_stats.stale_generation);
++		break;
++	case PARP_SCAN_REASON_MODEL_VERSION:
++		atomic64_inc(&parp_scan_budget_stats.model_version_mismatch);
++		break;
++	case PARP_SCAN_REASON_PRESSURE_BYPASS:
++		atomic64_inc(&parp_scan_budget_stats.pressure_bypass);
++		break;
++	default:
++		break;
++	}
++	if (decision->reason_flags & BIT(PARP_SCAN_REASON_CLAMP_MIN))
++		atomic64_inc(&parp_scan_budget_stats.clamp_min);
++	if (decision->reason_flags & BIT(PARP_SCAN_REASON_CLAMP_MAX))
++		atomic64_inc(&parp_scan_budget_stats.clamp_max);
++	if (parp_get_scan_budget_mode() == PARP_SCAN_BUDGET_APPLY &&
++	    decision->applied_nr_to_scan != decision->native_nr_to_scan)
++		atomic64_inc(&parp_scan_budget_stats.apply_count);
++	else
++		atomic64_inc(&parp_scan_budget_stats.observe_count);
++	atomic64_add(decision->native_nr_to_scan,
++		     &parp_scan_budget_stats.native_units_total);
++	atomic64_add(decision->proposed_nr_to_scan,
++		     &parp_scan_budget_stats.proposed_units_total);
++	atomic64_add(decision->applied_nr_to_scan,
++		     &parp_scan_budget_stats.applied_units_total);
++}
+diff --git a/mm/parp/core/snapshot.c b/mm/parp/core/snapshot.c
+index 76a8fe729..d65e28b2a 100644
+--- a/mm/parp/core/snapshot.c
++++ b/mm/parp/core/snapshot.c
+@@ -1,8 +1,10 @@
+ // SPDX-License-Identifier: GPL-2.0
+ #include <linux/slab.h>
++#include <linux/mutex.h>
+ #include "../internal.h"
+ 
+ static DEFINE_SPINLOCK(parp_snapshot_lock);
++static DEFINE_MUTEX(parp_snapshot_update_lock);
+ static struct parp_snapshot __rcu *parp_active_snapshot;
+ 
+ static void parp_free_snapshot(struct rcu_head *head)
+@@ -37,7 +39,8 @@ static struct parp_snapshot *parp_clone_snapshot(gfp_t gfp)
+ 	memset(&new->rcu, 0, sizeof(new->rcu));
+ 	new->version++;
+ 	new->created_ns = ktime_get_mono_fast_ns();
+-	new->expires_ns = new->created_ns + 300ULL * NSEC_PER_SEC;
++	if (!old || !new->expires_ns)
++		new->expires_ns = new->created_ns + 300ULL * NSEC_PER_SEC;
+ 	return new;
+ }
+ 
+@@ -56,11 +59,13 @@ static void parp_publish_snapshot(struct parp_snapshot *new)
+ 
+ int parp_snapshot_update_binding(const struct parp_binding *binding)
+ {
+-	struct parp_snapshot *new = parp_clone_snapshot(GFP_KERNEL);
++	struct parp_snapshot *new;
+ 	unsigned int i, slot;
+ 
++	mutex_lock(&parp_snapshot_update_lock);
++	new = parp_clone_snapshot(GFP_KERNEL);
+ 	if (!new)
+-		return -ENOMEM;
++		goto nomem;
+ 	slot = min_t(u32, new->nr_bindings, PARP_MAX_DOMAINS - 1);
+ 	for (i = 0; i < new->nr_bindings; i++)
+ 		if (new->bindings[i].domain_id == binding->domain_id) {
+@@ -70,16 +75,30 @@ int parp_snapshot_update_binding(const struct parp_binding *binding)
+ 	new->bindings[slot] = *binding;
+ 	new->nr_bindings = max_t(u32, new->nr_bindings, slot + 1);
+ 	parp_publish_snapshot(new);
++	mutex_unlock(&parp_snapshot_update_lock);
+ 	return 0;
++nomem:
++	mutex_unlock(&parp_snapshot_update_lock);
++	return -ENOMEM;
+ }
+ 
+ int parp_snapshot_update_prior(const struct parp_app_prior *prior)
+ {
+-	struct parp_snapshot *new = parp_clone_snapshot(GFP_KERNEL);
++	struct parp_snapshot *new;
+ 	unsigned int i, slot;
+ 
++	mutex_lock(&parp_snapshot_update_lock);
++	rcu_read_lock();
++	new = rcu_dereference(parp_active_snapshot);
++	if (new && new->prediction_generation) {
++		rcu_read_unlock();
++		mutex_unlock(&parp_snapshot_update_lock);
++		return -EBUSY;
++	}
++	rcu_read_unlock();
++	new = parp_clone_snapshot(GFP_KERNEL);
+ 	if (!new)
+-		return -ENOMEM;
++		goto nomem;
+ 	slot = min_t(u32, new->nr_priors, PARP_MAX_APPS - 1);
+ 	for (i = 0; i < new->nr_priors; i++)
+ 		if (new->priors[i].app_id == prior->app_id) {
+@@ -89,7 +108,155 @@ int parp_snapshot_update_prior(const struct parp_app_prior *prior)
+ 	new->priors[slot] = *prior;
+ 	new->nr_priors = max_t(u32, new->nr_priors, slot + 1);
+ 	parp_publish_snapshot(new);
++	mutex_unlock(&parp_snapshot_update_lock);
+ 	return 0;
++nomem:
++	mutex_unlock(&parp_snapshot_update_lock);
++	return -ENOMEM;
++}
++
++static int parp_validate_prior_batch(const struct parp_app_prior_batch *batch,
++				     u64 now_ns)
++{
++	unsigned int i, j, foreground = 0;
++
++	if (!batch || batch->schema_version != PARP_APP_PRIOR_BATCH_SCHEMA ||
++	    !batch->model_version || !batch->prediction_generation ||
++	    !batch->nr_entries || batch->nr_entries > PARP_MAX_APPS)
++		return -EINVAL;
++	if (!batch->timestamp_ns ||
++	    batch->timestamp_ns > now_ns + 5ULL * NSEC_PER_SEC ||
++	    batch->expiry_ns <= batch->timestamp_ns ||
++	    batch->expiry_ns - batch->timestamp_ns >
++		PARP_APP_PRIOR_MAX_TTL_NS ||
++	    !batch->horizon_ns ||
++	    batch->horizon_ns > PARP_APP_PRIOR_MAX_HORIZON_NS)
++		return -ERANGE;
++	for (i = 0; i < batch->nr_entries; i++) {
++		const struct parp_app_prior *entry = &batch->entries[i];
++
++		if (!entry->valid || !entry->app_id ||
++		    entry->use_score_q15 > PARP_Q15_ONE || !entry->rank ||
++		    entry->rank > batch->nr_entries)
++			return -EINVAL;
++		foreground += entry->foreground;
++		for (j = 0; j < i; j++)
++			if (batch->entries[j].app_id == entry->app_id ||
++			    batch->entries[j].rank == entry->rank)
++				return -EINVAL;
++	}
++	return foreground > 1 ? -EINVAL : 0;
++}
++
++int parp_snapshot_replace_prior_batch(const struct parp_app_prior_batch *batch)
++{
++	struct parp_snapshot *active;
++	struct parp_snapshot *new;
++	u64 now_ns = ktime_get_mono_fast_ns();
++	unsigned int i;
++	int error;
++
++	error = parp_validate_prior_batch(batch, now_ns);
++	if (error) {
++		atomic64_inc(&parp_scan_budget_stats.invalid_batch);
++		return error;
++	}
++	mutex_lock(&parp_snapshot_update_lock);
++	rcu_read_lock();
++	active = rcu_dereference(parp_active_snapshot);
++	if (active && batch->prediction_generation <=
++	    active->prediction_generation) {
++		error = batch->prediction_generation ==
++			active->prediction_generation ? -EALREADY : -ESTALE;
++		rcu_read_unlock();
++		mutex_unlock(&parp_snapshot_update_lock);
++		atomic64_inc(&parp_scan_budget_stats.stale_batch);
++		return error;
++	}
++	rcu_read_unlock();
++	new = parp_clone_snapshot(GFP_KERNEL);
++	if (!new) {
++		mutex_unlock(&parp_snapshot_update_lock);
++		return -ENOMEM;
++	}
++	memset(new->priors, 0, sizeof(new->priors));
++	new->nr_priors = batch->nr_entries;
++	new->prediction_schema_version = batch->schema_version;
++	new->prediction_model_version = batch->model_version;
++	new->prediction_generation = batch->prediction_generation;
++	new->prediction_timestamp_ns = batch->timestamp_ns;
++	new->prediction_horizon_ns = batch->horizon_ns;
++	new->prediction_expiry_ns = batch->expiry_ns;
++	new->expires_ns = batch->expiry_ns;
++	for (i = 0; i < batch->nr_entries; i++) {
++		new->priors[i] = batch->entries[i];
++		new->priors[i].updated_ns = batch->timestamp_ns;
++		new->priors[i].expires_ns = batch->expiry_ns;
++		new->priors[i].horizon_ms = div_u64(batch->horizon_ns,
++						     NSEC_PER_MSEC);
++		new->priors[i].model_version = batch->model_version;
++		new->priors[i].prediction_generation =
++			batch->prediction_generation;
++	}
++	parp_publish_snapshot(new);
++	mutex_unlock(&parp_snapshot_update_lock);
++	return 0;
++}
++
++void parp_snapshot_fill_scan_budget_input(u64 domain_id, u64 now_ns,
++					 struct parp_scan_budget_input *input)
++{
++	const struct parp_snapshot *snapshot;
++	const struct parp_binding *binding = NULL;
++	const struct parp_app_prior *prior = NULL;
++	unsigned int i;
++
++	snapshot = parp_snapshot_acquire();
++	if (!snapshot)
++		goto out;
++	for (i = 0; i < min_t(u32, snapshot->nr_bindings,
++			      PARP_MAX_DOMAINS); i++)
++		if (snapshot->bindings[i].active &&
++		    snapshot->bindings[i].domain_id == domain_id) {
++			binding = &snapshot->bindings[i];
++			break;
++		}
++	if (!binding)
++		goto out;
++	input->flags |= PARP_SCAN_INPUT_BIND_PRESENT;
++	input->app_id = binding->app_id;
++	input->bind_generation = binding->bind_generation;
++	input->bind_expiry_ns = binding->expires_ns;
++	input->foreground_epoch_id = binding->epoch_id;
++	if (now_ns < binding->expires_ns)
++		input->flags |= PARP_SCAN_INPUT_BIND_VALID;
++	for (i = 0; i < min_t(u32, snapshot->nr_priors,
++			      PARP_MAX_APPS); i++)
++		if (snapshot->priors[i].app_id == binding->app_id) {
++			prior = &snapshot->priors[i];
++			break;
++		}
++	if (!prior)
++		goto metadata;
++	input->flags |= PARP_SCAN_INPUT_PRIOR_PRESENT;
++	input->foreground = prior->foreground;
++	input->app_use_score_q15 = prior->use_score_q15;
++	input->app_rank = prior->rank;
++	if (prior->valid && now_ns < snapshot->prediction_expiry_ns &&
++	    prior->prediction_generation == snapshot->prediction_generation)
++		input->flags |= PARP_SCAN_INPUT_PRIOR_VALID;
++metadata:
++	input->prediction_timestamp_ns = snapshot->prediction_timestamp_ns;
++	input->prediction_expiry_ns = snapshot->prediction_expiry_ns;
++	input->prediction_generation = snapshot->prediction_generation;
++	input->model_version = snapshot->prediction_model_version;
++	if (snapshot->prediction_generation)
++		input->flags |= PARP_SCAN_INPUT_GENERATION_VALID;
++	if (prior && binding->model_version == snapshot->prediction_model_version &&
++	    prior->model_version == snapshot->prediction_model_version)
++		input->flags |= PARP_SCAN_INPUT_MODEL_COMPATIBLE;
++out:
++	parp_snapshot_release();
+ }
+ 
+ bool parp_context_lookup(u64 domain_id, u64 now_ns,
+diff --git a/mm/parp/internal.h b/mm/parp/internal.h
+index 19401a508..c022483f5 100644
+--- a/mm/parp/internal.h
++++ b/mm/parp/internal.h
+@@ -15,6 +15,17 @@
+ #define PARP_MAX_SPLITS_PER_DAMON_REGION 64
+ #define PARP_WINDOW_BUCKETS	60
+ #define PARP_EVIDENCE_TTL_NS	(60ULL * NSEC_PER_SEC)
++#define PARP_APP_PRIOR_BATCH_SCHEMA 1U
++#define PARP_APP_PRIOR_MAX_TTL_NS (10ULL * 60 * NSEC_PER_SEC)
++#define PARP_APP_PRIOR_MAX_HORIZON_NS (60ULL * 60 * NSEC_PER_SEC)
++
++#define PARP_SCAN_INPUT_BIND_PRESENT	BIT(0)
++#define PARP_SCAN_INPUT_BIND_VALID	BIT(1)
++#define PARP_SCAN_INPUT_PRIOR_PRESENT	BIT(2)
++#define PARP_SCAN_INPUT_PRIOR_VALID	BIT(3)
++#define PARP_SCAN_INPUT_GENERATION_VALID BIT(4)
++#define PARP_SCAN_INPUT_MODEL_COMPATIBLE BIT(5)
++#define PARP_SCAN_INPUT_CIRCUIT_OK	BIT(6)
+ 
+ enum parp_page_type {
+ 	PARP_PAGE_ANON,
+@@ -300,9 +311,44 @@ struct parp_app_prior {
+ 	u64 updated_ns;
+ 	u64 expires_ns;
+ 	u64 model_version;
++	u32 prediction_generation;
++	u32 flags;
++	bool foreground;
+ 	bool valid;
+ };
+ 
++struct parp_app_prior_batch {
++	u32 schema_version;
++	u32 model_version;
++	u32 prediction_generation;
++	u64 timestamp_ns;
++	u64 horizon_ns;
++	u64 expiry_ns;
++	u32 nr_entries;
++	struct parp_app_prior entries[PARP_MAX_APPS];
++};
++
++struct parp_scan_budget_input {
++	u64 domain_id;
++	u32 app_id;
++	enum parp_reclaim_scope reclaim_scope;
++	enum parp_pressure_level pressure;
++	u64 native_nr_to_scan;
++	bool foreground;
++	u16 app_use_score_q15;
++	u16 app_rank;
++	u64 foreground_epoch_id;
++	u64 bind_generation;
++	u64 bind_expiry_ns;
++	u64 prediction_timestamp_ns;
++	u64 prediction_expiry_ns;
++	u32 prediction_generation;
++	u32 model_version;
++	s32 reclaim_priority;
++	u64 now_ns;
++	u32 flags;
++};
++
+ struct parp_binding {
+ 	u64 domain_id;
+ 	u32 app_id;
+@@ -321,10 +367,53 @@ struct parp_snapshot {
+ 	u64 expires_ns;
+ 	u32 nr_priors;
+ 	u32 nr_bindings;
++	u32 prediction_schema_version;
++	u32 prediction_model_version;
++	u32 prediction_generation;
++	u64 prediction_timestamp_ns;
++	u64 prediction_horizon_ns;
++	u64 prediction_expiry_ns;
+ 	struct parp_app_prior priors[PARP_MAX_APPS];
+ 	struct parp_binding bindings[PARP_MAX_DOMAINS];
+ };
+ 
++struct parp_scan_budget_stats {
++	atomic64_t scan_budget_queries;
++	atomic64_t target_memcg_queries;
++	atomic64_t global_kswapd_bypass;
++	atomic64_t global_direct_bypass;
++	atomic64_t unknown_scope_bypass;
++	atomic64_t no_appbind;
++	atomic64_t stale_bind;
++	atomic64_t no_prior;
++	atomic64_t expired_prior;
++	atomic64_t stale_generation;
++	atomic64_t model_version_mismatch;
++	atomic64_t foreground_decisions;
++	atomic64_t high_prior_decisions;
++	atomic64_t medium_prior_decisions;
++	atomic64_t low_prior_decisions;
++	atomic64_t pressure_bypass;
++	atomic64_t clamp_min;
++	atomic64_t clamp_max;
++	atomic64_t observe_count;
++	atomic64_t apply_count;
++	atomic64_t native_units_total;
++	atomic64_t proposed_units_total;
++	atomic64_t applied_units_total;
++	atomic64_t double_scaling_reject;
++	atomic64_t invalid_batch;
++	atomic64_t stale_batch;
++	atomic64_t circuit_breaker_count;
++};
++
++struct parp_scan_guard_view {
++	u64 domain_id;
++	u32 generation;
++	u32 failures;
++	bool tripped;
++};
++
+ struct parp_stats {
+ 	atomic64_t prepare;
+ 	atomic64_t scored;
+@@ -335,6 +424,7 @@ struct parp_stats {
+ 
+ extern struct parp_stats parp_stats;
+ extern struct parp_evidence_stats parp_evidence_stats;
++extern struct parp_scan_budget_stats parp_scan_budget_stats;
+ 
+ u16 parp_q15_mul(u16 a, u16 b);
+ s16 parp_q15_sat_add(s16 a, s16 b);
+@@ -355,6 +445,20 @@ const struct parp_snapshot *parp_snapshot_acquire(void);
+ void parp_snapshot_release(void);
+ int parp_snapshot_update_binding(const struct parp_binding *binding);
+ int parp_snapshot_update_prior(const struct parp_app_prior *prior);
++int parp_snapshot_replace_prior_batch(const struct parp_app_prior_batch *batch);
++void parp_snapshot_fill_scan_budget_input(u64 domain_id, u64 now_ns,
++					 struct parp_scan_budget_input *input);
++int parp_compute_scan_budget(const struct parp_scan_budget_input *input,
++			     struct parp_scan_budget_decision *decision);
++enum parp_scan_budget_mode parp_get_scan_budget_mode(void);
++int parp_set_scan_budget_mode(enum parp_scan_budget_mode mode);
++bool parp_scan_budget_guard(u64 domain_id, u32 generation, bool valid);
++void parp_scan_budget_guard_clear(u64 domain_id);
++unsigned int parp_scan_budget_guard_snapshot(
++		struct parp_scan_guard_view *views, unsigned int max_views);
++void parp_scan_budget_guard_reset_all_for_test(void);
++void parp_scan_budget_account(const struct parp_scan_budget_input *input,
++			      const struct parp_scan_budget_decision *decision);
+ void parp_stats_account(const struct parp_decision *decision);
+ enum parp_action parp_policy_applied(enum parp_mode mode,
+ 				     enum parp_action original,
+diff --git a/mm/parp/tests/parp_test.c b/mm/parp/tests/parp_test.c
+index 475b10a32..a3c7c899b 100644
+--- a/mm/parp/tests/parp_test.c
++++ b/mm/parp/tests/parp_test.c
+@@ -418,6 +418,148 @@ static void parp_observe_test(struct kunit *test)
+ 			PARP_ACTION_NATIVE);
+ }
+ 
++static struct parp_scan_budget_input parp_budget_input(void)
++{
++	return (struct parp_scan_budget_input) {
++		.domain_id = 0x25,
++		.app_id = 1,
++		.reclaim_scope = PARP_RECLAIM_SCOPE_TARGET_MEMCG,
++		.pressure = PARP_PRESSURE_NORMAL,
++		.native_nr_to_scan = 1000,
++		.app_use_score_q15 = 30000,
++		.app_rank = 1,
++		.bind_generation = 2,
++		.prediction_timestamp_ns = 1,
++		.prediction_expiry_ns = U64_MAX,
++		.prediction_generation = 3,
++		.model_version = 4,
++		.flags = PARP_SCAN_INPUT_BIND_VALID |
++			 PARP_SCAN_INPUT_PRIOR_VALID |
++			 PARP_SCAN_INPUT_GENERATION_VALID |
++			 PARP_SCAN_INPUT_MODEL_COMPATIBLE |
++			 PARP_SCAN_INPUT_CIRCUIT_OK,
++	};
++}
++
++static void parp_scan_budget_basic_test(struct kunit *test)
++{
++	struct parp_scan_budget_input input = parp_budget_input();
++	struct parp_scan_budget_decision decision;
++
++	input.foreground = true;
++	KUNIT_ASSERT_EQ(test, parp_compute_scan_budget(&input, &decision), 0);
++	KUNIT_EXPECT_EQ(test, decision.proposed_nr_to_scan, 500ULL);
++	KUNIT_EXPECT_EQ(test, decision.applied_nr_to_scan, 1000ULL);
++	KUNIT_EXPECT_EQ(test, decision.reason,
++			(enum parp_scan_budget_reason)PARP_SCAN_REASON_FOREGROUND);
++	input.foreground = false;
++	KUNIT_ASSERT_EQ(test, parp_compute_scan_budget(&input, &decision), 0);
++	KUNIT_EXPECT_EQ(test, decision.proposed_nr_to_scan, 600ULL);
++	input.app_use_score_q15 = 18000;
++	KUNIT_ASSERT_EQ(test, parp_compute_scan_budget(&input, &decision), 0);
++	KUNIT_EXPECT_EQ(test, decision.proposed_nr_to_scan, 800ULL);
++	input.app_use_score_q15 = 4000;
++	KUNIT_ASSERT_EQ(test, parp_compute_scan_budget(&input, &decision), 0);
++	KUNIT_EXPECT_EQ(test, decision.proposed_nr_to_scan, 1200ULL);
++}
++
++static void parp_scan_budget_gate_pressure_test(struct kunit *test)
++{
++	struct parp_scan_budget_input input = parp_budget_input();
++	struct parp_scan_budget_decision decision;
++
++	input.foreground = true;
++	input.pressure = PARP_PRESSURE_ELEVATED;
++	KUNIT_ASSERT_EQ(test, parp_compute_scan_budget(&input, &decision), 0);
++	KUNIT_EXPECT_GE(test, decision.proposed_nr_to_scan, 500ULL);
++	input.pressure = PARP_PRESSURE_HIGH;
++	KUNIT_ASSERT_EQ(test, parp_compute_scan_budget(&input, &decision), 0);
++	KUNIT_EXPECT_GE(test, decision.proposed_nr_to_scan, 750ULL);
++	input.pressure = PARP_PRESSURE_EMERGENCY;
++	KUNIT_ASSERT_EQ(test, parp_compute_scan_budget(&input, &decision), 0);
++	KUNIT_EXPECT_EQ(test, decision.proposed_nr_to_scan, 1000ULL);
++	input.pressure = PARP_PRESSURE_NORMAL;
++	input.reclaim_scope = PARP_RECLAIM_SCOPE_GLOBAL_KSWAPD;
++	KUNIT_ASSERT_EQ(test, parp_compute_scan_budget(&input, &decision), 0);
++	KUNIT_EXPECT_EQ(test, decision.proposed_nr_to_scan, 1000ULL);
++	input.reclaim_scope = PARP_RECLAIM_SCOPE_GLOBAL_DIRECT;
++	KUNIT_ASSERT_EQ(test, parp_compute_scan_budget(&input, &decision), 0);
++	KUNIT_EXPECT_EQ(test, decision.proposed_nr_to_scan, 1000ULL);
++}
++
++static void parp_scan_budget_bounds_mode_test(struct kunit *test)
++{
++	struct parp_scan_budget_input input = parp_budget_input();
++	struct parp_scan_budget_decision decision;
++	u64 first;
++
++	input.native_nr_to_scan = 0;
++	KUNIT_ASSERT_EQ(test, parp_compute_scan_budget(&input, &decision), 0);
++	KUNIT_EXPECT_EQ(test, decision.proposed_nr_to_scan, 0ULL);
++	input.native_nr_to_scan = 1;
++	input.foreground = true;
++	KUNIT_ASSERT_EQ(test, parp_compute_scan_budget(&input, &decision), 0);
++	KUNIT_EXPECT_EQ(test, decision.proposed_nr_to_scan, 1ULL);
++	input.native_nr_to_scan = U64_MAX;
++	input.foreground = false;
++	input.app_use_score_q15 = 0;
++	KUNIT_ASSERT_EQ(test, parp_compute_scan_budget(&input, &decision), 0);
++	KUNIT_EXPECT_LE(test, decision.proposed_nr_to_scan, U64_MAX);
++	input.native_nr_to_scan = 1000;
++	input.app_use_score_q15 = 30000;
++	parp_set_scan_budget_mode(PARP_SCAN_BUDGET_APPLY);
++	KUNIT_ASSERT_EQ(test, parp_compute_scan_budget(&input, &decision), 0);
++	KUNIT_EXPECT_EQ(test, decision.applied_nr_to_scan,
++			decision.proposed_nr_to_scan);
++	first = parp_adapter_apply_scan_budget(&decision);
++	KUNIT_EXPECT_EQ(test, parp_adapter_apply_scan_budget(&decision), first);
++	parp_set_scan_budget_mode(PARP_SCAN_BUDGET_OBSERVE);
++}
++
++static void parp_prior_batch_test(struct kunit *test)
++{
++	u64 now = ktime_get_mono_fast_ns();
++	struct parp_app_prior_batch batch = {
++		.schema_version = 1,
++		.model_version = 9,
++		.prediction_generation = 100,
++		.timestamp_ns = now,
++		.horizon_ns = 30 * NSEC_PER_SEC,
++		.expiry_ns = now + 60 * NSEC_PER_SEC,
++		.nr_entries = 2,
++		.entries = {
++			{ .app_id = 1, .use_score_q15 = 30000, .rank = 1,
++			  .foreground = true, .valid = true },
++			{ .app_id = 2, .use_score_q15 = 10000, .rank = 2,
++			  .valid = true },
++		},
++	};
++	const struct parp_snapshot *snapshot;
++
++	KUNIT_ASSERT_EQ(test, parp_snapshot_replace_prior_batch(&batch), 0);
++	snapshot = parp_snapshot_acquire();
++	KUNIT_ASSERT_NOT_NULL(test, snapshot);
++	KUNIT_EXPECT_EQ(test, snapshot->prediction_generation, 100U);
++	KUNIT_EXPECT_EQ(test, snapshot->nr_priors, 2U);
++	parp_snapshot_release();
++	KUNIT_EXPECT_EQ(test, parp_snapshot_replace_prior_batch(&batch), -EALREADY);
++	batch.prediction_generation--;
++	KUNIT_EXPECT_EQ(test, parp_snapshot_replace_prior_batch(&batch), -ESTALE);
++	batch.prediction_generation += 2;
++	batch.entries[1].rank = 1;
++	KUNIT_EXPECT_EQ(test, parp_snapshot_replace_prior_batch(&batch), -EINVAL);
++}
++
++static void parp_scan_budget_circuit_test(struct kunit *test)
++{
++	parp_scan_budget_guard_reset_all_for_test();
++	KUNIT_EXPECT_TRUE(test, parp_scan_budget_guard(7, 1, false));
++	KUNIT_EXPECT_TRUE(test, parp_scan_budget_guard(7, 1, false));
++	KUNIT_EXPECT_FALSE(test, parp_scan_budget_guard(7, 1, false));
++	KUNIT_EXPECT_TRUE(test, parp_scan_budget_guard(8, 1, true));
++	KUNIT_EXPECT_TRUE(test, parp_scan_budget_guard(7, 2, true));
++}
++
+ static struct kunit_case parp_cases[] = {
+ 	KUNIT_CASE(parp_q15_test),
+ 	KUNIT_CASE(parp_state_test),
+@@ -430,6 +572,11 @@ static struct kunit_case parp_cases[] = {
+ 	KUNIT_CASE(parp_fallback_test),
+ 	KUNIT_CASE(parp_snapshot_test),
+ 	KUNIT_CASE(parp_observe_test),
++	KUNIT_CASE(parp_scan_budget_basic_test),
++	KUNIT_CASE(parp_scan_budget_gate_pressure_test),
++	KUNIT_CASE(parp_scan_budget_bounds_mode_test),
++	KUNIT_CASE(parp_prior_batch_test),
++	KUNIT_CASE(parp_scan_budget_circuit_test),
+ 	{}
+ };
+ 
+diff --git a/mm/vmscan.c b/mm/vmscan.c
+index 702901c20..ac13880d1 100644
+--- a/mm/vmscan.c
++++ b/mm/vmscan.c
+@@ -4908,10 +4908,15 @@ static bool try_to_shrink_lruvec(struct lruvec *lruvec, struct scan_control *sc)
+ 
+ 	while (true) {
+ 		int delta;
++		struct parp_scan_budget_decision budget;
+ 
+ 		nr_to_scan = get_nr_to_scan(lruvec, sc, swappiness);
+ 		if (nr_to_scan <= 0)
+ 			break;
++		parp_adapter_prepare_scan_budget(lruvec, sc->target_mem_cgroup,
++			current_is_kswapd(), sc->proactive, sc->priority,
++			nr_to_scan, &budget);
++		nr_to_scan = parp_adapter_apply_scan_budget(&budget);
+ 
+ 		delta = evict_folios(nr_to_scan, lruvec, sc, swappiness);
+ 		if (!delta)
+-- 
+2.25.1
+

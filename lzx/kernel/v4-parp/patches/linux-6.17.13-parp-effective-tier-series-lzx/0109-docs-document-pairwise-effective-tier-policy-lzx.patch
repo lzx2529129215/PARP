@@ -1,0 +1,1146 @@
+From d2fbd9e83e7435446335aa5ce2a55e62b4aabf9f Mon Sep 17 00:00:00 2001
+From: Codex PARP Reproduction <codex@localhost>
+Date: Tue, 4 Aug 2026 18:51:23 +0800
+Subject: [PATCH 109/124] docs: document pairwise effective tier policy
+
+---
+ docs/parp_effective_tier_implementation.md    | 439 +++++++++++++++
+ docs/parp_effective_tier_pairwise_ranking.md  | 514 ++++++++++++++++++
+ ...p_effective_tier_ranking_redirect_audit.md | 158 ++++++
+ 3 files changed, 1111 insertions(+)
+ create mode 100644 docs/parp_effective_tier_implementation.md
+ create mode 100644 docs/parp_effective_tier_pairwise_ranking.md
+ create mode 100644 docs/parp_effective_tier_ranking_redirect_audit.md
+
+diff --git a/docs/parp_effective_tier_implementation.md b/docs/parp_effective_tier_implementation.md
+new file mode 100644
+index 000000000..1ac6572ae
+--- /dev/null
++++ b/docs/parp_effective_tier_implementation.md
+@@ -0,0 +1,439 @@
++# PARP MGLRU effective-tier implementation
++
++## Status and scope
++
++This document describes the effective-tier kernel contract in the
++`feat/parp-effective-tier` worktree and its Phase-E offline boundary.  The
++implementation is deliberately runtime-default-OFF.  It has not collected an
++authorized real SHADOW dataset, installed or booted a kernel, changed a
++cgroup, generated memory pressure, or executed an APPLY mode.
++
++The embedded six-feature lookup table and its thresholds are deterministic
++engineering fixtures for implementation and Python/C parity tests.  They are
++not a trained Bradley–Terry model, calibrated probabilities, or evidence that
++Protect-only or Bidirectional APPLY is safe.  The next allowed operational
++state is therefore:
++
++`PARP_EFFECTIVE_TIER_LIVE_AUTH_REQUIRED`
++
++The source-level MGLRU findings that define the integration point are recorded
++in `docs/parp_effective_tier_source_audit.md`.  The offline model contract is
++recorded in `docs/parp_effective_tier_pairwise_ranking.md`.
++
++## Design outcome
++
++PARP does not replace MGLRU's native tier.  It computes a virtual tier for the
++one ordinary tier-protection decision that MGLRU is about to make:
++
++```text
++offline training:  bounded Bradley–Terry next-real-access pairs
++kernel inference:  one independent additive integer score per folio
++kernel decision:   score thresholds -> Q8 delta -> effective tier
++```
++
++The distinction is fundamental.  The training loss compares pages, but the
++kernel never collects a candidate set for ranking.  For each folio it performs
++a fixed number of feature-bin lookups, integer additions, four ordered
++threshold comparisons, and fixed-point arithmetic.  There is no runtime sigmoid,
++probability, pairwise comparison, sort, heap, tree, dynamic allocation,
++floating point, I/O, RPC, or unbounded loop.
++
++The runtime complexity is `O(fixed features + fixed thresholds)` per folio,
++not `O(K log K)` or `O(K²)` over a candidate batch.
++
++The offline bounded pair sampler defaults strictly to 64 pairs per group and
++supports the declared cap ablations `[32, 64, 128]`; its manifest records both
++the selected cap and the supported set.
++
++## Exact MGLRU integration boundary
++
++The integration is inside `mm/vmscan.c:sort_folio()`, after the unevictable and
++already-promoted/race checks and at the ordinary native tier gate.  The native
++values are derived from the same coherent folio-flag snapshot:
++
++```text
++refs          = folio_lru_refs(folio)
++workingset    = folio_test_workingset(folio)
++native_tier   = lru_tier_from_refs(refs, workingset)
++native_protect = native_tier > native_tier_idx
++```
++
++`native_tier_idx` remains MGLRU's per-lruvec, per-anon/file dynamic boundary,
++derived from the native refault/evicted/protected controller.  PARP neither
++replaces that controller nor writes its arrays.
++
++Only the ordinary strict `native_tier > native_tier_idx` protection can be
++experimentally reclassified.  The following remain Native and cannot be
++cancelled by the first implementation:
++
++- unevictable handling;
++- a folio already moved out of the current oldest generation;
++- the saturated lazy/workingset condition
++  `refs + workingset == BIT(LRU_REFS_WIDTH) + 1`;
++- strong ordinary protection at `native_tier >= native_tier_idx + 2`;
++- a zone above `reclaim_idx`;
++- writeback and file-dirty handling;
++- all subsequent GFP/swap, reference, LRU-race, isolation, putback, and reclaim
++  conditions.
++
++A predictive upgrade changes an ordinary native-reclaim decision into one
++policy protection and moves the folio at most one generation.  It does not
++set an access bit, change native refs/tier, or increment native protected
++statistics.  A predictive downgrade is permitted only at
++`native_tier == native_tier_idx + 1`; it skips this round's ordinary tier
++promotion, does not write a lower native tier or older generation, and then
++continues through the remaining native `sort_folio()` and isolation checks.
++
++Consequently, a trace outcome such as `PREDICTIVE_DOWNGRADE` means that the
++ordinary tier protection was bypassed.  It does not mean the folio was
++necessarily isolated, reclaimed, or refaulted.
++
++## GLOBAL integer scorer
++
++There is exactly one `GLOBAL_REUSE_MODEL`.  There is no WPS, FILES, QQ, App,
++process, path, session, workload, or frontier-based runtime routing.  The
++schema-v1 score is:
++
++```text
++reuse_score = quantized_bias
++            + sum(quantized_weights[feature][bin(feature_value)])
++```
++
++The six fixed runtime features, all captured at the candidate decision time,
++are:
++
++| Index | Feature | Runtime representation |
++|---:|---|---|
++| 0 | `time_since_last_real_access_ms` | non-negative integer |
++| 1 | `previous_real_access_interval_ms` | non-negative integer |
++| 2 | `reuse_interval_ema_ms` | non-negative integer |
++| 3 | `consecutive_reclaim_candidate_count` | saturating count |
++| 4 | `time_in_current_generation_ms` | non-negative integer |
++| 5 | `access_ema_q8` | unsigned Q8 history |
++
++Each feature has five fixed edges and six bins.  An edge belongs to its lower
++bin.  The accumulator is checked before conversion to `s32`; missing state,
++an `S64_MIN` feature sentinel, model/schema mismatch, or overflow invalidates
++the result.
++
++The primary ranker intentionally excludes `native_tier` and
++`native_tier_idx`, because native frequency evidence already participates in
++the effective-tier formula.  Including native tier, and including both native
++tier and tier index, remain offline ablations rather than v1 kernel inputs.
++
++`reuse_score` is an ordinal utility: a higher score means an earlier expected
++next trusted real-access observation and higher short-term reuse value.  It is
++not a reuse probability, calibrated probability, or refault probability.
++
++## Q8 score-to-tier contract
++
++The fixed-point scale is:
++
++```c
++#define PARP_TIER_SCALE 256
++#define PARP_MAX_TIER   3
++```
++
++The canonical main-path field names are:
++
++- `reuse_score`;
++- `score_threshold_cold`;
++- `score_threshold_hot_1`;
++- `score_threshold_hot_2`;
++- `predictive_delta_tier_q8`;
++- `effective_tier_q8`.
++
++The model artifact also carries nullable `score_threshold_hot_3`, but only as
++the boundary of the separate experimental +3 contract.  Its default is
++`null`; it is not a fourth primary-path threshold.
++
++The normalized offline record currently retains `cold_threshold`,
++`hot_threshold_1`, `hot_threshold_2`, `hot_threshold_3`, and `delta_tier_q8`
++only as deprecated, equal-valued compatibility aliases.  They must never
++acquire probability semantics.
++
++The primary model artifact has exactly this nominal Q8 mapping:
++
++```text
++cold    -> -256
++neutral ->    0
++hot_1   -> +256
++hot_2   -> +512
++```
++
++Accordingly, both its `delta_tier_q8` and `predictive_delta_tier_q8` objects
++contain only `cold`, `neutral`, `hot_1`, and `hot_2`.  By default,
++`score_threshold_hot_3 = null` and `experimental_plus3` records
++`status = NOT_SELECTED`, `default_enabled = false`, and
++`apply_supported = false`.
++
++The kernel engineering fixture retains the explicit score thresholds -48,
++48, 96, and 144 and defaults `max_upgrade_tiers` to 2.  Its fixed-cost
++score-to-policy mapping is:
++
++```text
++reuse_score <= score_threshold_cold
++    -> predictive_delta_tier_q8 = -256
++
++score_threshold_cold < reuse_score < score_threshold_hot_1
++    -> predictive_delta_tier_q8 = 0
++
++score_threshold_hot_1 <= reuse_score < score_threshold_hot_2
++    -> predictive_delta_tier_q8 = +256
++
++reuse_score >= score_threshold_hot_2
++  and reuse_score < score_threshold_hot_3
++    -> predictive_delta_tier_q8 = min(max_upgrade_tiers, 2) * 256
++
++reuse_score >= score_threshold_hot_3
++    -> predictive_delta_tier_q8 =
++       (max_upgrade_tiers == 3 ? +768
++                               : min(max_upgrade_tiers, 2) * 256)
++```
++
++`max_upgrade_tiers` supports +1, +2, and experimental +3 model replay.  A +3
++threshold may enter an artifact only after explicit validation selection,
++recorded as `hot_threshold_3_selected_on_split = validation` on input and
++`experimental_plus3.threshold_selected_on_split = validation` on export.
++Even then, +3 is offline/SHADOW-only, `default_enabled` remains false, and
++`apply_supported` remains false.  The mode setter rejects every APPLY mode
++while the configured cap exceeds +2; the kernel has no production +3 APPLY
++configuration.  The separate boundary preserves a +2 bucket between `hot_2`
++and `hot_3` during an authorized SHADOW +3 ablation.  With cap at most 2,
++scores at or above `hot_3` retain the configured +1/+2 cap.  The cold side is
++always capped at -1.  The fixture value 144 is engineering scaffolding, not a
++validation-selected +3 threshold.
++
++The effective decision is:
++
++```text
++native_tier_q8 = native_tier * 256
++
++effective_tier_q8 = clamp(native_tier_q8 + predictive_delta_tier_q8,
++                          0, PARP_MAX_TIER * 256)
++
++effective_protect = effective_tier_q8 > native_tier_idx * 256
++```
++
++The comparison remains strictly greater.  Equality does not protect.
++
++On an invalid model, invalid/missing/unstable metadata, model-version or
++configuration race, exhausted action budget, repeated per-folio epoch claim,
++or commit-time folio-state race, the affected action's applied delta becomes
++zero and it falls back to Native.  Both predictive upgrades and downgrades
++additionally fall back under severe pressure or no progress:
++
++```text
++predictive_delta_tier_q8 = 0
++effective_protect == native_protect
++```
++
++This is the central fail-safe invariant.
++
++## Runtime modes and authorization
++
++`CONFIG_PARP_EFFECTIVE_TIER` is `default n`, selects `PAGE_EXTENSION`, and is
++mutually exclusive with the older frontier-score experiment.
++`CONFIG_PARP_EFFECTIVE_TIER_EXPERIMENTAL_APPLY` is separately `default n`.
++When the latter is disabled, all APPLY setters return `-EOPNOTSUPP`.
++
++| Mode | Score/trace | Reclaim behavior |
++|---|---|---|
++| `OFF` | effective scorer fast path disabled | exactly Native |
++| `SHADOW_EFFECTIVE_TIER` | computes counterfactual quadrants | exactly Native |
++| `APPLY_PROTECT_ONLY` | permits bounded upgrades | never applies downgrades |
++| `APPLY_BIDIRECTIONAL` | permits bounded upgrades and boundary-only downgrades | authorization required |
++| `APPLY_RANDOM_MATCHED` | hashed random baseline using configured rates | authorization required; limitation below |
++| `APPLY_RECENCY_BASELINE` | recency-only score baseline | authorization required |
++
++Configuration writes are accepted only while OFF.  Active-to-active mode
++switches return `-EBUSY`, requiring an OFF transition.  An OFF-to-active
++transition advances the state epoch and clears a prior state-fault latch.  A
++concurrent MGLRU state change faults the experiment until another explicit
++OFF-to-active transition.
++
++Upgrade and downgrade accounting are independent.  Each has batch pages,
++epoch pages, and a base-page ratio limit.  A folio may claim each action at
++most once per epoch.  A shared severe-pressure/no-progress gate disables both
++directions; downgrades additionally require the boundary tier, may require two
++cold observations, and never override special or strong Native protection.
++State and reservation revalidation prevents a decision from being committed
++after its feature/tier snapshot has changed.
++
++## Page state and trusted access boundary
++
++The effective-tier `page_ext` payload is exactly 24 bytes per base page:
++
++```text
++last_access_ms, previous_interval_ms, reuse_interval_ema_ms,
++generation_enter_ms, lifetime_epoch, packed state, decision epochs
++```
++
++Score and native tier are not persisted.  A keyed folio cookie plus lifetime
++epoch prevents a recycled PFN from joining an older folio lifetime.
++
++Only audited real-access event classes can update `last_access`, interval/EMA
++history, access count state, or consecutive-candidate state:
++
++- a successfully observed/cleared PTE or PMD young bit;
++- an explicitly audited `MARK_ACCESSED` source;
++- a successful buffered/splice `FD_REFERENCE` source.
++
++The generic `folio_mark_accessed()` source is deliberately untrusted unless a
++caller supplies an audited source.  Policy marks invalidate confidence rather
++than fabricate access history.  Native tier promotion, native generation
++maintenance, PARP policy promotion, putback, and list movement update only
++movement/generation bookkeeping; they do not update the last-real-access
++timestamp.  This prevents a PARP promotion from becoming self-reinforcing
++training evidence.
++
++These hooks provide conservative observed access evidence, not a complete log
++of CPU accesses.  A young bit reports that an access occurred since the last
++clear and is timestamped when observed, not at the exact instruction.  Access
++may be coalesced or missed between observations.  This false-negative and
++timing-interval boundary must be carried into ranking-quality uncertainty.
++
++### `page_ext` memory cost
++
++Assuming 4 KiB base pages and excluding allocator/alignment overhead outside
++the 24-byte PARP payload:
++
++| Physical memory | PARP payload | Fraction of physical memory |
++|---:|---:|---:|
++| 16 GiB | 96 MiB | 0.5859375% |
++| 32 GiB | 192 MiB | 0.5859375% |
++| 64 GiB | 384 MiB | 0.5859375% |
++
++## Trace and latency observability
++
++The effective-tier trace family records decision, access, outcome, batch, and
++lock events.  A single monotonic `trace_sequence` spans all five kinds so the
++offline collector can detect internal gaps and duplicates.  Access, outcome,
++and batch events carry explicit experiment/session ownership; candidate
++identity includes the folio cookie and lifetime epoch.  Invalid feature state
++is exported as `features_valid=false` and normalized to six `null` feature
++values, never six fabricated zeros.
++
++Trace construction, cookie hashing, and timestamps are behind each
++tracepoint's enabled check.  The mandatory state and counter work remains in
++the active effective-tier path.
++
++Lock tracing separates:
++
++- wait time, from the lock-attempt timestamp to acquisition;
++- held time, from acquisition to immediately before unlock;
++- the IRQ-disabled interval where the architecture/configuration permits it.
++
++On non-RT builds the IRQ-disabled sample begins just after IRQ disable and ends
++just before IRQ enable, so it is a lower-bound measurement by a few
++instructions.  On `CONFIG_PREEMPT_RT`, the native `spin_lock_irq()` primitive
++is preserved; wait and held time remain measured, but IRQ-disabled duration is
++unmeasured and must be normalized to `null`, not a fabricated zero.
++
++The instrumented lru-lock scopes are the scan/isolation lock section and the
++later batch putback/accounting lock section in `evict_folios()`.  They are not
++a measurement of every `lruvec->lru_lock` user or of an entire direct-reclaim
++request.  Separate exported reclaim telemetry is required for those claims.
++Likewise, sequence-gap detection only covers records that reached the trace
++stream; independently measured trace-buffer loss and tier-gate counter
++coverage remain authoritative at capture boundaries.
++
++The kernel decision trace records mode, integer score, rank-score bin, all four
++thresholds, features, model validity, expected/actual model version, feature
++schema, scorer identity/provenance, checksum, and timings.  The collector
++normalizes it into raw-event schema v2; labeled-candidate and observability
++schemas are also v2, while session metadata remains v1 and the runtime feature
++schema remains v1.  GLOBAL decisions identify `pairwise_linear_ranker` and the
++checksum of the embedded scorer parameters with provenance
++`ENGINEERING_FIXTURE_UNTRAINED`; the checksum is not training data or
++model-quality evidence.  RECENCY and RANDOM_MATCHED use distinct scorer
++identities, `CONTROL_BASELINE` provenance, and no pairwise model checksum.  The
++collector checks mode/scorer agreement.  A live model comparison must still
++bind every export to the corresponding immutable model manifest.  Score
++percentile is an offline derivative, not a kernel hot-path computation.
++
++## Four counterfactual quadrants
++
++SHADOW records the native and effective decisions but applies Native behavior:
++
++| Native decision | Effective decision | Action |
++|---|---|---|
++| reclaim | reclaim | `KEEP_RECLAIM` |
++| reclaim | protect | `PREDICTIVE_UPGRADE` |
++| protect | protect | `KEEP_PROTECT` |
++| protect | reclaim | `PREDICTIVE_DOWNGRADE` |
++
++Special Native protection is reported separately and forced protected.  Counts
++and rates use `folio_nr_pages` so a large folio is represented in base pages.
++Future access is not called a refault.  A real refault claim requires native
++`workingset_refault_file`/`workingset_refault_anon` counters or another
++verified workingset event.
++
++## Validation boundary and known limitations
++
++The current validation record supports the focused integer scorer/reference
++and effective-tier KUnit work, but it does not authorize live use.  A filtered
++effective-tier UML run reported all 16 focused effective-tier cases passing.
++The full legacy `parp` suite did not pass: pre-existing, non-effective-tier
++failures include `parp_evidence_window_test` returning `-ESTALE` and a SIGFPE
++near `parp_compute_scan_budget`.  The full legacy suite must therefore not be
++reported as PASS.  The enabled `bzImage` and modules, feature-disabled
++`bzImage`, focused non-RT/PREEMPT_RT objects, and the Python regression matrix
++were instead validated independently on the final integration tree.
++
++The remaining limitations and gates are explicit:
++
++1. **No real ranking evidence.** No authorized exported SHADOW dataset,
++   trained ranking model, real session/pair counts, validation thresholds,
++   pairwise accuracy, NDCG, C-index, score monotonicity, four-quadrant rates,
++   reclaim benefit, refault delta, App latency, or lock/direct-reclaim tails
++   exist.  Those values are NOT COLLECTED or NOT EVALUATED, never inferred
++   from fixtures.
++2. **Random baseline is rate-matched, not count-matched.** The online
++   `APPLY_RANDOM_MATCHED` path uses a deterministic hash and configured upgrade
++   and downgrade rates.  It does not guarantee exactly the same realized
++   counts as the model in each stratum.  An exact reservoir helper test does
++   not make the online baseline exact.
++3. **Rank feedback is not implemented.** No separate
++   `rank_feedback[anon/file][native_tier][score_bin/action]` arrays exist yet.
++   Native refault PID statistics are intentionally untouched.  No online
++   weight or threshold adaptation is claimed.
++4. **Access observation is incomplete.** Trusted hooks distinguish access
++   from movement, but sampled young bits and audited FD/mark paths can miss or
++   coalesce accesses and timestamp observation rather than the exact access.
++5. **A five-second tail is mandatory.** Live SHADOW/access capture must remain
++   active for the full ranking horizon after the final candidate.  Ending the
++   session at workload completion right-censors tail candidates; they cannot
++   be relabeled as cold negatives.
++6. **Probability ablation is not complete.** The old
++   `analyze._train_weights()` path is only a legacy page-weighted, per-bin,
++   smoothed 1-second log-odds heuristic (`LEGACY_1S_LOG_ODDS`).  It is not four
++   independent 100 ms/500 ms/1 s/5 s classifiers and is not calibrated.
++   `PROBABILITY_CLASSIFIER_ABLATION` and calibrated-Q15 `PRODUCT_ABLATION`
++   remain `NOT_IMPLEMENTED`; a raw rank score must never substitute for
++   `prob_q15`.
++7. **APPLY remains unauthorized.** The validation helper can pass its
++   Protect-only selection gate only when a hot-1 point exists, distinct hot-2
++   validation evidence exists, and the 95% bootstrap CI for the upgrade
++   selected-minus-baseline reuse-rate difference is entirely above zero.
++   Bidirectional additionally requires a cold candidate whose Wilson
++   downgrade-mistake upper bound is at most 0.10 and whose downgrade
++   selected-minus-baseline bootstrap CI is entirely below zero.  These are
++   threshold-selection prerequisites, not deployment authorization: real
++   SHADOW model, coverage, trace-loss, KUnit, latency, refault, and App-tail
++   gates are still required.  With no real dataset, both delivery gates remain
++   false.  The ranking delivery gate is independent of the legacy one-second
++   quadrant direction report and also fails closed on missing held-out
++   pairwise support, non-vacuous monotonicity, quantized-order consistency, or
++   fixed-native-tier/boundary residual discrimination.
++8. **Validation session-cluster bootstrap is implemented.** Threshold
++   selection deterministically performs 1,000 resamples, drawing whole
++   validation sessions with replacement and deriving two-sided percentile
++   95% intervals.  Difference intervals use only sessions containing both
++   arms.  Its seed is derived from the operation tag and sorted paired-session
++   identities.  Fewer than two paired supporting sessions or fewer than
++   `max(200, 80% of requested)` valid resamples yields a null CI and a false
++   direction/delivery gate.  Rates, coverage, Wilson counts, and delay
++   summaries are base-page weighted through `folio_nr_pages`.  Unit fixtures
++   do not turn these intervals into real evidence, and this validation
++   procedure does not claim paired live confidence intervals.
+diff --git a/docs/parp_effective_tier_pairwise_ranking.md b/docs/parp_effective_tier_pairwise_ranking.md
+new file mode 100644
+index 000000000..2d946b9b8
+--- /dev/null
++++ b/docs/parp_effective_tier_pairwise_ranking.md
+@@ -0,0 +1,514 @@
++# PARP pairwise next-real-access ranking
++
++## Primary offline task
++
++The primary model learns a relative short-term reuse order:
++
++> Given two folios from the same reclaim decision context, which one will be
++> observed at its next trusted real access sooner?
++
++This replaces fixed-window probability classification as the mainline task.
++The exported single-folio utility is:
++
++```text
++reuse_score_i = bias
++              + sum(weights[feature][bin(feature_i)])
++```
++
++Higher `reuse_score` means earlier expected next real access and greater
++short-term protection value.  The score is ordinal.  It is not a probability,
++does not promise calibration, and must not be written into a probability field.
++
++Training uses a Bradley–Terry-style pairwise logistic objective:
++
++```text
++P(i earlier than j | training only) = sigmoid(reuse_score_i - reuse_score_j)
++
++loss(i, j) = log(1 + exp(-label * (reuse_score_i - reuse_score_j)))
++```
++
++The sigmoid exists only in the offline loss.  Pair differences cancel the
++single-page bias; the exported rank bias is therefore fixed to zero unless a
++separately documented score-offset convention is introduced.  The learned
++per-feature table can still score one folio independently.
++
++The kernel consumes only quantized integer bias/bin weights and score
++thresholds.  It never evaluates the sigmoid, compares two folios, or sorts a
++candidate set.
++
++## Why ranking is the primary target
++
++A label such as `reuse_within_1s` makes every access at 1.001 seconds a negative
++and every access at 0.999 seconds a positive, even though their reclaim value
++is almost identical.  It also collapses a 5 ms reuse and a 900 ms reuse into
++the same class.  Pairwise next-access ranking preserves the direction that
++matters to reclamation: among comparable candidates, protect the one expected
++to be needed earlier.
++
++Fixed windows remain useful reporting views.  Reuse within 100 ms, 500 ms,
++1 second, and 5 seconds is used for score-bucket monotonicity and auxiliary
++ROC/PR AUC.  These views neither train the main model nor turn the score into a
++probability.
++
++## Candidate universe and feature time boundary
++
++The candidate universe is every folio that reaches the native ordinary tier
++gate in `sort_folio()`, including:
++
++- native-reclaim candidates;
++- native-tier-protect candidates;
++- special Native protection candidates.
++
++Special Native protection remains useful for observational ranking quality,
++but is reported separately, is never predictively downgraded, and is excluded
++from the default cold-downgrade training/threshold target.
++
++Every feature is frozen at `candidate_time_i`.  No later access, action,
++isolation, reclaim, putback, generation move, refault, session result, App
++label, or workload label may enter the model features.  Identity joins require
++the same experiment, session, folio cookie, and lifetime epoch.
++
++Rows with `features_valid=false` retain their diagnostic candidate record but
++cannot enter pairwise training.  Their six feature values remain `null`; the
++ranking adapter rejects them rather than treating missing state as a cold
++all-zero vector.
++
++Valid next-access sources are audited real evidence such as observed PTE/PMD
++young, explicitly audited mark-accessed sources, and successful FD/buffered
++reference paths.  Native tier promotion, native generation movement, PARP
++policy promotion, putback, list movement, and reclaim retry are not accesses.
++The target describes a future access observation, not a true refault.
++
++## Horizon and censoring
++
++The primary ranking horizon is exactly:
++
++```text
++ranking_horizon_ns = 5_000_000_000
++```
++
++For candidate `i`:
++
++```text
++next_reuse_delay_i = next_real_access_time_i - candidate_time_i
++```
++
++The labeled-candidate schema records:
++
++- `next_reuse_delay_ns`;
++- `observed_within_horizon`;
++- `censored_by_session_end`;
++- `horizon_ns`;
++- `tie_margin_ns`;
++- `ranking_target_semantics =
++  NEXT_REAL_ACCESS_DELAY_RIGHT_CENSORED_AT_HORIZON`.
++
++Raw-event, labeled-candidate, and observability records use schema v2.  Session
++metadata remains schema v1; the fixed runtime feature schema remains v1.
++
++The rules are:
++
++1. A trusted access within 5 seconds has its positive delay recorded.
++2. If the full 5 seconds is observed with no access, the folio is right
++   censored at the horizon (`+INF_WITHIN_HORIZON` conceptually); its numeric
++   delay remains `null`.
++3. An access later than 5 seconds does not become an exact primary delay; for
++   this task the folio was not reused within the horizon.
++4. If the session ends before the candidate's 5-second horizon and no earlier
++   access was seen, `censored_by_session_end=true`.  The row is not a cold
++   negative and cannot provide a pair ordering against an observed or
++   horizon-censored row.
++
++Live collection must therefore leave effective-tier decision and trusted
++access tracing active for a full 5-second tail after the final candidate.  A
++workload-end timestamp is not automatically a complete observation end.
++
++## Session split before pair construction
++
++Train, validation, and test splits are assigned to whole sessions before any
++pair is constructed.  The pair builder rejects cross-session pairs and never
++randomly splits candidate rows or already-built pairs.  This prevents the same
++session context or folio lifetime from appearing in more than one split.
++
++The GLOBAL training pool may combine WPS, FILES, and QQ sessions, but App,
++process name, path, session ID, workload, and future data are reporting or
++grouping fields only.  They are not ranker inputs.  Results must be reported
++globally and by App, anon/file, native tier, and the
++`native_tier == native_tier_idx + 1` boundary subset.
++
++No session count is currently available from a real authorized export.  Train,
++validation, and test session counts are therefore NOT COLLECTED, not zero.
++
++## Pair groups
++
++Pairs are constructed only inside one already-split dataset partition and one
++comparable page type.  The exact context priority is:
++
++1. **Primary group:** same experiment/session, same `batch_id`, and same
++   anon/file type.
++2. **Fallback group, used only when the primary group is insufficient:** same
++   experiment/session, same `reclaim_epoch`, same anon/file type, and
++   `abs(candidate_time_i - candidate_time_j) < 100_000_000 ns`.
++
++The fallback close-time window is 100 ms.  It is a context bound, not a reuse
++label window.  A pair is never formed across sessions, page types, or splits.
++The grouping level used for each sampled pair must be present in the pair
++manifest.
++
++For two exact delays and a tie margin `m`:
++
++```text
++delay_i + m < delay_j  -> i ranks above j
++delay_j + m < delay_i  -> j ranks above i
++otherwise              -> tie; skip
++```
++
++The default is `m = 10_000_000 ns` (10 ms).  Sensitivity analysis must also
++run 0 ms and 50 ms; validation chooses the primary margin and records it.
++
++Censoring changes pair eligibility as follows:
++
++| Candidate i | Candidate j | Pair rule |
++|---|---|---|
++| exact within-horizon reuse | exact within-horizon reuse | compare delays and skip ties |
++| exact within-horizon reuse | full-horizon no reuse | exact reuse ranks higher |
++| full-horizon no reuse | full-horizon no reuse | skip; order is unknown |
++| session-end censored | any non-identical target | skip; order is not observed |
++
++Pair orientation and label sign must be balanced or explicitly weighted.  A
++feature swap must invert the label without changing pair eligibility.
++
++## Deterministic bounded sampling
++
++Generating all pairs from `N` candidates would be `O(N²)` offline and would
++allow a large batch or one App to dominate.  The primary sampler therefore has
++these canonical defaults:
++
++```text
++max_pairs_per_group = 64
++seed                = "parp-rank-pairs-v1"
++fallback_window_ns  = 100_000_000
++```
++
++The supported cap ablations are exactly `[32, 64, 128]`; 64 remains the strict
++default, not a range.  Sampling is deterministic from the fixed seed and stable
++group identity.  It is bounded before materializing all combinations and
++stratifies eligible pairs to retain:
++
++- clearly early versus clearly late exact reuses;
++- within-horizon reuse versus full-horizon non-reuse;
++- difficult non-tie pairs just beyond the selected margin.
++
++The builder accepts caps through 128, and the manifest explicitly records the
++selected value, strict default 64, and supported set `[32, 64, 128]`.  It also
++uses a 250 ms boundary between its `hard_observed` and `wide_observed` strata,
++and a default cap of 4096 sampled pairs per App per split.  Per-App and
++anon/file caps or weights are recorded so no large group silently determines
++the GLOBAL model.  Pair construction runs independently inside train,
++validation, and test after the session split.
++
++`pair_sampling.json` must report at least:
++
++- original candidate count;
++- eligible pair count without materializing an unbounded set;
++- sampled pair count;
++- ties skipped;
++- double-horizon-censored pairs skipped;
++- session-end-censored pairs skipped;
++- primary versus fallback group counts;
++- per-App and anon/file counts;
++- positive and reverse-orientation label counts;
++- cap, seed, fallback window, horizon, and tie margin.
++
++No real pair manifest exists yet.  Candidate, eligible, sampled, tie, censor,
++App, and orientation counts remain NOT COLLECTED.
++
++## Five ranking ablations
++
++All five variants use the same session splits, pair semantics, horizon,
++sampling seed/caps, optimization protocol, quantization checks, and reporting
++strata:
++
++| ID | Model inputs | Purpose |
++|---|---|---|
++| `rank_base` | the six real-history runtime features | primary GLOBAL candidate; no native tier duplication |
++| `rank_plus_native_tier` | Rank-Base plus `native_tier` | test whether native frequency adds stable residual signal |
++| `rank_plus_native_tier_and_tier_idx` | Rank-Base plus `native_tier` and `native_tier_idx` | test both native state and dynamic boundary |
++| `recency_only_rank` | `time_since_last_real_access_ms` | minimal recency baseline |
++| `recent_frequency_rank` | `time_since_last_real_access_ms`, `consecutive_reclaim_candidate_count`, and `access_ema_q8` | recency plus simple past frequency |
++
++Only `rank_base` has the current six-slot kernel shape.  The native-tier
++variants are offline-only until an explicit feature-schema change is reviewed.
++Every model artifact must emit its exact feature list; no variant may include
++App/session/workload or future information.
++
++Model selection is not based on training NDCG alone.  It prioritizes
++cross-session stability, residual discrimination within a fixed native tier,
++quantized ordering fidelity, fixed kernel cost, and conservative downgrade
++risk.
++
++## Training and quantization
++
++The offline optimizer consumes binned feature-difference vectors:
++
++```text
++X_pair = X_i - X_j
++label  = +1 when i should rank above j, else -1
++```
++
++It minimizes a numerically stable, regularized pairwise logistic loss with a
++fixed seed and deterministic iteration order.  The result must be recoverable
++as an independently evaluable single-page additive score.  A model that only
++emits pair predictions is invalid for this project.
++
++Floating-point training output is quantized into fixed bin weights and a zero
++bias.  Export validation must cover:
++
++- accumulator range and overflow rejection;
++- score direction before and after quantization;
++- Python floating score versus Python quantized score ordering;
++- exact Python-quantized versus C/kernel integer score parity;
++- quantized pairwise agreement;
++- threshold equality and Q8 delta mapping.
++
++Quantization may change score scale, but cannot reinterpret it as a
++probability.  `ranking_model.json`/`global_model.json` must state:
++
++```json
++{
++  "model_type": "pairwise_linear_ranker",
++  "score_semantics": "higher_score_means_earlier_next_real_access",
++  "score_is_probability": false,
++  "runtime_pairwise_comparison": false,
++  "runtime_sorting": false,
++  "runtime_sigmoid": false,
++  "quantized_bias": 0
++}
++```
++
++No trained floating or quantized model exists from real data at this stopping
++point.  The in-tree integer table is an engineering fixture and must not be
++reported as a ranking result.
++
++## Ranking quality and monotonicity
++
++Primary held-out metrics are:
++
++- pairwise accuracy/concordance;
++- NDCG@K on each declared held-out evaluation population, with comparable
++  decision-context views where sample size permits;
++- Kendall tau or Spearman rank correlation where exact order is observed;
++- censoring-aware C-index;
++- quantized-versus-floating ordering agreement;
++- residual discrimination after fixing native tier;
++- score-bucket median next-reuse delay;
++- score-bucket reuse within 100 ms, 500 ms, 1 second, and 5 seconds.
++
++The desired monotonic direction is:
++
++```text
++higher score -> smaller median next-reuse delay
++higher score -> higher reuse@100ms/@500ms/@1s/@5s
++```
++
++Auxiliary ROC-AUC and PR-AUC may treat the integer score as a ranking signal
++for each fixed window.  They are not the primary objective and do not provide
++probability calibration.
++
++Metrics must be shown on untouched test sessions globally and by WPS, FILES,
++QQ, anon/file, native tier, and the boundary-tier subset.  Thresholds and tie
++margin are selected on validation only.  Bootstrap intervals must resample a
++session-safe unit rather than individual page rows.
++
++The delivery gate is fail-closed.  Held-out quantized evidence requires at
++least 20 pairs and accuracy strictly above 0.5.  Quantized-versus-floating
++ordering requires at least 20 non-tied comparisons and consistency of at
++least 0.95.  Every native-tier stratum with at least 20 held-out pairs must
++have accuracy strictly above 0.5; their pair-weighted and minimum accuracies
++must also clear that floor.  The boundary subset requires at least 20
++actually observed next-reuse samples and Spearman correlation of at least
++0.10.  Score monotonicity
++requires at least two distinct score buckets and known direction for every
++adjacent median-delay and fixed-window reuse-rate comparison; an empty or
++single-bucket comparison cannot pass.
++
++There is no real held-out ranking result yet.  Pairwise accuracy, NDCG,
++C-index, quantized agreement, monotonicity, fixed-native-tier discrimination,
++and all per-App values are NOT EVALUATED and must be serialized as `null` or an
++explicit not-evaluated status, never as fixture-derived quality.
++
++## Validation-only score thresholds
++
++Because `reuse_score` is not a probability, thresholds are integer score
++cut-points selected only from validation sessions.  Candidate/observability
++records use the canonical names `score_threshold_cold`,
++`score_threshold_hot_1`, and `score_threshold_hot_2`.  The model artifact also
++carries nullable `score_threshold_hot_3` for the separate experimental +3
++contract; it defaults to `null` and is not a fourth primary threshold.  The
++runtime policy/reference and candidate wire schema retain `cold_threshold`
++and `hot_threshold_*` compatibility keys; integration exports equal-valued
++canonical aliases and treats the shorter observation names as deprecated,
++never probabilistic.
++
++For native-reclaim candidates, the hot thresholds seek progressively smaller,
++higher-score sets whose future-reuse rate and reuse-delay distribution improve
++over `KEEP_RECLAIM`, while respecting upgrade coverage, waste, base-page
++budgets, and lock-cost constraints.
++
++For ordinary boundary protection
++`native_tier == native_tier_idx + 1`, the cold threshold seeks a low-score set
++with less future reuse and longer delay than `KEEP_PROTECT`.  It prioritizes
++downgrade-mistake rate, the upper bound of its 95% confidence interval,
++per-App P95/P99 risk, and verified native refault risk.  Strong and special
++Native protection is never part of the downgrade action target.
++
++Threshold reports must include score percentiles, base-page coverage, future
++reuse rates, median next-reuse delay, per-App and anon/file strata, upgrade and
++downgrade metrics, and bootstrap intervals.  Coverage, reuse rates, Wilson
++counts, and medians are weighted by positive `folio_nr_pages`; candidate-row
++counts are retained under explicitly named diagnostic fields.  Percentiles
++alone are insufficient.
++
++The threshold helper implements deterministic session-cluster bootstrap
++intervals.  For each comparison it performs 1,000 resamples of whole
++validation sessions with replacement.  Difference intervals use only
++sessions containing both the selected and baseline arms, preventing
++session-only arm confounding.  The pseudorandom seed is derived from the
++operation tag and sorted paired-session identities, and the interval is the
++2.5th to 97.5th percentile of valid resamples.  Fewer than two paired
++supporting sessions, or fewer than `max(200, 80% of requested)` valid
++resamples, produces a null CI, `gate_eligible = false`, and a false direction
++gate.
++
++The validation selection gates are deliberately strict:
++
++- Protect-only requires a selected hot-1 point, distinct hot-2 validation
++  evidence, and an upgrade selected-minus-`KEEP_RECLAIM` reuse-rate-difference
++  bootstrap CI entirely above zero.
++- Bidirectional first requires Protect-only, then a cold candidate whose
++  Wilson 95% downgrade-mistake upper bound is at most 0.10 and whose downgrade
++  selected-minus-`KEEP_PROTECT` reuse-rate-difference bootstrap CI is entirely
++  below zero.
++
++These are validation threshold gates, not live APPLY gates.  There is no real
++dataset in the current delivery, so both delivery-gate booleans remain false;
++unit-test fixtures cannot be reported as real gate evidence or paired-live
++confidence intervals.
++
++A trained scorer export additionally requires
++`selected_on_split = validation`, `test_set_used = false`, and separate
++`VALIDATION_SELECTED` provenance for cold, hot-1, and hot-2.  The aggregate
++completion bit alone is never trusted.
++
++The primary model artifact's `delta_tier_q8` and
++`predictive_delta_tier_q8` maps contain exactly:
++
++```text
++score <= score_threshold_cold        -> -256 Q8 (-1 tier)
++cold < score < score_threshold_hot_1 ->    0 Q8
++hot_1 <= score < score_threshold_hot_2 -> +256 Q8 (+1 tier)
++score >= score_threshold_hot_2       -> +512 Q8 (+2 tiers)
++```
++
++Thus the primary artifact has only `cold`, `neutral`, `hot_1`, and `hot_2`
++delta entries.  Its default `experimental_plus3` object has
++`status = NOT_SELECTED`, `default_enabled = false`,
++`apply_supported = false`, and a null threshold.  A +3 boundary may be
++recorded only after explicit validation selection with
++`hot_threshold_3_selected_on_split = validation`; the exported experimental
++object then records the same validation provenance.  It remains
++offline/SHADOW-only and can never authorize APPLY.
++
++The executable plan contract mirrors that boundary: primary
++`max_upgrade_tiers_apply` is exactly `[1, 2]`, while
++`experimental_plus3.max_upgrade_tiers` is `[3]`, its allowed modes are only
++`SHADOW_EFFECTIVE_TIER` and `ORACLE_OFFLINE_ONLY`, and
++`apply_supported = false`.
++
++The kernel engineering fixture still implements distinct 96 and 144 hot-2
++and hot-3 boundaries, with `max_upgrade_tiers = 2` by default.  This preserves
++the +2 bin when an authorized experimental SHADOW replay raises the cap to 3;
++with cap 1 or 2, the hot-3 bin retains that lower cap.  The mode setter rejects
++APPLY when the cap is 3.  If hot evidence passes but cold evidence does not,
++the valid threshold-selection result is Protect-only and Bidirectional
++remains false.  If neither side passes, both selection gates remain false.
++
++No validation-derived threshold currently exists.  The in-tree values -48,
++48, 96, and 144 are engineering fixtures, not selected ranking thresholds;
++in particular, 144 is not evidence of a selected +3 boundary.
++
++## Refault feedback boundary
++
++Future access and refault are different signals.  Candidate ranking labels use
++trusted future access observations.  Native `workingset_refault_file` and
++`workingset_refault_anon`, or verified workingset events, are required for
++refault safety evaluation.
++
++The native MGLRU refault PID and its `refaulted`, `evicted`, and `protected`
++arrays remain unchanged.  A future independent rank-feedback structure could
++stratify eviction, fast/late refault, policy protection/downgrade, and score
++histograms by anon/file, native tier, and score bin/action.  That structure is
++not implemented in the current tree.  Therefore no score-to-refault
++monotonicity or adaptive-threshold claim is made.
++
++If a later controller is authorized, it may adjust thresholds, Q8 deltas, or
++global enable/disable in the background.  It must not train weights or mutate
++native MGLRU PID data inside `lruvec->lru_lock`.
++
++## Probability classifier is an optional, incomplete ablation
++
++The former `analyze._train_weights()` implementation is a page-weighted,
++per-bin, smoothed log-odds heuristic for `reuse_within_1s`.  Its accurate label
++is `LEGACY_1S_LOG_ODDS`.  It is not a calibrated model and does not implement
++the required four independent 100 ms, 500 ms, 1 second, and 5 second
++probability classifiers.
++
++Accordingly:
++
++- `PROBABILITY_CLASSIFIER_ABLATION = NOT_IMPLEMENTED`;
++- it is not the primary model and cannot overwrite ranking outputs;
++- a future implementation must reuse the same session split, candidates, and
++  features and report all four windows independently;
++- `PRODUCT_ABLATION = NOT_IMPLEMENTED` until a separately validated and
++  validation-calibrated Q15 probability model exists;
++- a raw ranking score must never be used as `prob_q15`.
++
++## Required artifacts and current evidence state
++
++A real authorized run adds these ranking-first files to the timestamped output
++directory:
++
++```text
++ranking_dataset.json
++pair_sampling.json
++ranking_model.json
++ranking_quality.json
++score_distribution.json
++score_reuse_monotonicity.json
++threshold_selection.json
++ranking_quantization.json
++probability_ablation.json
++```
++
++The first eight are mainline artifacts.  `probability_ablation.json` is
++optional and must explicitly say `NOT_IMPLEMENTED` until the four-window
++ablation exists.  `model_quality.json` must identify
++`primary_task = pairwise_next-reuse_ranking`, `score_is_probability = false`,
++`runtime_sorting = false`, and `runtime_sigmoid = false`.
++
++At the current Phase-E boundary there is no authorized exported dataset or
++trained model artifact.  The following are all unavailable: real session
++counts, candidate/pair counts and App shares, learned weights, selected tie
++margin, pairwise accuracy, NDCG, C-index, quantized agreement, monotonicity,
++cold/hot thresholds, fixed-native-tier residual quality, four-quadrant sample
++counts, and real Protect-only or Bidirectional evidence.  Metric values must
++remain `null` or explicit `NOT_COLLECTED`/`NOT_EVALUATED` states;
++`protect_only_gate_pass` and `bidirectional_gate_pass` remain false.  The
++current model-artifact +3 threshold likewise remains null, with
++`experimental_plus3.status = NOT_SELECTED`.
++
++Live SHADOW collection, installation/boot, cgroup pressure, and every APPLY
++mode require separate explicit authorization.  Until then the terminal state
++remains:
++
++`PARP_EFFECTIVE_TIER_LIVE_AUTH_REQUIRED`
+diff --git a/docs/parp_effective_tier_ranking_redirect_audit.md b/docs/parp_effective_tier_ranking_redirect_audit.md
+new file mode 100644
+index 000000000..f105f92fc
+--- /dev/null
++++ b/docs/parp_effective_tier_ranking_redirect_audit.md
+@@ -0,0 +1,158 @@
++# PARP effective-tier pairwise-ranking redirect audit
++
++Status: `PARP_EFFECTIVE_TIER_RANKING_REDIRECT_AUDIT_COMPLETE`
++
++This audit records the in-place redirect requested after the effective-tier
++work had already started.  It does not recreate the branch, discard a diff,
++or alter the frozen frontier worktree.
++
++## Repository and progress audit
++
++- Worktree: `/home/lzxxxxxx/桌面/huawei/huawei_mem/lzx/MGLRU-test/v4-parp/work/linux-6.17.13-parp-effective-tier`
++- Branch: `feat/parp-effective-tier`
++- Audited HEAD: `a7447a42ad7331798f5203e2bd04a851df87190c`
++- Effective-tier baseline: `a5ad006e8b66332a12e13f5e2dc7324bd6111d4a`
++- Existing redirect-compatible commits:
++  - `fcd2e9774 docs: audit MGLRU effective tier integration`
++  - `41185bdd3 parp: add quantized global reuse scorer reference`
++  - `a7447a42a parp: add controlled effective tier experiment harness`
++- The kernel access-state, effective-tier gate, safety-budget, trace, and KUnit
++  implementation is intentionally still an uncommitted work in progress.  The
++  audit found no branch, worktree, or ancestry conflict and no reason to reset
++  it.
++
++At the redirect point, Phase A was committed; the Phase-B access-state and
++metadata implementation and the Phase-C shadow/effective-tier implementation
++were present but not yet committed; Phase-D validation was in progress; and
++the original Phase-E offline analyzer still treated fixed-window reuse as its
++main training target.  No live SHADOW or APPLY data had been collected.
++
++## Changes retained without model-semantic changes
++
++The following work is independent of whether the offline trainer uses a
++fixed-window classifier or a pairwise ranker and is retained:
++
++- the Linux 6.17.13 MGLRU source audit and the exact ordinary tier-gate
++  integration in `sort_folio()`;
++- `CONFIG_PARP_EFFECTIVE_TIER`, its mutual exclusion with the frontier
++  experiment, default-off runtime mode, and separately gated experimental
++  APPLY modes;
++- the 24-byte/base-page `page_ext` reuse-history state and lifetime cookie;
++- separation of trusted real access (`PTE_YOUNG`, audited
++  `MARK_ACCESSED`, and successful `FD_REFERENCE`) from native generation,
++  native tier, policy, putback, and list movement;
++- the fixed six-feature integer lookup scorer.  Pairwise training still
++  produces the same independently evaluable single-folio additive score;
++- Q8 score-to-delta and effective-tier arithmetic, strict comparison, clamp,
++  invalid-model Native fallback, special-protection preservation, +1/+2/+3
++  upgrade ablation support, and the boundary-only -1 downgrade;
++- OFF, SHADOW, PROTECT_ONLY, BIDIRECTIONAL, RANDOM_MATCHED, and RECENCY mode
++  plumbing, independent upgrade/downgrade budgets, pressure/no-progress
++  bypass, per-folio epoch claims, and race revalidation;
++- candidate/access/outcome/batch/lock tracepoints, trace-loss contracts,
++  exported-file-only collection, latency contracts, and the no-live-action
++  experiment planner;
++- the pure Python/C integer scorer parity tests and the effective-tier KUnit
++  base.  Neither performs a sigmoid, candidate sorting, or online pairwise
++  comparison.
++
++The current kernel uses the neutral term `reuse_score`; it has no probability
++field, probability calibration, runtime sigmoid, or runtime candidate sort.
++The default lookup table remains an engineering/parity fixture until real
++authorized SHADOW data trains and validates a ranker.
++
++## Semantics that require adjustment
++
++The following components are structurally reusable but must become
++ranking-first:
++
++| File | Existing element | Redirect |
++|---|---|---|
++| `tools/parp/effective_tier/collector.py` | future-window labels and right-censoring | preserve the four labels as auxiliary reports; add 5-second `next_reuse_delay_ns`, horizon/session censoring, and pair inputs |
++| `tools/parp/effective_tier/contracts.py` | `PRIMARY_LABEL = reuse_within_1s`; three model ablations | add ranking horizon/tie contracts and five rank ablations; fixed-window labels cease to be the primary task |
++| `tools/parp/effective_tier/feature_schema.json` | fixed-window label block | identify pairwise next-reuse ranking as the primary task and fixed windows as auxiliary monotonicity/AUC views |
++| `tools/parp/effective_tier/analyze.py` | model selection and quality entrypoint | route the main output to bounded pair construction, Bradley–Terry training, quantization, ranking metrics, and validation-only score thresholds |
++| `tools/parp/effective_tier/README.phase_e.md` | smoothed-log-odds trainer description | document pairwise training versus independent runtime scoring and retain probability classification only as an optional ablation |
++| Phase-E schemas/tests | fixed-window completeness tests | retain them and add session-safe grouping, censoring, bounded sampling, reproducibility, quantization, and ranking-quality tests |
++| experiment manifest | probability/product comparison wording | make ranker the mainline; mark the probability and calibrated-Q15 product paths optional/not implemented unless separately validated |
++
++The exported v2 observation and model contracts use the canonical integer
++score names `score_threshold_cold`, `score_threshold_hot_1`,
++`score_threshold_hot_2`, and nullable experimental
++`score_threshold_hot_3`.  The shorter `cold_threshold`/`hot_threshold_*`
++keys remain only as deprecated, equality-checked compatibility aliases for
++the runtime policy and older readers.  Neither spelling has probability
++semantics.
++
++## Probability-classification mainline being replaced
++
++The old offline mainline is localized in
++`tools/parp/effective_tier/analyze.py`:
++
++- `_logit()` and `_train_weights()` fit per-bin smoothed fixed-window reuse
++  log odds using `reuse_within_1s`;
++- `_thresholds()` selects integer thresholds from validation fixed-window
++  hit/mistake targets;
++- `_quality()` makes ROC-AUC, average precision, binary NDCG, and reuse-rate
++  buckets the central quality view;
++- `train_ablations()` trains only the base, +native-tier, and
++  +native-tier/+tier-idx fixed-window variants and exports them as the global
++  candidate.
++
++These functions and their tests are not kernel dependencies.  The existing
++one-second smoothed-log-odds helper is isolated as `LEGACY_1S_LOG_ODDS`; it
++does not select the default model, overwrite ranking output, or block the
++ranking mainline.  It is not the requested four-window probability ablation.
++The four `reuse_within_{100ms,500ms,1s,5s}` labels remain useful auxiliary
++monotonicity and AUC measurements and therefore are not deleted, while
++`PROBABILITY_CLASSIFIER_ABLATION` remains explicitly `NOT_IMPLEMENTED` until
++four independent classifiers and validation calibration exist.
++
++`PRODUCT_ABLATION` has no validated calibrated Q15 probability model in the
++current work.  It remains `NOT_IMPLEMENTED`; a raw ranking score must never be
++substituted for `prob_q15`.
++
++## New primary contract
++
++- Training task: bounded Bradley–Terry-style pairwise ranking of which folio
++  reaches its next trusted real access sooner within the same reclaim context.
++- Runtime task: one independent fixed-cost integer score per folio.
++- Runtime decision: integer score threshold to Q8 virtual tier delta to the
++  existing effective-tier gate.
++- Score direction: higher means earlier expected next real access and higher
++  short-term reuse value.
++- Score interpretation: rank utility, not probability or refault probability.
++- Runtime pair comparison, sigmoid, and candidate sorting: all disabled.
++- Primary horizon: 5 seconds.  Default tie margin: 10 ms, with 0/10/50 ms
++  offline sensitivity analysis.
++- Primary group: same session, batch, and anon/file type.  The bounded fallback
++  is same session, reclaim epoch, anon/file type, and a configured close-time
++  window.  Cross-session pairs are forbidden.
++- Sampling is deterministic and capped before materialization; session splits
++  precede pair construction.  The strict default is 64 sampled pairs per
++  group, the supported cap sensitivity set is exactly `[32, 64, 128]`, and
++  per-App caps prevent one workload from dominating.
++- The fallback context window is 100 ms within the same session, reclaim
++  epoch, and anon/file type.  It is a grouping bound, not a reuse label.
++- The event, labeled-candidate, observability, and pair-facing contracts are
++  schema v2.  Session metadata and the fixed runtime feature schema remain
++  v1 by design.
++- The mainline ablations are exactly `rank_base`,
++  `rank_plus_native_tier`, `rank_plus_native_tier_and_tier_idx`,
++  `recency_only_rank`, and `recent_frequency_rank`.  Only `rank_base` is
++  eligible for the current six-feature kernel shape.
++- A trained export must carry per-threshold validation provenance, declare
++  that the test set was not used for selection, and use the canonical scorer
++  checksum projection.  A whole-artifact digest is recorded separately.
++
++Because no authorized live SHADOW dataset exists, this audit records no pair
++counts, learned quality, thresholds, or model selection result.  Those values
++must remain null/unmeasured until exported real data is supplied.
++
++## Safety disposition
++
++No kernel was installed or booted; no cgroup setting was written; no pressure
++workload or live mode was started; and no APPLY path was executed.  All
++runtime-changing modes remain default-off and experimental-apply-gated.
++
++`PARP_EFFECTIVE_TIER_RANKING_REDIRECT_AUDIT_COMPLETE`
+-- 
+2.25.1
+

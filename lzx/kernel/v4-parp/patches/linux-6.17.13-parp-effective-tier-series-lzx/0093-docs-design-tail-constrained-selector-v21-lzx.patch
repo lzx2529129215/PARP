@@ -1,0 +1,64 @@
+From 1ef709ea0ec60753169554c7684c78b4ed28e7f4 Mon Sep 17 00:00:00 2001
+From: Codex PARP Reproduction <codex@localhost>
+Date: Tue, 4 Aug 2026 10:07:42 +0800
+Subject: [PATCH 093/124] docs: design tail-constrained selector v21
+
+---
+ ...-08-04-parp-candidate-selector-v21-plan.md | 10 +++++++
+ ...8-04-parp-candidate-selector-v21-design.md | 27 +++++++++++++++++++
+ 2 files changed, 37 insertions(+)
+ create mode 100644 docs/superpowers/plans/2026-08-04-parp-candidate-selector-v21-plan.md
+ create mode 100644 docs/superpowers/specs/2026-08-04-parp-candidate-selector-v21-design.md
+
+diff --git a/docs/superpowers/plans/2026-08-04-parp-candidate-selector-v21-plan.md b/docs/superpowers/plans/2026-08-04-parp-candidate-selector-v21-plan.md
+new file mode 100644
+index 000000000..faa10a587
+--- /dev/null
++++ b/docs/superpowers/plans/2026-08-04-parp-candidate-selector-v21-plan.md
+@@ -0,0 +1,10 @@
++# Phase2.10C implementation plan
++
++1. Resolve the two Phase2.10B HEAD identifiers and require a clean canonical source.
++2. Create an independent worktree and freeze B outputs, pilot inputs, and all referenced hashes.
++3. Reproduce V1 and V2.0 summary metrics before adding v2.1 logic.
++4. Implement a causal native-tail comparator, normalized tail distance, T0–T3 bands, and deterministic C1–C4 selection with no-copy partial handling.
++5. Add TDD contracts for head resolution, tail ordering, bands, quotas, causality, freeze order, gate precedence, and checkpoint behavior while preserving 116 prior tests.
++6. Run development/validation template gates, freeze the conservative template, then evaluate test sessions independently.
++7. Produce multi-horizon support, realism, V1/V2/V2.1 comparisons, OOD diagnostics, and Oracle only when gates permit.
++8. Recompute before/after hashes, write the eight required handoff tables and final report, and make local commits only.
+diff --git a/docs/superpowers/specs/2026-08-04-parp-candidate-selector-v21-design.md b/docs/superpowers/specs/2026-08-04-parp-candidate-selector-v21-design.md
+new file mode 100644
+index 000000000..7aa5ae93e
+--- /dev/null
++++ b/docs/superpowers/specs/2026-08-04-parp-candidate-selector-v21-design.md
+@@ -0,0 +1,27 @@
++# PARP Phase2.10C Candidate Selector v2.1 design
++
++Phase2.10C is a pure offline continuation from canonical Phase2.10B HEAD `9fdf54f0d72c...`. It preserves the Phase2.10B causal inactive universe and independent labeler, and changes only the deterministic selector layer.
++
++## Failure boundary
++
++V1 (`GENERATION_TAIL_128_V1`) selects the first 128 rows of the native cold ordering and reproduces zero 60-second positives. V2.0 (`S3/Q_BALANCED`) restores support but violates age and recent-inactive realism gates. Phase2.10C must stay between these boundaries without consuming test labels.
++
++## Tail distance
++
++For each decision, the V1 comparator is applied to the complete legal universe. `tail_rank` is its zero-based rank and `tail_distance = tail_rank / max(|U|-1, 1)`. Rank zero is the coldest/native reclaim priority. Only distance ≤ 0.20 is eligible for a v2.1 main selection.
++
++## Layers and templates
++
++The four mutually exclusive percentile bands are T0 [0,1%], T1 (1,5%], T2 (5,10%], and T3 (10,20%]. C1/C2/C3/C4 quotas are respectively 64/48/16/0, 56/40/24/8, 48/48/32/0, and 40/40/32/16. Every complete decision has 128 unique inactive candidates; shortage is recorded as partial and never padded.
++
++## Causal boundary and labels
++
++Selectors consume only decision-time fields, stable identity tie-breaks, and the V1 comparator. They do not read future rows, labels, operation metadata, session names as scores, paths, names, or content. Candidate rows are written and hashed before the independent 10/30/60/120-second labeler runs; unknown is never negative.
++
++## Selection and gates
++
++Development is WPS/files_01, validation is WPS_02, and test is WPS_03/files_02/QQ pilot. Templates are chosen by legality, validation realism, validation support, then conservative order C1, C3, C2, C4. Test labels never alter the frozen template. Realism requires inactive-only, no distance >20%, T3 ≤12.5%, oldest-half ≥70%, top-10%-tail ≥75%, and selected medians no colder than the universe contract. Support requires 60-second positive ≥20, pairwise ≥10, another horizon positive, and bounded validation ratios. Oracle runs only after all preceding gates.
++
++## Final states
++
++The report distinguishes support-insufficient, realism-gated, oracle-gated, limited, validated, and collection-authorization-required states. A validated state describes offline proxy reconstruction only; it never claims real kernel refault or latency improvement.
+-- 
+2.25.1
+

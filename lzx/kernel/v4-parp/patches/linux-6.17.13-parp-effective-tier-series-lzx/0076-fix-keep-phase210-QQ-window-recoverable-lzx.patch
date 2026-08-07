@@ -1,0 +1,86 @@
+From 3df9a7c3c3de7a902a0ab17ddcef9d0b60cd2973 Mon Sep 17 00:00:00 2001
+From: Codex PARP Reproduction <codex@localhost>
+Date: Mon, 3 Aug 2026 17:57:20 +0800
+Subject: [PATCH 076/124] fix: keep phase210 QQ window recoverable
+
+---
+ tools/parp/phase210/build_qq_collection.py    |  1 -
+ .../phase210/tests/test_phase210_contracts.py | 43 +++++++++++++++++++
+ 2 files changed, 43 insertions(+), 1 deletion(-)
+
+diff --git a/tools/parp/phase210/build_qq_collection.py b/tools/parp/phase210/build_qq_collection.py
+index beebe7504..bafa87fdb 100644
+--- a/tools/parp/phase210/build_qq_collection.py
++++ b/tools/parp/phase210/build_qq_collection.py
+@@ -73,7 +73,6 @@ def scenario(session, seed):
+                 {"type": "wait", "seconds": rng.randint(10, 18)},
+                 {"type": "key", "key": "ctrl+a"},
+                 {"type": "key", "key": "BackSpace"},
+-                {"type": "key", "key": "Escape"},
+             ])
+         elif operation == "BACKGROUND_COOLING":
+             actions.extend([
+diff --git a/tools/parp/phase210/tests/test_phase210_contracts.py b/tools/parp/phase210/tests/test_phase210_contracts.py
+index 1c7d9729e..4eaace5fa 100644
+--- a/tools/parp/phase210/tests/test_phase210_contracts.py
++++ b/tools/parp/phase210/tests/test_phase210_contracts.py
+@@ -177,6 +177,17 @@ class Phase210Contracts(unittest.TestCase):
+             "xdotool", "search", "--onlyvisible", "--class", "^parp-phase210-qq$",
+         ]])
+ 
++        calls.clear()
++        with mock.patch.object(module.shutil, "which", return_value="/usr/bin/xdotool"), \
++             mock.patch.object(module.subprocess, "run", side_effect=fake_run):
++            self.assertEqual(module.list_window_candidates({
++                "class": "^parp-phase210-qq$", "strict_window_match": True,
++                "include_hidden": True,
++            }, "QQ"), [])
++        self.assertEqual(calls, [[
++            "xdotool", "search", "--class", "^parp-phase210-qq$",
++        ]])
++
+     def test_43_root_collector_enforces_dedicated_qq_leaf(self):
+         collector = (Path(__file__).resolve().parents[1] / "qq_collection_root.sh").read_text()
+         self.assertIn("parp-qq-targets", collector)
+@@ -188,6 +199,38 @@ class Phase210Contracts(unittest.TestCase):
+         self.assertIn("[[ -n $current_cgroup ]] || continue", collector)
+         self.assertIn("failed to attach live QQ target", collector)
+ 
++    def test_44_fixture_search_does_not_hide_qq_window(self):
++        builder_path = Path(__file__).resolve().parents[1] / "build_qq_collection.py"
++        spec = importlib.util.spec_from_file_location("phase210_qq_builder_no_escape", builder_path)
++        self.assertIsNotNone(spec)
++        self.assertIsNotNone(spec.loader)
++        module = importlib.util.module_from_spec(spec)
++        spec.loader.exec_module(module)
++        actions = module.scenario("qq_train_01", 21001)["actions"]
++        self.assertFalse(any(action.get("type") == "key" and action.get("key") == "Escape" for action in actions))
++
++    def test_45_find_window_can_include_hidden_windows(self):
++        automation_path = Path(__file__).resolve().parents[8] / "automation" / "app_automation.py"
++        spec = importlib.util.spec_from_file_location("phase210_app_automation_hidden", automation_path)
++        self.assertIsNotNone(spec)
++        self.assertIsNotNone(spec.loader)
++        module = importlib.util.module_from_spec(spec)
++        sys.modules[spec.name] = module
++        try:
++            spec.loader.exec_module(module)
++        finally:
++            sys.modules.pop(spec.name, None)
++        calls = []
++
++        def fake_run(command, ctx, check=False):
++            calls.append(command)
++            return mock.Mock(returncode=0, stdout="42\n")
++
++        with mock.patch.object(module, "require_xdotool"), mock.patch.object(module, "run", side_effect=fake_run):
++            result = module.find_window({"class": "^parp-phase210-qq$", "include_hidden": True}, module.Context(dry_run=False))
++        self.assertEqual(result, "42")
++        self.assertEqual(calls, [["xdotool", "search", "--class", "^parp-phase210-qq$"]])
++
+ 
+ if __name__ == "__main__":
+     unittest.main()
+-- 
+2.25.1
+

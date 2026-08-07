@@ -1,0 +1,51 @@
+From b9c5bdf5dbe1550c6c78f3c92a8f3b7d8eb4875c Mon Sep 17 00:00:00 2001
+From: Codex PARP Reproduction <codex@localhost>
+Date: Mon, 3 Aug 2026 18:19:39 +0800
+Subject: [PATCH 078/124] fix: make phase210 QQ automation visible
+
+---
+ tools/parp/phase210/build_qq_collection.py           | 9 ++++++++-
+ tools/parp/phase210/tests/test_phase210_contracts.py | 7 +++++++
+ 2 files changed, 15 insertions(+), 1 deletion(-)
+
+diff --git a/tools/parp/phase210/build_qq_collection.py b/tools/parp/phase210/build_qq_collection.py
+index bafa87fdb..ea8b4531b 100644
+--- a/tools/parp/phase210/build_qq_collection.py
++++ b/tools/parp/phase210/build_qq_collection.py
+@@ -33,7 +33,14 @@ def scenario(session, seed):
+         "pid=$(pgrep -f -- '--user-data-dir=${QQ_PROFILE}/chromium' | head -1 || true); "
+         "[ -n \"$pid\" ] && wid=$(xdotool search --onlyvisible --pid \"$pid\" 2>/dev/null | tail -1 || true); "
+         "[ -n \"$wid\" ] || sleep 1; done; "
+-        "xdotool set_window --class parp-phase210-qq --classname parp-phase210-qq \"$wid\""
++        "xdotool set_window --class parp-phase210-qq --classname parp-phase210-qq "
++        "--name 'PARP Phase2.10 QQ Test (Read-only)' \"$wid\"; "
++        "wmctrl -i -r \"$wid\" -t 0; "
++        "xdotool windowmap \"$wid\"; "
++        "xdotool windowsize \"$wid\" 900 700; "
++        "xdotool windowmove \"$wid\" 120 80; "
++        "xdotool windowraise \"$wid\"; "
++        "xdotool windowactivate --sync \"$wid\""
+     )
+     actions = [
+         {"type": "launch", "name": "qq_phase210", "scope_name": scope,
+diff --git a/tools/parp/phase210/tests/test_phase210_contracts.py b/tools/parp/phase210/tests/test_phase210_contracts.py
+index 5b5c05c8d..443854090 100644
+--- a/tools/parp/phase210/tests/test_phase210_contracts.py
++++ b/tools/parp/phase210/tests/test_phase210_contracts.py
+@@ -237,6 +237,13 @@ class Phase210Contracts(unittest.TestCase):
+         self.assertIn('search_action["include_hidden"] = True', source)
+         self.assertIn('run(["xdotool", "windowmap", window_id], ctx, check=False)', source)
+ 
++    def test_47_test_qq_window_is_visibly_placed(self):
++        builder = (Path(__file__).resolve().parents[1] / "build_qq_collection.py").read_text()
++        self.assertIn("PARP Phase2.10 QQ Test (Read-only)", builder)
++        self.assertIn('xdotool windowsize \\"$wid\\" 900 700', builder)
++        self.assertIn('xdotool windowmove \\"$wid\\" 120 80', builder)
++        self.assertIn('xdotool windowactivate --sync \\"$wid\\"', builder)
++
+ 
+ if __name__ == "__main__":
+     unittest.main()
+-- 
+2.25.1
+

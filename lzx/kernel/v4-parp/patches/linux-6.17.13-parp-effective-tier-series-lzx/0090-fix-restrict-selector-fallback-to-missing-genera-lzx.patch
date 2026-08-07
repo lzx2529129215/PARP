@@ -1,0 +1,88 @@
+From 1b1810c5295395ec3860e4dfc7bbbc87789102aa Mon Sep 17 00:00:00 2001
+From: Codex PARP Reproduction <codex@localhost>
+Date: Mon, 3 Aug 2026 23:59:10 +0800
+Subject: [PATCH 090/124] fix: restrict selector fallback to missing generation
+
+---
+ tools/parp/phase210b/selector_v2.py            |  9 ++++++++-
+ tools/parp/phase210b/tests/test_selector_v2.py | 11 ++++++++++-
+ 2 files changed, 18 insertions(+), 2 deletions(-)
+
+diff --git a/tools/parp/phase210b/selector_v2.py b/tools/parp/phase210b/selector_v2.py
+index fa134c281..ac140070c 100644
+--- a/tools/parp/phase210b/selector_v2.py
++++ b/tools/parp/phase210b/selector_v2.py
+@@ -36,7 +36,7 @@ def eligible_universe(rows):
+     for source in rows:
+         row = dict(source)
+         flags = row.get("validity_flags", {})
+-        if row.get("current_active"):
++        if row.get("current_active") is not False:
+             continue
+         if row.get("observation_state") in (None, "NOT_OBSERVED"):
+             continue
+@@ -46,6 +46,9 @@ def eligible_universe(rows):
+             continue
+         if row.get("partition_generation") in (None, ""):
+             continue
++        history_fields = ("age", "segment_age", "time_since_last_active", "recent_access_count")
++        if not any(row.get(field) is not None for field in history_fields):
++            continue
+         if expected_session is not None and row.get("session_id") not in (None, expected_session):
+             continue
+         if expected_domain is not None and row.get("domain_id") not in (None, expected_domain):
+@@ -165,6 +168,7 @@ def select(rows, selector_id, quota_template="Q_BALANCED"):
+     if quota_template not in QUOTAS:
+         raise ValueError("unknown quota template")
+     rows = eligible_universe(rows)
++    fallback_only_generation_missing = False
+     if selector_id == "S0":
+         selected = sorted(rows, key=_stable_key)[:128]
+         strata_field, names = None, ()
+@@ -180,6 +184,8 @@ def select(rows, selector_id, quota_template="Q_BALANCED"):
+             rows = assign_hybrid_strata(rows)
+             strata_field, names = "hybrid_stratum", ("H0", "H1", "H2", "H3")
+         elif selector_id == "S4":
++            rows = [row for row in rows if row.get("generation_proxy") in (None, "")]
++            fallback_only_generation_missing = True
+             rows = _fallback_strata(rows)
+             strata_field, names = "fallback_stratum", ("F0", "F1", "F2", "F3")
+         else:
+@@ -200,6 +206,7 @@ def select(rows, selector_id, quota_template="Q_BALANCED"):
+         "candidate_hash": candidate_hash,
+         "stratum_counts": {name: sum(row.get(strata_field) == name for row in selected) for name in names} if names else {},
+         "fill_counts": fill_counts,
++        "fallback_only_generation_missing": fallback_only_generation_missing,
+         "stable_sort_contract": "generation_age_recency_inactivity_identity",
+         "causal_inputs_only": True,
+     }
+diff --git a/tools/parp/phase210b/tests/test_selector_v2.py b/tools/parp/phase210b/tests/test_selector_v2.py
+index 28759c788..a7aeed04a 100644
+--- a/tools/parp/phase210b/tests/test_selector_v2.py
++++ b/tools/parp/phase210b/tests/test_selector_v2.py
+@@ -55,12 +55,21 @@ class SelectorV2Contracts(unittest.TestCase):
+         self.assertTrue(all(row["hybrid_stratum"] in {"H0", "H1", "H2", "H3"} for row in rows))
+ 
+     def test_all_selector_candidates_are_unique_and_fixed(self):
+-        for selector in ("S0", "S1", "S2", "S3", "S4"):
++        for selector in ("S0", "S1", "S2", "S3"):
+             selected, audit = s.select(self.universe, selector, "Q_BALANCED")
+             self.assertEqual(len(selected), 128)
+             self.assertEqual(len({row["identity"] for row in selected}), 128)
+             self.assertEqual(audit["candidate_count"], 128)
+ 
++    def test_s4_is_only_generation_missing_fallback(self):
++        rows = [dict(row, generation_proxy=None) for row in self.universe]
++        selected, audit = s.select(rows, "S4", "Q_BALANCED")
++        self.assertEqual(len(selected), 128)
++        self.assertTrue(audit["fallback_only_generation_missing"])
++        selected, audit = s.select(self.universe, "S4", "Q_BALANCED")
++        self.assertEqual(len(selected), 0)
++        self.assertTrue(audit["fallback_only_generation_missing"])
++
+     def test_short_universe_is_partial_without_duplication(self):
+         selected, audit = s.select(self.universe[:40], "S3", "Q_BALANCED")
+         self.assertEqual(len(selected), 40)
+-- 
+2.25.1
+

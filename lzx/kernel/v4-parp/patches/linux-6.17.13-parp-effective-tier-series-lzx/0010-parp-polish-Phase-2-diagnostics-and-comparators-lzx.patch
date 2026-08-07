@@ -1,0 +1,248 @@
+From e5ac0d676762c36a238adc269166df58d89535bb Mon Sep 17 00:00:00 2001
+From: Codex PARP Reproduction <codex@localhost>
+Date: Fri, 31 Jul 2026 19:31:39 +0800
+Subject: [PATCH 010/124] parp: polish Phase 2 diagnostics and comparators
+
+---
+ mm/parp/Kconfig                           |  4 +-
+ mm/parp/core/evidence.c                   | 53 +++++++++++++++--------
+ tools/parp/alignment_analyze.py           |  2 +-
+ tools/parp/configs/damon_default.yaml     |  1 +
+ tools/parp/damon_collect.py               |  1 +
+ tools/parp/dataset_export.py              |  1 +
+ tools/parp/plot_summary.py                |  2 +-
+ tools/parp/region_decode.py               |  2 +-
+ tools/parp/region_schema.py               |  1 +
+ tools/parp/tests/test_app_alignment.py    |  2 +-
+ tools/parp/tests/test_region_alignment.py |  2 +-
+ tools/parp/tests/test_windows.py          |  1 +
+ tools/parp/window_analyze.py              |  1 +
+ 13 files changed, 48 insertions(+), 25 deletions(-)
+
+diff --git a/mm/parp/Kconfig b/mm/parp/Kconfig
+index ef3bee3b6..14ac2bb03 100644
+--- a/mm/parp/Kconfig
++++ b/mm/parp/Kconfig
+@@ -24,4 +24,6 @@ config PARP_DAMON_ALIGNMENT
+ 	help
+ 	  Copy DAMON aggregation records into an asynchronous PARP alignment
+ 	  worker. This remains evidence-only by default and never changes
+-	  reclaim, prefetch, pageout, generations, or scan budgets.
++	  reclaim, prefetch, pageout, generations, or scan budgets. Records are
++	  classified against referenced process VMAs and published through bounded,
++	  immutable evidence snapshots for later PARP observation.
+diff --git a/mm/parp/core/evidence.c b/mm/parp/core/evidence.c
+index 8ad838dfb..69ddd0b55 100644
+--- a/mm/parp/core/evidence.c
++++ b/mm/parp/core/evidence.c
+@@ -223,20 +223,30 @@ parp_anon_victim(const struct parp_anon_observation *observation,
+ 	return victim && incoming > weakest ? victim : NULL;
+ }
+ 
++static int parp_cmp_u64(u64 left, u64 right)
++{
++	if (left == right)
++		return 0;
++	return left < right ? -1 : 1;
++}
++
+ static int parp_file_compare(const void *left, const void *right)
+ {
+ 	const struct parp_file_evidence *a = left, *b = right;
+-
+-#define PARP_CMP_FIELD(field) do { if (a->field != b->field) \
+-	return a->field < b->field ? -1 : 1; } while (0)
+-	PARP_CMP_FIELD(domain_id);
+-	PARP_CMP_FIELD(key.dev_major);
+-	PARP_CMP_FIELD(key.dev_minor);
+-	PARP_CMP_FIELD(key.inode);
+-	PARP_CMP_FIELD(key.file_version);
+-	PARP_CMP_FIELD(key.start_index);
+-#undef PARP_CMP_FIELD
+-	return 0;
++	int ret;
++
++	ret = parp_cmp_u64(a->domain_id, b->domain_id);
++	if (!ret)
++		ret = parp_cmp_u64(a->key.dev_major, b->key.dev_major);
++	if (!ret)
++		ret = parp_cmp_u64(a->key.dev_minor, b->key.dev_minor);
++	if (!ret)
++		ret = parp_cmp_u64(a->key.inode, b->key.inode);
++	if (!ret)
++		ret = parp_cmp_u64(a->key.file_version, b->key.file_version);
++	if (!ret)
++		ret = parp_cmp_u64(a->key.start_index, b->key.start_index);
++	return ret;
+ }
+ 
+ static int parp_anon_compare(const void *left, const void *right)
+@@ -615,18 +625,23 @@ static int parp_compare_file_point(const struct parp_file_evidence *entry,
+ 				   const struct parp_file_region_key *key,
+ 				   u64 index)
+ {
+-#define PARP_POINT_CMP(left, right) do { if ((left) != (right)) \
+-	return (left) < (right) ? -1 : 1; } while (0)
+-	PARP_POINT_CMP(entry->domain_id, domain_id);
+-	PARP_POINT_CMP(entry->key.dev_major, key->dev_major);
+-	PARP_POINT_CMP(entry->key.dev_minor, key->dev_minor);
+-	PARP_POINT_CMP(entry->key.inode, key->inode);
+-	PARP_POINT_CMP(entry->key.file_version, key->file_version);
++	int ret;
++
++	ret = parp_cmp_u64(entry->domain_id, domain_id);
++	if (!ret)
++		ret = parp_cmp_u64(entry->key.dev_major, key->dev_major);
++	if (!ret)
++		ret = parp_cmp_u64(entry->key.dev_minor, key->dev_minor);
++	if (!ret)
++		ret = parp_cmp_u64(entry->key.inode, key->inode);
++	if (!ret)
++		ret = parp_cmp_u64(entry->key.file_version, key->file_version);
++	if (ret)
++		return ret;
+ 	if (index < entry->key.start_index)
+ 		return 1;
+ 	if (index >= entry->key.start_index + entry->key.nr_pages)
+ 		return -1;
+-#undef PARP_POINT_CMP
+ 	return 0;
+ }
+ 
+diff --git a/tools/parp/alignment_analyze.py b/tools/parp/alignment_analyze.py
+index 6dff67689..e586a93c5 100755
+--- a/tools/parp/alignment_analyze.py
++++ b/tools/parp/alignment_analyze.py
+@@ -1,4 +1,5 @@
+ #!/usr/bin/env python3
++# SPDX-License-Identifier: GPL-2.0
+ """Generate Phase-2 alignment, identity, window, and overhead reports."""
+ 
+ import argparse
+@@ -96,4 +97,3 @@ reported as kernel overhead.
+ 
+ if __name__ == "__main__":
+     main()
+-
+diff --git a/tools/parp/configs/damon_default.yaml b/tools/parp/configs/damon_default.yaml
+index 3c69729b7..1f792f62d 100644
+--- a/tools/parp/configs/damon_default.yaml
++++ b/tools/parp/configs/damon_default.yaml
+@@ -1,3 +1,4 @@
++# SPDX-License-Identifier: GPL-2.0
+ schema_version: 1
+ sampling_interval_us: 5000
+ aggregation_interval_us: 1000000
+diff --git a/tools/parp/damon_collect.py b/tools/parp/damon_collect.py
+index 105e3b247..1d57eebec 100755
+--- a/tools/parp/damon_collect.py
++++ b/tools/parp/damon_collect.py
+@@ -1,4 +1,5 @@
+ #!/usr/bin/env python3
++# SPDX-License-Identifier: GPL-2.0
+ """Probe or decode controlled PARP DAMON collection without privilege changes."""
+ 
+ import argparse
+diff --git a/tools/parp/dataset_export.py b/tools/parp/dataset_export.py
+index 797185824..60e436316 100755
+--- a/tools/parp/dataset_export.py
++++ b/tools/parp/dataset_export.py
+@@ -1,4 +1,5 @@
+ #!/usr/bin/env python3
++# SPDX-License-Identifier: GPL-2.0
+ """Export synthetic or decoded PARP Phase-2 JSONL/CSV datasets."""
+ 
+ import argparse
+diff --git a/tools/parp/plot_summary.py b/tools/parp/plot_summary.py
+index b250ba759..16cb5e57d 100755
+--- a/tools/parp/plot_summary.py
++++ b/tools/parp/plot_summary.py
+@@ -1,4 +1,5 @@
+ #!/usr/bin/env python3
++# SPDX-License-Identifier: GPL-2.0
+ """Create a dependency-free Markdown summary from data-readiness metrics."""
+ 
+ import argparse
+@@ -20,4 +21,3 @@ def main():
+ 
+ if __name__ == "__main__":
+     main()
+-
+diff --git a/tools/parp/region_decode.py b/tools/parp/region_decode.py
+index 3447e04ad..2dc7e11fd 100755
+--- a/tools/parp/region_decode.py
++++ b/tools/parp/region_decode.py
+@@ -1,4 +1,5 @@
+ #!/usr/bin/env python3
++# SPDX-License-Identifier: GPL-2.0
+ """Decode key=value PARP region trace lines without exposing raw pointers."""
+ 
+ import re
+@@ -30,4 +31,3 @@ def decode_trace_line(line: str) -> Optional[Dict]:
+         "reason_flags": values["reasons"], "source": "parp_region_evidence",
+         "address_redacted": True,
+     }
+-
+diff --git a/tools/parp/region_schema.py b/tools/parp/region_schema.py
+index 1f161cd15..817ea5c76 100755
+--- a/tools/parp/region_schema.py
++++ b/tools/parp/region_schema.py
+@@ -1,4 +1,5 @@
+ #!/usr/bin/env python3
++# SPDX-License-Identifier: GPL-2.0
+ """Neutral Phase-2 region schema and synthetic VMA alignment reference."""
+ 
+ from dataclasses import dataclass, asdict
+diff --git a/tools/parp/tests/test_app_alignment.py b/tools/parp/tests/test_app_alignment.py
+index c8e8fb14d..080655812 100755
+--- a/tools/parp/tests/test_app_alignment.py
++++ b/tools/parp/tests/test_app_alignment.py
+@@ -1,4 +1,5 @@
+ #!/usr/bin/env python3
++# SPDX-License-Identifier: GPL-2.0
+ import unittest
+ 
+ from region_schema import align_app_context
+@@ -40,4 +41,3 @@ class AppAlignmentTest(unittest.TestCase):
+ 
+ if __name__ == "__main__":
+     unittest.main()
+-
+diff --git a/tools/parp/tests/test_region_alignment.py b/tools/parp/tests/test_region_alignment.py
+index f86b981db..2d1c79b7a 100755
+--- a/tools/parp/tests/test_region_alignment.py
++++ b/tools/parp/tests/test_region_alignment.py
+@@ -1,4 +1,5 @@
+ #!/usr/bin/env python3
++# SPDX-License-Identifier: GPL-2.0
+ import json
+ from pathlib import Path
+ import unittest
+@@ -56,4 +57,3 @@ class RegionAlignmentTest(unittest.TestCase):
+ 
+ if __name__ == "__main__":
+     unittest.main()
+-
+diff --git a/tools/parp/tests/test_windows.py b/tools/parp/tests/test_windows.py
+index 4430a1006..679c19a66 100755
+--- a/tools/parp/tests/test_windows.py
++++ b/tools/parp/tests/test_windows.py
+@@ -1,4 +1,5 @@
+ #!/usr/bin/env python3
++# SPDX-License-Identifier: GPL-2.0
+ import unittest
+ 
+ from window_analyze import WindowState, aggregate
+diff --git a/tools/parp/window_analyze.py b/tools/parp/window_analyze.py
+index 1041609fb..662924fb2 100755
+--- a/tools/parp/window_analyze.py
++++ b/tools/parp/window_analyze.py
+@@ -1,4 +1,5 @@
+ #!/usr/bin/env python3
++# SPDX-License-Identifier: GPL-2.0
+ """Timestamp-based 10/30/60 second PARP evidence aggregation."""
+ 
+ from collections import defaultdict
+-- 
+2.25.1
+

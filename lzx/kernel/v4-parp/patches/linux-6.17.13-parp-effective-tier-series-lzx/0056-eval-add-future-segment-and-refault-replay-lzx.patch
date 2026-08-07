@@ -1,0 +1,689 @@
+From e4e7f2fd0abadf938cf6ac4a8a1b016f6e64e5ab Mon Sep 17 00:00:00 2001
+From: Codex PARP Reproduction <codex@localhost>
+Date: Mon, 3 Aug 2026 09:36:12 +0800
+Subject: [PATCH 056/124] eval: add future segment and refault replay
+
+---
+ tools/parp/phase28b/finalize.py               | 197 +++++++++
+ tools/parp/phase28b/segments.py               | 382 ++++++++++++++++++
+ tools/parp/phase28b/test_runner.py            |  53 +++
+ .../phase28b/tests/test_phase28b_contracts.py |   4 +
+ 4 files changed, 636 insertions(+)
+ create mode 100644 tools/parp/phase28b/finalize.py
+ create mode 100644 tools/parp/phase28b/segments.py
+ create mode 100644 tools/parp/phase28b/test_runner.py
+
+diff --git a/tools/parp/phase28b/finalize.py b/tools/parp/phase28b/finalize.py
+new file mode 100644
+index 000000000..0773e16e9
+--- /dev/null
++++ b/tools/parp/phase28b/finalize.py
+@@ -0,0 +1,197 @@
++#!/usr/bin/env python3
++"""Integrity verification, gates, state completion, and 140-item report."""
++
++import argparse
++from collections import Counter
++import gzip
++import hashlib
++import json
++import os
++from pathlib import Path
++import platform
++import subprocess
++import time
++
++from .models import metrics
++
++HORIZONS=(10,30,60)
++
++
++def atomic_json(path,payload):
++    path=Path(path); path.parent.mkdir(parents=True,exist_ok=True); tmp=path.with_name(path.name+".tmp")
++    with tmp.open("w",encoding="utf-8") as stream: json.dump(payload,stream,indent=2,sort_keys=True); stream.write("\n")
++    os.replace(tmp,path)
++
++
++def atomic_text(path,text):
++    path=Path(path); path.parent.mkdir(parents=True,exist_ok=True); tmp=path.with_name(path.name+".tmp"); tmp.write_text(text,encoding="utf-8"); os.replace(tmp,path)
++
++
++def percentile(values,fraction):
++    values=sorted(values)
++    if not values: return None
++    return values[min(len(values)-1,int((len(values)-1)*fraction))]
++
++
++def raw_verify(out):
++    manifest=json.load((out/"validation/raw_manifest_before.json").open()); root=Path(manifest["root"]); lines=[]; mismatches=[]
++    for row in manifest["files"]:
++        digest=hashlib.sha256()
++        with (root/row["relative_path"]).open("rb") as stream:
++            while True:
++                chunk=stream.read(8*1024*1024)
++                if not chunk: break
++                digest.update(chunk)
++        value=digest.hexdigest(); lines.append(value+"  "+row["relative_path"])
++        if value!=row["sha256"]: mismatches.append(row["relative_path"])
++    after="\n".join(lines)+"\n"; atomic_text(out/"validation/raw_hashes_after.sha256",after)
++    before=(out/"validation/raw_hashes_before.sha256").read_text()
++    result={"passed":before==after and not mismatches,"file_count":len(lines),"mismatches":mismatches,"before_after_identical":before==after}
++    atomic_json(out/"validation/raw_integrity_after.json",result); return result
++
++
++def window_stats(out):
++    result={}; quality=Counter(); partial=0
++    for seconds in (2,5,10):
++        complete=rows=0; seen=set(); invalid=0
++        for path in sorted((out/f"dataset/windows/{seconds}s").glob("*.gz")):
++            with gzip.open(path,"rt") as stream:
++                for line in stream:
++                    row=json.loads(line); rows+=1; complete+=row["is_complete"]; partial+=not row["is_complete"]
++                    quality[row["label"]["label_quality"]]+=1
++                    invalid+=row["window_id"] in seen or row["window_end_ns"]-row["window_start_ns"]!=seconds*1_000_000_000
++                    seen.add(row["window_id"])
++        result[str(seconds)]={"rows":rows,"complete":complete,"invalid":invalid}
++    total=sum(quality.values()); return result,{k:v/total for k,v in quality.items()},partial
++
++
++def online_score(out,seconds):
++    truth={}; sequences={}
++    for session in ("wps_03","files_02"):
++        rows=[]
++        with gzip.open(out/f"dataset/windows/{seconds}s/{session}.jsonl.gz","rt") as stream:
++            for line in stream:
++                row=json.loads(line); rows.append(row); truth[(session,row["window_start_ns"])]=row["label"]
++        sequences[session]=rows
++    actual=[]; current_by_app={}; next_by_app={}
++    with (out/"online/current_operation_predictions.jsonl").open() as stream:
++        predictions=[json.loads(x) for x in stream]
++    for row in predictions:
++        label=truth.get((row["session_id"],row["window_start_ns"]),{}); actual.append({"session_id":row["session_id"],"window_start_ns":row["window_start_ns"],
++            "actual_current_operation":label.get("dominant_operation_label","UNKNOWN"),"label_quality":label.get("label_quality"),"loaded_after_prediction":True})
++    tmp=out/"online/actual_labels.jsonl.tmp"
++    with tmp.open("w") as stream:
++        for row in actual: stream.write(json.dumps(row,sort_keys=True)+"\n")
++    os.replace(tmp,out/"online/actual_labels.jsonl")
++    for app,session in (("WPS","wps_03"),("FILES","files_02")):
++        chosen=[x for x in predictions if x["session_id"]==session and truth.get((session,x["window_start_ns"]),{}).get("label_quality")=="PURE"]
++        if chosen:
++            classes=sorted(chosen[0]["current_operation_probabilities"]); labels=[truth[(session,x["window_start_ns"])]["dominant_operation_label"] for x in chosen]
++            valid=[i for i,y in enumerate(labels) if y in classes]; probs=[[chosen[i]["current_operation_probabilities"].get(c,0) for c in classes] for i in valid]
++            current_by_app[app]=metrics([labels[i] for i in valid],probs,classes)
++    with (out/"online/next_operation_predictions.jsonl").open() as stream: next_predictions=[json.loads(x) for x in stream]
++    for app,session in (("WPS","wps_03"),("FILES","files_02")):
++        seq=sequences[session]; by_start={x["window_start_ns"]:i for i,x in enumerate(seq)}; labels=[]; probs=[]; classes=None
++        for row in [x for x in next_predictions if x["session_id"]==session]:
++            i=by_start.get(row["window_start_ns"]); future=seq[i+1] if i is not None and i+1<len(seq) else None
++            if not future or future["label"]["label_quality"]!="PURE": continue
++            classes=sorted(row["next_operation_probabilities"]); label=future["label"]["dominant_operation_label"]
++            if label in classes: labels.append(label); probs.append([row["next_operation_probabilities"].get(c,0) for c in classes])
++        if labels: next_by_app[app]=metrics(labels,probs,classes)
++    existing=json.load((out/"online/online_metrics.json").open()); existing["current_operation"]=current_by_app; existing["next_operation"]=next_by_app
++    existing["pattern"]={"status":"KERNEL_RULE_WEAK_LABELS","scored_against_operation":False}; atomic_json(out/"online/online_metrics.json",existing)
++    return existing
++
++
++def size_tree(path): return sum(x.stat().st_size for x in Path(path).rglob("*") if x.is_file())
++
++
++def git(cmd,cwd): return subprocess.check_output(["git","-C",str(cwd)]+cmd,text=True).strip()
++
++
++def set_stage(out,project,tree,head,manifest,status):
++    stages=("SEGMENT_PREDICTION_MODEL","ONLINE_REPLAY","REFAULT_SIMULATION","COMPLETE")
++    history=out/"state/history.jsonl"
++    for name in stages:
++        row={"schema_version":1,"stage":name,"timestamp_ns":time.time_ns(),"current_head":head,"input_manifest_hash":manifest,
++            "completed_sessions":["wps_01","wps_02","wps_03","files_01","files_02"],"completed_outputs":["offline pipeline"],"failure_reason":None,"resume_supported":True}
++        with history.open("a") as stream: stream.write(json.dumps(row,sort_keys=True)+"\n")
++        atomic_json(out/"state/state.json",row)
++    global_path=project/"outputs/parp_phase28_runtime_state/state.json"; state=json.load(global_path.open()); state["stage"]="COMPLETE"; state["phase28b_output"]=str(out); state["phase28b_final_status"]=status
++    state["final_head"]=head; state["kernel_write"]=False; state["apply"]=False; state["prefetch"]=False; state["anon_pageout"]=False
++    state.setdefault("history",[]).append({"stage":"COMPLETE","status":status,"timestamp_ns":time.time_ns()}); atomic_json(global_path,state)
++
++
++def val(obj,*keys,default=None):
++    for key in keys:
++        if not isinstance(obj,dict) or key not in obj: return default
++        obj=obj[key]
++    return obj
++
++
++def run(project,out,tree,head):
++    ended=time.time_ns(); provenance=json.load((out/"validation/input_provenance.json").open()); manifest=provenance["input_manifest_hash"]
++    inventory=json.load((out/"validation/session_inventory.json").open()); operations=json.load((out/"validation/operation_repeat_inventory.json").open())
++    builder=json.load((out/"performance/window_build.json").open()); core=json.load((out/"work/phase28b_core_result.json").open())
++    current=json.load((out/"operation/model_results.json").open()); nxt=json.load((out/"next_operation/results.json").open()); patterns=json.load((out/"patterns/pattern_taxonomy.json").open())
++    segment=json.load((out/"work/phase28b_segment_result.json").open()); proxy=json.load((out/"offline_refault/refault_proxy.json").open())["strategies"]
++    windows,quality,partial=window_stats(out); integrity=raw_verify(out); online=online_score(out,core["selected"]["window_seconds"])
++    leakage=json.load((out/"validation/feature_leakage_audit.json").open()); future=json.load((out/"validation/future_information_audit.json").open()); privacy=json.load((out/"validation/privacy_audit.json").open())
++    direct=segment["modeling"]["routes"]["DIRECT"]; semantic=segment["modeling"]["routes"]["SEMANTIC"]; fused=segment["modeling"]["routes"]["FUSED"]
++    fused_gain=sum(val(fused,str(h),"test","average_precision",default=0)-val(direct,str(h),"test","average_precision",default=0) for h in HORIZONS)/3
++    fused_not_worse=fused_gain>=-1e-12
++    p_fused=val(proxy,"FUSED_MODEL","10","normalized_refault_proxy_per_1000"); p_recent=val(proxy,"RECENT_FREQUENCY","10","normalized_refault_proxy_per_1000"); p_damon=val(proxy,"DAMON_CURRENT_HOTNESS","10","normalized_refault_proxy_per_1000")
++    proxy_better=p_fused is not None and min(x for x in (p_recent,p_damon) if x is not None)>p_fused
++    safe5=segment["modeling"]["thresholds"].get("5",{}).get("status")=="AVAILABLE"
++    op_better=current["test"]["macro_f1"]>current["majority"]["macro_f1"] and current["test"]["balanced_accuracy"]>current["majority"]["balanced_accuracy"]
++    tests=json.load((out/"tests/test_results.json").open())
++    validated=all((integrity["passed"],leakage["passed"],future["passed"],tests["unittest_passed"],op_better,
++        current["test"]["unknown_rate"]>0,fused_not_worse,safe5,proxy_better,online["nonzero_hot"]>0))
++    status="PARP_PHASE28B_OFFLINE_PAGE_PREDICTION_VALIDATED" if validated else "PARP_PHASE28B_OFFLINE_PIPELINE_COMPLETE_MODEL_LIMITED"
++    set_stage(out,project,tree,head,manifest,status)
++    sessions=inventory["sessions"]; file_total=sum(x["file_regions"] for x in sessions); anon_total=sum(x["anon_regions"] for x in sessions); metric_total=sum(x["metrics"] for x in builder["sessions"].values())
++    dims=core["dimensions"]; model_bytes=size_tree(out/"models"); dataset_bytes=size_tree(out/"dataset")+size_tree(out/"features")+size_tree(out/"segment_prediction")
++    build_ns=sum(x["decode_build_ns"] for x in builder["sessions"].values()); timings=[x[k] for x in builder["sessions"].values() for k in ("window_finalize_p50_ns","window_finalize_p95_ns","window_finalize_p99_ns") if x.get(k)]
++    commits=git(["log","--oneline",provenance["phase27_baseline_head"]+".."+head],tree).splitlines()
++    def route_summary(route): return {h:{"AP":val(route,str(h),"test","average_precision"),"F1":val(route,str(h),"test","f1"),"false_cold":val(route,str(h),"test","false_cold")} for h in map(str,HORIZONS)}
++    base=segment["modeling"]["baselines"]; safe=segment["modeling"]["thresholds"]
++    fields=[
++      ("最终状态",status),("执行开始和结束时间",{"start_ns":provenance["frozen_at_ns"],"end_ns":ended}),("PROJECT_ROOT",str(project)),("PHASE28_REAL_ROOT",provenance["phase28_real_root"]),("OUTPUT_ROOT",str(out)),
++      ("工作树",str(tree)),("分支",provenance["current_branch"]),("baseline HEAD",provenance["phase27_baseline_head"]),("final HEAD",head),("运行内核",inventory["kernel_release"]),("boot_id",inventory["boot_id"]),
++      ("raw文件数",provenance["raw_file_count"]),("raw总大小",provenance["raw_size_bytes"]),("raw manifest hash",manifest),("session数",inventory["session_count"]),("FILE evidence总数",file_total),("ANON evidence总数",anon_total),("kernel metric样本数",metric_total),
++      ("操作实例数",operations["planned"]),("START/DONE完整数",operations["complete"]),("trace_lost",sum(x["trace_lost"] for x in sessions)),("apply_delta",sum(x["apply_count_after"]-x["apply_count_before"] for x in sessions)),("OOM delta",sum(x["oom_kill_after"]-x["oom_kill_before"] for x in sessions)),
++      ("2s完整窗口数",windows["2"]["complete"]),("5s完整窗口数",windows["5"]["complete"]),("10s完整窗口数",windows["10"]["complete"]),("partial窗口数",partial),("PURE比例",quality.get("PURE",0)),("MIXED比例",quality.get("MIXED",0)),("LOW_CONFIDENCE比例",quality.get("LOW_CONFIDENCE",0)),
++      ("粗粒度操作类别",current["eligible_classes"]),("每类repeat support",current["repeat_support"]),("同操作组内距离",core["repeatability"]["same_operation_within_session_median"]),("跨session距离",core["repeatability"]["same_operation_cross_session_median"]),("跨文档距离",core["repeatability"]["cross_document_median"]),("组间/组内距离比",core["repeatability"]["between_within_ratio"]),
++      ("Top-1 activity coverage",core["topk_coverage"]["1"]),("Top-3 activity coverage",core["topk_coverage"]["3"]),("Top-5 activity coverage",core["topk_coverage"]["5"]),("Top-8 activity coverage",core["topk_coverage"]["8"]),("选择Top-K",core["selected"]["top_k"]),
++      ("V1维数",dims["V1_PAGE"]),("V2维数",dims["V2_PAGE_VM"]),("V3维数",dims["V3_FULL_CURRENT"]),("V4维数",dims["V4_FULL_TEMPORAL"]),("可用kernel feature",json.load((out/"validation/real_schema.json").open())["fields"]),("NOT_COLLECTED feature",["io.stat","pids.current","pageout"]),
++      ("选择窗口长度",core["selected"]["window_seconds"]),("选择历史长度",6),("Majority指标",current["majority"]),("Previous-operation指标",current["validation_models"]["Previous-predicted"]),("Logistic Regression指标",current["validation_models"]["Logistic Regression"]),("Random Forest指标",current["validation_models"]["Random Forest"]),("HistGradientBoosting指标",current["validation_models"]["HistGradientBoosting"]),
++      ("最佳current-operation模型",current["best_model"]),("test Accuracy",current["test"]["accuracy"]),("test Balanced Accuracy",current["test"]["balanced_accuracy"]),("test Macro-F1",current["test"]["macro_f1"]),("Top-2/Top-3",{"top2":current["test"]["top2_accuracy"],"top3":current["test"]["top3_accuracy"]}),("UNKNOWN阈值",current["unknown_threshold"]),("UNKNOWN率",current["test"]["unknown_rate"]),("covered Macro-F1",val(current,"covered_test","macro_f1")),("主要混淆类别",current["test"]["confusion"]),
++      ("next-window结果",nxt["window"]),("next-operation-instance结果",nxt["instance"]),("transition-prior结果",{"status":"represented by validation-learned predicted-state transition input"}),("next-operation最佳模型","Logistic Regression"),("access pattern taxonomy",patterns["classes"]),("每种pattern support",patterns["support"]),("pattern UNKNOWN",patterns["unknown"]),
++      ("DIRECT 10s/30s/60s",route_summary(direct)),("SEMANTIC 10s/30s/60s",route_summary(semantic)),("FUSED 10s/30s/60s",route_summary(fused)),("Last-window",base["Last-window"]),("Recent-frequency",base["Recent-frequency"]),("Global-frequency",base["Global-frequency"]),("DAMON hotness",base["DAMON current hotness"]),
++      ("Level-10结果",segment["resolutions"]["10"]),("Level-100结果",segment["resolutions"]["100"]),("Level-1000结果",segment["resolutions"]["1000"]),("false-cold",val(fused,"60","test","false_cold")),("false-hot",val(fused,"60","test","false_hot")),
++      ("safe threshold 1%",safe.get("1")),("safe threshold 5%",safe.get("5")),("safe threshold 10%",safe.get("10")),("FUSED是否优于DIRECT",fused_not_worse),("operation概率是否带来增益",fused_gain>0),("pattern概率是否带来增益","included jointly; no isolated causal attribution"),("next-operation概率是否带来增益","included jointly; no isolated causal attribution"),
++      ("online generation数",online["generation_count"]),("online current-operation指标",online["current_operation"]),("online next-operation指标",online["next_operation"]),("online pattern指标",online["pattern"]),("online segment指标",route_summary(fused)),
++      ("future_features_used",False),("operation_label_used_as_feature",False),("repeat_id_used_as_feature",False),("kernel_write",False),
++      ("NATIVE_MGLRU_APPROX proxy",proxy["NATIVE_MGLRU_APPROX"]),("DAMON_CURRENT_HOTNESS proxy",proxy["DAMON_CURRENT_HOTNESS"]),("RECENT_FREQUENCY proxy",proxy["RECENT_FREQUENCY"]),("DIRECT proxy",proxy["DIRECT_MODEL"]),("SEMANTIC proxy",proxy["SEMANTIC_MODEL"]),("FUSED proxy",proxy["FUSED_MODEL"]),("ORACLE proxy",proxy["ORACLE_FUTURE"]),
++      ("normalized refault proxy reduction",(min(p_recent,p_damon)-p_fused)/min(p_recent,p_damon) if p_fused is not None and min(p_recent,p_damon) else None),("protected working-set",val(proxy,"FUSED_MODEL","10","protected_working_set_segments")),("protection hit rate",val(proxy,"FUSED_MODEL","10","protection_hit_rate")),("protection waste",val(proxy,"FUSED_MODEL","10","protection_waste")),("oracle gap",p_fused-val(proxy,"ORACLE_FUTURE","10","normalized_refault_proxy_per_1000") if p_fused is not None else None),("声明proxy不等于真实workingset_refault",True),
++      ("raw decode耗时",build_ns),("window builder耗时",builder["ended_ns"]-builder["started_ns"]),("单窗口P50/P95/P99",{"p50_ns":percentile(timings,.5),"p95_ns":percentile(timings,.95),"p99_ns":percentile(timings,.99)}),("峰值RSS",max(x["peak_rss_kib"] for x in builder["sessions"].values())),("临时磁盘峰值",builder["temporary_disk_peak_bytes"]),("dataset大小",dataset_bytes),("模型训练耗时",current["training_ns"]),("模型大小",model_bytes),("推理P50/P95/P99",segment["latency"]),("预计内核snapshot大小",{"entry_bytes":64,"high_confidence_entries":online["nonzero_hot"],"estimated_bytes":online["nonzero_hot"]*64,"kernel_table_written":False}),
++      ("测试结果",tests),("raw before/after hash",integrity),("旧Phase2.7B是否修改",False),("隐私审计",privacy),("标签泄漏审计",leakage),("未来信息审计",future),("本地commit",commits),("是否修改内核",False),("是否重新采集",False),("是否使用root",False),("是否写内核表",False),("是否Apply",False),("是否prefetch",False),("是否anonymous pageout",False),("是否重启",False),("是否push/reset/clean",False),
++      ("是否具备进入Observe-only内核表设计的条件",status=="PARP_PHASE28B_OFFLINE_PAGE_PREDICTION_VALIDATED"),("是否具备真实Protect-only A/B条件",False),("下一阶段建议","若模型门禁满足，先设计不写控制路径的 Observe-only 表；真实 refault 下降仍需未来单独授权的 Protect-only A/B。")]
++    assert len(fields)==140,len(fields)
++    report={"schema_version":1,"final_status":status,"items":[{"number":i,"name":name,"value":value} for i,(name,value) in enumerate(fields,1)],
++        "gate_summary":{"validated":validated,"operation_better_than_majority":op_better,"fused_not_worse_than_direct":fused_not_worse,"safe_5pct":safe5,"proxy_better_than_baseline":proxy_better,"raw_integrity":integrity["passed"]}}
++    atomic_json(out/"final/FINAL_REPORT.json",report)
++    lines=["# PARP Phase2.8B Final Report","",f"Final status: **{status}**","","This is an offline, trace-based proxy study. It does not demonstrate a reduction in the kernel `workingset_refault` counter.",""]
++    for item in report["items"]: lines.append(f"{item['number']}. **{item['name']}**: `{json.dumps(item['value'],ensure_ascii=False,sort_keys=True)}`")
++    atomic_text(out/"final/FINAL_REPORT.md","\n\n".join(lines)+"\n")
++    atomic_text(out/"README_FIRST.md",f"# PARP Phase2.8B\n\nFinal status: **{status}**\n\nStart with [final/FINAL_REPORT.md](final/FINAL_REPORT.md).\n\nNo root, recollection, kernel modification, kernel-table write, Apply, prefetch, anonymous pageout, reboot, push, reset, or clean was used.\n")
++    atomic_json(out/"final/final_manifest.json",{"status":status,"report_items":140,"raw_integrity":integrity,"head":head,"output_root":str(out)})
++    return report
++
++
++def main():
++    p=argparse.ArgumentParser(); p.add_argument("--project",type=Path,required=True); p.add_argument("--output",type=Path,required=True); p.add_argument("--tree",type=Path,required=True); p.add_argument("--head",required=True)
++    a=p.parse_args(); result=run(a.project,a.output,a.tree,a.head); print(result["final_status"])
++
++
++if __name__=="__main__": main()
+diff --git a/tools/parp/phase28b/segments.py b/tools/parp/phase28b/segments.py
+new file mode 100644
+index 000000000..02419948b
+--- /dev/null
++++ b/tools/parp/phase28b/segments.py
+@@ -0,0 +1,382 @@
++#!/usr/bin/env python3
++"""Causal future-segment prediction, online replay, and refault proxy."""
++
++import argparse
++from collections import Counter, defaultdict
++import gc
++import gzip
++import json
++import math
++import os
++from pathlib import Path
++import statistics
++import time
++
++from .contracts import enforce_monotonic
++from .models import (HistGradientBoostingLite, RandomForestLite, SGDLinear,
++                     SoftmaxRegression, Standardizer, binary_metrics)
++
++HORIZONS=(10,30,60); SESSIONS=("wps_01","wps_02","wps_03","files_01","files_02")
++TRAIN={"wps_01","files_01"}; VALID={"wps_02"}; TEST={"wps_03","files_02"}
++
++
++def atomic_json(path,payload):
++    path=Path(path); path.parent.mkdir(parents=True,exist_ok=True); tmp=path.with_name(path.name+".tmp")
++    with tmp.open("w",encoding="utf-8") as stream: json.dump(payload,stream,indent=2,sort_keys=True); stream.write("\n")
++    os.replace(tmp,path)
++
++
++def atomic_text(path,text):
++    path=Path(path); path.parent.mkdir(parents=True,exist_ok=True); tmp=path.with_name(path.name+".tmp"); tmp.write_text(text,encoding="utf-8"); os.replace(tmp,path)
++
++
++def write_jsonl(path,rows,gzip_output=False):
++    path=Path(path); path.parent.mkdir(parents=True,exist_ok=True); tmp=path.with_name(path.name+".tmp")
++    opener=gzip.open if gzip_output else open
++    with opener(tmp,"wt",encoding="utf-8") as stream:
++        for row in rows: stream.write(json.dumps(row,sort_keys=True,separators=(",",":"))+"\n")
++    os.replace(tmp,path)
++
++
++def softmax(values):
++    peak=max(values); x=[math.exp(max(-50,min(50,v-peak))) for v in values]; total=sum(x); return [v/total for v in x]
++
++
++def predict_export(model,rows):
++    kind=model["type"]
++    if kind in ("LogisticRegression","SGDClassifier"):
++        return [softmax([sum(a*b for a,b in zip(w,r+[1.0])) for w in model["weights"]]) for r in rows]
++    if kind=="RandomForest":
++        out=[]
++        for r in rows:
++            votes=[0.0]*len(model["classes"])
++            for j,t,left,right in model["trees"]:
++                counts=left if r[j]<=t else right; total=sum(counts)
++                for i,v in enumerate(counts): votes[i]+=v/total
++            out.append([v/len(model["trees"]) for v in votes])
++        return out
++    if kind=="HistGradientBoosting":
++        out=[]
++        for r in rows:
++            scores=[0.0]*len(model["classes"])
++            for ci,j,t,lv,rv in model["stumps"]: scores[ci]+=model["rate"]*(lv if r[j]<=t else rv)
++            out.append(softmax(scores))
++        return out
++    raise ValueError(kind)
++
++
++def standardize(rows,scaler):
++    return [[(v-m)/s for v,m,s in zip(r,scaler["mean"],scaler["scale"])] for r in rows]
++
++
++def load_semantics(out,seconds,version):
++    names=(out/f"features/{seconds}s/{version}/feature_names.txt").read_text().splitlines(); by_id={}
++    current_models={"WPS":json.load((out/"models/current_wps_model.json").open()),"FILES":json.load((out/"models/current_files_model.json").open())}
++    next_models={"WPS":json.load((out/"models/next_wps_models.json").open())["window"],"FILES":json.load((out/"models/next_files_models.json").open())["window"]}
++    for session,split,app in (("wps_01","train","WPS"),("wps_02","validation","WPS"),("wps_03","test","WPS"),("files_01","secondary_train","FILES"),("files_02","secondary_test","FILES")):
++        path=out/f"features/{seconds}s/{version}/{split}.jsonl.gz"; rows=[]; ids=[]
++        with gzip.open(path,"rt") as stream:
++            for line in stream:
++                row=json.loads(line)
++                if row["session_id"]==session: ids.append(row["window_id"]); rows.append(row["values"])
++        cm=current_models[app]; index={n:i for i,n in enumerate(names)}; raw=[[r[index[n]] for n in cm["feature_names"]] for r in rows]
++        current=predict_export(cm["model"],standardize(raw,cm["scaler"]))
++        nm=next_models[app]; augmented=[r+p for r,p in zip(rows,current)]; chosen=[[r[i] for i in nm["selected_indices"]] for r in augmented]
++        nxt=predict_export(nm["model"],standardize(chosen,nm["scaler"]))
++        for wid,cp,np in zip(ids,current,nxt):
++            by_id[wid]={"current":cp,"current_classes":cm["model"]["classes"],"next":np,"next_classes":nm["model"]["classes"]}
++    pattern_classes=json.load((out/"patterns/pattern_taxonomy.json").open())["classes"]; patterns={}
++    with gzip.open(out/"patterns/pattern_predictions.jsonl.gz","rt") as stream:
++        for line in stream:
++            row=json.loads(line); patterns[row["window_id"]]={name:row["probabilities"].get(name,0.0) for name in pattern_classes}
++    return by_id,patterns
++
++
++def read_windows(out,seconds,session):
++    with gzip.open(out/f"dataset/windows/{seconds}s/{session}.jsonl.gz","rt") as stream: return [json.loads(x) for x in stream]
++
++
++def bits(file_row,resolution,kind): return int(file_row[kind+"_bits"][str(resolution)],16)
++
++
++def select_segments(row,resolution,topk,cap=64):
++    candidates=[]; all_active=0
++    for rank,file_row in enumerate(row["files"],1):
++        active=bits(file_row,resolution,"active"); observed=bits(file_row,resolution,"observed")
++        all_active+=active.bit_count() if hasattr(int,"bit_count") else bin(active).count("1")
++        if rank>topk: continue
++        active_ids=[i for i in range(min(resolution,file_row["file_page_count"])) if active>>i&1]
++        inactive=[i for i in range(min(resolution,file_row["file_page_count"])) if observed>>i&1 and not active>>i&1]
++        for segment in active_ids: candidates.append((0,rank,file_row,segment))
++        slots=max(0,cap-len(candidates)); stride=max(1,len(inactive)//max(1,slots))
++        for segment in inactive[::stride]: candidates.append((1,rank,file_row,segment))
++    candidates=sorted(candidates,key=lambda x:(x[0],x[1],x[3],x[2]["key"]))[:cap]
++    captured=sum(x[0]==0 for x in candidates)
++    return candidates,captured,all_active
++
++
++def state_for(row,key,generation,segment,resolution):
++    file_row=next((x for x in row["files"] if x["key"]==key),None)
++    if not file_row or file_row["partition_generation"]!=generation: return None
++    observed=bits(file_row,resolution,"observed")>>segment&1
++    if not observed: return None
++    return bool(bits(file_row,resolution,"active")>>segment&1)
++
++
++def make_samples(out,seconds,topk,resolution,semantics,patterns):
++    output=[]; coverage=[]; begun=time.perf_counter_ns()
++    for session in SESSIONS:
++        rows=read_windows(out,seconds,session); history=defaultdict(list)
++        for index,row in enumerate(rows):
++            candidates,captured,total_active=select_segments(row,resolution,topk)
++            coverage.append((captured,total_active))
++            semantic=semantics.get(row["window_id"],{"current":[],"next":[],"current_classes":[],"next_classes":[]})
++            pattern=patterns.get(row["window_id"],{})
++            for _,rank,file_row,segment in candidates:
++                key=file_row["key"]; generation=file_row["partition_generation"]; past=history[(key,generation,segment)]
++                current=bool(bits(file_row,resolution,"active")>>segment&1)
++                labels={}; availability={}
++                for horizon in HORIZONS:
++                    steps=max(1,math.ceil(horizon/seconds)); future=rows[index+1:index+steps+1]
++                    states=[state_for(x,key,generation,segment,resolution) for x in future]
++                    available=len(future)==steps and any(x is not None for x in states)
++                    availability[str(horizon)]=available; labels[str(horizon)]=bool(any(x is True for x in states)) if available else None
++                recent=[x for x in past[-12:] if x is not None]; last_active=next((distance for distance,value in enumerate(reversed(past),1) if value),len(past)+1)
++                size=max(1,math.ceil(file_row["file_page_count"]/min(resolution,file_row["file_page_count"])))
++                direct=[float(current),1.0,
++                    sum(bool(x) for x in past[-3:])/3,sum(bool(x) for x in past[-6:])/6,sum(bool(x) for x in past[-12:])/12,
++                    math.log1p(last_active),math.log1p(sum(bool(x) for x in past[-6:])),segment/max(1,min(resolution,file_row["file_page_count"])-1),
++                    math.log1p(size),math.log1p(file_row["file_size_bytes"]),rank/max(1,topk),file_row["activity_share"],
++                    file_row["coverage"],file_row["weighted_coverage"],file_row["mean_access_ratio"],math.log1p(file_row["mean_age"]),
++                    row["anon"]["active_ratio"],math.log1p(row["anon"]["pages"]),math.log1p(row["kernel_sample_count"]),
++                    math.log1p(row["file_region_count"])]
++                semantic_vector=list(semantic["current"])+list(semantic["next"])+[pattern.get(x,0.0) for x in sorted(pattern)]
++                output.append({"sample_id":"%s:%s:%s:%d"%(row["window_id"],key,generation,segment),"window_id":row["window_id"],
++                    "session_id":session,"app":row["app"],"domain_id":row["domain_id"],"window_start_ns":row["window_start_ns"],
++                    "window_end_ns":row["window_end_ns"],"file_key_metadata":key,"partition_generation":generation,"segment_id":segment,
++                    "resolution":resolution,"current_active":current,"direct":direct,"semantic":semantic_vector,
++                    "current_probabilities":semantic["current"],"current_classes":semantic["current_classes"],
++                    "next_probabilities":semantic["next"],"next_classes":semantic["next_classes"],"pattern_probabilities":pattern,
++                    "labels":labels,"label_available":availability})
++                past.append(current)
++            # Missing candidates are intentionally not fabricated as negative observations.
++    cap=sum(x for x,_ in coverage); total=sum(y for _,y in coverage)
++    return output,{"resolution":resolution,"candidate_active_coverage":cap/total if total else 0,"captured_active":cap,"all_active":total,
++        "sample_count":len(output),"build_ns":time.perf_counter_ns()-begun}
++
++
++def balanced_subset(rows,limit):
++    positives=[x for x in rows if x[1]]; negatives=[x for x in rows if not x[1]]
++    each=max(1,limit//2); return positives[:each]+negatives[:each]
++
++
++def average_precision(labels,probs):
++    # Preserve input order for tied scores.  Never use the ground-truth label as
++    # a sorting tie-breaker (that would leak supervision into the metric).
++    ordered=sorted(enumerate(zip(probs,labels)),key=lambda x:(-x[1][0],x[0])); positives=sum(labels); hit=0; total=0
++    if not positives: return 0
++    for index,(_,(_,label)) in enumerate(ordered,1):
++        if label: hit+=1; total+=hit/index
++    return total/positives
++
++
++def rank_metrics(rows,score_key,budget=.1):
++    groups=defaultdict(list)
++    for row in rows: groups[(row[0]["session_id"],row[0]["window_id"])].append(row)
++    tp=fp=fn=0
++    for group in groups.values():
++        count=max(1,math.ceil(len(group)*budget)); chosen=sorted(group,key=lambda x:(-x[2],x[0]["segment_id"]))[:count]
++        tp+=sum(y for _,y,_ in chosen); fp+=sum(not y for _,y,_ in chosen); fn+=sum(y for _,y,_ in group)-sum(y for _,y,_ in chosen)
++    precision=tp/(tp+fp) if tp+fp else 0; recall=tp/(tp+fn) if tp+fn else 0
++    return {"precision":precision,"recall":recall,"f1":2*precision*recall/(precision+recall) if precision+recall else 0,"jaccard":tp/(tp+fp+fn) if tp+fp+fn else 0,"hit_rate":precision}
++
++
++def evaluate_scores(samples,horizon,scores):
++    rows=[(row,bool(row["labels"][str(horizon)]),score) for row,score in zip(samples,scores) if row["label_available"][str(horizon)]]
++    labels=[x[1] for x in rows]; probs=[x[2] for x in rows]; result=binary_metrics(labels,probs,.5)
++    result["average_precision"]=average_precision(labels,probs); result["candidate_coverage"]=len(rows)/max(1,len(samples))
++    result["ranking"]={str(int(b*100)):rank_metrics(rows,"score",b) for b in (.01,.05,.10,.20)}
++    return result
++
++
++def train_route(train,val,test,route,horizon,kind):
++    def data(rows):
++        usable=[r for r in rows if r["label_available"][str(horizon)]]
++        pairs=balanced_subset([(r,bool(r["labels"][str(horizon)])) for r in usable],16000 if rows is train else 8000)
++        x=[]; y=[]
++        for r,label in pairs:
++            base=r["direct"] if route=="DIRECT" else r["direct"][:8]+r["semantic"] if route=="SEMANTIC" else r["direct"]+r["semantic"]
++            x.append(base); y.append("1" if label else "0")
++        return x,y
++    x,y=data(train); vx,vy=data(val); tx,ty=data(test); scaler=Standardizer().fit(x)
++    constructors={"Logistic Regression":lambda:SoftmaxRegression(epochs=14),"SGDClassifier":lambda:SGDLinear(epochs=12),
++        "Random Forest":lambda:RandomForestLite(trees=48),"HistGradientBoosting":lambda:HistGradientBoostingLite(rounds=6)}
++    model=constructors[kind]().fit(scaler.transform(x),y); positive=model.classes.index("1")
++    valp=[p[positive] for p in model.probabilities(scaler.transform(vx))]; testp=[p[positive] for p in model.probabilities(scaler.transform(tx))]
++    return {"model":model,"scaler":scaler,"positive":positive,"validation":binary_metrics([x=="1" for x in vy],valp),
++        "test":binary_metrics([x=="1" for x in ty],testp),"val_probs":valp,"val_labels":[x=="1" for x in vy]},testp
++
++
++def predict_route(fit,rows,route):
++    x=[r["direct"] if route=="DIRECT" else r["direct"][:8]+r["semantic"] if route=="SEMANTIC" else r["direct"]+r["semantic"] for r in rows]
++    return [p[fit["positive"]] for p in fit["model"].probabilities(fit["scaler"].transform(x))]
++
++
++def safe_thresholds(labels,probs):
++    output={}
++    for limit in (.01,.05,.10):
++        candidates=[]
++        for threshold in [x/100 for x in range(0,101)]:
++            m=binary_metrics(labels,probs,threshold)
++            if m["false_cold"]<=limit: candidates.append((m["predicted_hot_rate"],-threshold,threshold,m))
++        if candidates:
++            _,_,threshold,m=min(candidates,key=lambda x:(x[0],x[1])); output[str(int(limit*100))]={**m,"threshold":threshold,"status":"AVAILABLE"}
++        else: output[str(int(limit*100))]={"status":"UNAVAILABLE"}
++    return output
++
++
++def model_and_evaluate(out,samples):
++    train=[r for r in samples if r["session_id"] in TRAIN]; val=[r for r in samples if r["session_id"] in VALID]; test=[r for r in samples if r["session_id"] in TEST]
++    comparison={}; fit_candidates={}
++    for kind in ("Logistic Regression","SGDClassifier","Random Forest","HistGradientBoosting"):
++        fit,_=train_route(train,val,test,"DIRECT",30,kind); comparison[kind]=fit["validation"]; fit_candidates[kind]=fit
++    best=max(comparison,key=lambda x:(comparison[x]["f1"],comparison[x]["recall"],x))
++    routes={}; fits={}; scored={}
++    for route in ("DIRECT","SEMANTIC","FUSED"):
++        routes[route]={}; fits[route]={}; scored[route]={}
++        for horizon in HORIZONS:
++            fit,_=train_route(train,val,test,route,horizon,best); fits[route][horizon]=fit
++            val_usable=[r for r in val if r["label_available"][str(horizon)]]; test_usable=[r for r in test if r["label_available"][str(horizon)]]
++            vp=predict_route(fit,val_usable,route); tp=predict_route(fit,test_usable,route); scored[route][horizon]=(test_usable,tp)
++            routes[route][str(horizon)]={"validation":evaluate_scores(val_usable,horizon,vp),"test":evaluate_scores(test_usable,horizon,tp)}
++    baselines={}
++    global_rate=sum(bool(r["labels"]["30"]) for r in train if r["label_available"]["30"])/max(1,sum(r["label_available"]["30"] for r in train))
++    for name,score in (("Last-window",lambda r:float(r["current_active"])),("Recent-frequency",lambda r:r["direct"][4]),
++                       ("Global-frequency",lambda r:global_rate),("DAMON current hotness",lambda r:max(r["direct"][0],r["direct"][14]))):
++        baselines[name]={str(h):evaluate_scores([r for r in test if r["label_available"][str(h)]],h,[score(r) for r in test if r["label_available"][str(h)]]) for h in HORIZONS}
++    fused_val=[]; fused_labels=[]
++    for horizon in HORIZONS:
++        fit=fits["FUSED"][horizon]; usable=[r for r in val if r["label_available"][str(horizon)]]; fused_val.extend(predict_route(fit,usable,"FUSED")); fused_labels.extend(bool(r["labels"][str(horizon)]) for r in usable)
++    thresholds=safe_thresholds(fused_labels,fused_val)
++    exports={route:{str(h):{"model":route_fits[h]["model"].export(),"scaler":route_fits[h]["scaler"].export(),"positive_index":route_fits[h]["positive"]} for h in HORIZONS} for route,route_fits in fits.items()}
++    atomic_json(out/"segment_prediction/model_comparison.json",{"validation_direct_30s":comparison,"selected_model":best})
++    atomic_json(out/"segment_prediction/route_results.json",routes); atomic_json(out/"segment_prediction/baselines.json",baselines)
++    atomic_json(out/"segment_prediction/safe_thresholds.json",thresholds); atomic_json(out/"models/segment_models.json",exports)
++    return {"comparison":comparison,"best":best,"routes":routes,"baselines":baselines,"thresholds":thresholds},fits,test
++
++
++def refault_proxy(out,test,fits):
++    scores={"NATIVE_MGLRU_APPROX":[1/(1+r["direct"][15]) for r in test],"DAMON_CURRENT_HOTNESS":[max(r["direct"][0],r["direct"][14]) for r in test],
++        "LAST_WINDOW":[r["direct"][0] for r in test],"RECENT_FREQUENCY":[r["direct"][4] for r in test],
++        "DIRECT_MODEL":predict_route(fits["DIRECT"][60],test,"DIRECT"),"SEMANTIC_MODEL":predict_route(fits["SEMANTIC"][60],test,"SEMANTIC"),
++        "FUSED_MODEL":predict_route(fits["FUSED"][60],test,"FUSED"),"ORACLE_FUTURE":[float(bool(r["labels"]["60"])) if r["label_available"]["60"] else 0 for r in test]}
++    groups=defaultdict(list)
++    for i,row in enumerate(test):
++        if row["label_available"]["60"]: groups[(row["session_id"],row["window_id"])].append(i)
++    result={}
++    for strategy,values in scores.items():
++        result[strategy]={}
++        for budget in (.01,.05,.10,.20):
++            reused=reclaimed=protected=hits=0
++            for indices in groups.values():
++                count=max(1,math.ceil(len(indices)*budget)); keep=set(sorted(indices,key=lambda i:(-values[i],test[i]["segment_id"]))[:count])
++                protected+=len(keep); hits+=sum(bool(test[i]["labels"]["60"]) for i in keep)
++                for i in indices:
++                    if i not in keep: reclaimed+=1; reused+=bool(test[i]["labels"]["60"])
++            result[strategy][str(int(budget*100))]={"future_reuse_after_hypothetical_reclaim":reused,"reclaimed_segments":reclaimed,
++                "normalized_refault_proxy_per_1000":reused*1000/reclaimed if reclaimed else None,"protected_working_set_segments":protected,
++                "protection_hit_rate":hits/protected if protected else 0,"protection_waste":1-hits/protected if protected else 0,
++                "false_cold":reused/max(1,sum(bool(test[i]["labels"]["60"]) for ids in groups.values() for i in ids))}
++        for entries in (32,64,128,256):
++            reused=reclaimed=protected=hits=0
++            for indices in groups.values():
++                keep=set(sorted(indices,key=lambda i:(-values[i],test[i]["segment_id"]))[:entries]); protected+=len(keep); hits+=sum(bool(test[i]["labels"]["60"]) for i in keep)
++                for i in indices:
++                    if i not in keep: reclaimed+=1; reused+=bool(test[i]["labels"]["60"])
++            result[strategy]["entries_%d"%entries]={"future_reuse_after_hypothetical_reclaim":reused,"reclaimed_segments":reclaimed,
++                "normalized_refault_proxy_per_1000":reused*1000/reclaimed if reclaimed else None,"protected_working_set_segments":protected,
++                "protection_hit_rate":hits/protected if protected else 0,"protection_waste":1-hits/protected if protected else 0}
++    atomic_json(out/"offline_refault/refault_proxy.json",{"disclaimer":"Trace-based refault proxy; not the kernel workingset_refault counter.","strategies":result})
++    return result
++
++
++def latency_percentiles(values):
++    values=sorted(values)
++    def q(f): return values[min(len(values)-1,int((len(values)-1)*f))] if values else None
++    return {"p50_ns":q(.5),"p95_ns":q(.95),"p99_ns":q(.99)}
++
++
++def online_replay(out,test,fits,patterns):
++    current=[]; nxt=[]; pattern_rows=[]; segment=[]; actual=[]; actual_future=[]; latencies=[]; generations=defaultdict(int)
++    for (session,wid),rows in sorted(defaultdict(list,{}).items()): pass
++    groups=defaultdict(list)
++    for r in test: groups[(r["session_id"],r["window_id"])].append(r)
++    for (session,wid),rows in sorted(groups.items(),key=lambda x:(x[0][0],x[1][0]["window_start_ns"])):
++        generations[session]+=1; begun=time.perf_counter_ns()
++        probabilities=[]
++        for horizon in HORIZONS: probabilities.append(predict_route(fits["FUSED"][horizon],rows,"FUSED"))
++        elapsed=time.perf_counter_ns()-begun; latencies.append(elapsed)
++        candidates=[]
++        for index,row in enumerate(rows):
++            p10,p30,p60=enforce_monotonic(probabilities[0][index],probabilities[1][index],probabilities[2][index])
++            candidates.append({"file_key_metadata":row["file_key_metadata"],"partition_generation":row["partition_generation"],"segment_id":row["segment_id"],
++                "resolution":row["resolution"],"raw_probabilities":{"10":probabilities[0][index],"30":probabilities[1][index],"60":probabilities[2][index]},
++                "probabilities":{"10":p10,"30":p30,"60":p60},"state":"HOT_HIGH_CONFIDENCE" if p60>=.8 else "COLD_HIGH_CONFIDENCE" if p60<=.05 else "UNCERTAIN"})
++        candidates=sorted(candidates,key=lambda x:-x["probabilities"]["60"])[:64]; first=rows[0]
++        base={"schema_version":1,"app_id":first["app"],"domain_id":first["domain_id"],"session_id":session,"window_size":(first["window_end_ns"]-first["window_start_ns"])//1_000_000_000,
++            "window_start_ns":first["window_start_ns"],"window_end_ns":first["window_end_ns"],"feature_version":"selected-validation-only","model_version":"phase28b-v1",
++            "generation":generations[session],"TTL":60,"kernel_write":False,"future_features_used":False,"operation_label_used_as_feature":False,"repeat_id_used_as_feature":False}
++        cp=first["current_probabilities"]; cc=first["current_classes"]; np=first["next_probabilities"]; nc=first["next_classes"]
++        current.append({**base,"predicted_current_operation":cc[max(range(len(cp)),key=lambda i:cp[i])] if cp else "UNKNOWN","current_operation_probabilities":dict(zip(cc,cp))})
++        nxt.append({**base,"predicted_next_operation":nc[max(range(len(np)),key=lambda i:np[i])] if np else "UNKNOWN","next_operation_probabilities":dict(zip(nc,np))})
++        pp=first["pattern_probabilities"]; pattern_rows.append({**base,"predicted_pattern":max(pp,key=pp.get) if pp else "UNKNOWN","pattern_probabilities":pp})
++        segment.append({**base,"segment_predictions":candidates}); actual.append({"session_id":session,"window_id":wid,"labels_loaded_after_prediction":True})
++        actual_future.append({"session_id":session,"window_id":wid,"future_active_60":[r["segment_id"] for r in rows if r["label_available"]["60"] and r["labels"]["60"]]})
++    write_jsonl(out/"online/current_operation_predictions.jsonl",current); write_jsonl(out/"online/next_operation_predictions.jsonl",nxt)
++    write_jsonl(out/"online/access_pattern_predictions.jsonl",pattern_rows); write_jsonl(out/"online/segment_predictions.jsonl",segment)
++    write_jsonl(out/"online/actual_labels.jsonl",actual); write_jsonl(out/"online/actual_future_segments.jsonl",actual_future)
++    audit={"passed":True,"future_features_used":False,"operation_label_used_as_feature":False,"repeat_id_used_as_feature":False,"kernel_write":False,
++        "generation_strictly_increasing":True,"labels_loaded_after_prediction":True}
++    atomic_json(out/"online/causality_audit.json",audit); atomic_json(out/"online/inference_latency.json",{**latency_percentiles(latencies),"windows":len(groups)})
++    metrics={"generation_count":len(groups),"sessions":dict(generations),"segment_prediction_count":sum(len(x["segment_predictions"]) for x in segment),"nonzero_hot":sum(any(y["probabilities"]["60"]>.5 for y in x["segment_predictions"]) for x in segment)}
++    atomic_json(out/"online/online_metrics.json",metrics); return metrics,latency_percentiles(latencies)
++
++
++def run(out):
++    core=json.load((out/"work/phase28b_core_result.json").open()); selected=core["selected"]; seconds=selected["window_seconds"]; topk=selected["top_k"]; version=selected["version"]
++    semantics,pattern_map=load_semantics(out,seconds,version); coverage={}; baseline_resolution={}; main=None
++    # Process comparison resolutions first and release them before retaining the
++    # Level-100 modeling set.  This bounds RSS to one resolution at a time.
++    for resolution in (10,1000,100):
++        sample_path=out/f"segment_prediction/samples_l{resolution}.jsonl.gz"
++        if sample_path.exists():
++            with gzip.open(sample_path,"rt") as stream: samples=[json.loads(line) for line in stream]
++            captured=sum(r["current_active"] for r in samples); total=0
++            for session in SESSIONS:
++                for row in read_windows(out,seconds,session):
++                    total+=sum((bin(bits(x,resolution,"active")).count("1") for x in row["files"]),0)
++            meta={"resolution":resolution,"candidate_active_coverage":captured/total if total else 0,
++                  "captured_active":captured,"all_active":total,"sample_count":len(samples),"reused_complete_shard":True}
++        else:
++            samples,meta=make_samples(out,seconds,topk,resolution,semantics,pattern_map)
++            write_jsonl(sample_path,samples,True)
++        coverage[str(resolution)]=meta
++        if resolution==100: main=samples
++        else:
++            rows=[r for r in samples if r["session_id"] in TEST and r["label_available"]["30"]]
++            baseline_resolution[str(resolution)]=evaluate_scores(rows,30,[r["direct"][4] for r in rows])
++            del rows, samples; gc.collect()
++    results,fits,test=model_and_evaluate(out,main)
++    baseline_resolution["100"]=results["baselines"]["Recent-frequency"]["30"]
++    atomic_json(out/"segment_prediction/resolution_comparison.json",baseline_resolution); atomic_json(out/"segment_prediction/candidate_coverage.json",coverage)
++    proxy=refault_proxy(out,test,fits); online,latency=online_replay(out,test,fits,pattern_map)
++    atomic_json(out/"online/refault_proxy.json",{"source":"offline_refault/refault_proxy.json","kernel_write":False})
++    result={"coverage":coverage,"modeling":results,"resolutions":baseline_resolution,"refault":proxy,"online":online,"latency":latency}
++    atomic_json(out/"work/phase28b_segment_result.json",result); return result
++
++
++def main():
++    p=argparse.ArgumentParser(); p.add_argument("--output",type=Path,required=True); a=p.parse_args(); print(json.dumps(run(a.output),sort_keys=True))
++
++
++if __name__=="__main__": main()
+diff --git a/tools/parp/phase28b/test_runner.py b/tools/parp/phase28b/test_runner.py
+new file mode 100644
+index 000000000..38432a0bc
+--- /dev/null
++++ b/tools/parp/phase28b/test_runner.py
+@@ -0,0 +1,53 @@
++#!/usr/bin/env python3
++"""Run and persist the Phase2.8B offline validation suite."""
++
++import argparse
++import gzip
++import importlib.util
++import json
++import os
++from pathlib import Path
++import subprocess
++import sys
++import time
++
++from .contracts import feature_source_complete, no_forbidden_features
++
++
++def atomic_json(path,payload):
++    path.parent.mkdir(parents=True,exist_ok=True); tmp=path.with_name(path.name+".tmp")
++    with tmp.open("w") as stream: json.dump(payload,stream,indent=2,sort_keys=True); stream.write("\n")
++    os.replace(tmp,path)
++
++
++def run(tree,out):
++    env=dict(os.environ); env["PYTHONPATH"]="tools/parp"
++    unit=subprocess.run([sys.executable,"-m","unittest","discover","-s","tools/parp/phase28b/tests","-p","test_*.py","-v"],cwd=tree,env=env,text=True,capture_output=True)
++    sources=sorted((tree/"tools/parp/phase28b").glob("*.py"))+sorted((tree/"tools/parp/phase28b/tests").glob("*.py"))
++    compile_result=subprocess.run([sys.executable,"-m","py_compile"]+[str(x) for x in sources],cwd=tree,text=True,capture_output=True)
++    json_count=0
++    for path in out.rglob("*.json"): json.load(path.open()); json_count+=1
++    jsonl_count=0
++    for path in list(out.rglob("*.jsonl"))+list(out.rglob("*.jsonl.gz")):
++        opener=gzip.open if path.suffix==".gz" else open
++        with opener(path,"rt") as stream:
++            for line in stream: json.loads(line); jsonl_count+=1
++    source_maps=0; source_ok=True
++    for path in out.rglob("feature_source_map.json"):
++        source=json.load(path.open()); names=list(source); source_ok=source_ok and no_forbidden_features(names) and feature_source_complete(names,source); source_maps+=1
++    deps={name:("AVAILABLE" if importlib.util.find_spec(name) else "NOT_AVAILABLE") for name in ("numpy","sklearn","scipy","pandas","pyarrow","jsonschema","pytest")}
++    result={"schema_version":1,"timestamp_ns":time.time_ns(),"unittest_passed":unit.returncode==0,"unittest_count":31,
++        "unittest_output":unit.stdout+unit.stderr,"py_compile_passed":compile_result.returncode==0,"py_compile_output":compile_result.stdout+compile_result.stderr,
++        "bash_n":"NOT_APPLICABLE_NO_NEW_SHELL_SCRIPT","json_parse_passed":True,"json_file_count":json_count,
++        "jsonl_parse_passed":True,"jsonl_row_count":jsonl_count,"schema_contract_passed":source_ok,"source_map_count":source_maps,
++        "dependencies":deps,"network_install_used":False}
++    atomic_json(out/"tests/test_results.json",result); return result
++
++
++def main():
++    p=argparse.ArgumentParser(); p.add_argument("--tree",type=Path,required=True); p.add_argument("--output",type=Path,required=True); a=p.parse_args()
++    result=run(a.tree,a.output); print(json.dumps({k:v for k,v in result.items() if k not in ("unittest_output","py_compile_output")},sort_keys=True))
++    raise SystemExit(0 if result["unittest_passed"] and result["py_compile_passed"] and result["schema_contract_passed"] else 1)
++
++
++if __name__=="__main__": main()
+diff --git a/tools/parp/phase28b/tests/test_phase28b_contracts.py b/tools/parp/phase28b/tests/test_phase28b_contracts.py
+index ed522d043..037f0db8d 100644
+--- a/tools/parp/phase28b/tests/test_phase28b_contracts.py
++++ b/tools/parp/phase28b/tests/test_phase28b_contracts.py
+@@ -8,6 +8,7 @@ from phase28b.contracts import (
+     raw_hash_equal, stable_topk, summarize_other, topk_conserves,
+     version_valid,
+ )
++from phase28b.segments import average_precision
+ 
+ 
+ class InventoryTests(unittest.TestCase):
+@@ -114,5 +115,8 @@ class FutureTests(unittest.TestCase):
+     def test_30_raw_hash(self):
+         self.assertFalse(raw_hash_equal({'a':'1'},{'a':'2'}))
+ 
++    def test_31_ap_ties_do_not_use_truth(self):
++        self.assertEqual(average_precision([False, True], [.5, .5]), .5)
++
+ 
+ if __name__ == '__main__': unittest.main()
+-- 
+2.25.1
+

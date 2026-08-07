@@ -1,0 +1,57 @@
+From d5f65503aea66c3de3edd3073521c158a7f7ab40 Mon Sep 17 00:00:00 2001
+From: Codex PARP Reproduction <codex@localhost>
+Date: Tue, 4 Aug 2026 20:55:26 +0800
+Subject: [PATCH 113/124] parp: fail closed on unreadable preflight debugfs
+
+---
+ .../effective_tier/live_shadow_preflight.py   | 20 +++++++++++++++----
+ 1 file changed, 16 insertions(+), 4 deletions(-)
+
+diff --git a/tools/parp/effective_tier/live_shadow_preflight.py b/tools/parp/effective_tier/live_shadow_preflight.py
+index 1b78bb69f..0d2b9869b 100644
+--- a/tools/parp/effective_tier/live_shadow_preflight.py
++++ b/tools/parp/effective_tier/live_shadow_preflight.py
+@@ -66,6 +66,18 @@ def _text(path: Path) -> Optional[str]:
+         return None
+ 
+ 
++def _path_state(path: Path) -> Dict[str, object]:
++    """Distinguish an absent trace/debug file from an unreadable one."""
++
++    try:
++        path.stat()
++    except PermissionError:
++        return {"exists": True, "readable": False}
++    except OSError:
++        return {"exists": False, "readable": False}
++    return {"exists": True, "readable": _text(path) is not None}
++
++
+ def _sha256(path: Path) -> Optional[str]:
+     try:
+         digest = hashlib.sha256()
+@@ -316,9 +328,9 @@ def create_preflight(tree: Path, output: Path, build_dir: Optional[Path],
+         blockers.append("target_kernel_not_running")
+     debugfs_paths = ["/sys/kernel/debug/parp/effective_tier_mode",
+                      "/sys/kernel/debug/parp/effective_tier_stats"]
+-    missing_debugfs = [path for path in debugfs_paths if not Path(path).is_file()]
+-    if missing_debugfs:
+-        blockers.append("effective_tier_debugfs_unavailable")
++    debugfs_state = {path: _path_state(Path(path)) for path in debugfs_paths}
++    if not all(bool(state["readable"]) for state in debugfs_state.values()):
++        blockers.append("effective_tier_debugfs_unavailable_or_inaccessible")
+ 
+     repository_audit = {
+         "baseline_head": BASELINE_HEAD,
+@@ -376,7 +388,7 @@ def create_preflight(tree: Path, output: Path, build_dir: Optional[Path],
+         "expected_release": expected_release,
+         "running_release": running_release,
+         "running_target_kernel": False,
+-        "debugfs_paths": {path: Path(path).is_file() for path in debugfs_paths},
++        "debugfs_paths": debugfs_state,
+         "apply_modes_executed": False,
+     }
+     _write_json(output / "repository_audit.json", repository_audit)
+-- 
+2.25.1
+

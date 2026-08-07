@@ -1,0 +1,104 @@
+From 63d1eedfd5da3e226e05de0799c329451b1f2df7 Mon Sep 17 00:00:00 2001
+From: Codex PARP Reproduction <codex@localhost>
+Date: Fri, 31 Jul 2026 19:39:24 +0800
+Subject: [PATCH 012/124] parp: bound asynchronous DAMON alignment work
+
+---
+ mm/parp/adapter/damon_adapter.c | 28 ++++++++++++++++++++++++++++
+ mm/parp/control/debugfs.c       |  4 ++++
+ mm/parp/internal.h              |  2 ++
+ 3 files changed, 34 insertions(+)
+
+diff --git a/mm/parp/adapter/damon_adapter.c b/mm/parp/adapter/damon_adapter.c
+index 222df841a..a3405a09f 100644
+--- a/mm/parp/adapter/damon_adapter.c
++++ b/mm/parp/adapter/damon_adapter.c
+@@ -21,6 +21,30 @@ struct parp_damon_work {
+ };
+ 
+ static atomic64_t parp_sample_sequence = ATOMIC64_INIT(0);
++static unsigned int max_pending_damon_work = 4096;
++
++module_param(max_pending_damon_work, uint, 0644);
++
++static bool parp_damon_queue_reserve(void)
++{
++	s64 depth = atomic64_inc_return(&parp_evidence_stats.queue_depth);
++	s64 high = atomic64_read(&parp_evidence_stats.queue_high_water);
++
++	if (depth > max_pending_damon_work) {
++		atomic64_dec(&parp_evidence_stats.queue_depth);
++		atomic64_inc(&parp_evidence_stats.samples_dropped);
++		return false;
++	}
++	while (depth > high) {
++		s64 previous = atomic64_cmpxchg(
++			&parp_evidence_stats.queue_high_water, high, depth);
++
++		if (previous == high)
++			break;
++		high = previous;
++	}
++	return true;
++}
+ 
+ static u64 parp_session_cookie(struct task_struct *task,
+ 			       struct mm_struct *mm)
+@@ -316,6 +340,7 @@ static void parp_damon_workfn(struct work_struct *work)
+ 	put_task_struct(task);
+ out:
+ 	put_pid(item->pid);
++	atomic64_dec(&parp_evidence_stats.queue_depth);
+ 	kfree(item);
+ }
+ 
+@@ -327,8 +352,11 @@ void parp_damon_aggregate(struct damon_ctx *ctx, struct damon_target *target,
+ 
+ 	if (!target->pid || region->ar.start >= region->ar.end)
+ 		return;
++	if (!parp_damon_queue_reserve())
++		return;
+ 	item = kzalloc(sizeof(*item), GFP_ATOMIC);
+ 	if (!item) {
++		atomic64_dec(&parp_evidence_stats.queue_depth);
+ 		atomic64_inc(&parp_evidence_stats.samples_dropped);
+ 		return;
+ 	}
+diff --git a/mm/parp/control/debugfs.c b/mm/parp/control/debugfs.c
+index f144348ba..ea4b0a664 100644
+--- a/mm/parp/control/debugfs.c
++++ b/mm/parp/control/debugfs.c
+@@ -78,6 +78,8 @@ static ssize_t evidence_stats_read(struct file *file, char __user *buf,
+ 	size = scnprintf(text, sizeof(text),
+ 		"samples_queued %lld\n"
+ 		"samples_dropped %lld\n"
++		"queue_depth %lld\n"
++		"queue_high_water %lld\n"
+ 		"target_to_mm_ok %lld\n"
+ 		"mm_to_domain_ok %lld\n"
+ 		"domain_to_bind_ok %lld\n"
+@@ -90,6 +92,8 @@ static ssize_t evidence_stats_read(struct file *file, char __user *buf,
+ 		"file_folio_no_region %lld\nfile_folio_expired %lld\n",
+ 		atomic64_read(&parp_evidence_stats.samples_queued),
+ 		atomic64_read(&parp_evidence_stats.samples_dropped),
++		atomic64_read(&parp_evidence_stats.queue_depth),
++		atomic64_read(&parp_evidence_stats.queue_high_water),
+ 		atomic64_read(&parp_evidence_stats.target_to_mm_ok),
+ 		atomic64_read(&parp_evidence_stats.mm_to_domain_ok),
+ 		atomic64_read(&parp_evidence_stats.domain_to_bind_ok),
+diff --git a/mm/parp/internal.h b/mm/parp/internal.h
+index 0254cf153..19401a508 100644
+--- a/mm/parp/internal.h
++++ b/mm/parp/internal.h
+@@ -243,6 +243,8 @@ struct parp_evidence_snapshot {
+ struct parp_evidence_stats {
+ 	atomic64_t samples_queued;
+ 	atomic64_t samples_dropped;
++	atomic64_t queue_depth;
++	atomic64_t queue_high_water;
+ 	atomic64_t target_to_mm_ok;
+ 	atomic64_t mm_to_domain_ok;
+ 	atomic64_t domain_to_bind_ok;
+-- 
+2.25.1
+

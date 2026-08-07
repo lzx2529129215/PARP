@@ -1,0 +1,696 @@
+From 8b64db8423c6c4956de38f1e6d5728f751993528 Mon Sep 17 00:00:00 2001
+From: Codex PARP Reproduction <codex@localhost>
+Date: Tue, 4 Aug 2026 12:32:07 +0800
+Subject: [PATCH 097/124] parp: add quantized reuse score reference model
+
+---
+ tools/parp/frontier_score/README.md           |  32 +++
+ tools/parp/frontier_score/__init__.py         |   2 +
+ tools/parp/frontier_score/benchmark.py        |  76 +++++++
+ tools/parp/frontier_score/cscore.c            | 122 ++++++++++++
+ tools/parp/frontier_score/default_models.json |  48 +++++
+ tools/parp/frontier_score/reference.py        | 188 ++++++++++++++++++
+ tools/parp/frontier_score/tests/__init__.py   |   2 +
+ .../frontier_score/tests/test_reference.py    | 151 ++++++++++++++
+ 8 files changed, 621 insertions(+)
+ create mode 100644 tools/parp/frontier_score/README.md
+ create mode 100644 tools/parp/frontier_score/__init__.py
+ create mode 100644 tools/parp/frontier_score/benchmark.py
+ create mode 100644 tools/parp/frontier_score/cscore.c
+ create mode 100644 tools/parp/frontier_score/default_models.json
+ create mode 100644 tools/parp/frontier_score/reference.py
+ create mode 100644 tools/parp/frontier_score/tests/__init__.py
+ create mode 100644 tools/parp/frontier_score/tests/test_reference.py
+
+diff --git a/tools/parp/frontier_score/README.md b/tools/parp/frontier_score/README.md
+new file mode 100644
+index 000000000..c37a868dd
+--- /dev/null
++++ b/tools/parp/frontier_score/README.md
+@@ -0,0 +1,32 @@
++# PARP frontier score reference
++
++This directory defines the integer contract shared by offline replay and the
++kernel frontier scorer.
++
++The bundled WPS, QQ, FILES and Generic tables are deterministic engineering
++models for implementation and consistency testing. They were not trained on
++the old Phase2.10 V1/V2 candidate concatenations and must not be represented as
++production-quality reuse models. Promotion remains disabled until a genuine
++post-`sort_folio()` frontier dataset is collected and passes the SHADOW gate.
++
++The eight schema-v1 features, in fixed order, are:
++
++1. access age in milliseconds;
++2. previous access interval in milliseconds;
++3. access EMA in Q8;
++4. reuse interval EMA in milliseconds;
++5. consecutive inactive scan count;
++6. distance from the youngest MGLRU generation;
++7. time in the current generation in milliseconds;
++8. App-level LSTM reentry score in Q15.
++
++An edge belongs to the lower bin. A missing feature is represented by
++`INT64_MIN` and forces Native fallback. The score is an integer reuse score,
++not a calibrated probability.
++
++Run the reference tests from the kernel tree root:
++
++```sh
++python3 -m unittest -v tools.parp.frontier_score.tests.test_reference
++python3 tools/parp/frontier_score/benchmark.py --iterations 20000
++```
+diff --git a/tools/parp/frontier_score/__init__.py b/tools/parp/frontier_score/__init__.py
+new file mode 100644
+index 000000000..a892c5678
+--- /dev/null
++++ b/tools/parp/frontier_score/__init__.py
+@@ -0,0 +1,2 @@
++# SPDX-License-Identifier: GPL-2.0
++"""Reference implementation for PARP frontier reuse scoring."""
+diff --git a/tools/parp/frontier_score/benchmark.py b/tools/parp/frontier_score/benchmark.py
+new file mode 100644
+index 000000000..27ea9e55f
+--- /dev/null
++++ b/tools/parp/frontier_score/benchmark.py
+@@ -0,0 +1,76 @@
++#!/usr/bin/env python3
++# SPDX-License-Identifier: GPL-2.0
++"""No-reclaim microbenchmark for the pure integer reference scorer."""
++
++from __future__ import annotations
++
++import argparse
++import json
++import statistics
++import sys
++import time
++from pathlib import Path
++
++if __package__ in (None, ""):
++    sys.path.insert(0, str(Path(__file__).resolve().parents[3]))
++
++from tools.parp.frontier_score.reference import load_models, score_model
++
++
++def percentile(values, quantile):
++    ordered = sorted(values)
++    return ordered[min(len(ordered) - 1, int((len(ordered) - 1) * quantile))]
++
++
++def run(iterations):
++    models = load_models()
++    features = [50, 200, 128, 300, 1, 2, 700, 20000]
++    output = {"iterations": iterations, "clock": "perf_counter_ns",
++              "measurements": {}}
++    for app_id in (0, 1, 2, 3):
++        model = models[app_id]
++        samples = []
++        for _ in range(iterations):
++            started = time.perf_counter_ns()
++            score_model(model, features, 1, 1)
++            samples.append(time.perf_counter_ns() - started)
++        output["measurements"][model.model_name] = {
++            "p50_ns": percentile(samples, .50),
++            "p95_ns": percentile(samples, .95),
++            "p99_ns": percentile(samples, .99),
++            "max_ns": max(samples),
++            "mean_ns": statistics.fmean(samples),
++        }
++    disabled = []
++    for _ in range(iterations):
++        started = time.perf_counter_ns()
++        enabled = False
++        if enabled:  # pragma: no cover - intentionally measures OFF branch
++            score_model(models[0], features, 1, 1)
++        disabled.append(time.perf_counter_ns() - started)
++    output["measurements"]["OFF_BRANCH"] = {
++        "p50_ns": percentile(disabled, .50),
++        "p95_ns": percentile(disabled, .95),
++        "p99_ns": percentile(disabled, .99),
++        "max_ns": max(disabled),
++        "mean_ns": statistics.fmean(disabled),
++    }
++    return output
++
++
++def main():
++    parser = argparse.ArgumentParser()
++    parser.add_argument("--iterations", type=int, default=20000)
++    parser.add_argument("--output")
++    args = parser.parse_args()
++    payload = run(args.iterations)
++    text = json.dumps(payload, indent=2, sort_keys=True) + "\n"
++    if args.output:
++        with open(args.output, "w", encoding="utf-8") as stream:
++            stream.write(text)
++    else:
++        print(text, end="")
++
++
++if __name__ == "__main__":
++    main()
+diff --git a/tools/parp/frontier_score/cscore.c b/tools/parp/frontier_score/cscore.c
+new file mode 100644
+index 000000000..6e847fa6b
+--- /dev/null
++++ b/tools/parp/frontier_score/cscore.c
+@@ -0,0 +1,122 @@
++// SPDX-License-Identifier: GPL-2.0
++/* Standalone fixed-cost C oracle; the kernel implementation uses this contract. */
++#include <inttypes.h>
++#include <stdint.h>
++#include <stdio.h>
++#include <stdlib.h>
++
++#define FEATURES 8
++#define BINS 6
++
++struct model {
++	int32_t threshold;
++	int64_t edges[FEATURES][BINS - 1];
++	int16_t weights[FEATURES][BINS];
++};
++
++#define COMMON_EDGES { \
++	{ 10, 100, 500, 2000, 10000 }, \
++	{ 10, 100, 500, 2000, 10000 }, \
++	{ 8, 32, 96, 160, 224 }, \
++	{ 10, 100, 500, 2000, 10000 }, \
++	{ 0, 1, 2, 4, 8 }, \
++	{ 0, 1, 2, 3, 5 }, \
++	{ 10, 100, 500, 2000, 10000 }, \
++	{ 4096, 8192, 16384, 24576, 30000 } \
++}
++
++static const struct model models[] = {
++	{
++		.threshold = 96,
++		.edges = COMMON_EDGES,
++		.weights = {
++			{ 38, 29, 18, 7, -9, -21 },
++			{ 24, 18, 11, 3, -8, -17 },
++			{ -18, -7, 3, 15, 26, 37 },
++			{ 22, 16, 9, 1, -9, -19 },
++			{ 22, 13, 5, -5, -15, -25 },
++			{ 19, 11, 3, -5, -14, -23 },
++			{ 17, 11, 5, -2, -10, -19 },
++			{ -22, -13, -4, 8, 21, 34 },
++		},
++	},
++	{
++		.threshold = 94,
++		.edges = COMMON_EDGES,
++		.weights = {
++			{ 42, 32, 20, 8, -8, -22 },
++			{ 26, 20, 12, 4, -8, -18 },
++			{ -20, -8, 4, 16, 28, 40 },
++			{ 24, 18, 10, 2, -8, -18 },
++			{ 24, 14, 6, -4, -14, -26 },
++			{ 20, 12, 4, -4, -12, -20 },
++			{ 18, 12, 6, 0, -8, -16 },
++			{ -24, -14, -4, 8, 20, 32 },
++		},
++	},
++	{
++		.threshold = 100,
++		.edges = COMMON_EDGES,
++		.weights = {
++			{ 36, 28, 18, 8, -6, -18 },
++			{ 20, 16, 10, 4, -6, -14 },
++			{ -16, -6, 4, 14, 24, 34 },
++			{ 18, 14, 8, 2, -8, -16 },
++			{ 20, 12, 4, -4, -12, -22 },
++			{ 18, 10, 2, -6, -14, -22 },
++			{ 16, 10, 4, -2, -10, -18 },
++			{ -30, -18, -6, 10, 26, 42 },
++		},
++	},
++	{
++		.threshold = 88,
++		.edges = COMMON_EDGES,
++		.weights = {
++			{ 46, 34, 20, 6, -12, -28 },
++			{ 30, 22, 12, 2, -10, -22 },
++			{ -22, -10, 2, 16, 30, 44 },
++			{ 28, 20, 10, 0, -12, -24 },
++			{ 26, 16, 6, -6, -18, -30 },
++			{ 22, 12, 2, -8, -18, -28 },
++			{ 20, 12, 4, -4, -14, -24 },
++			{ -18, -10, -2, 6, 16, 26 },
++		},
++	},
++};
++
++static int32_t score(const struct model *model, const int64_t values[FEATURES])
++{
++	int32_t total = 0;
++	int feature;
++
++	for (feature = 0; feature < FEATURES; feature++) {
++		int bin = 0;
++
++		while (bin < BINS - 1 && values[feature] > model->edges[feature][bin])
++			bin++;
++		total += model->weights[feature][bin];
++	}
++	return total;
++}
++
++int main(void)
++{
++	int app_id;
++	int64_t values[FEATURES];
++
++	while (scanf("%d", &app_id) == 1) {
++		int feature;
++		int32_t value;
++
++		for (feature = 0; feature < FEATURES; feature++) {
++			if (scanf("%" SCNd64, &values[feature]) != 1)
++				return EXIT_FAILURE;
++		}
++		if (app_id < 0 || app_id > 3)
++			app_id = 0;
++		value = score(&models[app_id], values);
++		printf("%" PRId32 " %d\n", value,
++		       value >= models[app_id].threshold);
++	}
++	return ferror(stdin) ? EXIT_FAILURE : EXIT_SUCCESS;
++}
+diff --git a/tools/parp/frontier_score/default_models.json b/tools/parp/frontier_score/default_models.json
+new file mode 100644
+index 000000000..f23a30982
+--- /dev/null
++++ b/tools/parp/frontier_score/default_models.json
+@@ -0,0 +1,48 @@
++{
++  "feature_names": [
++    "access_age_ms",
++    "previous_access_interval_ms",
++    "access_ema_q8",
++    "reuse_interval_ema_ms",
++    "consecutive_inactive_count",
++    "generation_distance",
++    "time_in_generation_ms",
++    "app_reentry_q15"
++  ],
++  "feature_schema_version": 1,
++  "models": [
++    {
++      "app_id": 1,
++      "model_name": "WPS_REUSE_MODEL",
++      "model_version": 1,
++      "threshold": 94,
++      "bin_edges": [[10, 100, 500, 2000, 10000], [10, 100, 500, 2000, 10000], [8, 32, 96, 160, 224], [10, 100, 500, 2000, 10000], [0, 1, 2, 4, 8], [0, 1, 2, 3, 5], [10, 100, 500, 2000, 10000], [4096, 8192, 16384, 24576, 30000]],
++      "weights": [[42, 32, 20, 8, -8, -22], [26, 20, 12, 4, -8, -18], [-20, -8, 4, 16, 28, 40], [24, 18, 10, 2, -8, -18], [24, 14, 6, -4, -14, -26], [20, 12, 4, -4, -12, -20], [18, 12, 6, 0, -8, -16], [-24, -14, -4, 8, 20, 32]]
++    },
++    {
++      "app_id": 2,
++      "model_name": "QQ_REUSE_MODEL",
++      "model_version": 1,
++      "threshold": 100,
++      "bin_edges": [[10, 100, 500, 2000, 10000], [10, 100, 500, 2000, 10000], [8, 32, 96, 160, 224], [10, 100, 500, 2000, 10000], [0, 1, 2, 4, 8], [0, 1, 2, 3, 5], [10, 100, 500, 2000, 10000], [4096, 8192, 16384, 24576, 30000]],
++      "weights": [[36, 28, 18, 8, -6, -18], [20, 16, 10, 4, -6, -14], [-16, -6, 4, 14, 24, 34], [18, 14, 8, 2, -8, -16], [20, 12, 4, -4, -12, -22], [18, 10, 2, -6, -14, -22], [16, 10, 4, -2, -10, -18], [-30, -18, -6, 10, 26, 42]]
++    },
++    {
++      "app_id": 3,
++      "model_name": "FILES_REUSE_MODEL",
++      "model_version": 1,
++      "threshold": 88,
++      "bin_edges": [[10, 100, 500, 2000, 10000], [10, 100, 500, 2000, 10000], [8, 32, 96, 160, 224], [10, 100, 500, 2000, 10000], [0, 1, 2, 4, 8], [0, 1, 2, 3, 5], [10, 100, 500, 2000, 10000], [4096, 8192, 16384, 24576, 30000]],
++      "weights": [[46, 34, 20, 6, -12, -28], [30, 22, 12, 2, -10, -22], [-22, -10, 2, 16, 30, 44], [28, 20, 10, 0, -12, -24], [26, 16, 6, -6, -18, -30], [22, 12, 2, -8, -18, -28], [20, 12, 4, -4, -14, -24], [-18, -10, -2, 6, 16, 26]]
++    },
++    {
++      "app_id": 0,
++      "model_name": "GENERIC_REUSE_MODEL",
++      "model_version": 1,
++      "threshold": 96,
++      "bin_edges": [[10, 100, 500, 2000, 10000], [10, 100, 500, 2000, 10000], [8, 32, 96, 160, 224], [10, 100, 500, 2000, 10000], [0, 1, 2, 4, 8], [0, 1, 2, 3, 5], [10, 100, 500, 2000, 10000], [4096, 8192, 16384, 24576, 30000]],
++      "weights": [[38, 29, 18, 7, -9, -21], [24, 18, 11, 3, -8, -17], [-18, -7, 3, 15, 26, 37], [22, 16, 9, 1, -9, -19], [22, 13, 5, -5, -15, -25], [19, 11, 3, -5, -14, -23], [17, 11, 5, -2, -10, -19], [-22, -13, -4, 8, 21, 34]]
++    }
++  ],
++  "schema_name": "parp_frontier_features_v1"
++}
+diff --git a/tools/parp/frontier_score/reference.py b/tools/parp/frontier_score/reference.py
+new file mode 100644
+index 000000000..f80d88d12
+--- /dev/null
++++ b/tools/parp/frontier_score/reference.py
+@@ -0,0 +1,188 @@
++#!/usr/bin/env python3
++# SPDX-License-Identifier: GPL-2.0
++"""Pure integer reference for the PARP frontier score contract."""
++
++from __future__ import annotations
++
++import bisect
++import json
++from dataclasses import dataclass
++from pathlib import Path
++from typing import Dict, Iterable, List, Mapping, Optional, Sequence, Tuple
++
++MAX_FEATURES = 8
++MAX_BINS = 10
++MISSING_VALUE = -(1 << 63)
++S16_MIN = -(1 << 15)
++S16_MAX = (1 << 15) - 1
++S32_MIN = -(1 << 31)
++S32_MAX = (1 << 31) - 1
++
++
++class ModelError(ValueError):
++    """The model cannot be consumed safely by the fixed kernel scorer."""
++
++
++@dataclass(frozen=True)
++class QuantModel:
++    app_id: int
++    model_name: str
++    model_version: int
++    feature_schema_version: int
++    threshold: int
++    bin_edges: Tuple[Tuple[int, ...], ...]
++    weights: Tuple[Tuple[int, ...], ...]
++
++    @property
++    def nr_features(self) -> int:
++        return len(self.weights)
++
++
++@dataclass(frozen=True)
++class ScoreResult:
++    valid: bool
++    score: int = 0
++    would_promote: bool = False
++    model_name: str = "NATIVE"
++    reason: str = "native"
++
++
++def _checked_model(raw: Mapping[str, object], schema_version: int) -> QuantModel:
++    edges = tuple(tuple(int(value) for value in row)
++                  for row in raw["bin_edges"])  # type: ignore[index]
++    weights = tuple(tuple(int(value) for value in row)
++                    for row in raw["weights"])  # type: ignore[index]
++    if not 1 <= len(weights) <= MAX_FEATURES or len(edges) != len(weights):
++        raise ModelError("invalid feature count")
++    for edge_row, weight_row in zip(edges, weights):
++        if len(weight_row) != len(edge_row) + 1:
++            raise ModelError("bin edge/weight shape mismatch")
++        if not 1 <= len(weight_row) <= MAX_BINS:
++            raise ModelError("invalid bin count")
++        if any(left >= right for left, right in zip(edge_row, edge_row[1:])):
++            raise ModelError("bin edges must be strictly increasing")
++        if any(value < S16_MIN or value > S16_MAX for value in weight_row):
++            raise ModelError("weight outside s16")
++    threshold = int(raw["threshold"])
++    max_abs_score = sum(max(abs(value) for value in row) for row in weights)
++    if max_abs_score > S32_MAX or not S32_MIN <= threshold <= S32_MAX:
++        raise ModelError("score cannot be accumulated safely in s32")
++    model_version = int(raw["model_version"])
++    if model_version <= 0 or schema_version <= 0:
++        raise ModelError("versions must be positive")
++    return QuantModel(
++        app_id=int(raw["app_id"]),
++        model_name=str(raw["model_name"]),
++        model_version=model_version,
++        feature_schema_version=schema_version,
++        threshold=threshold,
++        bin_edges=edges,
++        weights=weights,
++    )
++
++
++def load_models(path: Optional[Path] = None) -> Dict[int, QuantModel]:
++    model_path = path or Path(__file__).with_name("default_models.json")
++    payload = json.loads(model_path.read_text(encoding="utf-8"))
++    schema = int(payload["feature_schema_version"])
++    models = [_checked_model(raw, schema) for raw in payload["models"]]
++    if len({model.app_id for model in models}) != len(models):
++        raise ModelError("duplicate app model")
++    return {model.app_id: model for model in models}
++
++
++def route_model(models: Mapping[int, QuantModel], app_id: int,
++                allow_generic: bool = True) -> Optional[QuantModel]:
++    model = models.get(app_id)
++    if model is not None:
++        return model
++    return models.get(0) if allow_generic else None
++
++
++def bin_index(value: int, edges: Sequence[int]) -> int:
++    if value == MISSING_VALUE:
++        raise ModelError("missing feature")
++    # An edge belongs to its lower bin. This is identical to the bounded C loop.
++    return bisect.bisect_left(edges, value)
++
++
++def score_model(model: QuantModel, features: Sequence[int],
++                expected_model_version: int,
++                expected_schema_version: int) -> ScoreResult:
++    if model.model_version != expected_model_version:
++        return ScoreResult(False, model_name=model.model_name,
++                           reason="model_version")
++    if model.feature_schema_version != expected_schema_version:
++        return ScoreResult(False, model_name=model.model_name,
++                           reason="feature_schema")
++    if len(features) != model.nr_features:
++        return ScoreResult(False, model_name=model.model_name,
++                           reason="feature_count")
++    score = 0
++    try:
++        for value, edges, weights in zip(features, model.bin_edges,
++                                         model.weights):
++            score += weights[bin_index(int(value), edges)]
++    except ModelError:
++        return ScoreResult(False, model_name=model.model_name,
++                           reason="missing_feature")
++    if not S32_MIN <= score <= S32_MAX:
++        return ScoreResult(False, model_name=model.model_name,
++                           reason="score_overflow")
++    return ScoreResult(True, score, score >= model.threshold,
++                       model.model_name, "score")
++
++
++def score_for_app(models: Mapping[int, QuantModel], app_id: int,
++                  features: Sequence[int], model_version: int = 1,
++                  schema_version: int = 1,
++                  allow_generic: bool = True) -> ScoreResult:
++    model = route_model(models, app_id, allow_generic)
++    if model is None:
++        return ScoreResult(False, reason="no_model")
++    return score_model(model, features, model_version, schema_version)
++
++
++def promotion_budget_pages(app_remaining: int, batch_remaining: int,
++                           epoch_remaining: int, frontier_headroom: int) -> int:
++    values = (app_remaining, batch_remaining, epoch_remaining,
++              frontier_headroom)
++    if any(value < 0 for value in values):
++        raise ValueError("budgets cannot be negative")
++    return min(values)
++
++
++def frontier_for_capacities(capacities: Sequence[int], remaining: int,
++                            eta_q15: int) -> Optional[Tuple[int, int, int]]:
++    """Return (frontier index, effective capacity, frontier headroom)."""
++    if remaining <= 0 or not 0 < eta_q15 <= 32768:
++        return None
++    cumulative = 0
++    for index, pages in enumerate(capacities):
++        if pages < 0:
++            return None
++        effective = pages * eta_q15 // 32768
++        previous = cumulative
++        cumulative += effective
++        if cumulative >= remaining:
++            demand_in_frontier = remaining - previous
++            return index, effective, effective - demand_in_frontier
++    return None
++
++
++def deterministic_vectors(models: Mapping[int, QuantModel]) -> Iterable[Tuple[int, List[int]]]:
++    """Boundary-heavy vectors shared by Python and the standalone C scorer."""
++    base = [50, 200, 128, 300, 1, 2, 700, 20000]
++    for app_id in (0, 1, 2, 3):
++        yield app_id, list(base)
++        model = models[app_id]
++        for feature, edges in enumerate(model.bin_edges):
++            for edge in edges:
++                for value in (edge - 1, edge, edge + 1):
++                    vector = list(base)
++                    vector[feature] = value
++                    yield app_id, vector
++        low = [-(1 << 62)] * model.nr_features
++        high = [(1 << 62)] * model.nr_features
++        yield app_id, low
++        yield app_id, high
+diff --git a/tools/parp/frontier_score/tests/__init__.py b/tools/parp/frontier_score/tests/__init__.py
+new file mode 100644
+index 000000000..81da0eb04
+--- /dev/null
++++ b/tools/parp/frontier_score/tests/__init__.py
+@@ -0,0 +1,2 @@
++# SPDX-License-Identifier: GPL-2.0
++"""Tests for the PARP frontier reference contract."""
+diff --git a/tools/parp/frontier_score/tests/test_reference.py b/tools/parp/frontier_score/tests/test_reference.py
+new file mode 100644
+index 000000000..68ae89f1b
+--- /dev/null
++++ b/tools/parp/frontier_score/tests/test_reference.py
+@@ -0,0 +1,151 @@
++#!/usr/bin/env python3
++# SPDX-License-Identifier: GPL-2.0
++from __future__ import annotations
++
++import json
++import subprocess
++import tempfile
++import unittest
++from pathlib import Path
++
++from tools.parp.frontier_score.reference import (
++    MISSING_VALUE,
++    ModelError,
++    QuantModel,
++    bin_index,
++    deterministic_vectors,
++    frontier_for_capacities,
++    load_models,
++    promotion_budget_pages,
++    route_model,
++    score_for_app,
++    score_model,
++)
++
++
++class ReferenceTests(unittest.TestCase):
++    @classmethod
++    def setUpClass(cls):
++        cls.models = load_models()
++
++    def test_models_validate_and_route(self):
++        self.assertEqual(set(self.models), {0, 1, 2, 3})
++        self.assertEqual(route_model(self.models, 1).model_name,
++                         "WPS_REUSE_MODEL")
++        self.assertEqual(route_model(self.models, 99).model_name,
++                         "GENERIC_REUSE_MODEL")
++        self.assertIsNone(route_model(self.models, 99, False))
++
++    def test_bin_edges_belong_to_lower_bin(self):
++        edges = [10, 100, 500]
++        self.assertEqual(bin_index(9, edges), 0)
++        self.assertEqual(bin_index(10, edges), 0)
++        self.assertEqual(bin_index(11, edges), 1)
++        self.assertEqual(bin_index(500, edges), 2)
++        self.assertEqual(bin_index(501, edges), 3)
++
++    def test_missing_feature_is_native(self):
++        values = [1] * 8
++        values[4] = MISSING_VALUE
++        result = score_for_app(self.models, 1, values)
++        self.assertFalse(result.valid)
++        self.assertEqual(result.reason, "missing_feature")
++
++    def test_version_and_schema_mismatch_are_native(self):
++        values = [1] * 8
++        self.assertEqual(score_for_app(self.models, 1, values, 2).reason,
++                         "model_version")
++        self.assertEqual(score_for_app(self.models, 1, values,
++                                       schema_version=2).reason,
++                         "feature_schema")
++
++    def test_threshold_is_inclusive(self):
++        model = QuantModel(9, "TEST", 1, 1, 7, ((0,),), ((7, 8),))
++        result = score_model(model, [0], 1, 1)
++        self.assertTrue(result.valid)
++        self.assertTrue(result.would_promote)
++        self.assertEqual(result.score, 7)
++
++    def test_feature_count_mismatch_is_native(self):
++        result = score_for_app(self.models, 2, [0] * 7)
++        self.assertFalse(result.valid)
++        self.assertEqual(result.reason, "feature_count")
++
++    def test_generic_and_native_fallback(self):
++        values = [50, 200, 128, 300, 1, 2, 700, 20000]
++        generic = score_for_app(self.models, 99, values)
++        native = score_for_app(self.models, 99, values,
++                               allow_generic=False)
++        self.assertTrue(generic.valid)
++        self.assertEqual(generic.model_name, "GENERIC_REUSE_MODEL")
++        self.assertEqual(native.reason, "no_model")
++
++    def test_extreme_feature_values_are_bounded(self):
++        for value in (-(1 << 62), 1 << 62):
++            result = score_for_app(self.models, 3, [value] * 8)
++            self.assertTrue(result.valid)
++            self.assertGreaterEqual(result.score, -(1 << 31))
++            self.assertLessEqual(result.score, (1 << 31) - 1)
++
++    def test_budget_uses_base_pages(self):
++        self.assertEqual(promotion_budget_pages(64, 32, 128, 48), 32)
++        self.assertEqual(promotion_budget_pages(511, 511, 511, 511), 511)
++        with self.assertRaises(ValueError):
++            promotion_budget_pages(-1, 1, 1, 1)
++
++    def test_frontier_is_first_capacity_covering_demand(self):
++        self.assertEqual(frontier_for_capacities([100, 200, 300], 220,
++                                                 32768), (1, 200, 80))
++        self.assertEqual(frontier_for_capacities([100, 200], 100, 16384),
++                         (1, 100, 50))
++        self.assertIsNone(frontier_for_capacities([10], 20, 32768))
++        self.assertIsNone(frontier_for_capacities([100], 10, 0))
++
++    def test_invalid_model_shapes_rejected(self):
++        source = Path(__file__).parents[1] / "default_models.json"
++        payload = json.loads(source.read_text(encoding="utf-8"))
++        payload["models"][0]["weights"][0] = [1]
++        with tempfile.TemporaryDirectory() as directory:
++            path = Path(directory) / "bad.json"
++            path.write_text(json.dumps(payload), encoding="utf-8")
++            with self.assertRaises(ModelError):
++                load_models(path)
++
++    def test_s16_weight_overflow_rejected(self):
++        source = Path(__file__).parents[1] / "default_models.json"
++        payload = json.loads(source.read_text(encoding="utf-8"))
++        payload["models"][0]["weights"][0][0] = 1 << 15
++        with tempfile.TemporaryDirectory() as directory:
++            path = Path(directory) / "overflow.json"
++            path.write_text(json.dumps(payload), encoding="utf-8")
++            with self.assertRaises(ModelError):
++                load_models(path)
++
++    def test_python_c_scores_match(self):
++        source = Path(__file__).parents[1] / "cscore.c"
++        with tempfile.TemporaryDirectory() as directory:
++            binary = Path(directory) / "cscore"
++            subprocess.run([
++                "cc", "-std=c11", "-O2", "-Wall", "-Wextra", "-Werror",
++                str(source), "-o", str(binary),
++            ], check=True)
++            vectors = list(deterministic_vectors(self.models))
++            request = "".join(
++                f"{app_id} {' '.join(str(value) for value in values)}\n"
++                for app_id, values in vectors
++            )
++            completed = subprocess.run([str(binary)], input=request, text=True,
++                                       check=True, capture_output=True)
++            actual = [tuple(int(value) for value in line.split())
++                      for line in completed.stdout.splitlines()]
++            expected = []
++            for app_id, values in vectors:
++                result = score_for_app(self.models, app_id, values)
++                expected.append((result.score, int(result.would_promote)))
++            self.assertEqual(actual, expected)
++            self.assertGreaterEqual(len(actual), 240)
++
++
++if __name__ == "__main__":
++    unittest.main()
++# SPDX-License-Identifier: GPL-2.0
+-- 
+2.25.1
+

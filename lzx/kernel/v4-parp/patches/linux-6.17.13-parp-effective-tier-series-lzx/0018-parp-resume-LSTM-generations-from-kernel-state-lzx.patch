@@ -1,0 +1,198 @@
+From 8feed29048769172e83865bc555df484ef5a7eb4 Mon Sep 17 00:00:00 2001
+From: Codex PARP Reproduction <codex@localhost>
+Date: Sat, 1 Aug 2026 01:03:18 +0800
+Subject: [PATCH 018/124] parp: resume LSTM generations from kernel state
+
+---
+ tools/parp/lstm_prior_bridge.py            | 58 ++++++++++++++++++++--
+ tools/parp/tests/test_lstm_prior_bridge.py | 50 ++++++++++++++++++-
+ 2 files changed, 103 insertions(+), 5 deletions(-)
+
+diff --git a/tools/parp/lstm_prior_bridge.py b/tools/parp/lstm_prior_bridge.py
+index 17d15aaaa..7a3cca453 100644
+--- a/tools/parp/lstm_prior_bridge.py
++++ b/tools/parp/lstm_prior_bridge.py
+@@ -6,6 +6,7 @@ import argparse
+ from concurrent.futures import Future, ThreadPoolExecutor
+ import json
+ from pathlib import Path
++import re
+ import threading
+ import time
+ 
+@@ -15,6 +16,11 @@ DEFAULT_HORIZON_NS = 5 * 60 * 1_000_000_000
+ DEFAULT_TTL_NS = 60 * 1_000_000_000
+ MAX_HORIZON_NS = 60 * 60 * 1_000_000_000
+ MAX_TTL_NS = 10 * 60 * 1_000_000_000
++U32_MAX = (1 << 32) - 1
++
++
++class GenerationQueryError(RuntimeError):
++    """The kernel generation cannot be queried safely."""
+ 
+ 
+ def score_to_q15(score):
+@@ -33,9 +39,19 @@ class BatchBuilder:
+ 
+     def _next_generation(self):
+         with self._lock:
++            if self._generation >= U32_MAX:
++                raise OverflowError("prediction generation exhausted")
+             self._generation += 1
+             return self._generation
+ 
++    def synchronize_generation(self, current_generation):
++        current_generation = int(current_generation)
++        if not 0 <= current_generation <= U32_MAX:
++            raise GenerationQueryError("kernel generation is outside u32")
++        with self._lock:
++            self._generation = max(self._generation, current_generation)
++            return self._generation
++
+     def build(self, rows, foreground_app, timestamp_ns=None,
+               horizon_ns=DEFAULT_HORIZON_NS, ttl_ns=DEFAULT_TTL_NS):
+         horizon_ns = int(horizon_ns)
+@@ -76,20 +92,27 @@ class BatchBuilder:
+ 
+ 
+ class MockTransport:
+-    def __init__(self, fail_once=False):
++    def __init__(self, fail_once=False, current_generation=0):
+         self.fail_once = fail_once
++        self._current_generation = int(current_generation)
+         self.batches = []
+         self.attempts = []
+ 
++    def current_generation(self):
++        return self._current_generation
++
+     def submit(self, batch):
++        generation = int(batch["prediction_generation"])
++        if generation <= self._current_generation:
++            raise IOError("stale or equal prediction generation")
+         if self.fail_once:
+             self.fail_once = False
+             self.attempts.append({"ok": False, "generation":
+-                                  batch["prediction_generation"]})
++                                  generation})
+             raise IOError("injected transport failure")
+         self.batches.append(batch)
+-        self.attempts.append({"ok": True, "generation":
+-                              batch["prediction_generation"]})
++        self._current_generation = generation
++        self.attempts.append({"ok": True, "generation": generation})
+         return {"transport": "mock", "accepted": True}
+ 
+ 
+@@ -109,6 +132,21 @@ class DebugfsTransport:
+                            entry.get("flags", 0)])
+         return " ".join(str(value) for value in fields) + "\n"
+ 
++    def current_generation(self):
++        try:
++            metadata = self.path.read_text(encoding="ascii")
++        except (OSError, UnicodeError) as exc:
++            raise GenerationQueryError(
++                "cannot read kernel app-prior generation: {}".format(exc))
++        match = re.search(r"(?:^|\s)generation=(\d+)(?:\s|$)", metadata)
++        if not match:
++            raise GenerationQueryError(
++                "kernel app-prior generation metadata is unavailable")
++        generation = int(match.group(1))
++        if not 0 <= generation <= U32_MAX:
++            raise GenerationQueryError("kernel generation is outside u32")
++        return generation
++
+     def submit(self, batch):
+         self.path.write_text(self.encode_batch(batch), encoding="ascii")
+         return {"transport": "debugfs", "accepted": True}
+@@ -119,6 +157,18 @@ class AsyncPriorBridge:
+         self.builder = builder
+         self.transport = transport
+         self.dry_run = dry_run
++        query = getattr(transport, "current_generation", None)
++        if not callable(query):
++            raise GenerationQueryError(
++                "transport has no kernel generation query interface")
++        try:
++            self.kernel_generation_at_start = int(query())
++        except GenerationQueryError:
++            raise
++        except Exception as exc:
++            raise GenerationQueryError(
++                "kernel generation query failed: {}".format(exc))
++        self.builder.synchronize_generation(self.kernel_generation_at_start)
+         self._executor = ThreadPoolExecutor(max_workers=1,
+                                             thread_name_prefix="parp-prior")
+         self._events = {}
+diff --git a/tools/parp/tests/test_lstm_prior_bridge.py b/tools/parp/tests/test_lstm_prior_bridge.py
+index cd42f79e9..44c86a1f4 100644
+--- a/tools/parp/tests/test_lstm_prior_bridge.py
++++ b/tools/parp/tests/test_lstm_prior_bridge.py
+@@ -4,7 +4,8 @@ import time
+ import unittest
+ 
+ from lstm_prior_bridge import (AsyncPriorBridge, BatchBuilder,
+-                               DebugfsTransport, MockTransport, score_to_q15)
++                               DebugfsTransport, GenerationQueryError,
++                               MockTransport, score_to_q15)
+ 
+ 
+ class LSTMPriorBridgeTest(unittest.TestCase):
+@@ -79,6 +80,53 @@ class LSTMPriorBridgeTest(unittest.TestCase):
+         self.assertEqual(sum(row["foreground"]
+                              for row in batch["entries"]), 0)
+ 
++    def test_generation_resumes_from_kernel_across_bridge_restart(self):
++        transport = MockTransport(current_generation=41)
++        first_bridge = AsyncPriorBridge(
++            BatchBuilder(self.whitelist, 1), transport)
++        first = first_bridge.submit_event(
++            "first-process", self.rows, "WPS").result(2)
++        first_bridge.close()
++        second_bridge = AsyncPriorBridge(
++            BatchBuilder(self.whitelist, 1), transport)
++        second = second_bridge.submit_event(
++            "second-process", self.rows, "QQ").result(2)
++        second_bridge.close()
++        self.assertEqual(first["generation"], 42)
++        self.assertEqual(second["generation"], 43)
++
++    def test_generation_uses_max_of_local_and_kernel(self):
++        transport = MockTransport(current_generation=41)
++        bridge = AsyncPriorBridge(
++            BatchBuilder(self.whitelist, 1, generation=50), transport)
++        result = bridge.submit_event("local-ahead", self.rows, "WPS").result(2)
++        bridge.close()
++        self.assertEqual(result["generation"], 51)
++
++    def test_generation_query_missing_or_malformed_fails_closed(self):
++        class SubmitOnlyTransport:
++            def submit(self, batch):
++                return {"accepted": True}
++
++        with self.assertRaises(GenerationQueryError):
++            AsyncPriorBridge(BatchBuilder(self.whitelist, 1),
++                             SubmitOnlyTransport())
++
++    def test_debugfs_generation_query(self):
++        import tempfile
++        from pathlib import Path
++
++        with tempfile.TemporaryDirectory() as directory:
++            control = Path(directory) / "app_prior_batch"
++            control.write_text(
++                "schema=1 model=9 generation=77 timestamp_ns=1 "
++                "horizon_ns=2 expiry_ns=3 entries=4\n", encoding="ascii")
++            self.assertEqual(DebugfsTransport(control).current_generation(),
++                             77)
++            control.write_text("not metadata\n", encoding="ascii")
++            with self.assertRaises(GenerationQueryError):
++                DebugfsTransport(control).current_generation()
++
+ 
+ if __name__ == "__main__":
+     unittest.main()
+-- 
+2.25.1
+

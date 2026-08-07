@@ -1,0 +1,103 @@
+From 0f1fa9fa57f113d0dc29f0d725068e459a9d33a8 Mon Sep 17 00:00:00 2001
+From: Codex PARP Reproduction <codex@localhost>
+Date: Mon, 3 Aug 2026 17:06:28 +0800
+Subject: [PATCH 070/124] fix: validate QQ main profile and clean process group
+
+---
+ tools/parp/phase210/qq_collection_root.sh | 30 ++++++++++++++++++++---
+ 1 file changed, 27 insertions(+), 3 deletions(-)
+
+diff --git a/tools/parp/phase210/qq_collection_root.sh b/tools/parp/phase210/qq_collection_root.sh
+index 0a0c2a724..cbddee734 100644
+--- a/tools/parp/phase210/qq_collection_root.sh
++++ b/tools/parp/phase210/qq_collection_root.sh
+@@ -43,6 +43,7 @@ active_trace=
+ trace_reader=
+ sampler_pid=
+ automation_pid=
++automation_pgid=
+ active_scope=
+ damon_created=0
+ declare -a memory_changed=()
+@@ -84,7 +85,16 @@ cleanup_runtime()
+ 	stop_damon
+ 	[[ -n $sampler_pid ]] && kill "$sampler_pid" 2>/dev/null
+ 	[[ -n $trace_reader ]] && kill "$trace_reader" 2>/dev/null
+-	[[ -n $automation_pid ]] && kill "$automation_pid" 2>/dev/null
++	if [[ -n $automation_pgid ]]; then
++		kill -TERM -- "-$automation_pgid" 2>/dev/null
++		for _ in $(seq 1 20); do
++			kill -0 -- "-$automation_pgid" 2>/dev/null || break
++			sleep 0.1
++		done
++		kill -KILL -- "-$automation_pgid" 2>/dev/null
++	elif [[ -n $automation_pid ]]; then
++		kill "$automation_pid" 2>/dev/null
++	fi
+ 	if [[ -n $active_scope ]]; then
+ 		run_as_user systemctl --user stop --no-block "$active_scope" >/dev/null 2>&1
+ 		for _ in $(seq 1 50); do
+@@ -149,6 +159,7 @@ memory_chain=(
+ 	"$cgroup_root/user.slice/user-$run_uid.slice/user@$run_uid.service/huawei.slice"
+ 	"$cgroup_root/user.slice/user-$run_uid.slice/user@$run_uid.service/huawei.slice/huawei-test.slice"
+ )
++: >"$collection/state/memory_controller_changes.txt"
+ for index in "${!memory_chain[@]}"; do
+ 	path=${memory_chain[$index]}
+ 	[[ -d $path ]] || { log "ERROR: cgroup chain path missing path=$path"; exit 85; }
+@@ -194,6 +205,7 @@ collect_session()
+ 	local scope_name=phase210-$session
+ 	local unit=automation-${scope_name}.scope
+ 	local control_group cgroup_path domain_id apply_before apply_after file_regions anon_regions lost
++	local qq_count profile_match cmdline
+ 	local collection_start_ns collection_end_ns
+ 	local -a pids
+ 
+@@ -210,12 +222,17 @@ collect_session()
+ 	chown -R "$run_uid:$run_gid" "$session_dir"
+ 	log "SESSION_START session=$session unit=$unit"
+ 
+-	run_as_user bash "$automation" --scenario "$scenario" --display "$display" --xauthority "$xauthority" \
++	setsid runuser -u "$run_user" -- env \
++		HOME="$run_home" USER="$run_user" LOGNAME="$run_user" \
++		DISPLAY="$display" XAUTHORITY="$xauthority" XDG_RUNTIME_DIR="$runtime_dir" \
++		DBUS_SESSION_BUS_ADDRESS="unix:path=$runtime_dir/bus" XDG_SESSION_TYPE=x11 GDK_BACKEND=x11 \
++		bash "$automation" --scenario "$scenario" --display "$display" --xauthority "$xauthority" \
+ 		--trace-output "$automation_trace" --session-id "$session" --scenario-id "phase210_$session" \
+ 		--test-slice huawei-test.slice --var "QQ_PROFILE=$profile" --var "SCOPE_NAME=$scope_name" \
+ 		--var "COLLECTOR_READY=$ready" --var "AUTOMATION_DONE=$automation_done" --var "COLLECTOR_DONE=$collector_done" \
+ 		>"$session_dir/automation.log" 2>&1 &
+ 	automation_pid=$!
++	automation_pgid=$automation_pid
+ 	active_scope=$unit
+ 
+ 	control_group=
+@@ -229,10 +246,16 @@ collect_session()
+ 	[[ -d $cgroup_path && -r $cgroup_path/memory.current ]] || { log "ERROR: dedicated memory cgroup missing session=$session"; exit 86; }
+ 	mapfile -t pids < <(find "$cgroup_path" -name cgroup.procs -type f -exec cat {} + | sort -nu)
+ 	((${#pids[@]} > 0)) || { log "ERROR: no QQ target pids session=$session"; exit 87; }
++	qq_count=0
++	profile_match=0
+ 	for pid in "${pids[@]}"; do
+ 		[[ $(readlink -f "/proc/$pid/exe" 2>/dev/null || true) == /opt/QQ/qq ]] || continue
+-		grep -Fq -- "--user-data-dir=$profile/chromium" "/proc/$pid/cmdline" || { log "ERROR: QQ profile mismatch pid=$pid"; exit 88; }
++		qq_count=$((qq_count + 1))
++		cmdline=$(tr '\0' ' ' <"/proc/$pid/cmdline" 2>/dev/null || true)
++		[[ $cmdline == *"--user-data-dir=$profile/chromium"* ]] && profile_match=1
+ 	done
++	((qq_count > 0 && profile_match == 1)) || { log "ERROR: isolated QQ main process missing qq_count=$qq_count profile_match=$profile_match"; exit 88; }
++	log "TARGET_VALIDATED session=$session cgroup=$control_group qq_processes=$qq_count profile_main_match=$profile_match"
+ 	domain_id=$(stat -c %i "$cgroup_path")
+ 	cat "$parp/scan_budget_stats" >"$session_dir/runtime/scan_budget_stats_before.txt"
+ 	cat "$parp/evidence_stats" >"$session_dir/runtime/evidence_stats_before.txt"
+@@ -311,6 +334,7 @@ PY
+ 	chown "$run_uid:$run_gid" "$collector_done"
+ 	wait "$automation_pid"
+ 	automation_pid=
++	automation_pgid=
+ 	active_scope=
+ 	rmdir "$active_trace"
+ 	active_trace=
+-- 
+2.25.1
+

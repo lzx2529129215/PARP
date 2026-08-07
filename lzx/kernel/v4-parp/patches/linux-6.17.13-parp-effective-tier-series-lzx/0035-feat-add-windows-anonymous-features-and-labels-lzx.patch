@@ -1,0 +1,342 @@
+From be4b901fd485c6c16bd4520fe84e5b6dce49ccd0 Mon Sep 17 00:00:00 2001
+From: Codex PARP Reproduction <codex@localhost>
+Date: Sun, 2 Aug 2026 15:33:29 +0800
+Subject: [PATCH 035/124] feat: add windows anonymous features and labels
+
+---
+ .../intra_app_prediction/anon_features.py     | 53 ++++++++++++++
+ .../intra_app_prediction/future_labels.py     | 48 ++++++++++++
+ .../operation_alignment.py                    | 73 +++++++++++++++++++
+ tools/parp/intra_app_prediction/splitter.py   | 54 ++++++++++++++
+ .../intra_app_prediction/window_builder.py    | 63 ++++++++++++++++
+ 5 files changed, 291 insertions(+)
+ create mode 100644 tools/parp/intra_app_prediction/anon_features.py
+ create mode 100644 tools/parp/intra_app_prediction/future_labels.py
+ create mode 100644 tools/parp/intra_app_prediction/operation_alignment.py
+ create mode 100644 tools/parp/intra_app_prediction/splitter.py
+ create mode 100644 tools/parp/intra_app_prediction/window_builder.py
+
+diff --git a/tools/parp/intra_app_prediction/anon_features.py b/tools/parp/intra_app_prediction/anon_features.py
+new file mode 100644
+index 000000000..0dc0dea05
+--- /dev/null
++++ b/tools/parp/intra_app_prediction/anon_features.py
+@@ -0,0 +1,53 @@
++"""Session-scoped domain-level anonymous working-set summaries."""
++
++from statistics import mean
++
++PAGE_SIZE = 4096
++
++
++def summarize_anon(rows, max_possible_accesses):
++    rows = list(rows)
++    if not rows:
++        return {
++            "anon_total_bytes": 0, "anon_observed_bytes": 0,
++            "anon_hot_bytes": 0, "anon_warm_bytes": 0,
++            "anon_cold_bytes": 0, "anon_active_region_count": 0,
++            "anon_region_count": 0, "anon_mean_access_ratio": 0.0,
++            "anon_max_access_ratio": 0.0, "anon_mean_age": 0.0,
++            "anon_max_age": 0, "anon_working_set_delta": 0,
++            "anon_recently_active_ratio": 0.0, "anon_cooling_ratio": 0.0,
++            "unresolved_anon_bytes": 0, "unresolved_anon_ratio": 0.0,
++        }
++    if max_possible_accesses <= 0:
++        raise ValueError("max_possible_accesses must be positive")
++    for key in ("domain_id", "foreground_epoch", "mm_cookie", "boot_id"):
++        values = {row.get(key) for row in rows if key in row}
++        if len(values) > 1:
++            raise ValueError(f"anonymous {key} identity cannot be merged")
++    ratios = [min(1.0, max(0.0, row.get("nr_accesses", 0) /
++                           max_possible_accesses)) for row in rows]
++    sizes = [row.get("nr_pages", 0) * PAGE_SIZE for row in rows]
++    total = sum(sizes)
++    hot = sum(size for size, ratio in zip(sizes, ratios) if ratio >= .5)
++    warm = sum(size for size, ratio in zip(sizes, ratios)
++               if 0 < ratio < .5)
++    cold = sum(size for size, ratio in zip(sizes, ratios) if ratio == 0)
++    unresolved = sum(row.get("unresolved_bytes", 0) for row in rows)
++    return {
++        "anon_total_bytes": total, "anon_observed_bytes": total,
++        "anon_hot_bytes": hot, "anon_warm_bytes": warm,
++        "anon_cold_bytes": cold,
++        "anon_active_region_count": sum(ratio > 0 for ratio in ratios),
++        "anon_region_count": len(rows),
++        "anon_mean_access_ratio": mean(ratios),
++        "anon_max_access_ratio": max(ratios),
++        "anon_mean_age": mean(row.get("age", 0) for row in rows),
++        "anon_max_age": max(row.get("age", 0) for row in rows),
++        "anon_working_set_delta": hot - cold,
++        "anon_recently_active_ratio": (hot + warm) / total if total else 0.0,
++        "anon_cooling_ratio": cold / total if total else 0.0,
++        "unresolved_anon_bytes": unresolved,
++        "unresolved_anon_ratio": unresolved / (total + unresolved)
++        if total + unresolved else 0.0,
++    }
++
+diff --git a/tools/parp/intra_app_prediction/future_labels.py b/tools/parp/intra_app_prediction/future_labels.py
+new file mode 100644
+index 000000000..c2060584e
+--- /dev/null
++++ b/tools/parp/intra_app_prediction/future_labels.py
+@@ -0,0 +1,48 @@
++"""Future 10/30/60-second labels with explicit availability."""
++
++from collections import defaultdict
++from typing import Any, Dict, Iterable, List
++
++HORIZONS = (10, 30, 60)
++
++
++def attach_future_labels(rows: Iterable[Dict[str, Any]]):
++    groups = defaultdict(list)
++    for row in rows:
++        key = (row.get("session_id"), row.get("file_id"),
++               row.get("requested_bins"), row.get("segment_id"))
++        groups[key].append(dict(row))
++    output = []
++    for group in groups.values():
++        group.sort(key=lambda row: row["window_start_ns"])
++        last_start = group[-1]["window_start_ns"]
++        by_start = {row["window_start_ns"]: row for row in group}
++        for row in group:
++            current = row["window_start_ns"]
++            for horizon in HORIZONS:
++                limit = current + horizon * 1_000_000_000
++                future = [item for start, item in by_start.items()
++                          if current < start <= limit]
++                available = last_start >= limit
++                row[f"label_available_{horizon}s"] = available
++                if not available:
++                    row[f"label_next_{horizon}s_access"] = None
++                    row[f"label_next_{horizon}s_max_coverage"] = None
++                    row[f"label_next_{horizon}s_weighted_coverage"] = None
++                    row[f"future_active_50_{horizon}s"] = None
++                    row[f"future_active_80_{horizon}s"] = None
++                    continue
++                max_coverage = max((item.get("coverage_ratio", 0.0)
++                                    for item in future), default=0.0)
++                max_weighted = max((item.get("weighted_coverage_ratio", 0.0)
++                                    for item in future), default=0.0)
++                row[f"label_next_{horizon}s_access"] = int(
++                    max_coverage > 0 or max_weighted > 0)
++                row[f"label_next_{horizon}s_max_coverage"] = max_coverage
++                row[f"label_next_{horizon}s_weighted_coverage"] = max_weighted
++                row[f"future_active_50_{horizon}s"] = max_coverage >= .5
++                row[f"future_active_80_{horizon}s"] = max_coverage >= .8
++            output.append(row)
++    return sorted(output, key=lambda row: (row.get("window_start_ns", 0),
++                                           row.get("window_id", "")))
++
+diff --git a/tools/parp/intra_app_prediction/operation_alignment.py b/tools/parp/intra_app_prediction/operation_alignment.py
+new file mode 100644
+index 000000000..bd377e9e6
+--- /dev/null
++++ b/tools/parp/intra_app_prediction/operation_alignment.py
+@@ -0,0 +1,73 @@
++"""Leakage-safe operation interval alignment."""
++
++from dataclasses import dataclass
++from typing import Iterable
++
++
++@dataclass(frozen=True)
++class OperationEvent:
++    operation_id: str
++    app_id: str
++    start_ns: int
++    end_ns: int
++    operation_type: str
++    source: str
++    confidence: float
++    session_id: str
++
++    def __post_init__(self):
++        if self.end_ns <= self.start_ns or not 0 <= self.confidence <= 1:
++            raise ValueError("invalid operation interval")
++
++
++@dataclass(frozen=True)
++class OperationAlignment:
++    operation_at_start: str
++    operation_at_end: str
++    dominant_operation: str
++    next_operation: str
++    operation_transition: str
++    operation_coverage_ratio: float
++    operation_count: int
++    state_changed: bool
++    label_quality: str
++
++
++def align_operations(window_start_ns: int, window_end_ns: int,
++                     events: Iterable[OperationEvent],
++                     next_operation: str = "UNKNOWN"):
++    if window_end_ns <= window_start_ns:
++        raise ValueError("invalid window")
++    overlapping = []
++    for event in events:
++        overlap = max(0, min(window_end_ns, event.end_ns) -
++                      max(window_start_ns, event.start_ns))
++        if overlap:
++            overlapping.append((event, overlap))
++    at_start = next((event.operation_type for event, _ in overlapping
++                     if event.start_ns <= window_start_ns < event.end_ns),
++                    "UNKNOWN")
++    at_end = next((event.operation_type for event, _ in reversed(overlapping)
++                   if event.start_ns < window_end_ns <= event.end_ns),
++                  "UNKNOWN")
++    if not overlapping:
++        return OperationAlignment(at_start, at_end, "UNKNOWN",
++                                  next_operation, "NONE", 0.0, 0,
++                                  False, "LOW_CONFIDENCE")
++    dominant, duration = max(overlapping,
++                             key=lambda item: (item[1], item[0].operation_type))
++    ratio = duration / (window_end_ns - window_start_ns)
++    quality = "PURE" if ratio >= .8 else (
++        "MIXED" if ratio >= .5 else "LOW_CONFIDENCE")
++    ordered = sorted(overlapping, key=lambda item: item[0].start_ns)
++    transition = "NONE"
++    distinct = []
++    for event, _ in ordered:
++        if not distinct or distinct[-1] != event.operation_type:
++            distinct.append(event.operation_type)
++    if len(distinct) > 1:
++        transition = f"{distinct[0]}->{distinct[-1]}"
++    return OperationAlignment(at_start, at_end, dominant.operation_type,
++                              next_operation, transition, ratio,
++                              len(overlapping), len(distinct) > 1, quality)
++
+diff --git a/tools/parp/intra_app_prediction/splitter.py b/tools/parp/intra_app_prediction/splitter.py
+new file mode 100644
+index 000000000..6ba4bf11c
+--- /dev/null
++++ b/tools/parp/intra_app_prediction/splitter.py
+@@ -0,0 +1,54 @@
++"""Chronological, session-disjoint split with future-horizon purge gaps."""
++
++from collections import defaultdict
++
++
++def chronological_split(rows, purge_gap_ns=60_000_000_000):
++    rows = [dict(row) for row in rows]
++    ids = [row["window_id"] for row in rows]
++    if len(ids) != len(set(ids)):
++        raise ValueError("duplicate window_id")
++    sessions = defaultdict(list)
++    for row in rows:
++        sessions[row["session_id"]].append(row)
++    ordered = sorted(sessions, key=lambda key: min(
++        row["window_start_ns"] for row in sessions[key]))
++    if len(ordered) < 3:
++        raise ValueError("at least three sessions are required")
++    train_count = max(1, int(len(ordered) * .70))
++    val_count = max(1, int(len(ordered) * .15))
++    if train_count + val_count >= len(ordered):
++        train_count = len(ordered) - 2
++        val_count = 1
++    session_sets = {
++        "train": ordered[:train_count],
++        "val": ordered[train_count:train_count + val_count],
++        "test": ordered[train_count + val_count:],
++    }
++    result = {}
++    previous_max = None
++    purged = 0
++    for name in ("train", "val", "test"):
++        selected = sorted((row for session in session_sets[name]
++                           for row in sessions[session]),
++                          key=lambda row: row["window_start_ns"])
++        if previous_max is not None:
++            before = len(selected)
++            selected = [row for row in selected
++                        if row["window_start_ns"] - previous_max >= purge_gap_ns]
++            purged += before - len(selected)
++        if not selected:
++            raise ValueError("purge gap removed an entire split")
++        result[name] = selected
++        previous_max = selected[-1]["window_start_ns"]
++    result["audit"] = {
++        "purge_gap_ns": purge_gap_ns,
++        "purged_windows": purged,
++        "session_disjoint": True,
++        "future_horizon_isolated": True,
++        "normalization_source": "train",
++        "clustering_source": "train",
++        "sessions": session_sets,
++    }
++    return result
++
+diff --git a/tools/parp/intra_app_prediction/window_builder.py b/tools/parp/intra_app_prediction/window_builder.py
+new file mode 100644
+index 000000000..0ed908c26
+--- /dev/null
++++ b/tools/parp/intra_app_prediction/window_builder.py
+@@ -0,0 +1,63 @@
++"""Epoch-aligned fixed ten-second offline windows."""
++
++from dataclasses import dataclass, field
++from typing import Any, Dict, List, Optional, Tuple
++
++WINDOW_NS = 10_000_000_000
++
++
++def window_bounds(event_time_ns: int, window_ns: int = WINDOW_NS):
++    if event_time_ns < 0 or window_ns <= 0:
++        raise ValueError("invalid event time/window")
++    start = event_time_ns // window_ns * window_ns
++    return start, start + window_ns
++
++
++@dataclass
++class EventWindow:
++    boot_id: str
++    session_id: str
++    start_ns: int
++    end_ns: int
++    events: List[Tuple[int, Any]] = field(default_factory=list)
++
++
++class EventWindowBuilder:
++    def __init__(self, window_ns: int = WINDOW_NS,
++                 watermark_ns: int = 0,
++                 monotonic_anchor_ns: Optional[int] = None,
++                 wall_anchor_ns: Optional[int] = None):
++        self.window_ns = window_ns
++        self.watermark_ns = watermark_ns
++        self.monotonic_anchor_ns = monotonic_anchor_ns
++        self.wall_anchor_ns = wall_anchor_ns
++        self._events: Dict[Tuple[str, str, int], EventWindow] = {}
++        self._newest_ns = 0
++        self.late_events = 0
++
++    def add(self, boot_id: str, session_id: str, event_time_ns: int,
++            value: Any):
++        if not boot_id or not session_id:
++            raise ValueError("boot and session identity are required")
++        if self._newest_ns and event_time_ns + self.watermark_ns < self._newest_ns:
++            self.late_events += 1
++        self._newest_ns = max(self._newest_ns, event_time_ns)
++        start, end = window_bounds(event_time_ns, self.window_ns)
++        window = self._events.setdefault(
++            (boot_id, session_id, start),
++            EventWindow(boot_id, session_id, start, end))
++        window.events.append((event_time_ns, value))
++
++    def windows(self):
++        output = sorted(self._events.values(),
++                        key=lambda item: (item.boot_id, item.session_id,
++                                          item.start_ns))
++        for item in output:
++            item.events.sort(key=lambda event: event[0])
++        return output
++
++    def monotonic_to_wall(self, monotonic_ns: int):
++        if self.monotonic_anchor_ns is None or self.wall_anchor_ns is None:
++            raise ValueError("clock anchor is unavailable")
++        return self.wall_anchor_ns + monotonic_ns - self.monotonic_anchor_ns
++
+-- 
+2.25.1
+

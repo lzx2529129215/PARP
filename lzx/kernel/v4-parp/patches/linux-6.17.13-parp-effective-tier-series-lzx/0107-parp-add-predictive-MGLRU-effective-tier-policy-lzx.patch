@@ -1,0 +1,4769 @@
+From 366babd6692dc6329334e62469a566543a1639f8 Mon Sep 17 00:00:00 2001
+From: Codex PARP Reproduction <codex@localhost>
+Date: Tue, 4 Aug 2026 18:50:54 +0800
+Subject: [PATCH 107/124] parp: add predictive MGLRU effective tier policy
+
+---
+ fs/proc/task_mmu.c            |   12 +-
+ include/linux/mm_inline.h     |    1 +
+ include/linux/mmzone.h        |   12 +
+ include/linux/parp.h          |  479 ++++++++
+ include/linux/swap.h          |    3 +
+ include/trace/events/parp.h   |  387 +++++++
+ mm/damon/ops-common.c         |   48 +-
+ mm/damon/paddr.c              |    3 +-
+ mm/filemap.c                  |   11 +-
+ mm/gup.c                      |    2 +-
+ mm/huge_memory.c              |   18 +-
+ mm/ksm.c                      |    3 +-
+ mm/madvise.c                  |    7 +
+ mm/memory.c                   |   16 +-
+ mm/page_alloc.c               |    2 +
+ mm/page_ext.c                 |    3 +
+ mm/page_idle.c                |    2 +
+ mm/parp/Kconfig               |   23 +
+ mm/parp/Makefile              |    1 +
+ mm/parp/control/debugfs.c     |  144 +++
+ mm/parp/core/effective_tier.c | 1944 +++++++++++++++++++++++++++++++++
+ mm/parp/tests/parp_test.c     |  400 +++++++
+ mm/rmap.c                     |    5 +-
+ mm/shmem.c                    |   11 +-
+ mm/swap.c                     |   21 +-
+ mm/vmscan.c                   |  355 +++++-
+ 26 files changed, 3858 insertions(+), 55 deletions(-)
+ create mode 100644 mm/parp/core/effective_tier.c
+
+diff --git a/fs/proc/task_mmu.c b/fs/proc/task_mmu.c
+index b26ae556b..dd85f888f 100644
+--- a/fs/proc/task_mmu.c
++++ b/fs/proc/task_mmu.c
+@@ -1598,6 +1598,7 @@ static int clear_refs_pte_range(pmd_t *pmd, unsigned long addr,
+ 	pte_t *pte, ptent;
+ 	spinlock_t *ptl;
+ 	struct folio *folio;
++	struct folio *last_noted = NULL;
+ 
+ 	ptl = pmd_trans_huge_lock(pmd, vma);
+ 	if (ptl) {
+@@ -1612,7 +1613,9 @@ static int clear_refs_pte_range(pmd_t *pmd, unsigned long addr,
+ 		folio = pmd_folio(*pmd);
+ 
+ 		/* Clear accessed and referenced bits. */
+-		pmdp_test_and_clear_young(vma, addr, pmd);
++		if (pmdp_test_and_clear_young(vma, addr, pmd))
++			parp_effective_tier_note_access(folio,
++						PARP_ACCESS_PTE_YOUNG);
+ 		folio_test_clear_young(folio);
+ 		folio_clear_referenced(folio);
+ out:
+@@ -1641,7 +1644,12 @@ static int clear_refs_pte_range(pmd_t *pmd, unsigned long addr,
+ 			continue;
+ 
+ 		/* Clear accessed and referenced bits. */
+-		ptep_test_and_clear_young(vma, addr, pte);
++		if (ptep_test_and_clear_young(vma, addr, pte) &&
++		    folio != last_noted) {
++			parp_effective_tier_note_access(folio,
++						PARP_ACCESS_PTE_YOUNG);
++			last_noted = folio;
++		}
+ 		folio_test_clear_young(folio);
+ 		folio_clear_referenced(folio);
+ 	}
+diff --git a/include/linux/mm_inline.h b/include/linux/mm_inline.h
+index 89b518ff0..fb6226896 100644
+--- a/include/linux/mm_inline.h
++++ b/include/linux/mm_inline.h
+@@ -271,6 +271,7 @@ static inline bool lru_gen_add_folio(struct lruvec *lruvec, struct folio *folio,
+ 	set_mask_bits(&folio->flags, LRU_GEN_MASK | BIT(PG_active), flags);
+ 
+ 	lru_gen_update_size(lruvec, folio, -1, gen);
++	parp_effective_tier_note_move(folio, PARP_OTHER_MOVE, gen);
+ 	/* for folio_rotate_reclaimable() */
+ 	if (reclaiming)
+ 		list_add_tail(&folio->lru, &lrugen->folios[gen][type][zone]);
+diff --git a/include/linux/mmzone.h b/include/linux/mmzone.h
+index a38f520bb..599652c22 100644
+--- a/include/linux/mmzone.h
++++ b/include/linux/mmzone.h
+@@ -506,6 +506,18 @@ struct lru_gen_folio {
+ 		u32 efficiency_q15;
+ 		u32 efficiency_samples;
+ 	} parp_frontier[ANON_AND_FILE];
++#endif
++#ifdef CONFIG_PARP_EFFECTIVE_TIER
++	/* Protected by lruvec->lru_lock; never changes native tier fields. */
++	struct {
++		u64 epoch_id;
++		unsigned long source_seq;
++		unsigned long candidate_pages;
++		unsigned long upgrade_pages;
++		unsigned long downgrade_pages;
++		u16 no_progress_rounds;
++		u8 state_epoch;
++	} parp_effective_tier[ANON_AND_FILE];
+ #endif
+ 	/* whether the multi-gen LRU is enabled */
+ 	bool enabled;
+diff --git a/include/linux/parp.h b/include/linux/parp.h
+index 461e9321f..9722d6712 100644
+--- a/include/linux/parp.h
++++ b/include/linux/parp.h
+@@ -6,6 +6,7 @@
+ #include <linux/jump_label.h>
+ 
+ struct folio;
++struct page;
+ struct lruvec;
+ struct scan_control;
+ struct mem_cgroup;
+@@ -66,6 +67,484 @@ struct parp_frontier_scan_ctx {
+ 	unsigned long app_used;
+ };
+ 
++#define PARP_TIER_SCALE		256
++#define PARP_MAX_TIER		3
++#define PARP_TIER_FEATURES	6
++#define PARP_TIER_BINS		6
++#define PARP_TIER_MODEL_VERSION	1U
++#define PARP_TIER_MODEL_TYPE	"pairwise_linear_ranker"
++/* SHA-256 of the canonical embedded scorer parameters, not training data. */
++#define PARP_TIER_MODEL_CHECKSUM						\
++	"1d5cc9918ae0e2caea316d36841fd61bef562e68f0820188c1cc0a6195f1fa5e"
++#define PARP_TIER_MODEL_PROVENANCE	"ENGINEERING_FIXTURE_UNTRAINED"
++#define PARP_TIER_TRACE_MODEL_TYPE_LEN	32
++#define PARP_TIER_TRACE_CHECKSUM_LEN	65
++#define PARP_TIER_TRACE_PROVENANCE_LEN	32
++#define PARP_TIER_RUNTIME_PAIRWISE_COMPARISON	0
++#define PARP_TIER_RUNTIME_CANDIDATE_SORTING	0
++#define PARP_TIER_RUNTIME_SIGMOID		0
++
++enum parp_rank_score_bin {
++	PARP_RANK_SCORE_COLD,
++	PARP_RANK_SCORE_NEUTRAL,
++	PARP_RANK_SCORE_HOT_1,
++	PARP_RANK_SCORE_HOT_2,
++	PARP_RANK_SCORE_HOT_3,
++	PARP_RANK_SCORE_INVALID = 0xff,
++};
++
++enum parp_tier_scorer_kind {
++	PARP_TIER_SCORER_PAIRWISE_LINEAR,
++	PARP_TIER_SCORER_RECENCY_BASELINE,
++	PARP_TIER_SCORER_RANDOM_BASELINE,
++};
++
++enum parp_effective_tier_mode {
++	PARP_EFFECTIVE_TIER_OFF,
++	PARP_EFFECTIVE_TIER_SHADOW,
++	PARP_EFFECTIVE_TIER_PROTECT_ONLY,
++	PARP_EFFECTIVE_TIER_BIDIRECTIONAL,
++	PARP_EFFECTIVE_TIER_RANDOM_MATCHED,
++	PARP_EFFECTIVE_TIER_RECENCY_BASELINE,
++};
++
++enum parp_tier_action {
++	PARP_TIER_KEEP_RECLAIM,
++	PARP_TIER_PREDICTIVE_UPGRADE,
++	PARP_TIER_KEEP_PROTECT,
++	PARP_TIER_PREDICTIVE_DOWNGRADE,
++	PARP_TIER_SPECIAL_NATIVE_PROTECT,
++};
++
++enum parp_tier_bypass_reason {
++	PARP_TIER_BYPASS_NONE,
++	PARP_TIER_BYPASS_DISABLED,
++	PARP_TIER_BYPASS_MODEL_INVALID,
++	PARP_TIER_BYPASS_METADATA_MISSING,
++	PARP_TIER_BYPASS_STATE_UNSTABLE,
++	PARP_TIER_BYPASS_NOT_BOUNDARY,
++	PARP_TIER_BYPASS_STRONG_NATIVE,
++	PARP_TIER_BYPASS_UPGRADE_BUDGET,
++	PARP_TIER_BYPASS_DOWNGRADE_BUDGET,
++	PARP_TIER_BYPASS_REPEAT_UPGRADE,
++	PARP_TIER_BYPASS_REPEAT_DOWNGRADE,
++	PARP_TIER_BYPASS_PRESSURE,
++	PARP_TIER_BYPASS_NO_PROGRESS,
++	PARP_TIER_BYPASS_GENERATION_RACE,
++	PARP_TIER_BYPASS_RANDOM_UNSELECTED,
++	PARP_TIER_BYPASS_NR,
++};
++
++enum parp_tier_outcome {
++	PARP_TIER_OUTCOME_RECLAIMED,
++	PARP_TIER_OUTCOME_PUTBACK,
++	PARP_TIER_OUTCOME_ACTIVATED,
++	PARP_TIER_OUTCOME_DEMOTE_ATTEMPT,
++};
++
++enum parp_tier_lock_scope {
++	PARP_TIER_LOCK_SCAN_FOLIOS,
++	PARP_TIER_LOCK_BATCH,
++};
++
++struct parp_tier_lock_measurement {
++	u64 irq_disabled_started_ns;
++	u64 lock_attempt_started_ns;
++	u64 acquired_ns;
++	u64 releasing_ns;
++	u64 irq_disabled_ended_ns;
++	u64 experiment_id;
++	u64 session_id;
++	u8 mode;
++	bool irq_disabled_measured;
++};
++
++enum parp_access_event {
++	PARP_ACCESS_PTE_YOUNG,
++	PARP_ACCESS_MARK_ACCESSED,
++	PARP_ACCESS_FD_REFERENCE,
++	PARP_ACCESS_UNTRUSTED_MARK,
++	PARP_ACCESS_POLICY_MARK,
++	PARP_NATIVE_TIER_PROMOTION,
++	PARP_NATIVE_GENERATION_MOVE,
++	PARP_POLICY_PROMOTION,
++	PARP_OTHER_MOVE,
++	PARP_ACCESS_EVENT_NR,
++};
++
++struct parp_tier_policy {
++	s32 cold_threshold;
++	s32 hot_threshold_1;
++	s32 hot_threshold_2;
++	s32 hot_threshold_3;
++	u8 max_upgrade_tiers;
++	u8 max_downgrade_tiers;
++	bool require_two_cold;
++};
++
++struct parp_tier_decision {
++	s64 features[PARP_TIER_FEATURES];
++	s32 reuse_score;
++	s32 raw_delta_tier_q8;
++	s32 delta_tier_q8;
++	s32 effective_tier_q8;
++	s32 cold_threshold;
++	s32 hot_threshold_1;
++	s32 hot_threshold_2;
++	s32 hot_threshold_3;
++	u64 score_duration_ns;
++	u64 decision_duration_ns;
++	unsigned long folio_nr_pages;
++	u8 native_tier;
++	u8 native_tier_idx;
++	u8 generation_index;
++	u8 action;
++	u8 bypass;
++	u8 rank_score_bin;
++	u8 scorer_kind;
++	u16 page_state_sequence;
++	bool evaluated;
++	bool model_valid;
++	bool features_valid;
++	bool native_protect;
++	bool effective_protect;
++	bool special_native_protect;
++	bool actual_tier_protect;
++	bool reservation_active;
++	bool reservation_upgrade;
++};
++
++struct parp_tier_scan_ctx {
++	u64 experiment_id;
++	u64 session_id;
++	u64 batch_id;
++	u64 epoch_id;
++	u64 memcg_id;
++	u64 model_time_ns;
++	unsigned long source_seq;
++	unsigned long candidate_pages;
++	unsigned long upgrade_pages;
++	unsigned long downgrade_pages;
++	u32 nid;
++	u32 config_sequence;
++	s32 reclaim_priority;
++	u16 epoch_tag;
++	u8 type;
++	u8 mode;
++	u8 run_epoch;
++	bool enabled;
++	bool severe_pressure;
++	bool no_progress;
++	bool rcu_held;
++};
++
++struct parp_tier_state_snapshot {
++	u32 last_access_ms;
++	u32 previous_interval_ms;
++	u32 reuse_interval_ema_ms;
++	u32 generation_enter_ms;
++	u16 last_upgrade_epoch;
++	u16 last_downgrade_epoch;
++	u32 lifetime_epoch;
++	u8 access_ema_q8;
++	u8 consecutive_candidates;
++	u8 generation;
++	u8 pending_action;
++	u8 state_epoch;
++	u16 state_sequence;
++	bool uncertain;
++};
++
++#ifdef CONFIG_PARP_EFFECTIVE_TIER
++extern struct static_key_false parp_effective_tier_enabled;
++extern struct static_key_false parp_effective_tier_lock_observe;
++extern struct page_ext_operations parp_effective_tier_page_ext_ops;
++
++static inline bool parp_effective_tier_tracking_active(void)
++{
++	return static_branch_unlikely(&parp_effective_tier_enabled);
++}
++
++void __parp_effective_tier_note_access(struct folio *folio,
++		enum parp_access_event event);
++void __parp_effective_tier_note_move(struct folio *folio,
++		enum parp_access_event event, int generation);
++void parp_effective_tier_page_alloc(struct page *page, unsigned int order);
++void __parp_effective_tier_mglru_state_change(void);
++void __parp_effective_tier_prepare(struct parp_tier_scan_ctx *ctx,
++		struct lruvec *lruvec, int type, int reclaim_priority);
++void __parp_effective_tier_decide(struct parp_tier_scan_ctx *ctx,
++		struct lruvec *lruvec, struct folio *folio, int native_tier,
++		int tier_idx, bool special_native_protect,
++		struct parp_tier_decision *decision);
++void __parp_effective_tier_finish(struct parp_tier_scan_ctx *ctx,
++		struct lruvec *lruvec, struct folio *folio,
++		struct parp_tier_decision *decision, bool sort_result,
++		bool isolate_attempted, bool isolate_result);
++void __parp_effective_tier_batch_finish(struct parp_tier_scan_ctx *ctx,
++		unsigned long isolated);
++void __parp_effective_tier_feedback(struct lruvec *lruvec, int type,
++		u8 run_epoch, unsigned long isolated, unsigned long reclaimed);
++void __parp_effective_tier_outcome(struct folio *folio,
++		enum parp_tier_outcome outcome);
++void __parp_effective_tier_lock_start(
++		struct parp_tier_lock_measurement *measurement);
++void __parp_effective_tier_lock_acquired(
++		struct parp_tier_lock_measurement *measurement);
++void __parp_effective_tier_lock_releasing(
++		struct parp_tier_lock_measurement *measurement);
++void __parp_effective_tier_lock_unlocked(
++		struct parp_tier_lock_measurement *measurement);
++void __parp_effective_tier_lock_finish(
++		struct parp_tier_lock_measurement *measurement,
++		enum parp_tier_lock_scope scope, int nid);
++
++enum parp_effective_tier_mode parp_effective_tier_get_mode(void);
++int parp_effective_tier_set_mode(enum parp_effective_tier_mode mode);
++ssize_t parp_effective_tier_format_stats(char *buf, size_t size);
++ssize_t parp_effective_tier_format_config(char *buf, size_t size);
++int parp_effective_tier_set_config(const char *buf);
++bool parp_effective_tier_get_lock_observe(void);
++int parp_effective_tier_set_lock_observe(bool enabled);
++
++bool parp_access_event_is_real(enum parp_access_event event);
++bool parp_effective_tier_score_values(
++		const s64 values[PARP_TIER_FEATURES], s32 *score);
++s32 parp_score_to_delta_q8(s32 score,
++		const struct parp_tier_policy *policy);
++s32 parp_effective_tier_q8(int native_tier, s32 delta_tier_q8);
++void parp_effective_tier_classify(s32 score, bool model_valid,
++		int native_tier, int tier_idx, bool special_native_protect,
++		const struct parp_tier_policy *policy,
++		struct parp_tier_decision *decision);
++bool parp_effective_tier_actual_protect(
++		enum parp_effective_tier_mode mode,
++		const struct parp_tier_decision *decision);
++bool parp_effective_tier_budget_allows(unsigned long used,
++		unsigned long candidates, unsigned long pages,
++		unsigned long absolute_limit, u32 ratio_permyriad);
++bool parp_effective_tier_random_claim(u64 random_value,
++		unsigned long selected, unsigned long target,
++		unsigned long seen, unsigned long eligible);
++bool parp_effective_tier_upgrade_gate(bool severe_pressure,
++		bool no_progress, enum parp_tier_bypass_reason *bypass);
++s32 parp_effective_tier_recency_score(u32 access_age_ms,
++		const struct parp_tier_policy *policy);
++int parp_effective_tier_next_generation(int generation);
++unsigned long parp_effective_tier_policy_flags(unsigned long old_flags,
++		int new_generation);
++bool parp_effective_tier_claim_epoch(struct folio *folio, bool upgrade,
++		u16 epoch_tag, enum parp_tier_bypass_reason *bypass);
++u64 parp_effective_tier_cookie(struct folio *folio);
++u32 parp_effective_tier_elapsed_ms(u32 now, u32 then, bool *valid);
++size_t parp_effective_tier_metadata_size(void);
++bool parp_effective_tier_state_snapshot(struct folio *folio,
++		struct parp_tier_state_snapshot *snapshot);
++bool parp_effective_tier_revalidate(struct folio *folio,
++		u16 state_sequence);
++bool parp_effective_tier_commit_revalidate(
++		const struct parp_tier_scan_ctx *ctx, struct folio *folio,
++		u16 state_sequence);
++
++static inline void parp_effective_tier_note_access(
++		struct folio *folio, enum parp_access_event event)
++{
++	if (static_branch_unlikely(&parp_effective_tier_enabled))
++		__parp_effective_tier_note_access(folio, event);
++}
++
++static inline void parp_effective_tier_note_move(
++		struct folio *folio, enum parp_access_event event, int generation)
++{
++	if (static_branch_unlikely(&parp_effective_tier_enabled))
++		__parp_effective_tier_note_move(folio, event, generation);
++}
++
++static inline void parp_effective_tier_mglru_state_change(void)
++{
++	if (static_branch_unlikely(&parp_effective_tier_enabled))
++		__parp_effective_tier_mglru_state_change();
++}
++
++static inline void parp_effective_tier_prepare(
++		struct parp_tier_scan_ctx *ctx, struct lruvec *lruvec,
++		int type, int reclaim_priority)
++{
++	if (static_branch_unlikely(&parp_effective_tier_enabled))
++		__parp_effective_tier_prepare(ctx, lruvec, type,
++				reclaim_priority);
++	else
++		ctx->enabled = false;
++}
++
++static inline void parp_effective_tier_decide(
++		struct parp_tier_scan_ctx *ctx, struct lruvec *lruvec,
++		struct folio *folio, int native_tier, int tier_idx,
++		bool special_native_protect, struct parp_tier_decision *decision)
++{
++	if (ctx->enabled)
++		__parp_effective_tier_decide(ctx, lruvec, folio, native_tier,
++				tier_idx, special_native_protect, decision);
++	else
++		decision->evaluated = false;
++}
++
++static inline void parp_effective_tier_finish(
++		struct parp_tier_scan_ctx *ctx, struct lruvec *lruvec,
++		struct folio *folio, struct parp_tier_decision *decision,
++		bool sort_result, bool isolate_attempted, bool isolate_result)
++{
++	if (decision->evaluated)
++		__parp_effective_tier_finish(ctx, lruvec, folio, decision,
++				sort_result, isolate_attempted, isolate_result);
++}
++
++static inline void parp_effective_tier_feedback(struct lruvec *lruvec,
++		int type, u8 run_epoch, unsigned long isolated,
++		unsigned long reclaimed)
++{
++	if (static_branch_unlikely(&parp_effective_tier_enabled))
++		__parp_effective_tier_feedback(lruvec, type, run_epoch, isolated,
++				reclaimed);
++}
++
++static inline void parp_effective_tier_batch_finish(
++		struct parp_tier_scan_ctx *ctx, unsigned long isolated)
++{
++	if (ctx->enabled)
++		__parp_effective_tier_batch_finish(ctx, isolated);
++}
++
++static inline void parp_effective_tier_outcome(struct folio *folio,
++		enum parp_tier_outcome outcome)
++{
++	if (static_branch_unlikely(&parp_effective_tier_enabled))
++		__parp_effective_tier_outcome(folio, outcome);
++}
++
++static inline void parp_effective_tier_lock_start(
++		struct parp_tier_lock_measurement *measurement)
++{
++	if (static_branch_unlikely(&parp_effective_tier_enabled))
++		__parp_effective_tier_lock_start(measurement);
++	else if (static_branch_unlikely(&parp_effective_tier_lock_observe))
++		__parp_effective_tier_lock_start(measurement);
++	else
++		*measurement = (struct parp_tier_lock_measurement) { };
++}
++
++static inline void parp_effective_tier_lock_acquired(
++		struct parp_tier_lock_measurement *measurement)
++{
++	if (measurement->irq_disabled_started_ns)
++		__parp_effective_tier_lock_acquired(measurement);
++}
++
++static inline void parp_effective_tier_lock_releasing(
++		struct parp_tier_lock_measurement *measurement)
++{
++	if (measurement->acquired_ns)
++		__parp_effective_tier_lock_releasing(measurement);
++}
++
++static inline void parp_effective_tier_lock_unlocked(
++		struct parp_tier_lock_measurement *measurement)
++{
++	if (measurement->releasing_ns)
++		__parp_effective_tier_lock_unlocked(measurement);
++}
++
++static inline void parp_effective_tier_lock_finish(
++		struct parp_tier_lock_measurement *measurement,
++		enum parp_tier_lock_scope scope, int nid)
++{
++	if (measurement->irq_disabled_ended_ns)
++		__parp_effective_tier_lock_finish(measurement, scope, nid);
++}
++#else
++static inline bool parp_effective_tier_tracking_active(void)
++{
++	return false;
++}
++
++static inline bool parp_effective_tier_commit_revalidate(
++		const struct parp_tier_scan_ctx *ctx, struct folio *folio,
++		u16 state_sequence)
++{
++	return false;
++}
++
++static inline void parp_effective_tier_note_access(
++		struct folio *folio, enum parp_access_event event)
++{
++}
++static inline void parp_effective_tier_note_move(
++		struct folio *folio, enum parp_access_event event, int generation)
++{
++}
++static inline void parp_effective_tier_page_alloc(struct page *page,
++		unsigned int order)
++{
++}
++static inline void parp_effective_tier_mglru_state_change(void)
++{
++}
++static inline void parp_effective_tier_prepare(
++		struct parp_tier_scan_ctx *ctx, struct lruvec *lruvec,
++		int type, int reclaim_priority)
++{
++	ctx->enabled = false;
++}
++static inline void parp_effective_tier_decide(
++		struct parp_tier_scan_ctx *ctx, struct lruvec *lruvec,
++		struct folio *folio, int native_tier, int tier_idx,
++		bool special_native_protect, struct parp_tier_decision *decision)
++{
++	decision->evaluated = false;
++}
++static inline void parp_effective_tier_finish(
++		struct parp_tier_scan_ctx *ctx, struct lruvec *lruvec,
++		struct folio *folio, struct parp_tier_decision *decision,
++		bool sort_result, bool isolate_attempted, bool isolate_result)
++{
++}
++static inline void parp_effective_tier_feedback(struct lruvec *lruvec,
++		int type, u8 run_epoch, unsigned long isolated,
++		unsigned long reclaimed)
++{
++}
++static inline void parp_effective_tier_batch_finish(
++		struct parp_tier_scan_ctx *ctx, unsigned long isolated)
++{
++}
++static inline void parp_effective_tier_outcome(struct folio *folio,
++		enum parp_tier_outcome outcome)
++{
++}
++static inline void parp_effective_tier_lock_start(
++		struct parp_tier_lock_measurement *measurement)
++{
++	*measurement = (struct parp_tier_lock_measurement) { };
++}
++static inline void parp_effective_tier_lock_acquired(
++		struct parp_tier_lock_measurement *measurement)
++{
++}
++static inline void parp_effective_tier_lock_releasing(
++		struct parp_tier_lock_measurement *measurement)
++{
++}
++static inline void parp_effective_tier_lock_unlocked(
++		struct parp_tier_lock_measurement *measurement)
++{
++}
++static inline void parp_effective_tier_lock_finish(
++		struct parp_tier_lock_measurement *measurement,
++		enum parp_tier_lock_scope scope, int nid)
++{
++}
++#endif
++
+ enum parp_mode {
+ 	PARP_MODE_DISABLED,
+ 	PARP_MODE_OBSERVE,
+diff --git a/include/linux/swap.h b/include/linux/swap.h
+index 7012a0f75..94b047a2a 100644
+--- a/include/linux/swap.h
++++ b/include/linux/swap.h
+@@ -13,6 +13,7 @@
+ #include <linux/pagemap.h>
+ #include <linux/atomic.h>
+ #include <linux/page-flags.h>
++#include <linux/parp.h>
+ #include <uapi/linux/mempolicy.h>
+ #include <asm/page.h>
+ 
+@@ -384,6 +385,8 @@ void folio_add_lru(struct folio *);
+ void folio_add_lru_vma(struct folio *, struct vm_area_struct *);
+ void mark_page_accessed(struct page *);
+ void folio_mark_accessed(struct folio *);
++void folio_mark_accessed_native(struct folio *);
++void folio_mark_accessed_source(struct folio *, unsigned int source);
+ 
+ static inline bool folio_may_be_lru_cached(struct folio *folio)
+ {
+diff --git a/include/trace/events/parp.h b/include/trace/events/parp.h
+index e0a4b5eb4..783abc0ae 100644
+--- a/include/trace/events/parp.h
++++ b/include/trace/events/parp.h
+@@ -5,6 +5,7 @@
+ #if !defined(_TRACE_PARP_H) || defined(TRACE_HEADER_MULTI_READ)
+ #define _TRACE_PARP_H
+ 
++#include <linux/parp.h>
+ #include <linux/tracepoint.h>
+ 
+ #ifndef _TRACE_PARP_TYPES_H
+@@ -93,6 +94,110 @@ struct parp_frontier_trace {
+ 	bool would_promote;
+ 	bool applied;
+ };
++
++struct parp_effective_tier_trace {
++	u64 timestamp_ns;
++	u64 experiment_id;
++	u64 session_id;
++	u64 folio_cookie;
++	u64 memcg_id;
++	u64 source_seq;
++	u64 batch_id;
++	u64 reclaim_epoch;
++	u64 score_duration_ns;
++	u64 decision_duration_ns;
++	u64 trace_sequence;
++	s64 features[6];
++	s32 reuse_score;
++	s32 cold_threshold;
++	s32 hot_threshold_1;
++	s32 hot_threshold_2;
++	s32 hot_threshold_3;
++	s32 delta_tier_q8;
++	s32 effective_tier_q8;
++	s32 priority;
++	u64 folio_nr_pages;
++	u32 lifetime_epoch;
++	u32 nid;
++	u32 model_version;
++	u32 expected_model_version;
++	u32 feature_schema_version;
++	char model_type[PARP_TIER_TRACE_MODEL_TYPE_LEN];
++	char model_checksum[PARP_TIER_TRACE_CHECKSUM_LEN];
++	char model_provenance[PARP_TIER_TRACE_PROVENANCE_LEN];
++	u8 generation_index;
++	u8 native_tier;
++	u8 native_tier_idx;
++	u8 page_type;
++	u8 mode;
++	u8 action;
++	u8 bypass;
++	u8 rank_score_bin;
++	bool special_native_protect;
++	bool model_valid;
++	bool features_valid;
++	bool native_protect;
++	bool effective_protect;
++	bool actual_tier_protect;
++	bool sort_result;
++	bool isolate_attempted;
++	bool isolate_result;
++};
++
++struct parp_effective_tier_access_trace {
++	u64 timestamp_ns;
++	u64 trace_sequence;
++	u64 experiment_id;
++	u64 session_id;
++	u64 folio_cookie;
++	u32 lifetime_epoch;
++	s32 generation;
++	u8 page_type;
++	u8 event;
++	bool real_access;
++};
++
++struct parp_effective_tier_outcome_trace {
++	u64 timestamp_ns;
++	u64 trace_sequence;
++	u64 experiment_id;
++	u64 session_id;
++	u64 folio_cookie;
++	u32 lifetime_epoch;
++	u8 proposed_action;
++	u8 actual_action;
++	u8 outcome;
++};
++
++struct parp_effective_tier_batch_trace {
++	u64 timestamp_ns;
++	u64 trace_sequence;
++	u64 experiment_id;
++	u64 session_id;
++	u64 batch_id;
++	u64 reclaim_epoch;
++	u64 model_time_ns;
++	u64 candidate_pages;
++	u64 upgrade_pages;
++	u64 downgrade_pages;
++	u64 isolated_pages;
++	u8 page_type;
++	u8 mode;
++};
++
++struct parp_effective_tier_lock_trace {
++	u64 timestamp_ns;
++	u64 trace_sequence;
++	u64 experiment_id;
++	u64 session_id;
++	u64 wait_ns;
++	u64 held_ns;
++	u64 irq_disabled_ns;
++	u32 nid;
++	u8 mode;
++	u8 scope;
++	bool irq_disabled_measured;
++};
+ #endif /* _TRACE_PARP_TYPES_H */
+ 
+ TRACE_EVENT(parp_decision,
+@@ -204,6 +309,288 @@ TRACE_EVENT(parp_frontier_decision,
+ 		  __entry->reason, __entry->would_promote, __entry->applied)
+ );
+ 
++TRACE_EVENT(parp_effective_tier_decision,
++	TP_PROTO(const struct parp_effective_tier_trace *event),
++	TP_ARGS(event),
++	TP_STRUCT__entry(
++		__field(u64, timestamp_ns)
++		__field(u64, experiment_id)
++		__field(u64, session_id)
++		__field(u64, folio_cookie)
++		__field(u64, memcg_id)
++		__field(u64, source_seq)
++		__field(u64, batch_id)
++		__field(u64, reclaim_epoch)
++		__field(u64, score_duration_ns)
++		__field(u64, decision_duration_ns)
++		__field(u64, trace_sequence)
++		__array(s64, features, 6)
++		__field(s32, reuse_score)
++		__field(s32, cold_threshold)
++		__field(s32, hot_threshold_1)
++		__field(s32, hot_threshold_2)
++		__field(s32, hot_threshold_3)
++		__field(s32, delta_tier_q8)
++		__field(s32, effective_tier_q8)
++		__field(s32, priority)
++		__field(u64, folio_nr_pages)
++		__field(u32, lifetime_epoch)
++		__field(u32, nid)
++		__field(u32, model_version)
++		__field(u32, expected_model_version)
++		__field(u32, feature_schema_version)
++		__array(char, model_type, PARP_TIER_TRACE_MODEL_TYPE_LEN)
++		__array(char, model_checksum, PARP_TIER_TRACE_CHECKSUM_LEN)
++		__array(char, model_provenance, PARP_TIER_TRACE_PROVENANCE_LEN)
++		__field(u8, generation_index)
++		__field(u8, native_tier)
++		__field(u8, native_tier_idx)
++		__field(u8, page_type)
++		__field(u8, mode)
++		__field(u8, action)
++		__field(u8, bypass)
++		__field(u8, rank_score_bin)
++		__field(bool, special_native_protect)
++		__field(bool, model_valid)
++		__field(bool, features_valid)
++		__field(bool, native_protect)
++		__field(bool, effective_protect)
++		__field(bool, actual_tier_protect)
++		__field(bool, sort_result)
++		__field(bool, isolate_attempted)
++		__field(bool, isolate_result)
++	),
++	TP_fast_assign(
++		__entry->timestamp_ns = event->timestamp_ns;
++		__entry->experiment_id = event->experiment_id;
++		__entry->session_id = event->session_id;
++		__entry->folio_cookie = event->folio_cookie;
++		__entry->memcg_id = event->memcg_id;
++		__entry->source_seq = event->source_seq;
++		__entry->batch_id = event->batch_id;
++		__entry->reclaim_epoch = event->reclaim_epoch;
++		__entry->score_duration_ns = event->score_duration_ns;
++		__entry->decision_duration_ns = event->decision_duration_ns;
++		__entry->trace_sequence = event->trace_sequence;
++		memcpy(__entry->features, event->features,
++		       sizeof(__entry->features));
++		__entry->reuse_score = event->reuse_score;
++		__entry->cold_threshold = event->cold_threshold;
++		__entry->hot_threshold_1 = event->hot_threshold_1;
++		__entry->hot_threshold_2 = event->hot_threshold_2;
++		__entry->hot_threshold_3 = event->hot_threshold_3;
++		__entry->delta_tier_q8 = event->delta_tier_q8;
++		__entry->effective_tier_q8 = event->effective_tier_q8;
++		__entry->priority = event->priority;
++		__entry->folio_nr_pages = event->folio_nr_pages;
++		__entry->lifetime_epoch = event->lifetime_epoch;
++		__entry->nid = event->nid;
++		__entry->model_version = event->model_version;
++		__entry->expected_model_version = event->expected_model_version;
++		__entry->feature_schema_version = event->feature_schema_version;
++		memcpy(__entry->model_type, event->model_type,
++		       sizeof(__entry->model_type));
++		memcpy(__entry->model_checksum, event->model_checksum,
++		       sizeof(__entry->model_checksum));
++		memcpy(__entry->model_provenance, event->model_provenance,
++		       sizeof(__entry->model_provenance));
++		__entry->generation_index = event->generation_index;
++		__entry->native_tier = event->native_tier;
++		__entry->native_tier_idx = event->native_tier_idx;
++		__entry->page_type = event->page_type;
++		__entry->mode = event->mode;
++		__entry->action = event->action;
++		__entry->bypass = event->bypass;
++		__entry->rank_score_bin = event->rank_score_bin;
++		__entry->special_native_protect = event->special_native_protect;
++		__entry->model_valid = event->model_valid;
++		__entry->features_valid = event->features_valid;
++		__entry->native_protect = event->native_protect;
++		__entry->effective_protect = event->effective_protect;
++		__entry->actual_tier_protect = event->actual_tier_protect;
++		__entry->sort_result = event->sort_result;
++		__entry->isolate_attempted = event->isolate_attempted;
++		__entry->isolate_result = event->isolate_result;
++	),
++	TP_printk("time=%llu experiment=%llu session=%llu cookie=%llu lifetime=%u memcg=%llu nid=%u type=%u source_seq=%llu gen=%u native_tier=%u tier_idx=%u special=%d mode=%u model_type=%s model_version=%u expected_model_version=%u feature_schema_version=%u model_checksum=%s model_provenance=%s model_valid=%d features_valid=%d native_protect=%d effective_protect=%d actual_tier_protect=%d score=%d score_bin=%u rank_score_bin=%u thresholds=%d/%d/%d/%d delta_q8=%d effective_q8=%d action=%u bypass=%u pages=%llu batch=%llu epoch=%llu priority=%d score_ns=%llu decision_ns=%llu trace_seq=%llu sort=%d isolate_attempted=%d isolate_result=%d features=%lld,%lld,%lld,%lld,%lld,%lld",
++		  __entry->timestamp_ns, __entry->experiment_id,
++		  __entry->session_id, __entry->folio_cookie,
++		  __entry->lifetime_epoch, __entry->memcg_id, __entry->nid,
++		  __entry->page_type, __entry->source_seq,
++		  __entry->generation_index, __entry->native_tier,
++		  __entry->native_tier_idx, __entry->special_native_protect,
++		  __entry->mode, __entry->model_type, __entry->model_version,
++		  __entry->expected_model_version,
++		  __entry->feature_schema_version, __entry->model_checksum,
++		  __entry->model_provenance, __entry->model_valid,
++		  __entry->features_valid,
++		  __entry->native_protect, __entry->effective_protect,
++		  __entry->actual_tier_protect, __entry->reuse_score,
++		  __entry->rank_score_bin, __entry->rank_score_bin,
++		  __entry->cold_threshold, __entry->hot_threshold_1,
++		  __entry->hot_threshold_2, __entry->hot_threshold_3,
++		  __entry->delta_tier_q8,
++		  __entry->effective_tier_q8, __entry->action, __entry->bypass,
++		  __entry->folio_nr_pages, __entry->batch_id,
++		  __entry->reclaim_epoch, __entry->priority,
++		  __entry->score_duration_ns, __entry->decision_duration_ns,
++		  __entry->trace_sequence,
++		  __entry->sort_result, __entry->isolate_attempted,
++		  __entry->isolate_result, __entry->features[0],
++		  __entry->features[1], __entry->features[2],
++		  __entry->features[3], __entry->features[4],
++		  __entry->features[5])
++);
++
++TRACE_EVENT(parp_effective_tier_access,
++	TP_PROTO(const struct parp_effective_tier_access_trace *event),
++	TP_ARGS(event),
++	TP_STRUCT__entry(
++		__field(u64, timestamp_ns)
++		__field(u64, trace_sequence)
++		__field(u64, experiment_id)
++		__field(u64, session_id)
++		__field(u64, folio_cookie)
++		__field(u32, lifetime_epoch)
++		__field(s32, generation)
++		__field(u8, page_type)
++		__field(u8, event)
++		__field(bool, real_access)
++	),
++	TP_fast_assign(
++		__entry->timestamp_ns = event->timestamp_ns;
++		__entry->trace_sequence = event->trace_sequence;
++		__entry->experiment_id = event->experiment_id;
++		__entry->session_id = event->session_id;
++		__entry->folio_cookie = event->folio_cookie;
++		__entry->lifetime_epoch = event->lifetime_epoch;
++		__entry->generation = event->generation;
++		__entry->page_type = event->page_type;
++		__entry->event = event->event;
++		__entry->real_access = event->real_access;
++	),
++	TP_printk("time=%llu trace_seq=%llu experiment=%llu session=%llu cookie=%llu lifetime=%u gen=%d type=%u event=%u real=%d",
++		  __entry->timestamp_ns, __entry->trace_sequence,
++		  __entry->experiment_id, __entry->session_id,
++		  __entry->folio_cookie,
++		  __entry->lifetime_epoch, __entry->generation,
++		  __entry->page_type, __entry->event, __entry->real_access)
++);
++
++TRACE_EVENT(parp_effective_tier_outcome,
++	TP_PROTO(const struct parp_effective_tier_outcome_trace *event),
++	TP_ARGS(event),
++	TP_STRUCT__entry(
++		__field(u64, timestamp_ns)
++		__field(u64, trace_sequence)
++		__field(u64, experiment_id)
++		__field(u64, session_id)
++		__field(u64, folio_cookie)
++		__field(u32, lifetime_epoch)
++		__field(u8, proposed_action)
++		__field(u8, actual_action)
++		__field(u8, outcome)
++	),
++	TP_fast_assign(
++		__entry->timestamp_ns = event->timestamp_ns;
++		__entry->trace_sequence = event->trace_sequence;
++		__entry->experiment_id = event->experiment_id;
++		__entry->session_id = event->session_id;
++		__entry->folio_cookie = event->folio_cookie;
++		__entry->lifetime_epoch = event->lifetime_epoch;
++		__entry->proposed_action = event->proposed_action;
++		__entry->actual_action = event->actual_action;
++		__entry->outcome = event->outcome;
++	),
++	TP_printk("time=%llu trace_seq=%llu experiment=%llu session=%llu cookie=%llu lifetime=%u action=%u actual_action=%u outcome=%u",
++		  __entry->timestamp_ns, __entry->trace_sequence,
++		  __entry->experiment_id, __entry->session_id,
++		  __entry->folio_cookie,
++		  __entry->lifetime_epoch, __entry->proposed_action,
++		  __entry->actual_action, __entry->outcome)
++);
++
++TRACE_EVENT(parp_effective_tier_batch,
++	TP_PROTO(const struct parp_effective_tier_batch_trace *event),
++	TP_ARGS(event),
++	TP_STRUCT__entry(
++		__field(u64, timestamp_ns)
++		__field(u64, trace_sequence)
++		__field(u64, experiment_id)
++		__field(u64, session_id)
++		__field(u64, batch_id)
++		__field(u64, reclaim_epoch)
++		__field(u64, model_time_ns)
++		__field(u64, candidate_pages)
++		__field(u64, upgrade_pages)
++		__field(u64, downgrade_pages)
++		__field(u64, isolated_pages)
++		__field(u8, page_type)
++		__field(u8, mode)
++	),
++	TP_fast_assign(
++		__entry->timestamp_ns = event->timestamp_ns;
++		__entry->trace_sequence = event->trace_sequence;
++		__entry->experiment_id = event->experiment_id;
++		__entry->session_id = event->session_id;
++		__entry->batch_id = event->batch_id;
++		__entry->reclaim_epoch = event->reclaim_epoch;
++		__entry->model_time_ns = event->model_time_ns;
++		__entry->candidate_pages = event->candidate_pages;
++		__entry->upgrade_pages = event->upgrade_pages;
++		__entry->downgrade_pages = event->downgrade_pages;
++		__entry->isolated_pages = event->isolated_pages;
++		__entry->page_type = event->page_type;
++		__entry->mode = event->mode;
++	),
++	TP_printk("time=%llu trace_seq=%llu experiment=%llu session=%llu batch=%llu epoch=%llu type=%u mode=%u candidates=%llu upgrades=%llu downgrades=%llu isolated=%llu model_ns=%llu",
++		  __entry->timestamp_ns, __entry->trace_sequence,
++		  __entry->experiment_id, __entry->session_id,
++		  __entry->batch_id,
++		  __entry->reclaim_epoch, __entry->page_type, __entry->mode,
++		  __entry->candidate_pages, __entry->upgrade_pages,
++		  __entry->downgrade_pages, __entry->isolated_pages,
++		  __entry->model_time_ns)
++);
++
++TRACE_EVENT(parp_effective_tier_lock,
++	TP_PROTO(const struct parp_effective_tier_lock_trace *event),
++	TP_ARGS(event),
++	TP_STRUCT__entry(
++		__field(u64, timestamp_ns)
++		__field(u64, trace_sequence)
++		__field(u64, experiment_id)
++		__field(u64, session_id)
++		__field(u64, wait_ns)
++		__field(u64, held_ns)
++		__field(u64, irq_disabled_ns)
++		__field(u32, nid)
++		__field(u8, mode)
++		__field(u8, scope)
++		__field(bool, irq_disabled_measured)
++	),
++	TP_fast_assign(
++		__entry->timestamp_ns = event->timestamp_ns;
++		__entry->trace_sequence = event->trace_sequence;
++		__entry->experiment_id = event->experiment_id;
++		__entry->session_id = event->session_id;
++		__entry->wait_ns = event->wait_ns;
++		__entry->held_ns = event->held_ns;
++		__entry->irq_disabled_ns = event->irq_disabled_ns;
++		__entry->nid = event->nid;
++		__entry->mode = event->mode;
++		__entry->scope = event->scope;
++		__entry->irq_disabled_measured = event->irq_disabled_measured;
++	),
++	TP_printk("time=%llu trace_seq=%llu experiment=%llu session=%llu nid=%u mode=%u scope=%u wait_ns=%llu held_ns=%llu irq_disabled_ns=%llu irq_measured=%d",
++		  __entry->timestamp_ns, __entry->trace_sequence,
++		  __entry->experiment_id,
++		  __entry->session_id, __entry->nid, __entry->mode,
++		  __entry->scope, __entry->wait_ns, __entry->held_ns,
++		  __entry->irq_disabled_ns,
++		  __entry->irq_disabled_measured)
++);
++
+ TRACE_EVENT(parp_region_evidence,
+ 	TP_PROTO(const struct parp_region_trace *event),
+ 	TP_ARGS(event),
+diff --git a/mm/damon/ops-common.c b/mm/damon/ops-common.c
+index 99321ff5c..7e2ebaedd 100644
+--- a/mm/damon/ops-common.c
++++ b/mm/damon/ops-common.c
+@@ -41,7 +41,8 @@ struct folio *damon_get_folio(unsigned long pfn)
+ 	return folio;
+ }
+ 
+-void damon_ptep_mkold(pte_t *pte, struct vm_area_struct *vma, unsigned long addr)
++static bool damon_ptep_mkold_internal(pte_t *pte,
++		struct vm_area_struct *vma, unsigned long addr, bool note_access)
+ {
+ 	pte_t pteval = ptep_get(pte);
+ 	struct folio *folio;
+@@ -55,7 +56,7 @@ void damon_ptep_mkold(pte_t *pte, struct vm_area_struct *vma, unsigned long addr
+ 
+ 	folio = damon_get_folio(pfn);
+ 	if (!folio)
+-		return;
++		return false;
+ 
+ 	/*
+ 	 * PFN swap PTEs, such as device-exclusive ones, that actually map pages
+@@ -67,27 +68,52 @@ void damon_ptep_mkold(pte_t *pte, struct vm_area_struct *vma, unsigned long addr
+ 	young |= mmu_notifier_clear_young(vma->vm_mm, addr, addr + PAGE_SIZE);
+ 	if (young)
+ 		folio_set_young(folio);
++	if (young && note_access)
++		parp_effective_tier_note_access(folio, PARP_ACCESS_PTE_YOUNG);
+ 
+ 	folio_set_idle(folio);
+ 	folio_put(folio);
++	return young;
++}
++
++void damon_ptep_mkold(pte_t *pte, struct vm_area_struct *vma,
++		unsigned long addr)
++{
++	damon_ptep_mkold_internal(pte, vma, addr, true);
+ }
+ 
+-void damon_pmdp_mkold(pmd_t *pmd, struct vm_area_struct *vma, unsigned long addr)
++static bool damon_pmdp_mkold_internal(pmd_t *pmd,
++		struct vm_area_struct *vma, unsigned long addr, bool note_access)
+ {
+ #ifdef CONFIG_TRANSPARENT_HUGEPAGE
+ 	struct folio *folio = damon_get_folio(pmd_pfn(pmdp_get(pmd)));
++	bool young;
+ 
+ 	if (!folio)
+-		return;
++		return false;
+ 
+-	if (pmdp_clear_young_notify(vma, addr, pmd))
++	young = pmdp_clear_young_notify(vma, addr, pmd);
++	if (young) {
+ 		folio_set_young(folio);
++		if (note_access)
++			parp_effective_tier_note_access(folio,
++						PARP_ACCESS_PTE_YOUNG);
++	}
+ 
+ 	folio_set_idle(folio);
+ 	folio_put(folio);
++	return young;
++#else
++	return false;
+ #endif /* CONFIG_TRANSPARENT_HUGEPAGE */
+ }
+ 
++void damon_pmdp_mkold(pmd_t *pmd, struct vm_area_struct *vma,
++		unsigned long addr)
++{
++	damon_pmdp_mkold_internal(pmd, vma, addr, true);
++}
++
+ #define DAMON_MAX_SUBSCORE	(100)
+ #define DAMON_MAX_AGE_IN_LOG	(32)
+ 
+@@ -145,13 +171,16 @@ static bool damon_folio_mkold_one(struct folio *folio,
+ 		struct vm_area_struct *vma, unsigned long addr, void *arg)
+ {
+ 	DEFINE_FOLIO_VMA_WALK(pvmw, folio, vma, addr, 0);
++	bool *young = arg;
+ 
+ 	while (page_vma_mapped_walk(&pvmw)) {
+ 		addr = pvmw.address;
+ 		if (pvmw.pte)
+-			damon_ptep_mkold(pvmw.pte, vma, addr);
++			*young |= damon_ptep_mkold_internal(pvmw.pte, vma,
++							      addr, false);
+ 		else
+-			damon_pmdp_mkold(pvmw.pmd, vma, addr);
++			*young |= damon_pmdp_mkold_internal(pvmw.pmd, vma,
++							      addr, false);
+ 	}
+ 	return true;
+ }
+@@ -163,6 +192,9 @@ void damon_folio_mkold(struct folio *folio)
+ 		.anon_lock = folio_lock_anon_vma_read,
+ 	};
+ 	bool need_lock;
++	bool young = false;
++
++	rwc.arg = &young;
+ 
+ 	if (!folio_mapped(folio) || !folio_raw_mapping(folio)) {
+ 		folio_set_idle(folio);
+@@ -174,6 +206,8 @@ void damon_folio_mkold(struct folio *folio)
+ 		return;
+ 
+ 	rmap_walk(folio, &rwc);
++	if (young)
++		parp_effective_tier_note_access(folio, PARP_ACCESS_PTE_YOUNG);
+ 
+ 	if (need_lock)
+ 		folio_unlock(folio);
+diff --git a/mm/damon/paddr.c b/mm/damon/paddr.c
+index 53a55c511..4ce265f0b 100644
+--- a/mm/damon/paddr.c
++++ b/mm/damon/paddr.c
+@@ -203,7 +203,8 @@ static inline unsigned long damon_pa_mark_accessed_or_deactivate(
+ 			*sz_filter_passed += folio_size(folio);
+ 
+ 		if (mark_accessed)
+-			folio_mark_accessed(folio);
++			folio_mark_accessed_source(folio,
++						     PARP_ACCESS_POLICY_MARK);
+ 		else
+ 			folio_deactivate(folio);
+ 		applied += folio_nr_pages(folio);
+diff --git a/mm/filemap.c b/mm/filemap.c
+index bef514b60..077453cbe 100644
+--- a/mm/filemap.c
++++ b/mm/filemap.c
+@@ -2738,7 +2738,7 @@ ssize_t filemap_read(struct kiocb *iocb, struct iov_iter *iter,
+ 		 */
+ 		if (!pos_same_folio(iocb->ki_pos, last_pos - 1,
+ 				    fbatch.folios[0]))
+-			folio_mark_accessed(fbatch.folios[0]);
++			folio_mark_accessed_native(fbatch.folios[0]);
+ 
+ 		for (i = 0; i < folio_batch_count(&fbatch); i++) {
+ 			struct folio *folio = fbatch.folios[i];
+@@ -2751,7 +2751,7 @@ ssize_t filemap_read(struct kiocb *iocb, struct iov_iter *iter,
+ 			if (end_offset < folio_pos(folio))
+ 				break;
+ 			if (i > 0)
+-				folio_mark_accessed(folio);
++				folio_mark_accessed_native(folio);
+ 			/*
+ 			 * If users can be writing to this folio using arbitrary
+ 			 * virtual addresses, take care of potential aliasing
+@@ -2761,6 +2761,9 @@ ssize_t filemap_read(struct kiocb *iocb, struct iov_iter *iter,
+ 				flush_dcache_folio(folio);
+ 
+ 			copied = copy_folio_to_iter(folio, offset, bytes, iter);
++			if (copied)
++				parp_effective_tier_note_access(
++					folio, PARP_ACCESS_FD_REFERENCE);
+ 
+ 			already_read += copied;
+ 			iocb->ki_pos += copied;
+@@ -3017,7 +3020,7 @@ ssize_t filemap_splice_read(struct file *in, loff_t *ppos,
+ 
+ 			if (folio_pos(folio) >= end_offset)
+ 				goto out;
+-			folio_mark_accessed(folio);
++			folio_mark_accessed_native(folio);
+ 
+ 			/*
+ 			 * If users can be writing to this folio using arbitrary
+@@ -3031,6 +3034,8 @@ ssize_t filemap_splice_read(struct file *in, loff_t *ppos,
+ 			n = splice_folio_into_pipe(pipe, folio, *ppos, n);
+ 			if (!n)
+ 				goto out;
++			parp_effective_tier_note_access(folio,
++						  PARP_ACCESS_FD_REFERENCE);
+ 			len -= n;
+ 			total_spliced += n;
+ 			*ppos += n;
+diff --git a/mm/gup.c b/mm/gup.c
+index 0bc4d140f..20facb9a8 100644
+--- a/mm/gup.c
++++ b/mm/gup.c
+@@ -897,7 +897,7 @@ static struct page *follow_page_pte(struct vm_area_struct *vma,
+ 		 * is needed to avoid losing the dirty bit: it is easier to use
+ 		 * folio_mark_accessed().
+ 		 */
+-		folio_mark_accessed(folio);
++		folio_mark_accessed_native(folio);
+ 	}
+ out:
+ 	pte_unmap_unlock(ptep, ptl);
+diff --git a/mm/huge_memory.c b/mm/huge_memory.c
+index 5d63ee72c..aa5bb9020 100644
+--- a/mm/huge_memory.c
++++ b/mm/huge_memory.c
+@@ -2154,6 +2154,9 @@ bool madvise_free_huge_pmd(struct mmu_gather *tlb, struct vm_area_struct *vma,
+ 	folio_unlock(folio);
+ 
+ 	if (pmd_young(orig_pmd) || pmd_dirty(orig_pmd)) {
++		if (pmd_young(orig_pmd))
++			parp_effective_tier_note_access(folio,
++						PARP_ACCESS_POLICY_MARK);
+ 		pmdp_invalidate(vma, addr, pmd);
+ 		orig_pmd = pmd_mkold(orig_pmd);
+ 		orig_pmd = pmd_mkclean(orig_pmd);
+@@ -2232,6 +2235,10 @@ int zap_huge_pmd(struct mmu_gather *tlb, struct vm_area_struct *vma,
+ 		if (folio_test_anon(folio)) {
+ 			zap_deposited_table(tlb->mm, pmd);
+ 			add_mm_counter(tlb->mm, MM_ANONPAGES, -HPAGE_PMD_NR);
++			if (flush_needed && pmd_young(orig_pmd) &&
++			    likely(vma_has_recency(vma)))
++				parp_effective_tier_note_access(folio,
++							PARP_ACCESS_PTE_YOUNG);
+ 		} else {
+ 			if (arch_needs_pgtable_deposit())
+ 				zap_deposited_table(tlb->mm, pmd);
+@@ -2244,7 +2251,8 @@ int zap_huge_pmd(struct mmu_gather *tlb, struct vm_area_struct *vma,
+ 			 */
+ 			if (flush_needed && pmd_young(orig_pmd) &&
+ 			    likely(vma_has_recency(vma)))
+-				folio_mark_accessed(folio);
++				folio_mark_accessed_source(folio,
++						     PARP_ACCESS_PTE_YOUNG);
+ 		}
+ 
+ 		spin_unlock(ptl);
+@@ -2726,6 +2734,9 @@ int zap_huge_pud(struct mmu_gather *tlb, struct vm_area_struct *vma,
+ 
+ 		page = pud_page(orig_pud);
+ 		folio = page_folio(page);
++		if (pud_young(orig_pud) && likely(vma_has_recency(vma)))
++			parp_effective_tier_note_access(folio,
++						PARP_ACCESS_PTE_YOUNG);
+ 		folio_remove_rmap_pud(folio, page, vma);
+ 		add_mm_counter(tlb->mm, mm_counter_file(folio), -HPAGE_PUD_NR);
+ 
+@@ -2756,6 +2767,8 @@ static void __split_huge_pud_locked(struct vm_area_struct *vma, pud_t *pud,
+ 
+ 	page = pud_page(old_pud);
+ 	folio = page_folio(page);
++	if (pud_young(old_pud) && likely(vma_has_recency(vma)))
++		parp_effective_tier_note_access(folio, PARP_ACCESS_PTE_YOUNG);
+ 
+ 	if (!folio_test_dirty(folio) && pud_dirty(old_pud))
+ 		folio_mark_dirty(folio);
+@@ -2875,6 +2888,9 @@ static void __split_huge_pmd_locked(struct vm_area_struct *vma, pmd_t *pmd,
+ 		} else {
+ 			page = pmd_page(old_pmd);
+ 			folio = page_folio(page);
++			if (pmd_young(old_pmd) && likely(vma_has_recency(vma)))
++				parp_effective_tier_note_access(folio,
++							PARP_ACCESS_PTE_YOUNG);
+ 			if (!folio_test_dirty(folio) && pmd_dirty(old_pmd))
+ 				folio_mark_dirty(folio);
+ 			if (!folio_test_referenced(folio) && pmd_young(old_pmd))
+diff --git a/mm/ksm.c b/mm/ksm.c
+index 16d41e268..249844796 100644
+--- a/mm/ksm.c
++++ b/mm/ksm.c
+@@ -1492,7 +1492,8 @@ static int try_to_merge_one_page(struct vm_area_struct *vma,
+ 			 * stable_tree_insert() will update stable_node.
+ 			 */
+ 			folio_set_stable_node(folio, NULL);
+-			folio_mark_accessed(folio);
++			folio_mark_accessed_source(folio,
++						     PARP_ACCESS_POLICY_MARK);
+ 			/*
+ 			 * Page reclaim just frees a clean folio with no dirty
+ 			 * ptes: make sure that the ksm page would be swapped.
+diff --git a/mm/madvise.c b/mm/madvise.c
+index 35ed4ab0d..e9ce87957 100644
+--- a/mm/madvise.c
++++ b/mm/madvise.c
+@@ -420,6 +420,8 @@ static int madvise_cold_or_pageout_pte_range(pmd_t *pmd,
+ 		}
+ 
+ 		if (!pageout && pmd_young(orig_pmd)) {
++			parp_effective_tier_note_access(folio,
++						PARP_ACCESS_POLICY_MARK);
+ 			pmdp_invalidate(vma, addr, pmd);
+ 			orig_pmd = pmd_mkold(orig_pmd);
+ 
+@@ -531,6 +533,8 @@ static int madvise_cold_or_pageout_pte_range(pmd_t *pmd,
+ 			continue;
+ 
+ 		if (!pageout && pte_young(ptent)) {
++			parp_effective_tier_note_access(folio,
++						PARP_ACCESS_POLICY_MARK);
+ 			clear_young_dirty_ptes(vma, addr, pte, nr,
+ 					       CYDP_CLEAR_YOUNG);
+ 			tlb_remove_tlb_entries(tlb, pte, nr, addr);
+@@ -769,6 +773,9 @@ static int madvise_free_pte_range(pmd_t *pmd, unsigned long addr,
+ 		}
+ 
+ 		if (pte_young(ptent) || pte_dirty(ptent)) {
++			if (pte_young(ptent))
++				parp_effective_tier_note_access(folio,
++							PARP_ACCESS_POLICY_MARK);
+ 			clear_young_dirty_ptes(vma, addr, pte, nr, cydp_flags);
+ 			tlb_remove_tlb_entries(tlb, pte, nr, addr);
+ 		}
+diff --git a/mm/memory.c b/mm/memory.c
+index 75f3b66be..beb85dfe2 100644
+--- a/mm/memory.c
++++ b/mm/memory.c
+@@ -1506,11 +1506,21 @@ static __always_inline void zap_present_folio_ptes(struct mmu_gather *tlb,
+ 			}
+ 		}
+ 		if (pte_young(ptent) && likely(vma_has_recency(vma)))
+-			folio_mark_accessed(folio);
++			folio_mark_accessed_source(folio,
++						     PARP_ACCESS_PTE_YOUNG);
+ 		rss[mm_counter(folio)] -= nr;
+ 	} else {
+-		/* We don't need up-to-date accessed/dirty bits. */
+-		clear_full_ptes(mm, addr, pte, nr, tlb->fullmm);
++		/* Preserve the native fast path unless PARP needs aggregate young. */
++		if (parp_effective_tier_tracking_active()) {
++			ptent = get_and_clear_full_ptes(mm, addr, pte, nr,
++							 tlb->fullmm);
++			if (pte_young(ptent) && likely(vma_has_recency(vma)))
++				parp_effective_tier_note_access(folio,
++							PARP_ACCESS_PTE_YOUNG);
++		} else {
++			/* We don't need up-to-date accessed/dirty bits. */
++			clear_full_ptes(mm, addr, pte, nr, tlb->fullmm);
++		}
+ 		rss[MM_ANONPAGES] -= nr;
+ 	}
+ 	/* Checking a single PTE in a batch is sufficient. */
+diff --git a/mm/page_alloc.c b/mm/page_alloc.c
+index 09241bb76..c53bc5348 100644
+--- a/mm/page_alloc.c
++++ b/mm/page_alloc.c
+@@ -55,6 +55,7 @@
+ #include <linux/delayacct.h>
+ #include <linux/cacheinfo.h>
+ #include <linux/pgalloc_tag.h>
++#include <linux/parp.h>
+ #include <asm/div64.h>
+ #include "internal.h"
+ #include "shuffle.h"
+@@ -1851,6 +1852,7 @@ inline void post_alloc_hook(struct page *page, unsigned int order,
+ 	set_page_owner(page, order, gfp_flags);
+ 	page_table_check_alloc(page, order);
+ 	pgalloc_tag_add(page, current, 1 << order);
++	parp_effective_tier_page_alloc(page, order);
+ }
+ 
+ static void prep_new_page(struct page *page, unsigned int order, gfp_t gfp_flags,
+diff --git a/mm/page_ext.c b/mm/page_ext.c
+index 709acf484..3f0f32fb6 100644
+--- a/mm/page_ext.c
++++ b/mm/page_ext.c
+@@ -81,6 +81,9 @@ static struct page_ext_operations *page_ext_ops[] __initdata = {
+ #ifdef CONFIG_PARP_FRONTIER_SCORE
+ 	&parp_frontier_page_ext_ops,
+ #endif
++#ifdef CONFIG_PARP_EFFECTIVE_TIER
++	&parp_effective_tier_page_ext_ops,
++#endif
+ #ifdef CONFIG_PAGE_OWNER
+ 	&page_owner_ops,
+ #endif
+diff --git a/mm/page_idle.c b/mm/page_idle.c
+index a82b340dc..cce826079 100644
+--- a/mm/page_idle.c
++++ b/mm/page_idle.c
+@@ -12,6 +12,7 @@
+ #include <linux/mmu_notifier.h>
+ #include <linux/page_ext.h>
+ #include <linux/page_idle.h>
++#include <linux/parp.h>
+ 
+ #include "internal.h"
+ 
+@@ -80,6 +81,7 @@ static bool page_idle_clear_pte_refs_one(struct folio *folio,
+ 	}
+ 
+ 	if (referenced) {
++		parp_effective_tier_note_access(folio, PARP_ACCESS_PTE_YOUNG);
+ 		folio_clear_idle(folio);
+ 		/*
+ 		 * We cleared the referenced bit in a mapping to this page. To
+diff --git a/mm/parp/Kconfig b/mm/parp/Kconfig
+index 2cf06e5d0..311da12c7 100644
+--- a/mm/parp/Kconfig
++++ b/mm/parp/Kconfig
+@@ -39,3 +39,26 @@ config PARP_FRONTIER_SCORE
+ 	  it records decisions after native MGLRU sorting, but never changes a
+ 	  folio generation or isolation result. APPLY is deliberately rejected
+ 	  until separate runtime validation authorizes it.
++
++config PARP_EFFECTIVE_TIER
++	bool "Predict MGLRU effective tiers from short-term folio reuse"
++	depends on PARP && !PARP_FRONTIER_SCORE
++	select PAGE_EXTENSION
++	default n
++	help
++	  Build a fixed-cost, integer-only GLOBAL reuse scorer at the native
++	  MGLRU tier-protection gate. The scorer computes a virtual Q8 tier
++	  adjustment without changing the native LRU_REFS tier. Runtime is OFF by
++	  default; SHADOW records native and effective decisions while preserving
++	  native behavior. This option is mutually exclusive with the older
++	  post-sort frontier experiment.
++
++config PARP_EFFECTIVE_TIER_EXPERIMENTAL_APPLY
++	bool "Allow experimental PARP effective-tier APPLY modes"
++	depends on PARP_EFFECTIVE_TIER
++	default n
++	help
++	  Permit the protect-only, bounded bidirectional, random-matched and
++	  recency-baseline APPLY modes. Keep this disabled until live SHADOW,
++	  KUnit runtime and reclaim-lock latency gates have passed. When disabled,
++	  every APPLY mode setter returns -EOPNOTSUPP.
+diff --git a/mm/parp/Makefile b/mm/parp/Makefile
+index e357764bc..89639c2d3 100644
+--- a/mm/parp/Makefile
++++ b/mm/parp/Makefile
+@@ -13,4 +13,5 @@ parp-y := core/engine.o core/domain.o core/snapshot.o core/policy.o \
+ 	  control/debugfs.o control/sysfs.o control/genl.o control/trace.o
+ parp-$(CONFIG_PARP_DAMON_ALIGNMENT) += adapter/damon_adapter.o
+ parp-$(CONFIG_PARP_FRONTIER_SCORE) += core/frontier_score.o
++parp-$(CONFIG_PARP_EFFECTIVE_TIER) += core/effective_tier.o
+ obj-$(CONFIG_PARP_KUNIT_TEST) += tests/parp_test.o
+diff --git a/mm/parp/control/debugfs.c b/mm/parp/control/debugfs.c
+index f8f739350..720e8a4ef 100644
+--- a/mm/parp/control/debugfs.c
++++ b/mm/parp/control/debugfs.c
+@@ -174,6 +174,140 @@ static const struct file_operations frontier_stats_fops = {
+ };
+ #endif
+ 
++#ifdef CONFIG_PARP_EFFECTIVE_TIER
++static ssize_t effective_tier_mode_read(struct file *file, char __user *buf,
++					size_t len, loff_t *ppos)
++{
++	char text[16];
++	int size = scnprintf(text, sizeof(text), "%u\n",
++			     parp_effective_tier_get_mode());
++
++	return simple_read_from_buffer(buf, len, ppos, text, size);
++}
++
++static ssize_t effective_tier_mode_write(struct file *file,
++					 const char __user *buf, size_t len,
++					 loff_t *ppos)
++{
++	char text[16];
++	unsigned int mode;
++	int error;
++
++	if (!len || len >= sizeof(text) || copy_from_user(text, buf, len))
++		return -EINVAL;
++	text[len] = '\0';
++	error = kstrtouint(strim(text), 0, &mode);
++	if (error)
++		return error;
++	error = parp_effective_tier_set_mode(mode);
++	return error ? error : len;
++}
++
++static const struct file_operations effective_tier_mode_fops = {
++	.owner = THIS_MODULE,
++	.read = effective_tier_mode_read,
++	.write = effective_tier_mode_write,
++	.llseek = default_llseek,
++};
++
++static ssize_t effective_tier_config_read(struct file *file,
++					  char __user *buf, size_t len,
++					  loff_t *ppos)
++{
++	char *text;
++	ssize_t result;
++	ssize_t size;
++
++	text = kzalloc(PAGE_SIZE, GFP_KERNEL);
++	if (!text)
++		return -ENOMEM;
++	size = parp_effective_tier_format_config(text, PAGE_SIZE);
++	result = simple_read_from_buffer(buf, len, ppos, text, size);
++	kfree(text);
++	return result;
++}
++
++static ssize_t effective_tier_config_write(struct file *file,
++					   const char __user *buf, size_t len,
++					   loff_t *ppos)
++{
++	char *text;
++	int error;
++
++	if (!len || len > 511)
++		return -E2BIG;
++	text = memdup_user_nul(buf, len);
++	if (IS_ERR(text))
++		return PTR_ERR(text);
++	error = parp_effective_tier_set_config(strim(text));
++	kfree(text);
++	return error ? error : len;
++}
++
++static const struct file_operations effective_tier_config_fops = {
++	.owner = THIS_MODULE,
++	.read = effective_tier_config_read,
++	.write = effective_tier_config_write,
++	.llseek = default_llseek,
++};
++
++static ssize_t effective_tier_lock_observe_read(struct file *file,
++		char __user *buf, size_t len, loff_t *ppos)
++{
++	char text[4];
++	int size = scnprintf(text, sizeof(text), "%u\n",
++			     parp_effective_tier_get_lock_observe());
++
++	return simple_read_from_buffer(buf, len, ppos, text, size);
++}
++
++static ssize_t effective_tier_lock_observe_write(struct file *file,
++		const char __user *buf, size_t len, loff_t *ppos)
++{
++	char text[16];
++	bool enabled;
++	int error;
++
++	if (!len || len >= sizeof(text) || copy_from_user(text, buf, len))
++		return -EINVAL;
++	text[len] = '\0';
++	error = kstrtobool(strim(text), &enabled);
++	if (error)
++		return error;
++	error = parp_effective_tier_set_lock_observe(enabled);
++	return error ? error : len;
++}
++
++static const struct file_operations effective_tier_lock_observe_fops = {
++	.owner = THIS_MODULE,
++	.read = effective_tier_lock_observe_read,
++	.write = effective_tier_lock_observe_write,
++	.llseek = default_llseek,
++};
++
++static ssize_t effective_tier_stats_read(struct file *file, char __user *buf,
++					 size_t len, loff_t *ppos)
++{
++	char *text;
++	ssize_t result;
++	ssize_t size;
++
++	text = kzalloc(PAGE_SIZE, GFP_KERNEL);
++	if (!text)
++		return -ENOMEM;
++	size = parp_effective_tier_format_stats(text, PAGE_SIZE);
++	result = simple_read_from_buffer(buf, len, ppos, text, size);
++	kfree(text);
++	return result;
++}
++
++static const struct file_operations effective_tier_stats_fops = {
++	.owner = THIS_MODULE,
++	.read = effective_tier_stats_read,
++	.llseek = default_llseek,
++};
++#endif
++
+ static ssize_t scan_budget_mode_read(struct file *file, char __user *buf,
+ 				     size_t len, loff_t *ppos)
+ {
+@@ -526,6 +660,16 @@ static int __init parp_init(void)
+ 			    &frontier_mode_fops);
+ 	debugfs_create_file("frontier_score_stats", 0400, parp_dir, NULL,
+ 			    &frontier_stats_fops);
++#endif
++#ifdef CONFIG_PARP_EFFECTIVE_TIER
++	debugfs_create_file("effective_tier_mode", 0600, parp_dir, NULL,
++			    &effective_tier_mode_fops);
++	debugfs_create_file("effective_tier_config", 0600, parp_dir, NULL,
++			    &effective_tier_config_fops);
++	debugfs_create_file("effective_tier_lock_observe", 0600, parp_dir, NULL,
++			    &effective_tier_lock_observe_fops);
++	debugfs_create_file("effective_tier_stats", 0400, parp_dir, NULL,
++			    &effective_tier_stats_fops);
+ #endif
+ 	debugfs_create_file("scan_budget_mode", 0600, parp_dir, NULL,
+ 			    &scan_budget_mode_fops);
+diff --git a/mm/parp/core/effective_tier.c b/mm/parp/core/effective_tier.c
+new file mode 100644
+index 000000000..0d33d6f59
+--- /dev/null
++++ b/mm/parp/core/effective_tier.c
+@@ -0,0 +1,1944 @@
++// SPDX-License-Identifier: GPL-2.0
++/* Bounded GLOBAL reuse scoring at the native MGLRU tier-protection gate. */
++#include <linux/bitfield.h>
++#include <linux/build_bug.h>
++#include <linux/kernel.h>
++#include <linux/math64.h>
++#include <linux/memcontrol.h>
++#include <linux/mm.h>
++#include <linux/mm_inline.h>
++#include <linux/mutex.h>
++#include <linux/page_ext.h>
++#include <linux/parp.h>
++#include <linux/random.h>
++#include <linux/rcupdate.h>
++#include <linux/siphash.h>
++#include <linux/string.h>
++#include <trace/events/parp.h>
++
++#define PARP_TIER_SCHEMA_VERSION	1U
++#define PARP_TIER_STATE_TRIES		4
++#define PARP_TIER_LATENCY_BUCKETS	32
++#define PARP_TIER_EPOCH_MASK		GENMASK(11, 0)
++#define PARP_TIER_DOWNGRADE_SHIFT	12
++#define PARP_TIER_STATE_EPOCH_SHIFT	24
++#define PARP_TIER_STATE_EPOCH_MASK	GENMASK(31, 24)
++
++#define PARP_STATE_ACCESS_MASK		GENMASK(7, 0)
++#define PARP_STATE_CANDIDATE_SHIFT	8
++#define PARP_STATE_CANDIDATE_MASK	GENMASK(13, 8)
++#define PARP_STATE_GENERATION_SHIFT	14
++#define PARP_STATE_GENERATION_MASK	GENMASK(15, 14)
++#define PARP_STATE_ACTION_SHIFT		16
++#define PARP_STATE_ACTION_MASK		GENMASK(18, 16)
++#define PARP_STATE_INITIALIZED		BIT(19)
++#define PARP_STATE_UNCERTAIN		BIT(20)
++#define PARP_STATE_SEQ_SHIFT		21
++#define PARP_STATE_SEQ_MASK		GENMASK(31, 21)
++
++#define PARP_DEFAULT_UPGRADE_BATCH_PAGES	2UL
++#define PARP_DEFAULT_UPGRADE_EPOCH_PAGES	8UL
++#define PARP_DEFAULT_UPGRADE_RATIO	100U /* 1% in 1/10000 units */
++#define PARP_DEFAULT_DOWNGRADE_BATCH_PAGES	1UL
++#define PARP_DEFAULT_DOWNGRADE_EPOCH_PAGES	4UL
++#define PARP_DEFAULT_DOWNGRADE_RATIO	50U /* 0.5% in 1/10000 units */
++#define PARP_SEVERE_PRESSURE_PRIORITY	2
++#define PARP_NO_PROGRESS_LIMIT		3
++
++/* Exactly 24 bytes per base page; score and native tier are never persisted. */
++struct parp_reuse_page_ext {
++	u32 last_access_ms;
++	u16 previous_interval_ms;
++	u16 reuse_interval_ema_ms;
++	u32 generation_enter_ms;
++	u32 lifetime_epoch;
++	u32 state;
++	u32 decision_epochs;
++};
++
++struct parp_global_reuse_model {
++	u32 model_version;
++	u32 feature_schema_version;
++	s32 bias;
++	s64 bin_edges[PARP_TIER_FEATURES][PARP_TIER_BINS - 1];
++	s16 weights[PARP_TIER_FEATURES][PARP_TIER_BINS];
++};
++
++struct parp_tier_runtime_config {
++	u32 sequence;
++	struct parp_tier_policy policy;
++	unsigned long upgrade_batch_pages;
++	unsigned long upgrade_epoch_pages;
++	unsigned long downgrade_batch_pages;
++	unsigned long downgrade_epoch_pages;
++	u32 upgrade_ratio_permyriad;
++	u32 downgrade_ratio_permyriad;
++	u64 experiment_id;
++	u64 session_id;
++};
++
++struct parp_tier_stats {
++	atomic64_t candidates;
++	atomic64_t candidate_pages;
++	atomic64_t scores;
++	atomic64_t metadata_missing;
++	atomic64_t state_unstable;
++	atomic64_t model_invalid;
++	atomic64_t action_pages[5];
++	atomic64_t bypass[PARP_TIER_BYPASS_NR];
++	atomic64_t access_events[PARP_ACCESS_EVENT_NR];
++	atomic64_t outcomes[4];
++	atomic64_t policy_promotions;
++	atomic64_t native_tier_promotions;
++	atomic64_t native_generation_moves;
++	atomic64_t score_time_ns_total;
++	atomic64_t score_time_ns_max;
++	atomic64_t decision_time_ns_total;
++	atomic64_t decision_time_ns_max;
++	atomic64_t lock_time_ns_total;
++	atomic64_t lock_time_ns_max;
++	atomic64_t score_hist[PARP_TIER_LATENCY_BUCKETS];
++	atomic64_t decision_hist[PARP_TIER_LATENCY_BUCKETS];
++	atomic64_t lock_hist[PARP_TIER_LATENCY_BUCKETS];
++	atomic64_t trace_decisions;
++	atomic64_t trace_accesses;
++	atomic64_t trace_outcomes;
++	atomic64_t trace_batches;
++	atomic64_t trace_locks;
++};
++
++static const struct parp_global_reuse_model parp_global_model = {
++	.model_version = PARP_TIER_MODEL_VERSION,
++	.feature_schema_version = PARP_TIER_SCHEMA_VERSION,
++	.bias = 0,
++	.bin_edges = {
++		{ 10, 100, 500, 2000, 10000 },
++		{ 10, 100, 500, 2000, 10000 },
++		{ 10, 100, 500, 2000, 10000 },
++		{ 0, 1, 2, 4, 8 },
++		{ 10, 100, 500, 2000, 10000 },
++		{ 8, 32, 96, 160, 224 },
++	},
++	.weights = {
++		{ 64, 48, 24, 0, -32, -64 },
++		{ 32, 24, 12, 0, -12, -24 },
++		{ 32, 24, 12, 0, -12, -24 },
++		{ 24, 12, 0, -12, -24, -36 },
++		{ 16, 12, 8, 0, -8, -16 },
++		{ -24, -12, 0, 12, 24, 36 },
++	},
++};
++
++static struct parp_tier_runtime_config parp_tier_config = {
++	.sequence = 0,
++	.policy = {
++		.cold_threshold = -48,
++		.hot_threshold_1 = 48,
++		.hot_threshold_2 = 96,
++		.hot_threshold_3 = 144,
++		.max_upgrade_tiers = 2,
++		.max_downgrade_tiers = 1,
++		.require_two_cold = true,
++	},
++	.upgrade_batch_pages = PARP_DEFAULT_UPGRADE_BATCH_PAGES,
++	.upgrade_epoch_pages = PARP_DEFAULT_UPGRADE_EPOCH_PAGES,
++	.downgrade_batch_pages = PARP_DEFAULT_DOWNGRADE_BATCH_PAGES,
++	.downgrade_epoch_pages = PARP_DEFAULT_DOWNGRADE_EPOCH_PAGES,
++	.upgrade_ratio_permyriad = PARP_DEFAULT_UPGRADE_RATIO,
++	.downgrade_ratio_permyriad = PARP_DEFAULT_DOWNGRADE_RATIO,
++};
++
++static struct parp_tier_stats parp_tier_stats;
++DEFINE_STATIC_KEY_FALSE(parp_effective_tier_enabled);
++DEFINE_STATIC_KEY_FALSE(parp_effective_tier_lock_observe);
++static DEFINE_MUTEX(parp_tier_mode_lock);
++static DEFINE_MUTEX(parp_tier_config_lock);
++static DEFINE_MUTEX(parp_tier_lock_observe_lock);
++static enum parp_effective_tier_mode parp_tier_mode;
++static atomic64_t parp_tier_batch_id = ATOMIC64_INIT(0);
++static atomic64_t parp_tier_trace_sequence = ATOMIC64_INIT(0);
++static siphash_key_t parp_tier_cookie_key __read_mostly;
++static u8 parp_tier_state_epoch __read_mostly;
++static atomic_t parp_tier_state_fault = ATOMIC_INIT(0);
++
++static bool __init parp_effective_tier_page_ext_needed(void)
++{
++	return true;
++}
++
++struct page_ext_operations parp_effective_tier_page_ext_ops = {
++	.size = sizeof(struct parp_reuse_page_ext),
++	.need = parp_effective_tier_page_ext_needed,
++};
++
++static int __init parp_effective_tier_init(void)
++{
++	BUILD_BUG_ON(sizeof(struct parp_reuse_page_ext) != 24);
++	get_random_bytes(&parp_tier_cookie_key, sizeof(parp_tier_cookie_key));
++	return 0;
++}
++subsys_initcall(parp_effective_tier_init);
++
++static struct parp_reuse_page_ext *parp_reuse_ext_get(
++		struct folio *folio, struct page_ext **page_ext)
++{
++	*page_ext = page_ext_get(&folio->page);
++	if (!*page_ext)
++		return NULL;
++	return page_ext_data(*page_ext, &parp_effective_tier_page_ext_ops);
++}
++
++static struct parp_reuse_page_ext *parp_reuse_page_ext_get(
++		struct page *page, struct page_ext **page_ext)
++{
++	*page_ext = page_ext_get(page);
++	if (!*page_ext)
++		return NULL;
++	return page_ext_data(*page_ext, &parp_effective_tier_page_ext_ops);
++}
++
++static u32 parp_now_ms(void)
++{
++	return (u32)div_u64(ktime_get_mono_fast_ns(), NSEC_PER_MSEC);
++}
++
++static u32 parp_state_seq(u32 state)
++{
++	return FIELD_GET(PARP_STATE_SEQ_MASK, state);
++}
++
++static bool parp_state_write_begin(struct parp_reuse_page_ext *ext,
++		u32 *stable_state)
++{
++	int attempt;
++
++	for (attempt = 0; attempt < PARP_TIER_STATE_TRIES; attempt++) {
++		u32 old = READ_ONCE(ext->state);
++		u32 seq = parp_state_seq(old);
++		u32 locked;
++
++		if (seq & 1) {
++			cpu_relax();
++			continue;
++		}
++		locked = (old & ~PARP_STATE_SEQ_MASK) |
++			FIELD_PREP(PARP_STATE_SEQ_MASK,
++				   (seq + 1) & FIELD_MAX(PARP_STATE_SEQ_MASK));
++		if (cmpxchg(&ext->state, old, locked) == old) {
++			*stable_state = old;
++			return true;
++		}
++		cpu_relax();
++	}
++	return false;
++}
++
++static void parp_state_write_end(struct parp_reuse_page_ext *ext,
++		u32 old_state, u32 new_state)
++{
++	u32 seq = (parp_state_seq(old_state) + 2) &
++		FIELD_MAX(PARP_STATE_SEQ_MASK);
++
++	new_state &= ~PARP_STATE_SEQ_MASK;
++	new_state |= FIELD_PREP(PARP_STATE_SEQ_MASK, seq);
++	smp_store_release(&ext->state, new_state);
++}
++
++static void parp_state_mark_uncertain(struct parp_reuse_page_ext *ext)
++{
++	int attempt;
++
++	for (attempt = 0; attempt < PARP_TIER_STATE_TRIES; attempt++) {
++		u32 old = READ_ONCE(ext->state);
++
++		if (parp_state_seq(old) & 1) {
++			cpu_relax();
++			continue;
++		}
++		if (old & PARP_STATE_UNCERTAIN)
++			return;
++		if (cmpxchg(&ext->state, old,
++			    old | PARP_STATE_UNCERTAIN) == old)
++			return;
++		cpu_relax();
++	}
++}
++
++static u16 parp_sat_u16(u32 value)
++{
++	return min_t(u32, value, U16_MAX);
++}
++
++static u16 parp_interval_ema(u16 old, u32 sample)
++{
++	s32 delta;
++	u32 next;
++
++	sample = min_t(u32, sample, U16_MAX);
++	if (!old)
++		return sample;
++	delta = (s32)sample - old;
++	next = old + delta / 4;
++	return parp_sat_u16(next);
++}
++
++static u8 parp_access_ema_on_access(u8 old)
++{
++	u8 delta;
++
++	if (!old)
++		return U8_MAX;
++	delta = (U8_MAX - old) / 4;
++	return min_t(u16, old + max_t(u8, delta, 1), U8_MAX);
++}
++
++static u8 parp_access_ema_on_candidate(u8 old)
++{
++	return old - old / 4;
++}
++
++static u64 parp_folio_cookie(struct folio *folio, u32 lifetime_epoch)
++{
++	return siphash_2u64(folio_pfn(folio), lifetime_epoch,
++			    &parp_tier_cookie_key);
++}
++
++static bool parp_effective_tier_identity(struct folio *folio,
++		u32 *lifetime_epoch, u64 *cookie)
++{
++	struct parp_reuse_page_ext *ext;
++	struct page_ext *page_ext;
++
++	ext = parp_reuse_ext_get(folio, &page_ext);
++	if (!ext) {
++		*lifetime_epoch = 0;
++		*cookie = 0;
++		return false;
++	}
++	*lifetime_epoch = READ_ONCE(ext->lifetime_epoch);
++	*cookie = parp_folio_cookie(folio, *lifetime_epoch);
++	page_ext_put(page_ext);
++	return true;
++}
++
++u64 parp_effective_tier_cookie(struct folio *folio)
++{
++	u32 lifetime_epoch;
++	u64 cookie;
++
++	parp_effective_tier_identity(folio, &lifetime_epoch, &cookie);
++	return cookie;
++}
++
++static void parp_account_max(atomic64_t *maximum, u64 value)
++{
++	s64 old = atomic64_read(maximum);
++	int attempt;
++
++	for (attempt = 0; attempt < PARP_TIER_STATE_TRIES && value > old;
++	     attempt++) {
++		s64 seen = atomic64_cmpxchg(maximum, old, value);
++
++		if (seen == old)
++			break;
++		old = seen;
++	}
++}
++
++static void parp_account_latency(atomic64_t *total, atomic64_t *maximum,
++		atomic64_t histogram[PARP_TIER_LATENCY_BUCKETS], u64 value)
++{
++	unsigned int bin = value ? fls64(value) - 1 : 0;
++
++	bin = min_t(unsigned int, bin, PARP_TIER_LATENCY_BUCKETS - 1);
++	atomic64_add(value, total);
++	parp_account_max(maximum, value);
++	atomic64_inc(&histogram[bin]);
++}
++
++static bool parp_runtime_config_read(struct parp_tier_runtime_config *result)
++{
++	u32 before = READ_ONCE(parp_tier_config.sequence);
++
++	if (before & 1)
++		return false;
++	smp_rmb();
++	*result = parp_tier_config;
++	smp_rmb();
++	return before == READ_ONCE(parp_tier_config.sequence) &&
++	       !(result->sequence & 1);
++}
++
++bool parp_access_event_is_real(enum parp_access_event event)
++{
++	return event == PARP_ACCESS_PTE_YOUNG ||
++	       event == PARP_ACCESS_MARK_ACCESSED ||
++	       event == PARP_ACCESS_FD_REFERENCE;
++}
++
++u32 parp_effective_tier_elapsed_ms(u32 now, u32 then, bool *valid)
++{
++	u32 elapsed = now - then;
++
++	*valid = elapsed <= S32_MAX;
++	return elapsed;
++}
++
++size_t parp_effective_tier_metadata_size(void)
++{
++	return sizeof(struct parp_reuse_page_ext);
++}
++
++void parp_effective_tier_page_alloc(struct page *page, unsigned int order)
++{
++	unsigned long nr_pages = 1UL << order;
++	unsigned long i;
++
++	for (i = 0; i < nr_pages; i++) {
++		struct parp_reuse_page_ext *ext;
++		struct page_ext *page_ext;
++		u32 lifetime;
++
++		ext = parp_reuse_page_ext_get(page + i, &page_ext);
++		if (!ext)
++			continue;
++		lifetime = READ_ONCE(ext->lifetime_epoch) + 1;
++		if (!lifetime)
++			lifetime = 1;
++		WRITE_ONCE(ext->last_access_ms, 0);
++		WRITE_ONCE(ext->previous_interval_ms, 0);
++		WRITE_ONCE(ext->reuse_interval_ema_ms, 0);
++		WRITE_ONCE(ext->generation_enter_ms, 0);
++		WRITE_ONCE(ext->decision_epochs, 0);
++		WRITE_ONCE(ext->lifetime_epoch, lifetime);
++		smp_store_release(&ext->state, 0);
++		page_ext_put(page_ext);
++	}
++}
++
++void __parp_effective_tier_mglru_state_change(void)
++{
++	/* Require an explicit OFF->active transition before model reuse. */
++	atomic_set(&parp_tier_state_fault, 1);
++}
++
++static void parp_emit_access(struct folio *folio,
++		struct parp_reuse_page_ext *ext, enum parp_access_event event,
++		bool real_access)
++{
++	struct parp_effective_tier_access_trace trace;
++	struct parp_tier_runtime_config config = { };
++
++	if (!trace_parp_effective_tier_access_enabled())
++		return;
++	trace = (struct parp_effective_tier_access_trace) {
++		.timestamp_ns = ktime_get_mono_fast_ns(),
++		.folio_cookie = parp_folio_cookie(folio,
++				READ_ONCE(ext->lifetime_epoch)),
++		.lifetime_epoch = READ_ONCE(ext->lifetime_epoch),
++		.generation = folio_lru_gen(folio),
++		.page_type = folio_is_file_lru(folio),
++		.event = event,
++		.real_access = real_access,
++	};
++	if (parp_runtime_config_read(&config)) {
++		trace.experiment_id = config.experiment_id;
++		trace.session_id = config.session_id;
++	}
++
++	trace.trace_sequence = atomic64_inc_return(&parp_tier_trace_sequence);
++	atomic64_inc(&parp_tier_stats.trace_accesses);
++	trace_parp_effective_tier_access(&trace);
++}
++
++void __parp_effective_tier_note_access(struct folio *folio,
++		enum parp_access_event event)
++{
++	struct parp_reuse_page_ext *ext;
++	struct page_ext *page_ext;
++	u32 old_state;
++	u32 new_state;
++	u32 decision_epochs;
++	u32 now = parp_now_ms();
++	bool real_access = parp_access_event_is_real(event);
++
++	if (event >= PARP_ACCESS_EVENT_NR)
++		return;
++	atomic64_inc(&parp_tier_stats.access_events[event]);
++	ext = parp_reuse_ext_get(folio, &page_ext);
++	if (!ext)
++		return;
++	if (!parp_state_write_begin(ext, &old_state)) {
++		atomic64_inc(&parp_tier_stats.state_unstable);
++		parp_state_mark_uncertain(ext);
++		atomic_set(&parp_tier_state_fault, 1);
++		goto emit;
++	}
++	new_state = old_state;
++	decision_epochs = READ_ONCE(ext->decision_epochs);
++	if (real_access) {
++		bool initialized = old_state & PARP_STATE_INITIALIZED;
++		u8 access_ema = FIELD_GET(PARP_STATE_ACCESS_MASK, old_state);
++		u32 previous = READ_ONCE(ext->last_access_ms);
++		u8 current_epoch = READ_ONCE(parp_tier_state_epoch);
++		bool new_run = FIELD_GET(PARP_TIER_STATE_EPOCH_MASK,
++					 decision_epochs) != current_epoch;
++		bool valid = false;
++		u32 interval = 0;
++
++		if (initialized &&
++		    FIELD_GET(PARP_TIER_STATE_EPOCH_MASK,
++			      decision_epochs) == READ_ONCE(parp_tier_state_epoch))
++			interval = parp_effective_tier_elapsed_ms(now, previous,
++							       &valid);
++		if (valid) {
++			WRITE_ONCE(ext->previous_interval_ms,
++				   parp_sat_u16(interval));
++			WRITE_ONCE(ext->reuse_interval_ema_ms,
++				   parp_interval_ema(
++					READ_ONCE(ext->reuse_interval_ema_ms),
++					interval));
++		} else {
++			WRITE_ONCE(ext->previous_interval_ms, 0);
++			WRITE_ONCE(ext->reuse_interval_ema_ms, 0);
++			access_ema = 0;
++		}
++		WRITE_ONCE(ext->last_access_ms, now);
++		new_state &= ~(PARP_STATE_ACCESS_MASK |
++			       PARP_STATE_CANDIDATE_MASK |
++			       PARP_STATE_UNCERTAIN);
++		new_state |= parp_access_ema_on_access(access_ema);
++		new_state |= PARP_STATE_INITIALIZED;
++		if (new_run) {
++			decision_epochs = FIELD_PREP(
++				PARP_TIER_STATE_EPOCH_MASK, current_epoch);
++			new_state &= ~PARP_STATE_ACTION_MASK;
++		}
++		WRITE_ONCE(ext->decision_epochs, decision_epochs);
++	} else if (old_state & PARP_STATE_INITIALIZED) {
++		new_state |= PARP_STATE_UNCERTAIN;
++	}
++	parp_state_write_end(ext, old_state, new_state);
++emit:
++	parp_emit_access(folio, ext, event, real_access);
++	page_ext_put(page_ext);
++}
++
++void __parp_effective_tier_note_move(struct folio *folio,
++		enum parp_access_event event, int generation)
++{
++	struct parp_reuse_page_ext *ext;
++	struct page_ext *page_ext;
++	u32 old_state;
++	u32 new_state;
++	u8 old_generation;
++
++	if (event < PARP_NATIVE_TIER_PROMOTION ||
++	    event >= PARP_ACCESS_EVENT_NR || generation < 0 ||
++	    generation > PARP_MAX_TIER)
++		return;
++	atomic64_inc(&parp_tier_stats.access_events[event]);
++	if (event == PARP_POLICY_PROMOTION)
++		atomic64_inc(&parp_tier_stats.policy_promotions);
++	else if (event == PARP_NATIVE_TIER_PROMOTION)
++		atomic64_inc(&parp_tier_stats.native_tier_promotions);
++	else if (event == PARP_NATIVE_GENERATION_MOVE)
++		atomic64_inc(&parp_tier_stats.native_generation_moves);
++	ext = parp_reuse_ext_get(folio, &page_ext);
++	if (!ext)
++		return;
++	if (!parp_state_write_begin(ext, &old_state)) {
++		atomic64_inc(&parp_tier_stats.state_unstable);
++		parp_state_mark_uncertain(ext);
++		atomic_set(&parp_tier_state_fault, 1);
++		goto emit;
++	}
++	old_generation = FIELD_GET(PARP_STATE_GENERATION_MASK, old_state);
++	new_state = old_state & ~PARP_STATE_GENERATION_MASK;
++	new_state |= FIELD_PREP(PARP_STATE_GENERATION_MASK, generation);
++	if (!READ_ONCE(ext->generation_enter_ms) || old_generation != generation)
++		WRITE_ONCE(ext->generation_enter_ms, parp_now_ms());
++	parp_state_write_end(ext, old_state, new_state);
++emit:
++	parp_emit_access(folio, ext, event, false);
++	page_ext_put(page_ext);
++}
++
++bool parp_effective_tier_state_snapshot(struct folio *folio,
++		struct parp_tier_state_snapshot *snapshot)
++{
++	struct parp_reuse_page_ext *ext;
++	struct page_ext *page_ext;
++	u32 first;
++	u32 second;
++	u32 epochs;
++
++	ext = parp_reuse_ext_get(folio, &page_ext);
++	if (!ext)
++		return false;
++	first = smp_load_acquire(&ext->state);
++	if (parp_state_seq(first) & 1)
++		goto unstable;
++	snapshot->last_access_ms = READ_ONCE(ext->last_access_ms);
++	snapshot->previous_interval_ms =
++		READ_ONCE(ext->previous_interval_ms);
++	snapshot->reuse_interval_ema_ms =
++		READ_ONCE(ext->reuse_interval_ema_ms);
++	snapshot->generation_enter_ms =
++		READ_ONCE(ext->generation_enter_ms);
++	snapshot->lifetime_epoch = READ_ONCE(ext->lifetime_epoch);
++	epochs = READ_ONCE(ext->decision_epochs);
++	smp_rmb();
++	second = READ_ONCE(ext->state);
++	if (first != second || parp_state_seq(second) & 1)
++		goto unstable;
++	snapshot->last_upgrade_epoch = epochs & PARP_TIER_EPOCH_MASK;
++	snapshot->last_downgrade_epoch =
++		(epochs >> PARP_TIER_DOWNGRADE_SHIFT) & PARP_TIER_EPOCH_MASK;
++	snapshot->state_epoch = FIELD_GET(PARP_TIER_STATE_EPOCH_MASK, epochs);
++	snapshot->state_sequence = parp_state_seq(first);
++	snapshot->access_ema_q8 = FIELD_GET(PARP_STATE_ACCESS_MASK, first);
++	snapshot->consecutive_candidates =
++		FIELD_GET(PARP_STATE_CANDIDATE_MASK, first);
++	snapshot->generation = FIELD_GET(PARP_STATE_GENERATION_MASK, first);
++	snapshot->pending_action = FIELD_GET(PARP_STATE_ACTION_MASK, first);
++	snapshot->uncertain = first & PARP_STATE_UNCERTAIN;
++	page_ext_put(page_ext);
++	return first & PARP_STATE_INITIALIZED;
++unstable:
++	page_ext_put(page_ext);
++	return false;
++}
++
++bool parp_effective_tier_score_values(
++		const s64 values[PARP_TIER_FEATURES], s32 *score)
++{
++	s64 total = parp_global_model.bias;
++	int feature;
++
++	if (parp_global_model.model_version != PARP_TIER_MODEL_VERSION ||
++	    parp_global_model.feature_schema_version !=
++			PARP_TIER_SCHEMA_VERSION)
++		return false;
++	for (feature = 0; feature < PARP_TIER_FEATURES; feature++) {
++		int bin = 0;
++
++		if (values[feature] == S64_MIN)
++			return false;
++		while (bin < PARP_TIER_BINS - 1 &&
++		       values[feature] >
++			parp_global_model.bin_edges[feature][bin])
++			bin++;
++		total += parp_global_model.weights[feature][bin];
++	}
++	if (total < S32_MIN || total > S32_MAX)
++		return false;
++	*score = total;
++	return true;
++}
++
++static bool parp_tier_policy_valid(const struct parp_tier_policy *policy)
++{
++	if (!policy || policy->max_upgrade_tiers < 1 ||
++	    policy->max_upgrade_tiers > 3 ||
++	    policy->max_downgrade_tiers != 1 ||
++	    policy->cold_threshold >= policy->hot_threshold_1 ||
++	    policy->hot_threshold_1 >= policy->hot_threshold_2 ||
++	    policy->hot_threshold_2 >= policy->hot_threshold_3)
++		return false;
++	return true;
++}
++
++s32 parp_score_to_delta_q8(s32 score,
++		const struct parp_tier_policy *policy)
++{
++	if (!parp_tier_policy_valid(policy))
++		return 0;
++	if (score <= policy->cold_threshold)
++		return -PARP_TIER_SCALE;
++	if (score >= policy->hot_threshold_3 &&
++	    policy->max_upgrade_tiers == 3)
++		return 3 * PARP_TIER_SCALE;
++	if (score >= policy->hot_threshold_2)
++		return min_t(u8, policy->max_upgrade_tiers, 2) *
++			PARP_TIER_SCALE;
++	if (score >= policy->hot_threshold_1)
++		return PARP_TIER_SCALE;
++	return 0;
++}
++
++s32 parp_effective_tier_q8(int native_tier, s32 delta_tier_q8)
++{
++	s64 effective;
++
++	if (native_tier < 0 || native_tier > PARP_MAX_TIER)
++		return 0;
++	effective = (s64)native_tier * PARP_TIER_SCALE + delta_tier_q8;
++	return clamp_t(s64, effective, 0,
++		       PARP_MAX_TIER * PARP_TIER_SCALE);
++}
++
++void parp_effective_tier_classify(s32 score, bool model_valid,
++		int native_tier, int tier_idx, bool special_native_protect,
++		const struct parp_tier_policy *policy,
++		struct parp_tier_decision *decision)
++{
++	bool effective_model_valid = model_valid &&
++		parp_tier_policy_valid(policy);
++	s32 delta = effective_model_valid ?
++		parp_score_to_delta_q8(score, policy) : 0;
++
++	memset(decision, 0, sizeof(*decision));
++	decision->evaluated = true;
++	decision->model_valid = effective_model_valid;
++	decision->reuse_score = effective_model_valid ? score : 0;
++	if (!effective_model_valid)
++		decision->rank_score_bin = PARP_RANK_SCORE_INVALID;
++	else if (score <= policy->cold_threshold)
++		decision->rank_score_bin = PARP_RANK_SCORE_COLD;
++	else if (score < policy->hot_threshold_1)
++		decision->rank_score_bin = PARP_RANK_SCORE_NEUTRAL;
++	else if (score < policy->hot_threshold_2)
++		decision->rank_score_bin = PARP_RANK_SCORE_HOT_1;
++	else if (score < policy->hot_threshold_3)
++		decision->rank_score_bin = PARP_RANK_SCORE_HOT_2;
++	else
++		decision->rank_score_bin = PARP_RANK_SCORE_HOT_3;
++	decision->native_tier = clamp(native_tier, 0, PARP_MAX_TIER);
++	decision->native_tier_idx = clamp(tier_idx, 0, PARP_MAX_TIER);
++	decision->special_native_protect = special_native_protect;
++	decision->raw_delta_tier_q8 = delta;
++	decision->delta_tier_q8 = delta;
++	decision->effective_tier_q8 = parp_effective_tier_q8(
++		decision->native_tier, delta);
++	decision->native_protect =
++		decision->native_tier > decision->native_tier_idx;
++	decision->effective_protect = decision->effective_tier_q8 >
++		decision->native_tier_idx * PARP_TIER_SCALE;
++	if (effective_model_valid) {
++		decision->cold_threshold = policy->cold_threshold;
++		decision->hot_threshold_1 = policy->hot_threshold_1;
++		decision->hot_threshold_2 = policy->hot_threshold_2;
++		decision->hot_threshold_3 = policy->hot_threshold_3;
++	}
++	if (special_native_protect)
++		decision->action = PARP_TIER_SPECIAL_NATIVE_PROTECT;
++	else if (!decision->native_protect &&
++		 decision->effective_protect)
++		decision->action = PARP_TIER_PREDICTIVE_UPGRADE;
++	else if (decision->native_protect &&
++		 !decision->effective_protect)
++		decision->action = PARP_TIER_PREDICTIVE_DOWNGRADE;
++	else if (decision->native_protect)
++		decision->action = PARP_TIER_KEEP_PROTECT;
++	else
++		decision->action = PARP_TIER_KEEP_RECLAIM;
++	if (!effective_model_valid)
++		decision->bypass = PARP_TIER_BYPASS_MODEL_INVALID;
++}
++
++bool parp_effective_tier_actual_protect(
++		enum parp_effective_tier_mode mode,
++		const struct parp_tier_decision *decision)
++{
++	if (decision->special_native_protect)
++		return true;
++	switch (mode) {
++	case PARP_EFFECTIVE_TIER_PROTECT_ONLY:
++		return decision->native_protect ||
++		       (!decision->native_protect &&
++			decision->effective_protect);
++	case PARP_EFFECTIVE_TIER_BIDIRECTIONAL:
++	case PARP_EFFECTIVE_TIER_RANDOM_MATCHED:
++	case PARP_EFFECTIVE_TIER_RECENCY_BASELINE:
++		return decision->effective_protect;
++	case PARP_EFFECTIVE_TIER_OFF:
++	case PARP_EFFECTIVE_TIER_SHADOW:
++	default:
++		return decision->native_protect;
++	}
++}
++
++bool parp_effective_tier_budget_allows(unsigned long used,
++		unsigned long candidates, unsigned long pages,
++		unsigned long absolute_limit, u32 ratio_permyriad)
++{
++	u64 ratio_limit;
++
++	if (!pages || !absolute_limit || !ratio_permyriad ||
++	    ratio_permyriad > 10000 || used > ULONG_MAX - pages ||
++	    used + pages > absolute_limit)
++		return false;
++	ratio_limit = mul_u64_u32_div(candidates, ratio_permyriad, 10000);
++	if (candidates && !ratio_limit)
++		ratio_limit = 1;
++	return used + pages <= ratio_limit;
++}
++
++bool parp_effective_tier_random_claim(u64 random_value,
++		unsigned long selected, unsigned long target,
++		unsigned long seen, unsigned long eligible)
++{
++	u64 remainder;
++	unsigned long remaining_target;
++	unsigned long remaining_eligible;
++
++	if (selected >= target)
++		return false;
++	if (seen >= eligible)
++		return false;
++	remaining_target = target - selected;
++	remaining_eligible = eligible - seen;
++	if (remaining_target >= remaining_eligible)
++		return true;
++	div64_u64_rem(random_value, remaining_eligible, &remainder);
++	return remainder < remaining_target;
++}
++
++bool parp_effective_tier_upgrade_gate(bool severe_pressure,
++		bool no_progress, enum parp_tier_bypass_reason *bypass)
++{
++	if (severe_pressure) {
++		*bypass = PARP_TIER_BYPASS_PRESSURE;
++		return false;
++	}
++	if (no_progress) {
++		*bypass = PARP_TIER_BYPASS_NO_PROGRESS;
++		return false;
++	}
++	*bypass = PARP_TIER_BYPASS_NONE;
++	return true;
++}
++
++int parp_effective_tier_next_generation(int generation)
++{
++	if (generation < 0 || generation >= MAX_NR_GENS)
++		return -EINVAL;
++	return (generation + 1) % MAX_NR_GENS;
++}
++
++unsigned long parp_effective_tier_policy_flags(unsigned long old_flags,
++		int new_generation)
++{
++	if (new_generation < 0 || new_generation >= MAX_NR_GENS)
++		return old_flags;
++	return (old_flags & ~LRU_GEN_MASK) |
++		((new_generation + 1UL) << LRU_GEN_PGOFF);
++}
++
++static void parp_decision_native_fallback(struct parp_tier_decision *decision,
++		enum parp_tier_bypass_reason bypass)
++{
++	decision->delta_tier_q8 = 0;
++	decision->effective_tier_q8 =
++		decision->native_tier * PARP_TIER_SCALE;
++	decision->effective_protect = decision->native_protect;
++	decision->bypass = bypass;
++	if (decision->special_native_protect)
++		decision->action = PARP_TIER_SPECIAL_NATIVE_PROTECT;
++	else if (decision->native_protect)
++		decision->action = PARP_TIER_KEEP_PROTECT;
++	else
++		decision->action = PARP_TIER_KEEP_RECLAIM;
++}
++
++static bool parp_candidate_features(struct folio *folio,
++		s64 values[PARP_TIER_FEATURES],
++		struct parp_tier_state_snapshot *snapshot)
++{
++	struct parp_reuse_page_ext *ext;
++	struct page_ext *page_ext;
++	u32 old_state;
++	u32 new_state;
++	u32 epochs;
++	u32 now = parp_now_ms();
++	u32 access_age;
++	u32 generation_age;
++	u8 candidates;
++	u8 access_ema;
++	bool access_valid;
++	bool generation_valid;
++	bool valid;
++
++	ext = parp_reuse_ext_get(folio, &page_ext);
++	if (!ext)
++		return false;
++	if (!parp_state_write_begin(ext, &old_state)) {
++		snapshot->uncertain = true;
++		page_ext_put(page_ext);
++		return false;
++	}
++	epochs = READ_ONCE(ext->decision_epochs);
++	access_age = parp_effective_tier_elapsed_ms(now,
++			READ_ONCE(ext->last_access_ms), &access_valid);
++	generation_age = parp_effective_tier_elapsed_ms(now,
++			READ_ONCE(ext->generation_enter_ms), &generation_valid);
++	candidates = FIELD_GET(PARP_STATE_CANDIDATE_MASK, old_state);
++	candidates = min_t(u8, candidates + 1,
++			   FIELD_MAX(PARP_STATE_CANDIDATE_MASK));
++	access_ema = parp_access_ema_on_candidate(
++		FIELD_GET(PARP_STATE_ACCESS_MASK, old_state));
++	new_state = old_state & ~(PARP_STATE_ACCESS_MASK |
++				PARP_STATE_CANDIDATE_MASK);
++	new_state |= access_ema;
++	new_state |= FIELD_PREP(PARP_STATE_CANDIDATE_MASK, candidates);
++	valid = old_state & PARP_STATE_INITIALIZED;
++	valid = valid && !(old_state & PARP_STATE_UNCERTAIN);
++	valid = valid && access_valid && generation_valid &&
++		READ_ONCE(ext->last_access_ms) &&
++		READ_ONCE(ext->generation_enter_ms);
++	valid = valid && FIELD_GET(PARP_TIER_STATE_EPOCH_MASK, epochs) ==
++		READ_ONCE(parp_tier_state_epoch);
++	values[0] = access_age;
++	values[1] = READ_ONCE(ext->previous_interval_ms);
++	values[2] = READ_ONCE(ext->reuse_interval_ema_ms);
++	values[3] = candidates;
++	values[4] = generation_age;
++	values[5] = access_ema;
++	snapshot->last_access_ms = READ_ONCE(ext->last_access_ms);
++	snapshot->previous_interval_ms = values[1];
++	snapshot->reuse_interval_ema_ms = values[2];
++	snapshot->generation_enter_ms =
++		READ_ONCE(ext->generation_enter_ms);
++	snapshot->lifetime_epoch = READ_ONCE(ext->lifetime_epoch);
++	snapshot->last_upgrade_epoch = epochs & PARP_TIER_EPOCH_MASK;
++	snapshot->last_downgrade_epoch =
++		(epochs >> PARP_TIER_DOWNGRADE_SHIFT) & PARP_TIER_EPOCH_MASK;
++	snapshot->state_epoch = FIELD_GET(PARP_TIER_STATE_EPOCH_MASK, epochs);
++	snapshot->state_sequence = (parp_state_seq(old_state) + 2) &
++		FIELD_MAX(PARP_STATE_SEQ_MASK);
++	snapshot->access_ema_q8 = access_ema;
++	snapshot->consecutive_candidates = candidates;
++	snapshot->generation = FIELD_GET(PARP_STATE_GENERATION_MASK, old_state);
++	snapshot->pending_action = FIELD_GET(PARP_STATE_ACTION_MASK, old_state);
++	snapshot->uncertain = old_state & PARP_STATE_UNCERTAIN;
++	if (snapshot->generation != folio_lru_gen(folio)) {
++		new_state |= PARP_STATE_UNCERTAIN;
++		snapshot->uncertain = true;
++		valid = false;
++	}
++	parp_state_write_end(ext, old_state, new_state);
++	page_ext_put(page_ext);
++	return valid;
++}
++
++bool parp_effective_tier_revalidate(struct folio *folio, u16 state_sequence)
++{
++	struct parp_reuse_page_ext *ext;
++	struct page_ext *page_ext;
++	u32 first;
++	u32 second;
++	u32 epochs;
++	bool valid;
++
++	ext = parp_reuse_ext_get(folio, &page_ext);
++	if (!ext)
++		return false;
++	first = smp_load_acquire(&ext->state);
++	if (parp_state_seq(first) & 1)
++		goto invalid;
++	epochs = READ_ONCE(ext->decision_epochs);
++	smp_rmb();
++	second = READ_ONCE(ext->state);
++	valid = first == second && !(parp_state_seq(second) & 1) &&
++		parp_state_seq(second) == state_sequence &&
++		!(second & PARP_STATE_UNCERTAIN) &&
++		FIELD_GET(PARP_TIER_STATE_EPOCH_MASK, epochs) ==
++		READ_ONCE(parp_tier_state_epoch);
++	page_ext_put(page_ext);
++	return valid;
++invalid:
++	page_ext_put(page_ext);
++	return false;
++}
++
++bool parp_effective_tier_commit_revalidate(
++		const struct parp_tier_scan_ctx *ctx, struct folio *folio,
++		u16 state_sequence)
++{
++	struct parp_tier_runtime_config config;
++
++	if (atomic_read(&parp_tier_state_fault) ||
++	    READ_ONCE(parp_tier_mode) != ctx->mode ||
++	    !parp_runtime_config_read(&config) ||
++	    config.sequence != ctx->config_sequence)
++		return false;
++	return parp_effective_tier_revalidate(folio, state_sequence);
++}
++
++static bool parp_effective_tier_claim_epoch_sequence(struct folio *folio,
++		bool upgrade, u16 epoch_tag, int expected_sequence,
++		u16 *claimed_sequence, enum parp_tier_bypass_reason *bypass)
++{
++	struct parp_reuse_page_ext *ext;
++	struct page_ext *page_ext;
++	u32 old_state;
++	u32 epochs;
++	u32 previous;
++
++	ext = parp_reuse_ext_get(folio, &page_ext);
++	if (!ext) {
++		*bypass = PARP_TIER_BYPASS_METADATA_MISSING;
++		return false;
++	}
++	if (!parp_state_write_begin(ext, &old_state)) {
++		*bypass = PARP_TIER_BYPASS_STATE_UNSTABLE;
++		page_ext_put(page_ext);
++		return false;
++	}
++	if (expected_sequence >= 0 &&
++	    parp_state_seq(old_state) != expected_sequence) {
++		*bypass = PARP_TIER_BYPASS_GENERATION_RACE;
++		parp_state_write_end(ext, old_state, old_state);
++		page_ext_put(page_ext);
++		return false;
++	}
++	epochs = READ_ONCE(ext->decision_epochs);
++	if (FIELD_GET(PARP_TIER_STATE_EPOCH_MASK, epochs) !=
++	    READ_ONCE(parp_tier_state_epoch)) {
++		*bypass = PARP_TIER_BYPASS_STATE_UNSTABLE;
++		parp_state_write_end(ext, old_state, old_state);
++		page_ext_put(page_ext);
++		return false;
++	}
++	if (upgrade)
++		previous = epochs & PARP_TIER_EPOCH_MASK;
++	else
++		previous = (epochs >> PARP_TIER_DOWNGRADE_SHIFT) &
++			PARP_TIER_EPOCH_MASK;
++	if (previous == epoch_tag) {
++		*bypass = upgrade ? PARP_TIER_BYPASS_REPEAT_UPGRADE :
++				    PARP_TIER_BYPASS_REPEAT_DOWNGRADE;
++		parp_state_write_end(ext, old_state, old_state);
++		page_ext_put(page_ext);
++		return false;
++	}
++	if (upgrade) {
++		epochs &= ~PARP_TIER_EPOCH_MASK;
++		epochs |= epoch_tag;
++	} else {
++		epochs &= ~(PARP_TIER_EPOCH_MASK <<
++			    PARP_TIER_DOWNGRADE_SHIFT);
++		epochs |= (u32)epoch_tag << PARP_TIER_DOWNGRADE_SHIFT;
++	}
++	WRITE_ONCE(ext->decision_epochs, epochs);
++	if (claimed_sequence)
++		*claimed_sequence = (parp_state_seq(old_state) + 2) &
++			FIELD_MAX(PARP_STATE_SEQ_MASK);
++	parp_state_write_end(ext, old_state, old_state);
++	page_ext_put(page_ext);
++	return true;
++}
++
++bool parp_effective_tier_claim_epoch(struct folio *folio, bool upgrade,
++		u16 epoch_tag, enum parp_tier_bypass_reason *bypass)
++{
++	return parp_effective_tier_claim_epoch_sequence(folio, upgrade,
++			epoch_tag, -1, NULL, bypass);
++}
++
++static bool parp_effective_tier_release_epoch(struct folio *folio,
++		bool upgrade, u16 epoch_tag)
++{
++	struct parp_reuse_page_ext *ext;
++	struct page_ext *page_ext;
++	u32 old_state;
++	u32 epochs;
++	u32 mask;
++	u32 shift;
++
++	ext = parp_reuse_ext_get(folio, &page_ext);
++	if (!ext)
++		return false;
++	if (!parp_state_write_begin(ext, &old_state)) {
++		atomic64_inc(&parp_tier_stats.state_unstable);
++		parp_state_mark_uncertain(ext);
++		atomic_set(&parp_tier_state_fault, 1);
++		page_ext_put(page_ext);
++		return false;
++	}
++	epochs = READ_ONCE(ext->decision_epochs);
++	shift = upgrade ? 0 : PARP_TIER_DOWNGRADE_SHIFT;
++	mask = PARP_TIER_EPOCH_MASK << shift;
++	if (FIELD_GET(PARP_TIER_STATE_EPOCH_MASK, epochs) ==
++	    READ_ONCE(parp_tier_state_epoch) &&
++	    ((epochs & mask) >> shift) == epoch_tag) {
++		epochs &= ~mask;
++		WRITE_ONCE(ext->decision_epochs, epochs);
++	}
++	parp_state_write_end(ext, old_state, old_state);
++	page_ext_put(page_ext);
++	return true;
++}
++
++static bool parp_set_pending_action(struct folio *folio, u8 action)
++{
++	struct parp_reuse_page_ext *ext;
++	struct page_ext *page_ext;
++	u32 old_state;
++	u32 new_state;
++
++	ext = parp_reuse_ext_get(folio, &page_ext);
++	if (!ext)
++		return false;
++	if (!parp_state_write_begin(ext, &old_state)) {
++		parp_state_mark_uncertain(ext);
++		page_ext_put(page_ext);
++		return false;
++	}
++	new_state = old_state & ~PARP_STATE_ACTION_MASK;
++	new_state |= FIELD_PREP(PARP_STATE_ACTION_MASK, action + 1);
++	parp_state_write_end(ext, old_state, new_state);
++	page_ext_put(page_ext);
++	return true;
++}
++
++static unsigned long parp_saturating_add(unsigned long left,
++		unsigned long right)
++{
++	return left + min(right, ULONG_MAX - left);
++}
++
++void __parp_effective_tier_prepare(struct parp_tier_scan_ctx *ctx,
++		struct lruvec *lruvec, int type, int reclaim_priority)
++{
++	struct lru_gen_folio *lrugen = &lruvec->lrugen;
++	typeof(lrugen->parp_effective_tier[0]) *state =
++		&lrugen->parp_effective_tier[type];
++	struct parp_tier_runtime_config config;
++	u16 tag;
++
++	memset(ctx, 0, sizeof(*ctx));
++	rcu_read_lock();
++	ctx->rcu_held = true;
++	ctx->mode = READ_ONCE(parp_tier_mode);
++	if (ctx->mode == PARP_EFFECTIVE_TIER_OFF ||
++	    atomic_read(&parp_tier_state_fault) ||
++	    !parp_runtime_config_read(&config)) {
++		ctx->rcu_held = false;
++		rcu_read_unlock();
++		return;
++	}
++	ctx->enabled = true;
++	ctx->type = type;
++	ctx->nid = lruvec_pgdat(lruvec)->node_id;
++	ctx->memcg_id = mem_cgroup_id(lruvec_memcg(lruvec));
++	ctx->reclaim_priority = reclaim_priority;
++	ctx->source_seq = lrugen->min_seq[type];
++	ctx->batch_id = atomic64_inc_return(&parp_tier_batch_id);
++	ctx->experiment_id = config.experiment_id;
++	ctx->session_id = config.session_id;
++	ctx->config_sequence = config.sequence;
++	ctx->run_epoch = READ_ONCE(parp_tier_state_epoch);
++	ctx->severe_pressure =
++		reclaim_priority <= PARP_SEVERE_PRESSURE_PRIORITY;
++	if (!state->epoch_id || state->source_seq != ctx->source_seq ||
++	    state->state_epoch != READ_ONCE(parp_tier_state_epoch)) {
++		state->source_seq = ctx->source_seq;
++		state->state_epoch = READ_ONCE(parp_tier_state_epoch);
++		state->candidate_pages = 0;
++		state->upgrade_pages = 0;
++		state->downgrade_pages = 0;
++		state->no_progress_rounds = 0;
++		if (!++state->epoch_id)
++			state->epoch_id++;
++	}
++	tag = state->epoch_id & PARP_TIER_EPOCH_MASK;
++	if (!tag) {
++		state->epoch_id++;
++		tag = state->epoch_id & PARP_TIER_EPOCH_MASK;
++	}
++	ctx->no_progress = state->no_progress_rounds >=
++		PARP_NO_PROGRESS_LIMIT;
++	ctx->epoch_id = state->epoch_id;
++	ctx->epoch_tag = tag;
++}
++
++s32 parp_effective_tier_recency_score(u32 access_age_ms,
++		const struct parp_tier_policy *policy)
++{
++	if (!policy)
++		return 0;
++	if (access_age_ms <= 100)
++		return policy->hot_threshold_2;
++	if (access_age_ms <= 500)
++		return policy->hot_threshold_1;
++	if (access_age_ms >= 10000)
++		return policy->cold_threshold;
++	return 0;
++}
++
++static s32 parp_random_score(const struct parp_tier_runtime_config *config,
++		struct folio *folio, const struct parp_tier_scan_ctx *ctx,
++		int native_tier, int tier_idx, u32 lifetime_epoch)
++{
++	u64 random = siphash_2u64(parp_folio_cookie(folio, lifetime_epoch),
++				   ctx->batch_id, &parp_tier_cookie_key);
++	u32 bucket = do_div(random, 10000);
++
++	if (native_tier == tier_idx + 1 &&
++	    bucket < config->downgrade_ratio_permyriad)
++		return config->policy.cold_threshold;
++	if (native_tier <= tier_idx &&
++	    bucket < config->upgrade_ratio_permyriad)
++		return config->policy.hot_threshold_2;
++	return 0;
++}
++
++static bool parp_effective_tier_action_applies(
++		enum parp_effective_tier_mode mode, enum parp_tier_action action)
++{
++	if (action == PARP_TIER_PREDICTIVE_UPGRADE)
++		return mode == PARP_EFFECTIVE_TIER_PROTECT_ONLY ||
++		       mode == PARP_EFFECTIVE_TIER_BIDIRECTIONAL ||
++		       mode == PARP_EFFECTIVE_TIER_RANDOM_MATCHED ||
++		       mode == PARP_EFFECTIVE_TIER_RECENCY_BASELINE;
++	if (action == PARP_TIER_PREDICTIVE_DOWNGRADE)
++		return mode == PARP_EFFECTIVE_TIER_BIDIRECTIONAL ||
++		       mode == PARP_EFFECTIVE_TIER_RANDOM_MATCHED ||
++		       mode == PARP_EFFECTIVE_TIER_RECENCY_BASELINE;
++	return false;
++}
++
++static void parp_effective_tier_cancel_reservation(
++		struct parp_tier_scan_ctx *ctx, struct lruvec *lruvec,
++		struct folio *folio, struct parp_tier_decision *decision)
++{
++	typeof(lruvec->lrugen.parp_effective_tier[0]) *state =
++		&lruvec->lrugen.parp_effective_tier[ctx->type];
++	unsigned long pages = decision->folio_nr_pages;
++
++	if (!decision->reservation_active)
++		return;
++	if (!parp_effective_tier_release_epoch(folio,
++			decision->reservation_upgrade, ctx->epoch_tag)) {
++		atomic_set(&parp_tier_state_fault, 1);
++		decision->reservation_active = false;
++		return;
++	}
++	if (decision->reservation_upgrade) {
++		if (ctx->upgrade_pages < pages ||
++		    state->upgrade_pages < pages)
++			goto invariant_fault;
++		ctx->upgrade_pages -= pages;
++		state->upgrade_pages -= pages;
++	} else {
++		if (ctx->downgrade_pages < pages ||
++		    state->downgrade_pages < pages)
++			goto invariant_fault;
++		ctx->downgrade_pages -= pages;
++		state->downgrade_pages -= pages;
++	}
++	decision->reservation_active = false;
++	return;
++invariant_fault:
++	atomic_set(&parp_tier_state_fault, 1);
++	decision->reservation_active = false;
++}
++
++void __parp_effective_tier_decide(struct parp_tier_scan_ctx *ctx,
++		struct lruvec *lruvec, struct folio *folio, int native_tier,
++		int tier_idx, bool special_native_protect,
++		struct parp_tier_decision *decision)
++{
++	struct lru_gen_folio *lrugen = &lruvec->lrugen;
++	typeof(lrugen->parp_effective_tier[0]) *state =
++		&lrugen->parp_effective_tier[ctx->type];
++	struct parp_tier_runtime_config config;
++	struct parp_tier_state_snapshot snapshot = { };
++	s64 values[PARP_TIER_FEATURES] = { };
++	unsigned long pages = folio_nr_pages(folio);
++	u64 decision_started = ktime_get_mono_fast_ns();
++	u64 score_started;
++	u64 score_duration = 0;
++	s32 score = 0;
++	bool metadata_valid = false;
++	bool score_valid = false;
++	bool allowed;
++	bool applies;
++	enum parp_tier_bypass_reason bypass = PARP_TIER_BYPASS_NONE;
++
++	atomic64_inc(&parp_tier_stats.candidates);
++	atomic64_add(pages, &parp_tier_stats.candidate_pages);
++	ctx->candidate_pages = parp_saturating_add(ctx->candidate_pages, pages);
++	if (ctx->mode != PARP_EFFECTIVE_TIER_SHADOW)
++		state->candidate_pages = parp_saturating_add(
++			state->candidate_pages, pages);
++	if (atomic_read(&parp_tier_state_fault)) {
++		parp_effective_tier_classify(0, false, native_tier, tier_idx,
++				special_native_protect, NULL, decision);
++		decision->bypass = PARP_TIER_BYPASS_STATE_UNSTABLE;
++		goto copy_features;
++	}
++	if (!parp_runtime_config_read(&config) ||
++	    config.sequence != ctx->config_sequence) {
++		parp_effective_tier_classify(0, false, native_tier, tier_idx,
++				special_native_protect, NULL, decision);
++		decision->bypass = PARP_TIER_BYPASS_MODEL_INVALID;
++		atomic64_inc(&parp_tier_stats.model_invalid);
++		goto copy_features;
++	}
++	metadata_valid = parp_candidate_features(folio, values, &snapshot);
++	if (!metadata_valid) {
++		parp_effective_tier_classify(0, false, native_tier, tier_idx,
++				special_native_protect, &config.policy, decision);
++		decision->bypass = snapshot.uncertain ?
++			PARP_TIER_BYPASS_STATE_UNSTABLE :
++			PARP_TIER_BYPASS_METADATA_MISSING;
++		if (snapshot.uncertain)
++			atomic64_inc(&parp_tier_stats.state_unstable);
++		else
++			atomic64_inc(&parp_tier_stats.metadata_missing);
++		goto copy_features;
++	}
++	score_started = ktime_get_mono_fast_ns();
++	if (ctx->mode == PARP_EFFECTIVE_TIER_RECENCY_BASELINE) {
++		score = parp_effective_tier_recency_score(values[0],
++				&config.policy);
++		score_valid = true;
++	} else if (ctx->mode == PARP_EFFECTIVE_TIER_RANDOM_MATCHED) {
++		score = parp_random_score(&config, folio, ctx, native_tier,
++				tier_idx, snapshot.lifetime_epoch);
++		score_valid = true;
++	} else {
++		score_valid = parp_effective_tier_score_values(values, &score);
++	}
++	score_duration = ktime_get_mono_fast_ns() - score_started;
++	ctx->model_time_ns += score_duration;
++	parp_account_latency(&parp_tier_stats.score_time_ns_total,
++		&parp_tier_stats.score_time_ns_max,
++		parp_tier_stats.score_hist, score_duration);
++	if (score_valid)
++		atomic64_inc(&parp_tier_stats.scores);
++	else
++		atomic64_inc(&parp_tier_stats.model_invalid);
++	parp_effective_tier_classify(score, score_valid, native_tier,
++			tier_idx, special_native_protect, &config.policy,
++			decision);
++	if (!score_valid)
++		goto copy_features;
++	if (special_native_protect)
++		goto copy_features;
++	if (decision->raw_delta_tier_q8 < 0 &&
++	    native_tier != tier_idx + 1) {
++		parp_decision_native_fallback(decision,
++			native_tier >= tier_idx + 2 ?
++			PARP_TIER_BYPASS_STRONG_NATIVE :
++			PARP_TIER_BYPASS_NOT_BOUNDARY);
++		goto copy_features;
++	}
++	if (decision->action == PARP_TIER_PREDICTIVE_DOWNGRADE &&
++	    config.policy.require_two_cold &&
++	    snapshot.consecutive_candidates < 2) {
++		parp_decision_native_fallback(decision,
++			PARP_TIER_BYPASS_STATE_UNSTABLE);
++		goto copy_features;
++	}
++	if ((decision->action == PARP_TIER_PREDICTIVE_UPGRADE ||
++	     decision->action == PARP_TIER_PREDICTIVE_DOWNGRADE) &&
++	    !parp_effective_tier_upgrade_gate(ctx->severe_pressure,
++			ctx->no_progress, &bypass)) {
++		parp_decision_native_fallback(decision, bypass);
++		goto copy_features;
++	}
++	if (decision->action == PARP_TIER_PREDICTIVE_UPGRADE) {
++		applies = parp_effective_tier_action_applies(ctx->mode,
++							decision->action);
++		allowed = parp_effective_tier_budget_allows(
++			ctx->upgrade_pages, ctx->candidate_pages, pages,
++			config.upgrade_batch_pages,
++			config.upgrade_ratio_permyriad) &&
++			(!applies ||
++			parp_effective_tier_budget_allows(
++			state->upgrade_pages, state->candidate_pages, pages,
++			config.upgrade_epoch_pages,
++			config.upgrade_ratio_permyriad));
++		if (!allowed) {
++			parp_decision_native_fallback(decision,
++				PARP_TIER_BYPASS_UPGRADE_BUDGET);
++			goto copy_features;
++		}
++		if (applies &&
++		    !parp_effective_tier_claim_epoch_sequence(folio, true,
++				ctx->epoch_tag, snapshot.state_sequence,
++				&snapshot.state_sequence, &bypass)) {
++			parp_decision_native_fallback(decision, bypass);
++			goto copy_features;
++		}
++		ctx->upgrade_pages += pages;
++		if (applies) {
++			state->upgrade_pages += pages;
++			decision->reservation_active = true;
++			decision->reservation_upgrade = true;
++		}
++	} else if (decision->action == PARP_TIER_PREDICTIVE_DOWNGRADE) {
++		applies = parp_effective_tier_action_applies(ctx->mode,
++							decision->action);
++		allowed = parp_effective_tier_budget_allows(
++			ctx->downgrade_pages, ctx->candidate_pages, pages,
++			config.downgrade_batch_pages,
++			config.downgrade_ratio_permyriad) &&
++			(!applies ||
++			parp_effective_tier_budget_allows(
++			state->downgrade_pages, state->candidate_pages, pages,
++			config.downgrade_epoch_pages,
++			config.downgrade_ratio_permyriad));
++		if (!allowed) {
++			parp_decision_native_fallback(decision,
++				PARP_TIER_BYPASS_DOWNGRADE_BUDGET);
++			goto copy_features;
++		}
++		if (applies &&
++		    !parp_effective_tier_claim_epoch_sequence(folio, false,
++				ctx->epoch_tag, snapshot.state_sequence,
++				&snapshot.state_sequence, &bypass)) {
++			parp_decision_native_fallback(decision, bypass);
++			goto copy_features;
++		}
++		ctx->downgrade_pages += pages;
++		if (applies) {
++			state->downgrade_pages += pages;
++			decision->reservation_active = true;
++			decision->reservation_upgrade = false;
++		}
++	}
++copy_features:
++	if (ctx->mode == PARP_EFFECTIVE_TIER_RECENCY_BASELINE)
++		decision->scorer_kind = PARP_TIER_SCORER_RECENCY_BASELINE;
++	else if (ctx->mode == PARP_EFFECTIVE_TIER_RANDOM_MATCHED)
++		decision->scorer_kind = PARP_TIER_SCORER_RANDOM_BASELINE;
++	else
++		decision->scorer_kind = PARP_TIER_SCORER_PAIRWISE_LINEAR;
++	memcpy(decision->features, values, sizeof(values));
++	decision->features_valid = metadata_valid;
++	decision->folio_nr_pages = pages;
++	decision->generation_index = folio_lru_gen(folio);
++	decision->page_state_sequence = snapshot.state_sequence;
++	decision->score_duration_ns = score_duration;
++	decision->actual_tier_protect = parp_effective_tier_actual_protect(
++		ctx->mode, decision);
++	decision->folio_nr_pages = pages;
++	decision->decision_duration_ns =
++		ktime_get_mono_fast_ns() - decision_started;
++	parp_account_latency(&parp_tier_stats.decision_time_ns_total,
++		&parp_tier_stats.decision_time_ns_max,
++		parp_tier_stats.decision_hist,
++		decision->decision_duration_ns);
++}
++
++void __parp_effective_tier_finish(struct parp_tier_scan_ctx *ctx,
++		struct lruvec *lruvec, struct folio *folio,
++		struct parp_tier_decision *decision, bool sort_result,
++		bool isolate_attempted, bool isolate_result)
++{
++	bool reservation_committed;
++
++	reservation_committed = decision->reservation_active &&
++		((decision->reservation_upgrade && sort_result &&
++		  decision->action == PARP_TIER_PREDICTIVE_UPGRADE) ||
++		 (!decision->reservation_upgrade &&
++		  decision->action == PARP_TIER_PREDICTIVE_DOWNGRADE));
++	if (decision->reservation_active && !reservation_committed)
++		parp_effective_tier_cancel_reservation(ctx, lruvec, folio,
++						       decision);
++	if (decision->action < ARRAY_SIZE(parp_tier_stats.action_pages))
++		atomic64_add(decision->folio_nr_pages,
++			     &parp_tier_stats.action_pages[decision->action]);
++	if (decision->bypass < PARP_TIER_BYPASS_NR)
++		atomic64_add(decision->folio_nr_pages,
++			     &parp_tier_stats.bypass[decision->bypass]);
++
++	if (isolate_result && !parp_set_pending_action(folio, decision->action)) {
++		atomic64_inc(&parp_tier_stats.state_unstable);
++		atomic_set(&parp_tier_state_fault, 1);
++	}
++	if (trace_parp_effective_tier_decision_enabled()) {
++		struct parp_effective_tier_trace trace;
++		u32 lifetime_epoch;
++		u64 cookie;
++
++		if (!parp_effective_tier_identity(folio, &lifetime_epoch,
++				&cookie))
++			atomic_set(&parp_tier_state_fault, 1);
++		memset(&trace, 0, sizeof(trace));
++		trace.timestamp_ns = ktime_get_mono_fast_ns();
++		trace.experiment_id = ctx->experiment_id;
++		trace.session_id = ctx->session_id;
++		trace.folio_cookie = cookie;
++		trace.memcg_id = ctx->memcg_id;
++		trace.source_seq = ctx->source_seq;
++		trace.batch_id = ctx->batch_id;
++		trace.reclaim_epoch = ctx->epoch_id;
++		trace.score_duration_ns = decision->score_duration_ns;
++		trace.decision_duration_ns = decision->decision_duration_ns;
++		memcpy(trace.features, decision->features,
++		       sizeof(trace.features));
++		trace.reuse_score = decision->reuse_score;
++		trace.cold_threshold = decision->cold_threshold;
++		trace.hot_threshold_1 = decision->hot_threshold_1;
++		trace.hot_threshold_2 = decision->hot_threshold_2;
++		trace.hot_threshold_3 = decision->hot_threshold_3;
++		trace.delta_tier_q8 = decision->delta_tier_q8;
++		trace.effective_tier_q8 = decision->effective_tier_q8;
++		trace.priority = ctx->reclaim_priority;
++		trace.folio_nr_pages = decision->folio_nr_pages;
++		trace.lifetime_epoch = lifetime_epoch;
++		trace.nid = ctx->nid;
++		trace.expected_model_version = PARP_TIER_MODEL_VERSION;
++		if (decision->scorer_kind == PARP_TIER_SCORER_PAIRWISE_LINEAR) {
++			trace.model_version = parp_global_model.model_version;
++			trace.feature_schema_version =
++				parp_global_model.feature_schema_version;
++			strscpy(trace.model_type, PARP_TIER_MODEL_TYPE,
++				sizeof(trace.model_type));
++			strscpy(trace.model_checksum, PARP_TIER_MODEL_CHECKSUM,
++				sizeof(trace.model_checksum));
++			strscpy(trace.model_provenance,
++				PARP_TIER_MODEL_PROVENANCE,
++				sizeof(trace.model_provenance));
++		} else {
++			trace.model_version = 1;
++			trace.feature_schema_version = PARP_TIER_SCHEMA_VERSION;
++			strscpy(trace.model_type,
++				decision->scorer_kind ==
++				PARP_TIER_SCORER_RECENCY_BASELINE ?
++				"recency_baseline" : "random_matched_baseline",
++				sizeof(trace.model_type));
++			strscpy(trace.model_checksum, "none",
++				sizeof(trace.model_checksum));
++			strscpy(trace.model_provenance, "CONTROL_BASELINE",
++				sizeof(trace.model_provenance));
++		}
++		trace.generation_index = decision->generation_index;
++		trace.native_tier = decision->native_tier;
++		trace.native_tier_idx = decision->native_tier_idx;
++		trace.page_type = ctx->type;
++		trace.mode = ctx->mode;
++		trace.action = decision->action;
++		trace.bypass = decision->bypass;
++		trace.rank_score_bin = decision->rank_score_bin;
++		trace.special_native_protect = decision->special_native_protect;
++		trace.model_valid = decision->model_valid;
++		trace.features_valid = decision->features_valid;
++		trace.native_protect = decision->native_protect;
++		trace.effective_protect = decision->effective_protect;
++		trace.actual_tier_protect = decision->actual_tier_protect;
++		trace.sort_result = sort_result;
++		trace.isolate_attempted = isolate_attempted;
++		trace.isolate_result = isolate_result;
++		trace.trace_sequence = atomic64_inc_return(
++			&parp_tier_trace_sequence);
++		atomic64_inc(&parp_tier_stats.trace_decisions);
++		trace_parp_effective_tier_decision(&trace);
++	}
++}
++
++void __parp_effective_tier_batch_finish(struct parp_tier_scan_ctx *ctx,
++		unsigned long isolated)
++{
++	if (trace_parp_effective_tier_batch_enabled()) {
++		struct parp_effective_tier_batch_trace trace = {
++			.timestamp_ns = ktime_get_mono_fast_ns(),
++			.experiment_id = ctx->experiment_id,
++			.session_id = ctx->session_id,
++			.batch_id = ctx->batch_id,
++			.reclaim_epoch = ctx->epoch_id,
++			.model_time_ns = ctx->model_time_ns,
++			.candidate_pages = ctx->candidate_pages,
++			.upgrade_pages = ctx->upgrade_pages,
++			.downgrade_pages = ctx->downgrade_pages,
++			.isolated_pages = isolated,
++			.page_type = ctx->type,
++			.mode = ctx->mode,
++		};
++
++		trace.trace_sequence = atomic64_inc_return(
++			&parp_tier_trace_sequence);
++		atomic64_inc(&parp_tier_stats.trace_batches);
++		trace_parp_effective_tier_batch(&trace);
++	}
++	if (ctx->rcu_held) {
++		ctx->rcu_held = false;
++		rcu_read_unlock();
++	}
++}
++
++void __parp_effective_tier_feedback(struct lruvec *lruvec, int type,
++		u8 run_epoch, unsigned long isolated, unsigned long reclaimed)
++{
++	typeof(lruvec->lrugen.parp_effective_tier[0]) *state =
++		&lruvec->lrugen.parp_effective_tier[type];
++
++	if (!run_epoch || run_epoch != READ_ONCE(parp_tier_state_epoch) ||
++	    state->state_epoch != run_epoch || !isolated)
++		return;
++	if (reclaimed) {
++		state->no_progress_rounds = 0;
++		return;
++	}
++	if (state->no_progress_rounds < U16_MAX)
++		state->no_progress_rounds++;
++}
++
++void __parp_effective_tier_outcome(struct folio *folio,
++		enum parp_tier_outcome outcome)
++{
++	struct parp_reuse_page_ext *ext;
++	struct page_ext *page_ext;
++	u32 old_state;
++	u32 new_state;
++	u32 decision_epochs;
++	u8 pending;
++
++	if (outcome > PARP_TIER_OUTCOME_DEMOTE_ATTEMPT)
++		return;
++	ext = parp_reuse_ext_get(folio, &page_ext);
++	if (!ext)
++		return;
++	if (!parp_state_write_begin(ext, &old_state)) {
++		atomic64_inc(&parp_tier_stats.state_unstable);
++		parp_state_mark_uncertain(ext);
++		atomic_set(&parp_tier_state_fault, 1);
++		page_ext_put(page_ext);
++		return;
++	}
++	pending = FIELD_GET(PARP_STATE_ACTION_MASK, old_state);
++	decision_epochs = READ_ONCE(ext->decision_epochs);
++	new_state = old_state & ~PARP_STATE_ACTION_MASK;
++	parp_state_write_end(ext, old_state, new_state);
++	if (!pending ||
++	    FIELD_GET(PARP_TIER_STATE_EPOCH_MASK, decision_epochs) !=
++	    READ_ONCE(parp_tier_state_epoch)) {
++		page_ext_put(page_ext);
++		return;
++	}
++	atomic64_inc(&parp_tier_stats.outcomes[outcome]);
++	if (trace_parp_effective_tier_outcome_enabled()) {
++		struct parp_effective_tier_outcome_trace trace = { };
++		struct parp_tier_runtime_config config = { };
++
++		trace.timestamp_ns = ktime_get_mono_fast_ns();
++		if (parp_runtime_config_read(&config)) {
++			trace.experiment_id = config.experiment_id;
++			trace.session_id = config.session_id;
++		}
++		trace.lifetime_epoch = READ_ONCE(ext->lifetime_epoch);
++		trace.folio_cookie = parp_folio_cookie(folio,
++						trace.lifetime_epoch);
++		trace.proposed_action = pending - 1;
++		trace.actual_action = trace.proposed_action ==
++			PARP_TIER_PREDICTIVE_UPGRADE ?
++			PARP_TIER_KEEP_RECLAIM : trace.proposed_action;
++		trace.outcome = outcome;
++		trace.trace_sequence = atomic64_inc_return(
++			&parp_tier_trace_sequence);
++		atomic64_inc(&parp_tier_stats.trace_outcomes);
++		trace_parp_effective_tier_outcome(&trace);
++	}
++	page_ext_put(page_ext);
++}
++
++void __parp_effective_tier_lock_start(
++		struct parp_tier_lock_measurement *measurement)
++{
++	struct parp_tier_runtime_config config = { };
++
++	*measurement = (struct parp_tier_lock_measurement) { };
++	measurement->irq_disabled_started_ns = ktime_get_mono_fast_ns();
++	measurement->mode = READ_ONCE(parp_tier_mode);
++	if (parp_runtime_config_read(&config)) {
++		measurement->experiment_id = config.experiment_id;
++		measurement->session_id = config.session_id;
++	}
++	measurement->lock_attempt_started_ns = ktime_get_mono_fast_ns();
++}
++
++void __parp_effective_tier_lock_acquired(
++		struct parp_tier_lock_measurement *measurement)
++{
++	measurement->acquired_ns = ktime_get_mono_fast_ns();
++}
++
++void __parp_effective_tier_lock_releasing(
++		struct parp_tier_lock_measurement *measurement)
++{
++	measurement->releasing_ns = ktime_get_mono_fast_ns();
++}
++
++void __parp_effective_tier_lock_unlocked(
++		struct parp_tier_lock_measurement *measurement)
++{
++	measurement->irq_disabled_ended_ns = ktime_get_mono_fast_ns();
++}
++
++void __parp_effective_tier_lock_finish(
++		struct parp_tier_lock_measurement *measurement,
++		enum parp_tier_lock_scope scope, int nid)
++{
++	u64 duration = measurement->releasing_ns - measurement->acquired_ns;
++
++	parp_account_latency(&parp_tier_stats.lock_time_ns_total,
++		&parp_tier_stats.lock_time_ns_max, parp_tier_stats.lock_hist,
++		duration);
++	if (trace_parp_effective_tier_lock_enabled()) {
++		struct parp_effective_tier_lock_trace trace = {
++			.timestamp_ns = measurement->irq_disabled_ended_ns,
++			.experiment_id = measurement->experiment_id,
++			.session_id = measurement->session_id,
++			.wait_ns = measurement->acquired_ns -
++				measurement->lock_attempt_started_ns,
++			.held_ns = duration,
++			.irq_disabled_ns = measurement->irq_disabled_measured ?
++				measurement->irq_disabled_ended_ns -
++				measurement->irq_disabled_started_ns : 0,
++			.nid = nid,
++			.mode = measurement->mode,
++			.scope = scope,
++			.irq_disabled_measured =
++				measurement->irq_disabled_measured,
++		};
++
++		trace.trace_sequence = atomic64_inc_return(
++			&parp_tier_trace_sequence);
++		atomic64_inc(&parp_tier_stats.trace_locks);
++		trace_parp_effective_tier_lock(&trace);
++	}
++}
++
++bool parp_effective_tier_get_lock_observe(void)
++{
++	return static_branch_unlikely(&parp_effective_tier_lock_observe);
++}
++
++int parp_effective_tier_set_lock_observe(bool enabled)
++{
++	mutex_lock(&parp_tier_lock_observe_lock);
++	if (enabled != parp_effective_tier_get_lock_observe()) {
++		if (enabled)
++			static_branch_enable(&parp_effective_tier_lock_observe);
++		else
++			static_branch_disable(&parp_effective_tier_lock_observe);
++	}
++	mutex_unlock(&parp_tier_lock_observe_lock);
++	return 0;
++}
++
++enum parp_effective_tier_mode parp_effective_tier_get_mode(void)
++{
++	return READ_ONCE(parp_tier_mode);
++}
++
++int parp_effective_tier_set_mode(enum parp_effective_tier_mode mode)
++{
++	struct parp_tier_runtime_config config;
++	enum parp_effective_tier_mode old;
++	int error = 0;
++
++	if (mode > PARP_EFFECTIVE_TIER_RECENCY_BASELINE)
++		return -EINVAL;
++	if (mode >= PARP_EFFECTIVE_TIER_PROTECT_ONLY &&
++	    !IS_ENABLED(CONFIG_PARP_EFFECTIVE_TIER_EXPERIMENTAL_APPLY))
++		return -EOPNOTSUPP;
++	mutex_lock(&parp_tier_mode_lock);
++	if (mode >= PARP_EFFECTIVE_TIER_PROTECT_ONLY &&
++	    (!parp_runtime_config_read(&config) ||
++	     config.policy.max_upgrade_tiers > 2)) {
++		error = -ERANGE;
++		goto unlock;
++	}
++	old = READ_ONCE(parp_tier_mode);
++	if (old == mode)
++		goto unlock;
++	if (old == PARP_EFFECTIVE_TIER_OFF &&
++	    mode != PARP_EFFECTIVE_TIER_OFF) {
++		if (parp_tier_state_epoch == U8_MAX) {
++			error = -EOVERFLOW;
++			goto unlock;
++		}
++		WRITE_ONCE(parp_tier_state_epoch,
++			   parp_tier_state_epoch + 1);
++		atomic_set(&parp_tier_state_fault, 0);
++		WRITE_ONCE(parp_tier_mode, mode);
++		static_branch_enable(&parp_effective_tier_enabled);
++	} else if (mode == PARP_EFFECTIVE_TIER_OFF) {
++		static_branch_disable(&parp_effective_tier_enabled);
++		WRITE_ONCE(parp_tier_mode, mode);
++	} else {
++		error = -EBUSY;
++		goto unlock;
++	}
++	synchronize_rcu();
++unlock:
++	mutex_unlock(&parp_tier_mode_lock);
++	return error;
++}
++
++ssize_t parp_effective_tier_format_config(char *buf, size_t size)
++{
++	struct parp_tier_runtime_config config;
++
++	if (!parp_runtime_config_read(&config))
++		return scnprintf(buf, size, "invalid 1\n");
++	return scnprintf(buf, size,
++		"model GLOBAL_REUSE_MODEL\nmodel_type %s\nmodel_version %u\n"
++		"model_checksum %s\nmodel_provenance %s\n"
++		"feature_schema_version %u\nconfig_sequence %u\n"
++		"cold_threshold %d\nhot_threshold_1 %d\n"
++		"hot_threshold_2 %d\nhot_threshold_3 %d\n"
++		"max_upgrade_tiers %u\n"
++		"max_downgrade_tiers %u\nrequire_two_cold %u\n"
++		"upgrade_batch_pages %lu\nupgrade_epoch_pages %lu\n"
++		"upgrade_ratio_permyriad %u\n"
++		"downgrade_batch_pages %lu\ndowngrade_epoch_pages %lu\n"
++		"downgrade_ratio_permyriad %u\nexperiment_id %llu\n"
++		"session_id %llu\n",
++		PARP_TIER_MODEL_TYPE, PARP_TIER_MODEL_VERSION,
++		PARP_TIER_MODEL_CHECKSUM, PARP_TIER_MODEL_PROVENANCE,
++		PARP_TIER_SCHEMA_VERSION,
++		config.sequence, config.policy.cold_threshold,
++		config.policy.hot_threshold_1,
++		config.policy.hot_threshold_2,
++		config.policy.hot_threshold_3,
++		config.policy.max_upgrade_tiers,
++		config.policy.max_downgrade_tiers,
++		config.policy.require_two_cold,
++		config.upgrade_batch_pages, config.upgrade_epoch_pages,
++		config.upgrade_ratio_permyriad,
++		config.downgrade_batch_pages, config.downgrade_epoch_pages,
++		config.downgrade_ratio_permyriad, config.experiment_id,
++		config.session_id);
++}
++
++int parp_effective_tier_set_config(const char *buf)
++{
++	struct parp_tier_runtime_config next;
++	unsigned int max_upgrade;
++	unsigned int require_two_cold;
++	unsigned long long experiment_id;
++	unsigned long long session_id;
++	u32 sequence;
++	int matched;
++
++	if (!parp_runtime_config_read(&next))
++		return -EAGAIN;
++	matched = sscanf(buf, "%d %d %d %d %u %u %lu %lu %u %lu %lu %u %llu %llu",
++		&next.policy.cold_threshold, &next.policy.hot_threshold_1,
++		&next.policy.hot_threshold_2, &next.policy.hot_threshold_3,
++		&max_upgrade,
++		&require_two_cold, &next.upgrade_batch_pages,
++		&next.upgrade_epoch_pages, &next.upgrade_ratio_permyriad,
++		&next.downgrade_batch_pages, &next.downgrade_epoch_pages,
++		&next.downgrade_ratio_permyriad, &experiment_id, &session_id);
++	if (matched != 14)
++		return -EINVAL;
++	if (next.policy.cold_threshold >= next.policy.hot_threshold_1 ||
++	    next.policy.hot_threshold_1 >= next.policy.hot_threshold_2 ||
++	    next.policy.hot_threshold_2 >= next.policy.hot_threshold_3 ||
++	    max_upgrade < 1 || max_upgrade > 3 || require_two_cold > 1 ||
++	    !next.upgrade_batch_pages || !next.upgrade_epoch_pages ||
++	    !next.downgrade_batch_pages || !next.downgrade_epoch_pages ||
++	    !next.upgrade_ratio_permyriad ||
++	    next.upgrade_ratio_permyriad > 10000 ||
++	    !next.downgrade_ratio_permyriad ||
++	    next.downgrade_ratio_permyriad > 10000)
++		return -ERANGE;
++	next.policy.max_upgrade_tiers = max_upgrade;
++	next.policy.max_downgrade_tiers = 1;
++	next.policy.require_two_cold = require_two_cold;
++	next.experiment_id = experiment_id;
++	next.session_id = session_id;
++	mutex_lock(&parp_tier_mode_lock);
++	if (READ_ONCE(parp_tier_mode) != PARP_EFFECTIVE_TIER_OFF) {
++		mutex_unlock(&parp_tier_mode_lock);
++		return -EBUSY;
++	}
++	mutex_lock(&parp_tier_config_lock);
++	sequence = READ_ONCE(parp_tier_config.sequence);
++	WRITE_ONCE(parp_tier_config.sequence, sequence + 1);
++	smp_wmb();
++	next.sequence = sequence + 1;
++	parp_tier_config = next;
++	smp_wmb();
++	WRITE_ONCE(parp_tier_config.sequence, sequence + 2);
++	mutex_unlock(&parp_tier_config_lock);
++	mutex_unlock(&parp_tier_mode_lock);
++	return 0;
++}
++
++static ssize_t parp_format_histogram(char *buf, size_t size, ssize_t offset,
++		const char *name,
++		atomic64_t histogram[PARP_TIER_LATENCY_BUCKETS])
++{
++	int bin;
++
++	if (offset >= size)
++		return offset;
++	offset += scnprintf(buf + offset, size - offset,
++			    "%s", name);
++	for (bin = 0; bin < PARP_TIER_LATENCY_BUCKETS && offset < size;
++	     bin++)
++		offset += scnprintf(buf + offset, size - offset, "%c%lld",
++				    bin ? ',' : ' ',
++				    atomic64_read(&histogram[bin]));
++	if (offset < size)
++		offset += scnprintf(buf + offset, size - offset, "\n");
++	return offset;
++}
++
++ssize_t parp_effective_tier_format_stats(char *buf, size_t size)
++{
++	ssize_t len;
++
++	len = scnprintf(buf, size,
++		"mode %u\napply_compiled %u\npage_ext_bytes %zu\n"
++		"state_epoch %u\ncandidates %lld\ncandidate_pages %lld\n"
++		"state_fault %u\n"
++		"scores %lld\nmetadata_missing %lld\nstate_unstable %lld\n"
++		"model_invalid %lld\nkeep_reclaim_pages %lld\n"
++		"upgrade_pages %lld\nkeep_protect_pages %lld\n"
++		"downgrade_pages %lld\nspecial_protect_pages %lld\n"
++		"policy_promotions %lld\nnative_tier_promotions %lld\n"
++		"native_generation_moves %lld\nscore_time_ns_total %lld\n"
++		"score_time_ns_max %lld\ndecision_time_ns_total %lld\n"
++		"decision_time_ns_max %lld\nlock_time_ns_total %lld\n"
++		"lock_time_ns_max %lld\ntrace_decisions %lld\n"
++		"trace_accesses %lld\ntrace_outcomes %lld\ntrace_batches %lld\n"
++		"trace_locks %lld\n",
++		parp_effective_tier_get_mode(),
++		IS_ENABLED(CONFIG_PARP_EFFECTIVE_TIER_EXPERIMENTAL_APPLY),
++		parp_effective_tier_metadata_size(),
++		READ_ONCE(parp_tier_state_epoch),
++		atomic64_read(&parp_tier_stats.candidates),
++		atomic64_read(&parp_tier_stats.candidate_pages),
++		atomic_read(&parp_tier_state_fault),
++		atomic64_read(&parp_tier_stats.scores),
++		atomic64_read(&parp_tier_stats.metadata_missing),
++		atomic64_read(&parp_tier_stats.state_unstable),
++		atomic64_read(&parp_tier_stats.model_invalid),
++		atomic64_read(&parp_tier_stats.action_pages[0]),
++		atomic64_read(&parp_tier_stats.action_pages[1]),
++		atomic64_read(&parp_tier_stats.action_pages[2]),
++		atomic64_read(&parp_tier_stats.action_pages[3]),
++		atomic64_read(&parp_tier_stats.action_pages[4]),
++		atomic64_read(&parp_tier_stats.policy_promotions),
++		atomic64_read(&parp_tier_stats.native_tier_promotions),
++		atomic64_read(&parp_tier_stats.native_generation_moves),
++		atomic64_read(&parp_tier_stats.score_time_ns_total),
++		atomic64_read(&parp_tier_stats.score_time_ns_max),
++		atomic64_read(&parp_tier_stats.decision_time_ns_total),
++		atomic64_read(&parp_tier_stats.decision_time_ns_max),
++		atomic64_read(&parp_tier_stats.lock_time_ns_total),
++		atomic64_read(&parp_tier_stats.lock_time_ns_max),
++		atomic64_read(&parp_tier_stats.trace_decisions),
++		atomic64_read(&parp_tier_stats.trace_accesses),
++		atomic64_read(&parp_tier_stats.trace_outcomes),
++		atomic64_read(&parp_tier_stats.trace_batches),
++		atomic64_read(&parp_tier_stats.trace_locks));
++	len = parp_format_histogram(buf, size, len, "score_hist_log2_ns",
++				    parp_tier_stats.score_hist);
++	len = parp_format_histogram(buf, size, len, "decision_hist_log2_ns",
++				    parp_tier_stats.decision_hist);
++	len = parp_format_histogram(buf, size, len, "lock_hist_log2_ns",
++				    parp_tier_stats.lock_hist);
++	return min_t(ssize_t, len, size);
++}
+diff --git a/mm/parp/tests/parp_test.c b/mm/parp/tests/parp_test.c
+index 50cebc0e1..966063574 100644
+--- a/mm/parp/tests/parp_test.c
++++ b/mm/parp/tests/parp_test.c
+@@ -1,5 +1,7 @@
+ // SPDX-License-Identifier: GPL-2.0
+ #include <kunit/test.h>
++#include <linux/mm.h>
++#include <linux/mm_inline.h>
+ #include <trace/events/parp.h>
+ #include "../internal.h"
+ #include "../adapter/adapter.h"
+@@ -781,6 +783,386 @@ static void parp_phase27_region_trace_schema_test(struct kunit *test)
+ 				event.sample_interval_us, 200U);
+ }
+ 
++#ifdef CONFIG_PARP_EFFECTIVE_TIER
++static const struct parp_tier_policy parp_effective_test_policy = {
++	.cold_threshold = -48,
++	.hot_threshold_1 = 48,
++	.hot_threshold_2 = 96,
++	.hot_threshold_3 = 144,
++	.max_upgrade_tiers = 2,
++	.max_downgrade_tiers = 1,
++	.require_two_cold = true,
++};
++
++static void parp_effective_score_bins_test(struct kunit *test)
++{
++	const s64 lower_edges[PARP_TIER_FEATURES] = {
++		10, 10, 10, 0, 10, 8,
++	};
++	const s64 above_edges[PARP_TIER_FEATURES] = {
++		11, 11, 11, 1, 11, 9,
++	};
++	s32 score;
++
++	/* Equality belongs to the lower bin in both Python and C. */
++	KUNIT_ASSERT_TRUE(test,
++		parp_effective_tier_score_values(lower_edges, &score));
++	KUNIT_EXPECT_EQ(test, score, 144);
++	KUNIT_ASSERT_TRUE(test,
++		parp_effective_tier_score_values(above_edges, &score));
++	KUNIT_EXPECT_EQ(test, score, 108);
++}
++
++static void parp_effective_rank_runtime_contract_test(struct kunit *test)
++{
++	const s64 values[PARP_TIER_FEATURES] = { 10, 20, 30, 1, 40, 50 };
++	struct parp_tier_decision decision;
++	s32 first;
++	s32 second;
++
++	KUNIT_EXPECT_FALSE(test, PARP_TIER_RUNTIME_PAIRWISE_COMPARISON);
++	KUNIT_EXPECT_FALSE(test, PARP_TIER_RUNTIME_CANDIDATE_SORTING);
++	KUNIT_EXPECT_FALSE(test, PARP_TIER_RUNTIME_SIGMOID);
++	KUNIT_ASSERT_TRUE(test,
++		parp_effective_tier_score_values(values, &first));
++	KUNIT_ASSERT_TRUE(test,
++		parp_effective_tier_score_values(values, &second));
++	KUNIT_EXPECT_EQ(test, first, second);
++
++	parp_effective_tier_classify(-48, true, 1, 0, false,
++		&parp_effective_test_policy, &decision);
++	KUNIT_EXPECT_EQ(test, decision.rank_score_bin,
++		(u8)PARP_RANK_SCORE_COLD);
++	parp_effective_tier_classify(-47, true, 1, 0, false,
++		&parp_effective_test_policy, &decision);
++	KUNIT_EXPECT_EQ(test, decision.rank_score_bin,
++		(u8)PARP_RANK_SCORE_NEUTRAL);
++	parp_effective_tier_classify(48, true, 1, 0, false,
++		&parp_effective_test_policy, &decision);
++	KUNIT_EXPECT_EQ(test, decision.rank_score_bin,
++		(u8)PARP_RANK_SCORE_HOT_1);
++	parp_effective_tier_classify(96, true, 1, 0, false,
++		&parp_effective_test_policy, &decision);
++	KUNIT_EXPECT_EQ(test, decision.rank_score_bin,
++		(u8)PARP_RANK_SCORE_HOT_2);
++	parp_effective_tier_classify(144, true, 1, 0, false,
++		&parp_effective_test_policy, &decision);
++	KUNIT_EXPECT_EQ(test, decision.rank_score_bin,
++		(u8)PARP_RANK_SCORE_HOT_3);
++	parp_effective_tier_classify(96, false, 1, 0, false,
++		&parp_effective_test_policy, &decision);
++	KUNIT_EXPECT_EQ(test, decision.rank_score_bin,
++		(u8)PARP_RANK_SCORE_INVALID);
++}
++
++static void parp_effective_delta_thresholds_test(struct kunit *test)
++{
++	struct parp_tier_policy invalid = parp_effective_test_policy;
++	struct parp_tier_policy plus_three = parp_effective_test_policy;
++	struct parp_tier_decision invalid_decision;
++
++	KUNIT_EXPECT_EQ(test, parp_score_to_delta_q8(-48,
++		&parp_effective_test_policy), -PARP_TIER_SCALE);
++	KUNIT_EXPECT_EQ(test, parp_score_to_delta_q8(-47,
++		&parp_effective_test_policy), 0);
++	KUNIT_EXPECT_EQ(test, parp_score_to_delta_q8(48,
++		&parp_effective_test_policy), PARP_TIER_SCALE);
++	KUNIT_EXPECT_EQ(test, parp_score_to_delta_q8(96,
++		&parp_effective_test_policy), 2 * PARP_TIER_SCALE);
++	plus_three.max_upgrade_tiers = 3;
++	KUNIT_EXPECT_EQ(test, parp_score_to_delta_q8(96, &plus_three),
++		2 * PARP_TIER_SCALE);
++	KUNIT_EXPECT_EQ(test, parp_score_to_delta_q8(144, &plus_three),
++		3 * PARP_TIER_SCALE);
++	invalid.max_downgrade_tiers = 2;
++	KUNIT_EXPECT_EQ(test, parp_score_to_delta_q8(-100, &invalid), 0);
++	parp_effective_tier_classify(96, true, 1, 0, false, NULL,
++		&invalid_decision);
++	KUNIT_EXPECT_FALSE(test, invalid_decision.model_valid);
++	KUNIT_EXPECT_EQ(test, invalid_decision.delta_tier_q8, 0);
++}
++
++static void parp_effective_q8_clamp_test(struct kunit *test)
++{
++	KUNIT_EXPECT_EQ(test, parp_effective_tier_q8(0, -PARP_TIER_SCALE), 0);
++	KUNIT_EXPECT_EQ(test, parp_effective_tier_q8(0, PARP_TIER_SCALE),
++		PARP_TIER_SCALE);
++	KUNIT_EXPECT_EQ(test, parp_effective_tier_q8(3,
++		3 * PARP_TIER_SCALE), 3 * PARP_TIER_SCALE);
++	KUNIT_EXPECT_EQ(test, parp_effective_tier_q8(2,
++		-PARP_TIER_SCALE), PARP_TIER_SCALE);
++}
++
++static void parp_effective_native_modes_test(struct kunit *test)
++{
++	struct parp_tier_decision upgrade;
++	struct parp_tier_decision downgrade;
++
++	parp_effective_tier_classify(96, true, 1, 1, false,
++		&parp_effective_test_policy, &upgrade);
++	KUNIT_EXPECT_EQ(test, upgrade.action,
++		(u8)PARP_TIER_PREDICTIVE_UPGRADE);
++	KUNIT_EXPECT_FALSE(test, parp_effective_tier_actual_protect(
++		PARP_EFFECTIVE_TIER_OFF, &upgrade));
++	KUNIT_EXPECT_FALSE(test, parp_effective_tier_actual_protect(
++		PARP_EFFECTIVE_TIER_SHADOW, &upgrade));
++	KUNIT_EXPECT_TRUE(test, parp_effective_tier_actual_protect(
++		PARP_EFFECTIVE_TIER_PROTECT_ONLY, &upgrade));
++
++	parp_effective_tier_classify(-48, true, 2, 1, false,
++		&parp_effective_test_policy, &downgrade);
++	KUNIT_EXPECT_EQ(test, downgrade.action,
++		(u8)PARP_TIER_PREDICTIVE_DOWNGRADE);
++	KUNIT_EXPECT_TRUE(test, parp_effective_tier_actual_protect(
++		PARP_EFFECTIVE_TIER_SHADOW, &downgrade));
++	KUNIT_EXPECT_TRUE(test, parp_effective_tier_actual_protect(
++		PARP_EFFECTIVE_TIER_PROTECT_ONLY, &downgrade));
++	KUNIT_EXPECT_FALSE(test, parp_effective_tier_actual_protect(
++		PARP_EFFECTIVE_TIER_BIDIRECTIONAL, &downgrade));
++}
++
++static void parp_effective_native_fallback_test(struct kunit *test)
++{
++	struct parp_tier_decision invalid;
++	struct parp_tier_decision special;
++
++	parp_effective_tier_classify(1000, false, 2, 1, false,
++		&parp_effective_test_policy, &invalid);
++	KUNIT_EXPECT_EQ(test, invalid.delta_tier_q8, 0);
++	KUNIT_EXPECT_EQ(test, invalid.effective_tier_q8,
++		2 * PARP_TIER_SCALE);
++	KUNIT_EXPECT_EQ(test, invalid.native_protect,
++		invalid.effective_protect);
++	KUNIT_EXPECT_EQ(test, invalid.bypass,
++		(u8)PARP_TIER_BYPASS_MODEL_INVALID);
++
++	parp_effective_tier_classify(-1000, true, 1, 0, true,
++		&parp_effective_test_policy, &special);
++	KUNIT_EXPECT_EQ(test, special.action,
++		(u8)PARP_TIER_SPECIAL_NATIVE_PROTECT);
++	KUNIT_EXPECT_TRUE(test, parp_effective_tier_actual_protect(
++		PARP_EFFECTIVE_TIER_BIDIRECTIONAL, &special));
++}
++
++static void parp_effective_downgrade_boundary_test(struct kunit *test)
++{
++	struct parp_tier_decision boundary;
++	struct parp_tier_decision strong;
++
++	parp_effective_tier_classify(-48, true, 2, 1, false,
++		&parp_effective_test_policy, &boundary);
++	KUNIT_EXPECT_EQ(test, boundary.raw_delta_tier_q8, -PARP_TIER_SCALE);
++	KUNIT_EXPECT_EQ(test, boundary.action,
++		(u8)PARP_TIER_PREDICTIVE_DOWNGRADE);
++	parp_effective_tier_classify(-48, true, 3, 1, false,
++		&parp_effective_test_policy, &strong);
++	KUNIT_EXPECT_EQ(test, strong.action, (u8)PARP_TIER_KEEP_PROTECT);
++	KUNIT_EXPECT_TRUE(test, strong.effective_protect);
++}
++
++static void parp_effective_policy_flags_test(struct kunit *test)
++{
++	unsigned long old_flags;
++	unsigned long new_flags;
++	int next;
++
++	old_flags = (2UL << LRU_GEN_PGOFF) | LRU_REFS_FLAGS |
++		BIT(PG_workingset) | BIT(PG_dirty);
++	next = parp_effective_tier_next_generation(1);
++	KUNIT_ASSERT_EQ(test, next, 2);
++	new_flags = parp_effective_tier_policy_flags(old_flags, next);
++	KUNIT_EXPECT_EQ(test, new_flags & ~LRU_GEN_MASK,
++		old_flags & ~LRU_GEN_MASK);
++	KUNIT_EXPECT_EQ(test,
++		(new_flags & LRU_GEN_MASK) >> LRU_GEN_PGOFF, 3UL);
++	KUNIT_EXPECT_EQ(test, parp_effective_tier_next_generation(
++		MAX_NR_GENS - 1), 0);
++}
++
++static void parp_effective_budget_test(struct kunit *test)
++{
++	KUNIT_EXPECT_TRUE(test, parp_effective_tier_budget_allows(
++		0, 100, 1, 8, 100));
++	KUNIT_EXPECT_FALSE(test, parp_effective_tier_budget_allows(
++		1, 100, 1, 8, 100));
++	KUNIT_EXPECT_FALSE(test, parp_effective_tier_budget_allows(
++		7, 10000, 2, 8, 100));
++	KUNIT_EXPECT_FALSE(test, parp_effective_tier_budget_allows(
++		0, 10000, 512, 1024, 100));
++	KUNIT_EXPECT_FALSE(test, parp_effective_tier_budget_allows(
++		ULONG_MAX, ULONG_MAX, 1, ULONG_MAX, 10000));
++}
++
++static void parp_effective_upgrade_gate_test(struct kunit *test)
++{
++	enum parp_tier_bypass_reason bypass;
++
++	KUNIT_EXPECT_FALSE(test, parp_effective_tier_upgrade_gate(true, false,
++		&bypass));
++	KUNIT_EXPECT_EQ(test, bypass, PARP_TIER_BYPASS_PRESSURE);
++	KUNIT_EXPECT_FALSE(test, parp_effective_tier_upgrade_gate(false, true,
++		&bypass));
++	KUNIT_EXPECT_EQ(test, bypass, PARP_TIER_BYPASS_NO_PROGRESS);
++	KUNIT_EXPECT_TRUE(test, parp_effective_tier_upgrade_gate(false, false,
++		&bypass));
++	KUNIT_EXPECT_EQ(test, bypass, PARP_TIER_BYPASS_NONE);
++}
++
++static void parp_effective_random_matched_test(struct kunit *test)
++{
++	unsigned long selected_upgrade = 0;
++	unsigned long selected_downgrade = 0;
++	unsigned long seen;
++
++	for (seen = 0; seen < 100; seen++) {
++		if (parp_effective_tier_random_claim(seen * 7919ULL,
++			selected_upgrade, 5, seen, 100))
++			selected_upgrade++;
++		if (parp_effective_tier_random_claim(seen * 104729ULL,
++			selected_downgrade, 2, seen, 100))
++			selected_downgrade++;
++	}
++	KUNIT_EXPECT_EQ(test, selected_upgrade, 5UL);
++	KUNIT_EXPECT_EQ(test, selected_downgrade, 2UL);
++}
++
++static void parp_effective_recency_time_test(struct kunit *test)
++{
++	bool valid;
++
++	KUNIT_EXPECT_EQ(test, parp_effective_tier_recency_score(100,
++		&parp_effective_test_policy), 96);
++	KUNIT_EXPECT_EQ(test, parp_effective_tier_recency_score(500,
++		&parp_effective_test_policy), 48);
++	KUNIT_EXPECT_EQ(test, parp_effective_tier_recency_score(10000,
++		&parp_effective_test_policy), -48);
++	KUNIT_EXPECT_EQ(test, parp_effective_tier_elapsed_ms(5, U32_MAX - 4,
++		&valid), 10U);
++	KUNIT_EXPECT_TRUE(test, valid);
++	KUNIT_EXPECT_EQ(test, parp_effective_tier_metadata_size(), 24UL);
++}
++
++static void parp_effective_access_lifetime_test(struct kunit *test)
++{
++	struct parp_tier_state_snapshot before = { };
++	struct parp_tier_state_snapshot after = { };
++	struct folio *folio;
++	struct page *page;
++	u64 first_cookie;
++	u64 second_cookie;
++	u32 last_access;
++	int error;
++
++	page = alloc_page(GFP_KERNEL);
++	KUNIT_ASSERT_NOT_NULL(test, page);
++	folio = page_folio(page);
++	parp_effective_tier_page_alloc(page, 0);
++	error = parp_effective_tier_set_mode(PARP_EFFECTIVE_TIER_SHADOW);
++	if (error) {
++		KUNIT_FAIL(test, "cannot enable SHADOW: %d", error);
++		__free_page(page);
++		return;
++	}
++	parp_effective_tier_note_access(folio, PARP_ACCESS_PTE_YOUNG);
++	KUNIT_EXPECT_TRUE(test,
++		parp_effective_tier_state_snapshot(folio, &before));
++	last_access = before.last_access_ms;
++	first_cookie = parp_effective_tier_cookie(folio);
++	KUNIT_EXPECT_NE(test, first_cookie, 0ULL);
++	parp_effective_tier_note_move(folio, PARP_POLICY_PROMOTION, 1);
++	KUNIT_EXPECT_TRUE(test,
++		parp_effective_tier_state_snapshot(folio, &after));
++	KUNIT_EXPECT_EQ(test, after.last_access_ms, last_access);
++	parp_effective_tier_note_move(folio, PARP_NATIVE_GENERATION_MOVE, 2);
++	KUNIT_EXPECT_TRUE(test,
++		parp_effective_tier_state_snapshot(folio, &after));
++	KUNIT_EXPECT_EQ(test, after.last_access_ms, last_access);
++	parp_effective_tier_page_alloc(page, 0);
++	second_cookie = parp_effective_tier_cookie(folio);
++	KUNIT_EXPECT_NE(test, second_cookie, first_cookie);
++	KUNIT_EXPECT_FALSE(test,
++		parp_effective_tier_state_snapshot(folio, &after));
++	KUNIT_EXPECT_EQ(test,
++		parp_effective_tier_set_mode(PARP_EFFECTIVE_TIER_OFF), 0);
++	__free_page(page);
++}
++
++static void parp_effective_epoch_limit_test(struct kunit *test)
++{
++	enum parp_tier_bypass_reason bypass;
++	struct folio *folio;
++	struct page *page;
++	int error;
++
++	page = alloc_page(GFP_KERNEL);
++	KUNIT_ASSERT_NOT_NULL(test, page);
++	folio = page_folio(page);
++	parp_effective_tier_page_alloc(page, 0);
++	error = parp_effective_tier_set_mode(PARP_EFFECTIVE_TIER_SHADOW);
++	if (error) {
++		KUNIT_FAIL(test, "cannot enable SHADOW: %d", error);
++		__free_page(page);
++		return;
++	}
++	parp_effective_tier_note_access(folio, PARP_ACCESS_FD_REFERENCE);
++	KUNIT_EXPECT_TRUE(test, parp_effective_tier_claim_epoch(folio, true,
++		7, &bypass));
++	KUNIT_EXPECT_FALSE(test, parp_effective_tier_claim_epoch(folio, true,
++		7, &bypass));
++	KUNIT_EXPECT_EQ(test, bypass, PARP_TIER_BYPASS_REPEAT_UPGRADE);
++	KUNIT_EXPECT_TRUE(test, parp_effective_tier_claim_epoch(folio, false,
++		7, &bypass));
++	KUNIT_EXPECT_FALSE(test, parp_effective_tier_claim_epoch(folio, false,
++		7, &bypass));
++	KUNIT_EXPECT_EQ(test, bypass, PARP_TIER_BYPASS_REPEAT_DOWNGRADE);
++	KUNIT_EXPECT_EQ(test,
++		parp_effective_tier_set_mode(PARP_EFFECTIVE_TIER_OFF), 0);
++	__free_page(page);
++}
++
++static void parp_effective_trace_quadrants_test(struct kunit *test)
++{
++	struct parp_tier_decision decision;
++
++	parp_effective_tier_classify(0, true, 0, 0, false,
++		&parp_effective_test_policy, &decision);
++	KUNIT_EXPECT_EQ(test, decision.action, (u8)PARP_TIER_KEEP_RECLAIM);
++	parp_effective_tier_classify(96, true, 0, 0, false,
++		&parp_effective_test_policy, &decision);
++	KUNIT_EXPECT_EQ(test, decision.action,
++		(u8)PARP_TIER_PREDICTIVE_UPGRADE);
++	parp_effective_tier_classify(0, true, 2, 1, false,
++		&parp_effective_test_policy, &decision);
++	KUNIT_EXPECT_EQ(test, decision.action, (u8)PARP_TIER_KEEP_PROTECT);
++	parp_effective_tier_classify(-48, true, 2, 1, false,
++		&parp_effective_test_policy, &decision);
++	KUNIT_EXPECT_EQ(test, decision.action,
++		(u8)PARP_TIER_PREDICTIVE_DOWNGRADE);
++}
++
++static void parp_effective_config_safety_test(struct kunit *test)
++{
++	KUNIT_EXPECT_FALSE(test, IS_ENABLED(CONFIG_PARP_FRONTIER_SCORE));
++	KUNIT_EXPECT_EQ(test, parp_effective_tier_get_mode(),
++		PARP_EFFECTIVE_TIER_OFF);
++	if (!IS_ENABLED(CONFIG_PARP_EFFECTIVE_TIER_EXPERIMENTAL_APPLY))
++		KUNIT_EXPECT_EQ(test, parp_effective_tier_set_mode(
++			PARP_EFFECTIVE_TIER_BIDIRECTIONAL), -EOPNOTSUPP);
++	KUNIT_EXPECT_TRUE(test,
++		parp_access_event_is_real(PARP_ACCESS_PTE_YOUNG));
++	KUNIT_EXPECT_TRUE(test,
++		parp_access_event_is_real(PARP_ACCESS_MARK_ACCESSED));
++	KUNIT_EXPECT_TRUE(test,
++		parp_access_event_is_real(PARP_ACCESS_FD_REFERENCE));
++	KUNIT_EXPECT_FALSE(test,
++		parp_access_event_is_real(PARP_NATIVE_TIER_PROMOTION));
++	KUNIT_EXPECT_FALSE(test,
++		parp_access_event_is_real(PARP_NATIVE_GENERATION_MOVE));
++	KUNIT_EXPECT_FALSE(test,
++		parp_access_event_is_real(PARP_POLICY_PROMOTION));
++}
++#endif
++
+ #ifdef CONFIG_PARP_FRONTIER_SCORE
+ static void parp_frontier_quantized_score_test(struct kunit *test)
+ {
+@@ -872,6 +1254,24 @@ static struct kunit_case parp_cases[] = {
+ 	KUNIT_CASE(parp_prior_batch_validation_test),
+ 	KUNIT_CASE(parp_scan_budget_circuit_test),
+ 	KUNIT_CASE(parp_phase27_region_trace_schema_test),
++#ifdef CONFIG_PARP_EFFECTIVE_TIER
++	KUNIT_CASE(parp_effective_score_bins_test),
++	KUNIT_CASE(parp_effective_rank_runtime_contract_test),
++	KUNIT_CASE(parp_effective_delta_thresholds_test),
++	KUNIT_CASE(parp_effective_q8_clamp_test),
++	KUNIT_CASE(parp_effective_native_modes_test),
++	KUNIT_CASE(parp_effective_native_fallback_test),
++	KUNIT_CASE(parp_effective_downgrade_boundary_test),
++	KUNIT_CASE(parp_effective_policy_flags_test),
++	KUNIT_CASE(parp_effective_budget_test),
++	KUNIT_CASE(parp_effective_upgrade_gate_test),
++	KUNIT_CASE(parp_effective_random_matched_test),
++	KUNIT_CASE(parp_effective_recency_time_test),
++	KUNIT_CASE(parp_effective_access_lifetime_test),
++	KUNIT_CASE(parp_effective_epoch_limit_test),
++	KUNIT_CASE(parp_effective_trace_quadrants_test),
++	KUNIT_CASE(parp_effective_config_safety_test),
++#endif
+ #ifdef CONFIG_PARP_FRONTIER_SCORE
+ 	KUNIT_CASE(parp_frontier_quantized_score_test),
+ 	KUNIT_CASE(parp_frontier_selection_budget_test),
+diff --git a/mm/rmap.c b/mm/rmap.c
+index 568198e9e..5f14e2a42 100644
+--- a/mm/rmap.c
++++ b/mm/rmap.c
+@@ -904,8 +904,11 @@ static bool folio_referenced_one(struct folio *folio,
+ 				referenced++;
+ 		} else if (IS_ENABLED(CONFIG_TRANSPARENT_HUGEPAGE)) {
+ 			if (pmdp_clear_flush_young_notify(vma, address,
+-						pvmw.pmd))
++						pvmw.pmd)) {
++				parp_effective_tier_note_access(
++					folio, PARP_ACCESS_PTE_YOUNG);
+ 				referenced++;
++			}
+ 		} else {
+ 			/* unexpected pmd-mapped folio? */
+ 			WARN_ON_ONCE(1);
+diff --git a/mm/shmem.c b/mm/shmem.c
+index 3b0356a4c..e3ad9bd64 100644
+--- a/mm/shmem.c
++++ b/mm/shmem.c
+@@ -27,6 +27,7 @@
+ #include <linux/mount.h>
+ #include <linux/ramfs.h>
+ #include <linux/pagemap.h>
++#include <linux/parp.h>
+ #include <linux/file.h>
+ #include <linux/fileattr.h>
+ #include <linux/mm.h>
+@@ -3469,7 +3470,7 @@ static ssize_t shmem_file_read_iter(struct kiocb *iocb, struct iov_iter *to)
+ 			 * Mark the folio accessed if we read the beginning.
+ 			 */
+ 			if (!offset)
+-				folio_mark_accessed(folio);
++				folio_mark_accessed_native(folio);
+ 			/*
+ 			 * Ok, we have the page, and it's up-to-date, so
+ 			 * now we can copy it to user space...
+@@ -3478,6 +3479,9 @@ static ssize_t shmem_file_read_iter(struct kiocb *iocb, struct iov_iter *to)
+ 				ret = copy_folio_to_iter(folio, offset, nr, to);
+ 			else
+ 				ret = copy_page_to_iter(page, offset, nr, to);
++			if (ret)
++				parp_effective_tier_note_access(folio,
++						PARP_ACCESS_FD_REFERENCE);
+ 			folio_put(folio);
+ 		} else if (user_backed_iter(to)) {
+ 			/*
+@@ -3659,12 +3663,15 @@ static ssize_t shmem_file_splice_read(struct file *in, loff_t *ppos,
+ 				else
+ 					flush_dcache_page(page);
+ 			}
+-			folio_mark_accessed(folio);
++			folio_mark_accessed_native(folio);
+ 			/*
+ 			 * Ok, we have the page, and it's up-to-date, so we can
+ 			 * now splice it into the pipe.
+ 			 */
+ 			n = splice_folio_into_pipe(pipe, folio, *ppos, part);
++			if (n)
++				parp_effective_tier_note_access(folio,
++							PARP_ACCESS_FD_REFERENCE);
+ 			folio_put(folio);
+ 			folio = NULL;
+ 		} else {
+diff --git a/mm/swap.c b/mm/swap.c
+index b74ebe865..ea64d6401 100644
+--- a/mm/swap.c
++++ b/mm/swap.c
+@@ -37,6 +37,7 @@
+ #include <linux/page_idle.h>
+ #include <linux/local_lock.h>
+ #include <linux/buffer_head.h>
++#include <linux/parp.h>
+ 
+ #include "internal.h"
+ 
+@@ -452,7 +453,7 @@ static bool lru_gen_clear_refs(struct folio *folio)
+  * When a newly allocated folio is not yet visible, so safe for non-atomic ops,
+  * __folio_set_referenced() may be substituted for folio_mark_accessed().
+  */
+-void folio_mark_accessed(struct folio *folio)
++static void __folio_mark_accessed_native(struct folio *folio)
+ {
+ 	if (folio_test_dropbehind(folio))
+ 		return;
+@@ -486,6 +487,24 @@ void folio_mark_accessed(struct folio *folio)
+ 	if (folio_test_idle(folio))
+ 		folio_clear_idle(folio);
+ }
++
++void folio_mark_accessed_native(struct folio *folio)
++{
++	__folio_mark_accessed_native(folio);
++}
++
++void folio_mark_accessed_source(struct folio *folio, unsigned int source)
++{
++	if (source >= PARP_ACCESS_EVENT_NR)
++		source = PARP_ACCESS_UNTRUSTED_MARK;
++	parp_effective_tier_note_access(folio, source);
++	__folio_mark_accessed_native(folio);
++}
++
++void folio_mark_accessed(struct folio *folio)
++{
++	folio_mark_accessed_source(folio, PARP_ACCESS_UNTRUSTED_MARK);
++}
+ EXPORT_SYMBOL(folio_mark_accessed);
+ 
+ /**
+diff --git a/mm/vmscan.c b/mm/vmscan.c
+index be5395fe9..6849e2311 100644
+--- a/mm/vmscan.c
++++ b/mm/vmscan.c
+@@ -1289,6 +1289,8 @@ static unsigned int shrink_folio_list(struct list_head *folio_list,
+ 		 */
+ 		if (do_demote_pass &&
+ 		    (thp_migration_supported() || !folio_test_large(folio))) {
++			parp_effective_tier_outcome(folio,
++					PARP_TIER_OUTCOME_DEMOTE_ATTEMPT);
+ 			list_add(&folio->lru, &demote_folios);
+ 			folio_unlock(folio);
+ 			continue;
+@@ -1519,6 +1521,8 @@ static unsigned int shrink_folio_list(struct list_head *folio_list,
+ 			if (!filemap_release_folio(folio, sc->gfp_mask))
+ 				goto activate_locked;
+ 			if (!mapping && folio_ref_count(folio) == 1) {
++				parp_effective_tier_outcome(folio,
++						PARP_TIER_OUTCOME_RECLAIMED);
+ 				folio_unlock(folio);
+ 				if (folio_put_testzero(folio))
+ 					goto free_it;
+@@ -1554,6 +1558,8 @@ static unsigned int shrink_folio_list(struct list_head *folio_list,
+ 							 sc->target_mem_cgroup))
+ 			goto keep_locked;
+ 
++		parp_effective_tier_outcome(folio,
++					PARP_TIER_OUTCOME_RECLAIMED);
+ 		folio_unlock(folio);
+ free_it:
+ 		/*
+@@ -1580,6 +1586,8 @@ static unsigned int shrink_folio_list(struct list_head *folio_list,
+ 			nr_pages = 1;
+ 		}
+ activate_locked:
++		parp_effective_tier_outcome(folio,
++					PARP_TIER_OUTCOME_ACTIVATED);
+ 		/* Not a candidate for swapping, so reclaim swap space. */
+ 		if (folio_test_swapcache(folio) &&
+ 		    (mem_cgroup_swap_full(folio) || folio_test_mlocked(folio)))
+@@ -1594,6 +1602,7 @@ static unsigned int shrink_folio_list(struct list_head *folio_list,
+ keep_locked:
+ 		folio_unlock(folio);
+ keep:
++		parp_effective_tier_outcome(folio, PARP_TIER_OUTCOME_PUTBACK);
+ 		list_add(&folio->lru, &ret_folios);
+ 		VM_BUG_ON_FOLIO(folio_test_lru(folio) ||
+ 				folio_test_unevictable(folio), folio);
+@@ -3281,7 +3290,8 @@ static int folio_update_gen(struct folio *folio, int gen)
+ }
+ 
+ /* protect pages accessed multiple times through file descriptors */
+-static int folio_inc_gen(struct lruvec *lruvec, struct folio *folio, bool reclaiming)
++static int folio_inc_gen(struct lruvec *lruvec, struct folio *folio,
++		bool reclaiming, bool *moved)
+ {
+ 	int type = folio_is_file_lru(folio);
+ 	struct lru_gen_folio *lrugen = &lruvec->lrugen;
+@@ -3289,6 +3299,7 @@ static int folio_inc_gen(struct lruvec *lruvec, struct folio *folio, bool reclai
+ 	unsigned long new_flags, old_flags = READ_ONCE(folio->flags);
+ 
+ 	VM_WARN_ON_ONCE_FOLIO(!(old_flags & LRU_GEN_MASK), folio);
++	*moved = false;
+ 
+ 	do {
+ 		new_gen = ((old_flags & LRU_GEN_MASK) >> LRU_GEN_PGOFF) - 1;
+@@ -3306,10 +3317,37 @@ static int folio_inc_gen(struct lruvec *lruvec, struct folio *folio, bool reclai
+ 	} while (!try_cmpxchg(&folio->flags, &old_flags, new_flags));
+ 
+ 	lru_gen_update_size(lruvec, folio, old_gen, new_gen);
++	*moved = true;
+ 
+ 	return new_gen;
+ }
+ 
++/* Move one generation without touching native LRU_REFS or PG_workingset. */
++static bool parp_policy_inc_gen(struct lruvec *lruvec, struct folio *folio,
++		int *new_gen)
++{
++#ifdef CONFIG_PARP_EFFECTIVE_TIER
++	int type = folio_is_file_lru(folio);
++	struct lru_gen_folio *lrugen = &lruvec->lrugen;
++	int old_gen = lru_gen_from_seq(lrugen->min_seq[type]);
++	unsigned long old_flags = READ_ONCE(folio->flags);
++	unsigned long new_flags;
++	int current_gen;
++
++	current_gen = ((old_flags & LRU_GEN_MASK) >> LRU_GEN_PGOFF) - 1;
++	if (current_gen != old_gen)
++		return false;
++	*new_gen = parp_effective_tier_next_generation(old_gen);
++	new_flags = parp_effective_tier_policy_flags(old_flags, *new_gen);
++	if (cmpxchg(&folio->flags, old_flags, new_flags) != old_flags)
++		return false;
++	lru_gen_update_size(lruvec, folio, old_gen, *new_gen);
++	return true;
++#else
++	return false;
++#endif
++}
++
+ static void update_batch_size(struct lru_gen_mm_walk *walk, struct folio *folio,
+ 			      int old_gen, int new_gen)
+ {
+@@ -3496,13 +3534,16 @@ static bool suitable_to_scan(int total, int young)
+ }
+ 
+ static void walk_update_folio(struct lru_gen_mm_walk *walk, struct folio *folio,
+-			      int new_gen, bool dirty)
++			      int new_gen, bool dirty,
++			      struct folio *access_already_noted)
+ {
+ 	int old_gen;
+ 
+ 	if (!folio)
+ 		return;
+ 	parp_frontier_note_access(folio, new_gen);
++	if (folio != access_already_noted)
++		parp_effective_tier_note_access(folio, PARP_ACCESS_PTE_YOUNG);
+ 
+ 	if (dirty && !folio_test_dirty(folio) &&
+ 	    !(folio_test_anon(folio) && folio_test_swapbacked(folio) &&
+@@ -3511,8 +3552,11 @@ static void walk_update_folio(struct lru_gen_mm_walk *walk, struct folio *folio,
+ 
+ 	if (walk) {
+ 		old_gen = folio_update_gen(folio, new_gen);
+-		if (old_gen >= 0 && old_gen != new_gen)
++		if (old_gen >= 0 && old_gen != new_gen) {
+ 			update_batch_size(walk, folio, old_gen, new_gen);
++			parp_effective_tier_note_move(folio, PARP_OTHER_MOVE,
++						      new_gen);
++		}
+ 	} else if (lru_gen_set_refs(folio)) {
+ 		old_gen = folio_lru_gen(folio);
+ 		if (old_gen >= 0 && old_gen != new_gen)
+@@ -3574,7 +3618,7 @@ static bool walk_pte_range(pmd_t *pmd, unsigned long start, unsigned long end,
+ 			continue;
+ 
+ 		if (last != folio) {
+-			walk_update_folio(walk, last, gen, dirty);
++			walk_update_folio(walk, last, gen, dirty, NULL);
+ 
+ 			last = folio;
+ 			dirty = false;
+@@ -3587,7 +3631,7 @@ static bool walk_pte_range(pmd_t *pmd, unsigned long start, unsigned long end,
+ 		walk->mm_stats[MM_LEAF_YOUNG]++;
+ 	}
+ 
+-	walk_update_folio(walk, last, gen, dirty);
++	walk_update_folio(walk, last, gen, dirty, NULL);
+ 	last = NULL;
+ 
+ 	if (i < PTRS_PER_PTE && get_next_vma(PMD_MASK, PAGE_SIZE, args, &start, &end))
+@@ -3665,7 +3709,7 @@ static void walk_pmd_range_locked(pud_t *pud, unsigned long addr, struct vm_area
+ 			goto next;
+ 
+ 		if (last != folio) {
+-			walk_update_folio(walk, last, gen, dirty);
++			walk_update_folio(walk, last, gen, dirty, NULL);
+ 
+ 			last = folio;
+ 			dirty = false;
+@@ -3679,7 +3723,7 @@ static void walk_pmd_range_locked(pud_t *pud, unsigned long addr, struct vm_area
+ 		i = i > MIN_LRU_BATCH ? 0 : find_next_bit(bitmap, MIN_LRU_BATCH, i) + 1;
+ 	} while (i <= MIN_LRU_BATCH);
+ 
+-	walk_update_folio(walk, last, gen, dirty);
++	walk_update_folio(walk, last, gen, dirty, NULL);
+ 
+ 	arch_leave_lazy_mmu_mode();
+ 	spin_unlock(ptl);
+@@ -3894,6 +3938,7 @@ static bool inc_min_seq(struct lruvec *lruvec, int type, int swappiness)
+ 
+ 		while (!list_empty(head)) {
+ 			struct folio *folio = lru_to_folio(head);
++			bool moved;
+ 			int refs = folio_lru_refs(folio);
+ 			bool workingset = folio_test_workingset(folio);
+ 
+@@ -3902,7 +3947,11 @@ static bool inc_min_seq(struct lruvec *lruvec, int type, int swappiness)
+ 			VM_WARN_ON_ONCE_FOLIO(folio_is_file_lru(folio) != type, folio);
+ 			VM_WARN_ON_ONCE_FOLIO(folio_zonenum(folio) != zone, folio);
+ 
+-			new_gen = folio_inc_gen(lruvec, folio, false);
++			new_gen = folio_inc_gen(lruvec, folio, false, &moved);
++			if (moved)
++				parp_effective_tier_note_move(folio,
++						PARP_NATIVE_GENERATION_MOVE,
++						new_gen);
+ 			list_move_tail(&folio->lru, &lrugen->folios[new_gen][type][zone]);
+ 
+ 			/* don't count the workingset being lazily promoted */
+@@ -4240,6 +4289,7 @@ bool lru_gen_look_around(struct page_vma_mapped_walk *pvmw)
+ 	unsigned long addr = pvmw->address;
+ 	struct vm_area_struct *vma = pvmw->vma;
+ 	struct folio *folio = pfn_folio(pvmw->pfn);
++	struct folio *target = folio;
+ 	struct mem_cgroup *memcg = folio_memcg(folio);
+ 	struct pglist_data *pgdat = folio_pgdat(folio);
+ 	struct lruvec *lruvec = mem_cgroup_lruvec(memcg, pgdat);
+@@ -4252,6 +4302,7 @@ bool lru_gen_look_around(struct page_vma_mapped_walk *pvmw)
+ 
+ 	if (!ptep_clear_young_notify(vma, addr, pte))
+ 		return false;
++	parp_effective_tier_note_access(folio, PARP_ACCESS_PTE_YOUNG);
+ 
+ 	if (spin_is_contended(pvmw->ptl))
+ 		return true;
+@@ -4300,7 +4351,7 @@ bool lru_gen_look_around(struct page_vma_mapped_walk *pvmw)
+ 			continue;
+ 
+ 		if (last != folio) {
+-			walk_update_folio(walk, last, gen, dirty);
++			walk_update_folio(walk, last, gen, dirty, target);
+ 
+ 			last = folio;
+ 			dirty = false;
+@@ -4312,7 +4363,7 @@ bool lru_gen_look_around(struct page_vma_mapped_walk *pvmw)
+ 		young++;
+ 	}
+ 
+-	walk_update_folio(walk, last, gen, dirty);
++	walk_update_folio(walk, last, gen, dirty, target);
+ 
+ 	arch_leave_lazy_mmu_mode();
+ 
+@@ -4461,20 +4512,63 @@ void lru_gen_soft_reclaim(struct mem_cgroup *memcg, int nid)
+  *                          the eviction
+  ******************************************************************************/
+ 
+-static bool sort_folio(struct lruvec *lruvec, struct folio *folio, struct scan_control *sc,
+-		       int tier_idx)
++static void parp_tier_native_fallback(
++		struct parp_tier_decision *decision, int native_tier,
++		int tier_idx, bool special_native_protect,
++		enum parp_tier_bypass_reason bypass)
++{
++	decision->native_tier = native_tier;
++	decision->native_tier_idx = tier_idx;
++	decision->special_native_protect = special_native_protect;
++	decision->native_protect = native_tier > tier_idx;
++	decision->delta_tier_q8 = 0;
++	decision->effective_tier_q8 = native_tier * PARP_TIER_SCALE;
++	decision->effective_protect = decision->native_protect;
++	decision->actual_tier_protect = decision->native_protect ||
++		special_native_protect;
++	decision->bypass = bypass;
++	if (special_native_protect)
++		decision->action = PARP_TIER_SPECIAL_NATIVE_PROTECT;
++	else if (decision->native_protect)
++		decision->action = PARP_TIER_KEEP_PROTECT;
++	else
++		decision->action = PARP_TIER_KEEP_RECLAIM;
++}
++
++static int parp_lru_gen_from_flags(unsigned long flags)
++{
++	return ((flags & LRU_GEN_MASK) >> LRU_GEN_PGOFF) - 1;
++}
++
++static int parp_lru_refs_from_flags(unsigned long flags)
++{
++	if (!(flags & BIT(PG_referenced)))
++		return 0;
++	return ((flags & LRU_REFS_MASK) >> LRU_REFS_PGOFF) + 1;
++}
++
++static bool sort_folio(struct lruvec *lruvec, struct folio *folio,
++		       struct scan_control *sc, int tier_idx,
++		       struct parp_tier_scan_ctx *tier_ctx,
++		       struct parp_tier_decision *tier_decision)
+ {
+ 	bool success;
++	bool gen_moved;
++	bool special_native_protect;
++	bool actual_tier_protect;
+ 	bool dirty, writeback;
+-	int gen = folio_lru_gen(folio);
++	unsigned long tier_flags = READ_ONCE(folio->flags);
++	int gen = parp_lru_gen_from_flags(tier_flags);
+ 	int type = folio_is_file_lru(folio);
+ 	int zone = folio_zonenum(folio);
+ 	int delta = folio_nr_pages(folio);
+-	int refs = folio_lru_refs(folio);
+-	bool workingset = folio_test_workingset(folio);
++	int refs = parp_lru_refs_from_flags(tier_flags);
++	bool workingset = tier_flags & BIT(PG_workingset);
+ 	int tier = lru_tier_from_refs(refs, workingset);
+ 	struct lru_gen_folio *lrugen = &lruvec->lrugen;
+ 
++	tier_decision->evaluated = false;
++
+ 	VM_WARN_ON_ONCE_FOLIO(gen >= MAX_NR_GENS, folio);
+ 
+ 	/* unevictable */
+@@ -4493,13 +4587,142 @@ static bool sort_folio(struct lruvec *lruvec, struct folio *folio, struct scan_c
+ 		return true;
+ 	}
+ 
+-	/* protected */
+-	if (tier > tier_idx || refs + workingset == BIT(LRU_REFS_WIDTH) + 1) {
+-		gen = folio_inc_gen(lruvec, folio, false);
++	/* protected: only this ordinary tier boundary is model-overridable. */
++	special_native_protect =
++		refs + workingset == BIT(LRU_REFS_WIDTH) + 1;
++	parp_effective_tier_decide(tier_ctx, lruvec, folio, tier, tier_idx,
++			special_native_protect, tier_decision);
++	actual_tier_protect = tier_decision->evaluated ?
++		tier_decision->actual_tier_protect :
++		(tier > tier_idx || special_native_protect);
++	if (tier_decision->evaluated &&
++	    tier_decision->action == PARP_TIER_PREDICTIVE_DOWNGRADE &&
++	    !actual_tier_protect) {
++		unsigned long current_flags = READ_ONCE(folio->flags);
++		unsigned long decision_mask = LRU_GEN_MASK | LRU_REFS_FLAGS |
++			BIT(PG_workingset);
++
++		if (!parp_effective_tier_commit_revalidate(tier_ctx, folio,
++				tier_decision->page_state_sequence) ||
++		    (current_flags & decision_mask) !=
++		    (tier_flags & decision_mask)) {
++			parp_tier_native_fallback(tier_decision, tier, tier_idx,
++					special_native_protect,
++					PARP_TIER_BYPASS_GENERATION_RACE);
++			tier_decision->actual_tier_protect = true;
++			tier_decision->action = PARP_TIER_KEEP_PROTECT;
++			actual_tier_protect = true;
++		}
++	} else if (tier_decision->evaluated &&
++		   tier_decision->action == PARP_TIER_PREDICTIVE_UPGRADE &&
++		   actual_tier_protect) {
++		unsigned long current_flags = READ_ONCE(folio->flags);
++		unsigned long decision_mask = LRU_GEN_MASK | LRU_REFS_FLAGS |
++			BIT(PG_workingset);
++
++		if (!parp_effective_tier_commit_revalidate(tier_ctx, folio,
++				tier_decision->page_state_sequence) ||
++		    (current_flags & decision_mask) !=
++		    (tier_flags & decision_mask)) {
++			int current_gen = parp_lru_gen_from_flags(current_flags);
++			int current_refs = parp_lru_refs_from_flags(current_flags);
++			bool current_workingset =
++				current_flags & BIT(PG_workingset);
++			int current_tier = lru_tier_from_refs(current_refs,
++							 current_workingset);
++			bool current_special = current_refs + current_workingset ==
++				BIT(LRU_REFS_WIDTH) + 1;
++
++			gen = current_gen;
++			refs = current_refs;
++			workingset = current_workingset;
++			tier = current_tier;
++			special_native_protect = current_special;
++			parp_tier_native_fallback(tier_decision, current_tier,
++					tier_idx, current_special,
++					PARP_TIER_BYPASS_GENERATION_RACE);
++			if (current_gen !=
++			    lru_gen_from_seq(lrugen->min_seq[type])) {
++				tier_decision->actual_tier_protect = true;
++				tier_decision->action = PARP_TIER_KEEP_PROTECT;
++				list_move(&folio->lru,
++					  &lrugen->folios[current_gen][type][zone]);
++				parp_effective_tier_note_move(folio,
++						PARP_OTHER_MOVE, current_gen);
++				return true;
++			}
++			actual_tier_protect =
++				tier_decision->actual_tier_protect;
++		}
++	}
++	if (actual_tier_protect) {
++		bool policy_upgrade = tier_decision->evaluated &&
++			tier_decision->action == PARP_TIER_PREDICTIVE_UPGRADE &&
++			!tier_decision->native_protect &&
++			!special_native_protect;
++
++		if (policy_upgrade) {
++			if (!parp_policy_inc_gen(lruvec, folio, &gen)) {
++				unsigned long current_flags = READ_ONCE(folio->flags);
++				int raced_gen = parp_lru_gen_from_flags(current_flags);
++				int current_refs =
++					parp_lru_refs_from_flags(current_flags);
++				bool current_workingset =
++					current_flags & BIT(PG_workingset);
++				int current_tier = lru_tier_from_refs(current_refs,
++							 current_workingset);
++				bool current_special =
++					current_refs + current_workingset ==
++					BIT(LRU_REFS_WIDTH) + 1;
++
++				parp_tier_native_fallback(tier_decision,
++					current_tier, tier_idx, current_special,
++					PARP_TIER_BYPASS_GENERATION_RACE);
++				if (raced_gen >= 0 && raced_gen !=
++				    lru_gen_from_seq(lrugen->min_seq[type])) {
++					list_move(&folio->lru,
++						  &lrugen->folios[raced_gen]
++							[type][zone]);
++					parp_effective_tier_note_move(folio,
++						PARP_OTHER_MOVE, raced_gen);
++					return true;
++				}
++				if (tier_decision->actual_tier_protect) {
++					int hist;
++
++					gen = folio_inc_gen(lruvec, folio, false,
++							    &gen_moved);
++					if (gen_moved)
++						parp_effective_tier_note_move(folio,
++							PARP_NATIVE_TIER_PROMOTION,
++							gen);
++					list_move(&folio->lru,
++						  &lrugen->folios[gen][type][zone]);
++					if (!current_special) {
++						hist = lru_hist_from_seq(
++							lrugen->min_seq[type]);
++						WRITE_ONCE(
++							lrugen->protected[hist][type]
++							[current_tier],
++							lrugen->protected[hist][type]
++							[current_tier] + delta);
++					}
++					return true;
++				}
++				goto tier_not_protected;
++			}
++			parp_effective_tier_note_move(folio,
++						      PARP_POLICY_PROMOTION, gen);
++		} else {
++			gen = folio_inc_gen(lruvec, folio, false, &gen_moved);
++			if (gen_moved)
++				parp_effective_tier_note_move(folio,
++						PARP_NATIVE_TIER_PROMOTION, gen);
++		}
+ 		list_move(&folio->lru, &lrugen->folios[gen][type][zone]);
+ 
+ 		/* don't count the workingset being lazily promoted */
+-		if (refs + workingset != BIT(LRU_REFS_WIDTH) + 1) {
++		if (!policy_upgrade && !special_native_protect) {
+ 			int hist = lru_hist_from_seq(lrugen->min_seq[type]);
+ 
+ 			WRITE_ONCE(lrugen->protected[hist][type][tier],
+@@ -4507,10 +4730,14 @@ static bool sort_folio(struct lruvec *lruvec, struct folio *folio, struct scan_c
+ 		}
+ 		return true;
+ 	}
++tier_not_protected:
+ 
+ 	/* ineligible */
+ 	if (zone > sc->reclaim_idx) {
+-		gen = folio_inc_gen(lruvec, folio, false);
++		gen = folio_inc_gen(lruvec, folio, false, &gen_moved);
++		if (gen_moved)
++			parp_effective_tier_note_move(folio,
++					PARP_NATIVE_GENERATION_MOVE, gen);
+ 		list_move_tail(&folio->lru, &lrugen->folios[gen][type][zone]);
+ 		return true;
+ 	}
+@@ -4525,7 +4752,10 @@ static bool sort_folio(struct lruvec *lruvec, struct folio *folio, struct scan_c
+ 
+ 	/* waiting for writeback */
+ 	if (writeback || (type == LRU_GEN_FILE && dirty)) {
+-		gen = folio_inc_gen(lruvec, folio, true);
++		gen = folio_inc_gen(lruvec, folio, true, &gen_moved);
++		if (gen_moved)
++			parp_effective_tier_note_move(folio,
++					PARP_NATIVE_GENERATION_MOVE, gen);
+ 		list_move(&folio->lru, &lrugen->folios[gen][type][zone]);
+ 		return true;
+ 	}
+@@ -4568,10 +4798,11 @@ static bool isolate_folio(struct lruvec *lruvec, struct folio *folio, struct sca
+ 
+ static int scan_folios(unsigned long nr_to_scan, struct lruvec *lruvec,
+ 		       struct scan_control *sc, int type, int tier,
+-		       struct list_head *list)
++		       struct list_head *list, u8 *parp_run_epoch)
+ {
+ 	struct parp_reclaim_ctx parp_ctx;
+ 	struct parp_frontier_scan_ctx frontier_ctx;
++	struct parp_tier_scan_ctx tier_ctx;
+ 	int i;
+ 	int gen;
+ 	enum vm_event_item item;
+@@ -4595,6 +4826,9 @@ static int scan_folios(unsigned long nr_to_scan, struct lruvec *lruvec,
+ 			      sc->priority, sc->reclaim_idx,
+ 			      sc->nr_to_reclaim > sc->nr_reclaimed ?
+ 			      sc->nr_to_reclaim - sc->nr_reclaimed : 0);
++	parp_effective_tier_prepare(&tier_ctx, lruvec, type, sc->priority);
++	if (tier_ctx.enabled)
++		*parp_run_epoch = tier_ctx.run_epoch;
+ 
+ 	for (i = MAX_NR_ZONES; i > 0; i--) {
+ 		LIST_HEAD(moved);
+@@ -4605,6 +4839,8 @@ static int scan_folios(unsigned long nr_to_scan, struct lruvec *lruvec,
+ 		while (!list_empty(head)) {
+ 			struct folio *folio = lru_to_folio(head);
+ 			struct parp_decision parp_decision;
++			struct parp_tier_decision tier_decision = { };
++			bool sort_result;
+ 			int delta = folio_nr_pages(folio);
+ 
+ 			VM_WARN_ON_ONCE_FOLIO(folio_test_unevictable(folio), folio);
+@@ -4618,12 +4854,23 @@ static int scan_folios(unsigned long nr_to_scan, struct lruvec *lruvec,
+ 			parp_adapter_apply_decision(&parp_ctx, folio,
+ 						   &parp_decision);
+ 
+-			if (sort_folio(lruvec, folio, sc, tier))
++			sort_result = sort_folio(lruvec, folio, sc, tier,
++						 &tier_ctx, &tier_decision);
++			if (sort_result) {
+ 				sorted += delta;
+-			else {
++				parp_effective_tier_finish(&tier_ctx, lruvec, folio,
++						   &tier_decision, true,
++						   false, false);
++			} else {
++				bool isolated_folio;
++
+ 				/* Native MGLRU has declared this folio reclaimable. */
+ 				parp_frontier_consider(&frontier_ctx, lruvec, folio);
+-				if (isolate_folio(lruvec, folio, sc)) {
++				isolated_folio = isolate_folio(lruvec, folio, sc);
++				parp_effective_tier_finish(&tier_ctx, lruvec, folio,
++						   &tier_decision, false,
++						   true, isolated_folio);
++				if (isolated_folio) {
+ 					list_add(&folio->lru, list);
+ 					isolated += delta;
+ 				} else {
+@@ -4659,6 +4906,7 @@ static int scan_folios(unsigned long nr_to_scan, struct lruvec *lruvec,
+ 				type ? LRU_INACTIVE_FILE : LRU_INACTIVE_ANON);
+ 	if (type == LRU_GEN_FILE)
+ 		sc->nr.file_taken += isolated;
++	parp_effective_tier_batch_finish(&tier_ctx, isolated);
+ 	parp_adapter_finish(&parp_ctx, scanned, isolated);
+ 	/*
+ 	 * There might not be eligible folios due to reclaim_idx. Check the
+@@ -4708,7 +4956,8 @@ static int get_type_to_scan(struct lruvec *lruvec, int swappiness)
+ 
+ static int isolate_folios(unsigned long nr_to_scan, struct lruvec *lruvec,
+ 			  struct scan_control *sc, int swappiness,
+-			  int *type_scanned, struct list_head *list)
++			  int *type_scanned, struct list_head *list,
++			  u8 *parp_run_epoch)
+ {
+ 	int i;
+ 	int type = get_type_to_scan(lruvec, swappiness);
+@@ -4719,7 +4968,8 @@ static int isolate_folios(unsigned long nr_to_scan, struct lruvec *lruvec,
+ 
+ 		*type_scanned = type;
+ 
+-		scanned = scan_folios(nr_to_scan, lruvec, sc, type, tier, list);
++		scanned = scan_folios(nr_to_scan, lruvec, sc, type, tier, list,
++				      parp_run_epoch);
+ 		if (scanned)
+ 			return scanned;
+ 
+@@ -4729,9 +4979,42 @@ static int isolate_folios(unsigned long nr_to_scan, struct lruvec *lruvec,
+ 	return 0;
+ }
+ 
++static __always_inline void parp_lru_lock_irq(spinlock_t *lock,
++		struct parp_tier_lock_measurement *measurement)
++{
++#ifdef CONFIG_PREEMPT_RT
++	/* A spinlock_t may sleep on RT, so preserve the native primitive. */
++	parp_effective_tier_lock_start(measurement);
++	spin_lock_irq(lock);
++#else
++	local_irq_disable();
++	parp_effective_tier_lock_start(measurement);
++	measurement->irq_disabled_measured = true;
++	spin_lock(lock);
++#endif
++	parp_effective_tier_lock_acquired(measurement);
++}
++
++static __always_inline void parp_lru_unlock_irq(spinlock_t *lock,
++		struct parp_tier_lock_measurement *measurement)
++{
++	parp_effective_tier_lock_releasing(measurement);
++#ifdef CONFIG_PREEMPT_RT
++	spin_unlock_irq(lock);
++#else
++	spin_unlock(lock);
++	parp_effective_tier_lock_unlocked(measurement);
++	local_irq_enable();
++	return;
++#endif
++	parp_effective_tier_lock_unlocked(measurement);
++}
++
+ static int evict_folios(unsigned long nr_to_scan, struct lruvec *lruvec,
+ 			struct scan_control *sc, int swappiness)
+ {
++	struct parp_tier_lock_measurement parp_lock;
++	u8 parp_run_epoch = 0;
+ 	int type;
+ 	int scanned;
+ 	int reclaimed;
+@@ -4748,16 +5031,19 @@ static int evict_folios(unsigned long nr_to_scan, struct lruvec *lruvec,
+ 	struct mem_cgroup *memcg = lruvec_memcg(lruvec);
+ 	struct pglist_data *pgdat = lruvec_pgdat(lruvec);
+ 
+-	spin_lock_irq(&lruvec->lru_lock);
++	parp_lru_lock_irq(&lruvec->lru_lock, &parp_lock);
+ 
+-	scanned = isolate_folios(nr_to_scan, lruvec, sc, swappiness, &type, &list);
++	scanned = isolate_folios(nr_to_scan, lruvec, sc, swappiness, &type,
++				 &list, &parp_run_epoch);
+ 
+ 	scanned += try_to_inc_min_seq(lruvec, swappiness);
+ 
+ 	if (evictable_min_seq(lrugen->min_seq, swappiness) + MIN_NR_GENS > lrugen->max_seq)
+ 		scanned = 0;
+ 
+-	spin_unlock_irq(&lruvec->lru_lock);
++	parp_lru_unlock_irq(&lruvec->lru_lock, &parp_lock);
++	parp_effective_tier_lock_finish(&parp_lock,
++			PARP_TIER_LOCK_SCAN_FOLIOS, pgdat->node_id);
+ 
+ 	if (list_empty(&list))
+ 		return scanned;
+@@ -4793,8 +5079,10 @@ static int evict_folios(unsigned long nr_to_scan, struct lruvec *lruvec,
+ 			set_mask_bits(&folio->flags, LRU_REFS_FLAGS, BIT(PG_active));
+ 	}
+ 
+-	spin_lock_irq(&lruvec->lru_lock);
++	parp_lru_lock_irq(&lruvec->lru_lock, &parp_lock);
+ 	parp_frontier_feedback(lruvec, type, isolated, reclaimed);
++	parp_effective_tier_feedback(lruvec, type, parp_run_epoch, isolated,
++				     reclaimed);
+ 
+ 	move_folios_to_lru(lruvec, &list);
+ 
+@@ -4813,7 +5101,9 @@ static int evict_folios(unsigned long nr_to_scan, struct lruvec *lruvec,
+ 	count_memcg_events(memcg, item, reclaimed);
+ 	__count_vm_events(PGSTEAL_ANON + type, reclaimed);
+ 
+-	spin_unlock_irq(&lruvec->lru_lock);
++	parp_lru_unlock_irq(&lruvec->lru_lock, &parp_lock);
++	parp_effective_tier_lock_finish(&parp_lock,
++			PARP_TIER_LOCK_BATCH, pgdat->node_id);
+ 
+ 	list_splice_init(&clean, &list);
+ 
+@@ -5233,6 +5523,7 @@ static void lru_gen_change_state(bool enabled)
+ 
+ 	if (enabled == lru_gen_enabled())
+ 		goto unlock;
++	parp_effective_tier_mglru_state_change();
+ 
+ 	if (enabled)
+ 		static_branch_enable_cpuslocked(&lru_gen_caps[LRU_GEN_CORE]);
+-- 
+2.25.1
+

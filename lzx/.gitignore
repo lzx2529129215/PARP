@@ -26,12 +26,12 @@ v4.1-parp/outputs/
 /MGLRU-test/
 
 # PARP local kernel workspaces: track portable patches/configuration only.  #lzx
-v4-parp/build/
-v4-parp/outputs/
-v4-parp/upstream/
-v4-parp/work/
-v4-parp/.output_dir
-v4-parp/.phase25_output
-v4-parp/.phase26_output
-v4-parp/.phase2_output
-v4-parp/.task_timestamp
+kernel/v4-parp/build/
+kernel/v4-parp/outputs/
+kernel/v4-parp/upstream/
+kernel/v4-parp/work/
+kernel/v4-parp/.output_dir
+kernel/v4-parp/.phase25_output
+kernel/v4-parp/.phase26_output
+kernel/v4-parp/.phase2_output
+kernel/v4-parp/.task_timestamp

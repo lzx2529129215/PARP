@@ -1,0 +1,1219 @@
+From 244c28a9a1b05ab130017dbfcf963d97cfc90c0b Mon Sep 17 00:00:00 2001
+From: Codex PARP Reproduction <codex@localhost>
+Date: Sat, 1 Aug 2026 01:21:36 +0800
+Subject: [PATCH 021/124] tools: add guarded Phase 2.6 live validation workflow
+
+---
+ tools/parp/phase26/_common.sh                 | 146 +++++++++++++++++
+ tools/parp/phase26/phase26_apply_guarded.sh   | 118 +++++++++++++
+ tools/parp/phase26/phase26_build.sh           |  36 ++++
+ tools/parp/phase26/phase26_collect_metrics.sh |  28 ++++
+ tools/parp/phase26/phase26_install.sh         |  38 +++++
+ tools/parp/phase26/phase26_level3a_observe.sh | 155 ++++++++++++++++++
+ tools/parp/phase26/phase26_level3b_observe.sh |  26 +++
+ .../parp/phase26/phase26_mount_interfaces.sh  |  13 ++
+ tools/parp/phase26/phase26_package.sh         |  28 ++++
+ tools/parp/phase26/phase26_postboot.sh        |  28 ++++
+ tools/parp/phase26/phase26_preflight.sh       |  21 +++
+ tools/parp/phase26/phase26_restore_observe.sh |  16 ++
+ tools/parp/phase26/phase26_resume.sh          |  19 +++
+ tools/parp/phase26/phase26_rollback.sh        |  20 +++
+ tools/parp/phase26/phase26_select_boot.sh     |  18 ++
+ tools/parp/phase26/state_tool.py              |  69 ++++++++
+ tools/parp/phase26_memory_workload.py         | 119 ++++++++++++++
+ tools/parp/phase26_prior_submit.py            |  58 +++++++
+ tools/parp/tests/test_phase26_tools.py        | 100 +++++++++++
+ 19 files changed, 1056 insertions(+)
+ create mode 100755 tools/parp/phase26/_common.sh
+ create mode 100755 tools/parp/phase26/phase26_apply_guarded.sh
+ create mode 100755 tools/parp/phase26/phase26_build.sh
+ create mode 100755 tools/parp/phase26/phase26_collect_metrics.sh
+ create mode 100755 tools/parp/phase26/phase26_install.sh
+ create mode 100755 tools/parp/phase26/phase26_level3a_observe.sh
+ create mode 100755 tools/parp/phase26/phase26_level3b_observe.sh
+ create mode 100755 tools/parp/phase26/phase26_mount_interfaces.sh
+ create mode 100755 tools/parp/phase26/phase26_package.sh
+ create mode 100755 tools/parp/phase26/phase26_postboot.sh
+ create mode 100755 tools/parp/phase26/phase26_preflight.sh
+ create mode 100755 tools/parp/phase26/phase26_restore_observe.sh
+ create mode 100755 tools/parp/phase26/phase26_resume.sh
+ create mode 100755 tools/parp/phase26/phase26_rollback.sh
+ create mode 100755 tools/parp/phase26/phase26_select_boot.sh
+ create mode 100755 tools/parp/phase26/state_tool.py
+ create mode 100755 tools/parp/phase26_memory_workload.py
+ create mode 100755 tools/parp/phase26_prior_submit.py
+ create mode 100644 tools/parp/tests/test_phase26_tools.py
+
+diff --git a/tools/parp/phase26/_common.sh b/tools/parp/phase26/_common.sh
+new file mode 100755
+index 000000000..c5fac7d5c
+--- /dev/null
++++ b/tools/parp/phase26/_common.sh
+@@ -0,0 +1,146 @@
++#!/usr/bin/env bash
++# SPDX-License-Identifier: GPL-2.0
++set -euo pipefail
++
++PHASE26_SCRIPT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
++PHASE26_WORK_TREE=$(cd "$PHASE26_SCRIPT_DIR/../../.." && pwd)
++PHASE26_PROJECT_ROOT=$(cd "$PHASE26_WORK_TREE/../../../.." && pwd)
++PHASE26_DRY_RUN=0
++PHASE26_OUTPUT_ROOT=""
++PHASE26_EXTRA_ARGS=()
++
++phase26_init()
++{
++	while (($#)); do
++		case "$1" in
++		--dry-run)
++			PHASE26_DRY_RUN=1
++			shift
++			;;
++		--output-root)
++			test $# -ge 2 || { echo "--output-root requires a path" >&2; return 2; }
++			PHASE26_OUTPUT_ROOT=$2
++			shift 2
++			;;
++		--)
++			shift
++			PHASE26_EXTRA_ARGS+=("$@")
++			break
++			;;
++		*)
++			PHASE26_EXTRA_ARGS+=("$1")
++			shift
++			;;
++		esac
++	done
++	if [[ -z "$PHASE26_OUTPUT_ROOT" ]]; then
++		PHASE26_OUTPUT_ROOT=$(readlink -f \
++			"$PHASE26_PROJECT_ROOT/outputs/parp_live_validation_current")
++	fi
++	test -d "$PHASE26_OUTPUT_ROOT/state" || {
++		echo "invalid Phase 2.6 output root: $PHASE26_OUTPUT_ROOT" >&2
++		return 2
++	}
++	PHASE26_STATE="$PHASE26_OUTPUT_ROOT/state/phase26_state.json"
++	PHASE26_LOG_DIR="$PHASE26_OUTPUT_ROOT/command_logs"
++	mkdir -p "$PHASE26_LOG_DIR"
++	PHASE26_LOG="$PHASE26_LOG_DIR/$(basename "$0" .sh).log"
++	printf '%s START script=%s dry_run=%s output=%s\n' \
++		"$(date --iso-8601=seconds)" "$0" "$PHASE26_DRY_RUN" \
++		"$PHASE26_OUTPUT_ROOT" >>"$PHASE26_LOG"
++}
++
++phase26_log()
++{
++	printf '%s %s\n' "$(date --iso-8601=seconds)" "$*" | tee -a "$PHASE26_LOG"
++}
++
++phase26_run()
++{
++	local rc
++	local rendered
++	printf -v rendered '%q ' "$@"
++	phase26_log "RUN ${rendered% }"
++	if ((PHASE26_DRY_RUN)); then
++		phase26_log "DRY_RUN rc=0"
++		return 0
++	fi
++	set +e
++	"$@" >>"$PHASE26_LOG" 2>&1
++	rc=$?
++	set -e
++	phase26_log "EXIT rc=$rc"
++	return "$rc"
++}
++
++phase26_run_root()
++{
++	if ((PHASE26_DRY_RUN)); then
++		phase26_run sudo "$@"
++		return
++	fi
++	if [[ ! -t 0 ]]; then
++		phase26_log "SUDO_INTERACTIVE_REQUIRED command=$*"
++		return 77
++	fi
++	phase26_run sudo "$@"
++}
++
++phase26_read_root()
++{
++	local path=$1
++	local value rc
++	if ((PHASE26_DRY_RUN)); then
++		printf 'DRY_RUN'
++		return 0
++	fi
++	if [[ ! -t 0 ]]; then
++		printf '%s SUDO_INTERACTIVE_REQUIRED command=cat %q\n' \
++			"$(date --iso-8601=seconds)" "$path" >>"$PHASE26_LOG"
++		return 77
++	fi
++	printf '%s RUN sudo cat %q\n' "$(date --iso-8601=seconds)" \
++		"$path" >>"$PHASE26_LOG"
++	set +e
++	value=$(sudo cat "$path")
++	rc=$?
++	set -e
++	printf '%s EXIT rc=%s\n' "$(date --iso-8601=seconds)" "$rc" \
++		>>"$PHASE26_LOG"
++	((rc == 0)) || return "$rc"
++	printf '%s' "$value"
++}
++
++phase26_state_get()
++{
++	python3 "$PHASE26_SCRIPT_DIR/state_tool.py" get "$PHASE26_STATE" "$1"
++}
++
++phase26_state_set()
++{
++	python3 "$PHASE26_SCRIPT_DIR/state_tool.py" set "$PHASE26_STATE" "$1" "$2"
++}
++
++phase26_require_snapshot_marker()
++{
++	local user_home
++	user_home=$(getent passwd "$(id -u)" | cut -d: -f6)
++	test -f "$user_home/PARP_VMWARE_SNAPSHOT_CONFIRMED" || {
++		phase26_log "BLOCKED_VMWARE_SNAPSHOT_CONFIRMATION"
++		return 78
++	}
++}
++
++phase26_require_observe()
++{
++	local parp_dir=${1:-/sys/kernel/debug/parp}
++	((PHASE26_DRY_RUN)) && return 0
++	test "$(phase26_read_root "$parp_dir/scan_budget_mode")" = 1
++	test "$(phase26_read_root "$parp_dir/mode")" = 1
++	test "$(phase26_read_root "$parp_dir/evidence_mode")" = 0
++}
++
++phase26_finish()
++{
++	phase26_log "DONE"
++}
+diff --git a/tools/parp/phase26/phase26_apply_guarded.sh b/tools/parp/phase26/phase26_apply_guarded.sh
+new file mode 100755
+index 000000000..1e5cea7bd
+--- /dev/null
++++ b/tools/parp/phase26/phase26_apply_guarded.sh
+@@ -0,0 +1,118 @@
++#!/usr/bin/env bash
++# SPDX-License-Identifier: GPL-2.0
++set -euo pipefail
++source "$(dirname "$0")/_common.sh"
++phase26_init "$@"
++
++parp_dir=/sys/kernel/debug/parp
++trace_root=/sys/kernel/tracing
++cgroup=${PHASE26_SYNTHETIC_CGROUP:-/sys/fs/cgroup/huawei-test.slice/parp-phase26-synthetic.scope}
++[[ $cgroup = */parp-phase26-synthetic.scope ]]
++test -e "$cgroup/memory.reclaim"
++test "$(phase26_read_root "$parp_dir/scan_budget_mode")" = 1
++test "$(phase26_read_root "$parp_dir/scan_budget_apply_domain")" = 0
++test "$(phase26_read_root "$parp_dir/mode")" = 1
++test "$(phase26_read_root "$parp_dir/evidence_mode")" = 0
++python3 -c 'import json,sys; d=json.load(open(sys.argv[1])); assert d["status"] in ("PASS","APPLY_ALLOWED_FROM_LEVEL3A_ONLY")' \
++	"$PHASE26_OUTPUT_ROOT/validation/observe_gate.json"
++memory_max=$(<"$cgroup/memory.max")
++[[ $memory_max != max ]]
++domain_id=$(stat -c %i "$cgroup")
++mkdir -p "$PHASE26_OUTPUT_ROOT"/{apply,traces,metrics,validation}
++apply_trace="$PHASE26_OUTPUT_ROOT/traces/controlled_apply.raw"
++watchdog=""
++apply_armed=0
++
++restore()
++{
++	local rc=$?
++	sudo -n sh -c "printf '1\\n' > '$parp_dir/scan_budget_mode'" || true
++	sudo -n sh -c "printf '0\\n' > '$parp_dir/scan_budget_apply_domain'" || true
++	sudo -n sh -c "printf '0\\n' > '$trace_root/tracing_on'" || true
++	if [[ -n $watchdog ]]; then
++		kill "$watchdog" 2>/dev/null || true
++		wait "$watchdog" 2>/dev/null || true
++	fi
++	sudo -n install -m 0644 "$trace_root/trace" "$apply_trace" 2>/dev/null || true
++	phase26_state_set observe_restored true || true
++	if ((rc != 0 && apply_armed)); then
++		phase26_state_set apply_status '"CONTROLLED_APPLY_ABORTED_SAFE_RESTORE"' || true
++	fi
++	return "$rc"
++}
++trap restore EXIT INT TERM
++
++phase26_run_root true
++oom_before=$(awk '/^oom_kill / {print $2}' /proc/vmstat)
++swap_before=$(awk '/^SwapTotal:/ {t=$2} /^SwapFree:/ {f=$2} END {print (t-f)*1024}' /proc/meminfo)
++memcg_oom_before=$(awk '/^oom / {print $2}' "$cgroup/memory.events")
++phase26_run_root sh -c "dmesg > '$PHASE26_OUTPUT_ROOT/apply/dmesg_before.txt'"
++phase26_run_root sh -c \
++	": > '$trace_root/trace'; printf '1\\n' > '$trace_root/events/parp/parp_scan_budget_decision/enable'; printf '1\\n' > '$trace_root/tracing_on'"
++
++# App 9003 is the non-foreground medium prior (the conservative 0.80 case).
++phase26_run_root env PYTHONPATH="$PHASE26_WORK_TREE/tools/parp" python3 \
++	"$PHASE26_WORK_TREE/tools/parp/phase26_prior_submit.py" --count 1
++phase26_run_root sh -c \
++	"printf '%s 9003 120000 1 9\\n' '$domain_id' > '$parp_dir/app_bind'"
++
++sudo -n sh -c "sleep 60; printf '1\\n' > '$parp_dir/scan_budget_mode'; printf '0\\n' > '$parp_dir/scan_budget_apply_domain'" &
++watchdog=$!
++phase26_run_root sh -c "printf '%s\\n' '$domain_id' > '$parp_dir/scan_budget_apply_domain'"
++phase26_run_root sh -c "printf '2\\n' > '$parp_dir/scan_budget_mode'"
++test "$(phase26_read_root "$parp_dir/scan_budget_mode")" = 2
++test "$(phase26_read_root "$parp_dir/scan_budget_apply_domain")" = "$domain_id"
++apply_armed=1
++phase26_state_set observe_restored false
++phase26_state_set apply_status '"RUNNING_SYNTHETIC_ONLY"'
++
++for iteration in $(seq 1 20); do
++	kill -0 "$watchdog" 2>/dev/null || { phase26_log "ABORT watchdog exited"; exit 90; }
++	available=$(awk '/^MemAvailable:/ {print $2 * 1024}' /proc/meminfo)
++	total=$(awk '/^MemTotal:/ {print $2 * 1024}' /proc/meminfo)
++	((available * 100 >= total * 15)) || { phase26_log "ABORT MemAvailable below 15%"; exit 90; }
++	current=$(<"$cgroup/memory.current")
++	((current * 100 < memory_max * 95)) || { phase26_log "ABORT memory.current reached 95%"; exit 90; }
++	oom_now=$(awk '/^oom_kill / {print $2}' /proc/vmstat)
++	memcg_oom_now=$(awk '/^oom / {print $2}' "$cgroup/memory.events")
++	((oom_now == oom_before && memcg_oom_now == memcg_oom_before)) || { phase26_log "ABORT OOM delta"; exit 90; }
++	swap_now=$(awk '/^SwapTotal:/ {t=$2} /^SwapFree:/ {f=$2} END {print (t-f)*1024}' /proc/meminfo)
++	((swap_now - swap_before <= 268435456)) || { phase26_log "ABORT swap growth above 256MiB"; exit 90; }
++	psi_full=$(awk '/^full/ {for (i=1;i<=NF;i++) if ($i ~ /^avg10=/) {split($i,a,"="); print a[2]}}' /proc/pressure/memory)
++	awk -v value="$psi_full" 'BEGIN {exit !(value <= 5.0)}' || { phase26_log "ABORT memory PSI full avg10 above 5%"; exit 90; }
++	phase26_run_root sh -c "printf '4M\\n' > '$cgroup/memory.reclaim'"
++	sleep 2
++	phase26_run_root install -m 0644 "$trace_root/trace" "$apply_trace"
++	if awk -v wanted="$domain_id" '
++		/parp_scan_budget_decision:/ {
++			delete f; for (i=1;i<=NF;i++) {split($i,p,"="); f[p[1]]=p[2]}
++			if (f["mode"] == 2 && f["domain"] != wanted && f["applied_units"] != f["native_units"]) bad=1
++			if (f["mode"] == 2 && f["scope"] != 3 && f["applied_units"] != f["native_units"]) bad=1
++		} END {exit !bad}' "$apply_trace"; then
++		phase26_log "ABORT Apply escaped synthetic target"
++		exit 90
++	fi
++	decisions=$(awk -v wanted="$domain_id" '
++		/parp_scan_budget_decision:/ {delete f; for(i=1;i<=NF;i++){split($i,p,"=");f[p[1]]=p[2]} if(f["mode"]==2 && f["domain"]==wanted) n++} END{print n+0}' "$apply_trace")
++	((decisions < 20)) || break
++done
++
++phase26_run_root sh -c "printf '1\\n' > '$parp_dir/scan_budget_mode'"
++phase26_run_root sh -c "printf '0\\n' > '$parp_dir/scan_budget_apply_domain'"
++apply_armed=0
++kill "$watchdog" 2>/dev/null || true
++wait "$watchdog" 2>/dev/null || true
++watchdog=""
++phase26_require_observe "$parp_dir"
++test "$(phase26_read_root "$parp_dir/scan_budget_apply_domain")" = 0
++phase26_run_root sh -c "dmesg > '$PHASE26_OUTPUT_ROOT/apply/dmesg_after.txt'"
++phase26_run_root install -m 0644 "$trace_root/trace" "$apply_trace"
++awk -v wanted="$domain_id" '
++	/parp_scan_budget_decision:/ {delete f; for(i=1;i<=NF;i++){split($i,p,"=");f[p[1]]=p[2]}
++	 if(f["mode"]==2 && f["domain"]==wanted && f["applied_units"]==f["proposed_units"] && f["proposed_units"]<f["native_units"]) ok=1}
++	END {exit !ok}' "$apply_trace" || { phase26_log "APPLY_EFFECT_NOT_OBSERVED"; exit 91; }
++phase26_state_set observe_restored true
++phase26_state_set apply_status '"COMPLETED_PENDING_ANALYSIS"'
++trap - EXIT INT TERM
++restore
++phase26_finish
+diff --git a/tools/parp/phase26/phase26_build.sh b/tools/parp/phase26/phase26_build.sh
+new file mode 100755
+index 000000000..c1d1c14e8
+--- /dev/null
++++ b/tools/parp/phase26/phase26_build.sh
+@@ -0,0 +1,36 @@
++#!/usr/bin/env bash
++# SPDX-License-Identifier: GPL-2.0
++set -euo pipefail
++source "$(dirname "$0")/_common.sh"
++phase26_init "$@"
++
++build_dir=$(phase26_state_get build_dir)
++mkdir -p "$build_dir"
++if [[ ! -f "$build_dir/.config" ]]; then
++	phase25_config="$PHASE26_PROJECT_ROOT/MGLRU-test/v4-parp/build/phase25-observe/.config"
++	test -r "$phase25_config"
++	phase26_run cp "$phase25_config" "$build_dir/.config"
++	phase26_run "$PHASE26_WORK_TREE/scripts/config" --file "$build_dir/.config" \
++		-e PARP -e MEMCG -e CGROUPS -e LRU_GEN -e LRU_GEN_ENABLED \
++		-e DAMON -e DAMON_VADDR -e DAMON_SYSFS -e PARP_DAMON_ALIGNMENT \
++		-e DEBUG_FS -e TRACING -e TRACEPOINTS -e FTRACE -e SWAP \
++		--set-str SYSTEM_TRUSTED_KEYS "" \
++		--set-str SYSTEM_REVOCATION_KEYS "" \
++		-d LOCALVERSION_AUTO --set-str LOCALVERSION -parp-v4-phase26-observe
++	phase26_run make -C "$PHASE26_WORK_TREE" O="$build_dir" olddefconfig
++fi
++for symbol in PARP MEMCG CGROUPS LRU_GEN DAMON DAMON_VADDR DAMON_SYSFS \
++		DEBUG_FS TRACING TRACEPOINTS FTRACE SWAP; do
++	grep -q "^CONFIG_${symbol}=y" "$build_dir/.config"
++done
++grep -q '^CONFIG_SYSTEM_TRUSTED_KEYS=""$' "$build_dir/.config"
++if grep -q '^CONFIG_SYSTEM_REVOCATION_KEYS=' "$build_dir/.config"; then
++	grep -q '^CONFIG_SYSTEM_REVOCATION_KEYS=""$' "$build_dir/.config"
++fi
++! grep -q 'debian/canonical-.*certs.pem' "$build_dir/.config"
++phase26_run make -C "$PHASE26_WORK_TREE" O="$build_dir" -j"$(nproc)" bzImage modules
++release=$(make -s -C "$PHASE26_WORK_TREE" O="$build_dir" kernelrelease)
++test "$release" = 6.17.13-parp-v4-phase26-observe
++phase26_state_set target_kernel_release "\"$release\""
++phase26_state_set source_head "\"$(git -C "$PHASE26_WORK_TREE" rev-parse HEAD)\""
++phase26_finish
+diff --git a/tools/parp/phase26/phase26_collect_metrics.sh b/tools/parp/phase26/phase26_collect_metrics.sh
+new file mode 100755
+index 000000000..498471373
+--- /dev/null
++++ b/tools/parp/phase26/phase26_collect_metrics.sh
+@@ -0,0 +1,28 @@
++#!/usr/bin/env bash
++# SPDX-License-Identifier: GPL-2.0
++set -euo pipefail
++source "$(dirname "$0")/_common.sh"
++phase26_init "$@"
++
++duration=${PHASE26_METRICS_DURATION:-60}
++interval=${PHASE26_METRICS_INTERVAL:-2}
++[[ $duration =~ ^[0-9]+$ ]] && [[ $interval =~ ^[0-9]+$ ]]
++((duration <= 600 && interval >= 1))
++mkdir -p "$PHASE26_OUTPUT_ROOT/metrics"
++end=$((SECONDS + duration))
++while ((SECONDS < end)); do
++	now=$(date --iso-8601=seconds)
++	awk -v now="$now" '/^(MemTotal|MemAvailable|SwapTotal|SwapFree):/ {printf "%s,%s,%s\n",now,$1,$2}' \
++		/proc/meminfo >>"$PHASE26_OUTPUT_ROOT/metrics/meminfo.csv"
++	awk -v now="$now" '/^(SwapTotal|SwapFree):/ {printf "%s,%s,%s\n",now,$1,$2}' \
++		/proc/meminfo >>"$PHASE26_OUTPUT_ROOT/metrics/swap.csv"
++	awk -v now="$now" '{print now "," $0}' /proc/pressure/memory \
++		>>"$PHASE26_OUTPUT_ROOT/metrics/memory_psi.csv"
++	awk -v now="$now" '{print now "," $0}' /proc/loadavg \
++		>>"$PHASE26_OUTPUT_ROOT/metrics/load.csv"
++	awk -v now="$now" '/^(pgscan|pgsteal|pswp|oom_kill)/ {print now "," $1 "," $2}' \
++		/proc/vmstat >>"$PHASE26_OUTPUT_ROOT/metrics/vmstat.csv"
++	if ((PHASE26_DRY_RUN)); then break; fi
++	sleep "$interval"
++done
++phase26_finish
+diff --git a/tools/parp/phase26/phase26_install.sh b/tools/parp/phase26/phase26_install.sh
+new file mode 100755
+index 000000000..16cb67bc0
+--- /dev/null
++++ b/tools/parp/phase26/phase26_install.sh
+@@ -0,0 +1,38 @@
++#!/usr/bin/env bash
++# SPDX-License-Identifier: GPL-2.0
++set -euo pipefail
++source "$(dirname "$0")/_common.sh"
++phase26_init "$@"
++phase26_require_snapshot_marker
++
++release=$(phase26_state_get target_kernel_release)
++build_dir=$(phase26_state_get build_dir)
++test -n "$release"
++test "$(sha256sum "$build_dir/arch/x86/boot/bzImage" | cut -d' ' -f1)" = \
++	"$(phase26_state_get file_hashes.bzImage)"
++test -e /boot/vmlinuz-5.15.0-136-generic
++phase26_run df -h / /boot /boot/efi
++
++if compgen -G "$PHASE26_OUTPUT_ROOT/packages/*.deb" >/dev/null; then
++	mapfile -t packages < <(find "$PHASE26_OUTPUT_ROOT/packages" -maxdepth 1 \
++		-type f -name '*.deb' -print | sort)
++	phase26_run_root dpkg -i "${packages[@]}"
++else
++	stage="$PHASE26_OUTPUT_ROOT/packages/staged-root"
++	test -d "$stage/lib/modules/$release"
++	phase26_run_root cp -a "$stage/lib/modules/$release" /lib/modules/
++	for name in vmlinuz System.map config; do
++		phase26_run_root install -m 0644 "$stage/boot/$name-$release" "/boot/$name-$release"
++	done
++	phase26_run_root depmod -a "$release"
++fi
++phase26_run_root update-initramfs -c -k "$release"
++phase26_run_root update-grub
++test -e "/boot/vmlinuz-$release"
++test -e "/boot/initrd.img-$release"
++test -d "/lib/modules/$release"
++test -e /boot/vmlinuz-5.15.0-136-generic
++phase26_state_set install_status '"INSTALLED"'
++phase26_state_set grub_status '"UPDATED_DEFAULT_UNCHANGED"'
++phase26_state_set preboot_complete true
++phase26_finish
+diff --git a/tools/parp/phase26/phase26_level3a_observe.sh b/tools/parp/phase26/phase26_level3a_observe.sh
+new file mode 100755
+index 000000000..130c2aeca
+--- /dev/null
++++ b/tools/parp/phase26/phase26_level3a_observe.sh
+@@ -0,0 +1,155 @@
++#!/usr/bin/env bash
++# SPDX-License-Identifier: GPL-2.0
++set -euo pipefail
++source "$(dirname "$0")/_common.sh"
++phase26_init "$@"
++
++release=$(phase26_state_get target_kernel_release)
++[[ $(uname -r) = "$release" ]] || { phase26_log "TARGET_KERNEL_NOT_BOOTED"; exit 79; }
++duration=${PHASE26_LEVEL3A_DURATION:-180}
++[[ $duration =~ ^[0-9]+$ ]] && ((duration >= 180 && duration <= 600))
++parp_dir=/sys/kernel/debug/parp
++trace_root=/sys/kernel/tracing
++damon_admin=/sys/kernel/mm/damon/admin
++test -d "$parp_dir" && test -d "$trace_root/events/parp"
++test -d "$damon_admin"
++"$PHASE26_SCRIPT_DIR/phase26_restore_observe.sh" --output-root "$PHASE26_OUTPUT_ROOT"
++phase26_run_root true
++
++mkdir -p "$PHASE26_OUTPUT_ROOT"/{level3a,traces,damon,lstm,cgroup,metrics,validation}
++cgroup=/sys/fs/cgroup/huawei-test.slice/parp-phase26-synthetic.scope
++workload_pid=""
++metrics_pid=""
++damon_started=0
++cgroup_created=0
++
++cleanup()
++{
++	local rc=$?
++	[[ -z $workload_pid ]] || kill "$workload_pid" 2>/dev/null || true
++	[[ -z $metrics_pid ]] || kill "$metrics_pid" 2>/dev/null || true
++	[[ -z $workload_pid ]] || wait "$workload_pid" 2>/dev/null || true
++	[[ -z $metrics_pid ]] || wait "$metrics_pid" 2>/dev/null || true
++	if ((damon_started)); then
++		sudo -n sh -c "printf 'off\\n' > '$damon_admin/kdamonds/0/state'" || true
++	fi
++	sudo -n sh -c "printf '0\\n' > '$trace_root/tracing_on'" || true
++	sudo -n install -m 0644 "$trace_root/trace" \
++		"$PHASE26_OUTPUT_ROOT/traces/level3a_trace.raw" || true
++	sudo -n sh -c "printf '0\\n' > '$trace_root/events/parp/enable'" || true
++	if [[ -e $trace_root/events/damon/damon_aggregated/enable ]]; then
++		sudo -n sh -c "printf '0\\n' > '$trace_root/events/damon/damon_aggregated/enable'" || true
++	fi
++	if ((cgroup_created)); then
++		sudo -n rmdir "$cgroup" 2>/dev/null || true
++		sudo -n rmdir "$(dirname "$cgroup")" 2>/dev/null || true
++	fi
++	sudo -n sh -c "printf '1\\n' > '$parp_dir/scan_budget_mode'; printf '0\\n' > '$parp_dir/scan_budget_apply_domain'; printf '1\\n' > '$parp_dir/mode'; printf '0\\n' > '$parp_dir/evidence_mode'" || true
++	phase26_state_set observe_restored true || true
++	return "$rc"
++}
++trap cleanup EXIT INT TERM
++
++state_file="$damon_admin/kdamonds/0/state"
++if [[ -e $state_file && $(phase26_read_root "$state_file") != off ]]; then
++	phase26_log "DAMON_CONTEXT_BUSY"
++	exit 82
++fi
++phase26_run_root sh -c \
++	"printf '1\\n' > '$damon_admin/kdamonds/nr_kdamonds'; \
++	 printf '1\\n' > '$damon_admin/kdamonds/0/contexts/nr_contexts'; \
++	 printf 'vaddr\\n' > '$damon_admin/kdamonds/0/contexts/0/operations'; \
++	 printf '1\\n' > '$damon_admin/kdamonds/0/contexts/0/targets/nr_targets'"
++
++mem_total=$(awk '/^MemTotal:/ {print $2 * 1024}' /proc/meminfo)
++memory_max=$((mem_total * 15 / 100))
++((memory_max > 1073741824)) && memory_max=1073741824
++workload_bytes=$((mem_total / 10))
++((workload_bytes > 536870912)) && workload_bytes=536870912
++limit70=$((memory_max * 70 / 100))
++((workload_bytes > limit70)) && workload_bytes=$limit70
++workload_mib=$((workload_bytes / 1048576))
++
++phase26_log "RUN phase26_memory_workload.py total_mib=$workload_mib duration=$((duration + 30))"
++python3 "$PHASE26_WORK_TREE/tools/parp/phase26_memory_workload.py" \
++	--total-mib "$workload_mib" --duration "$((duration + 30))" \
++	>"$PHASE26_OUTPUT_ROOT/level3a/workload.jsonl" 2>&1 &
++workload_pid=$!
++PHASE26_METRICS_DURATION=$duration "$PHASE26_SCRIPT_DIR/phase26_collect_metrics.sh" \
++	--output-root "$PHASE26_OUTPUT_ROOT" &
++metrics_pid=$!
++
++phase26_run_root sh -c \
++	"printf '%s\\n' '$workload_pid' > '$damon_admin/kdamonds/0/contexts/0/targets/0/pid_target'; \
++	 : > '$trace_root/trace'; printf '16384\\n' > '$trace_root/buffer_size_kb'; \
++	 printf '1\\n' > '$trace_root/events/parp/enable'; \
++	 if test -e '$trace_root/events/damon/damon_aggregated/enable'; then printf '1\\n' > '$trace_root/events/damon/damon_aggregated/enable'; fi; \
++	 printf '1\\n' > '$trace_root/tracing_on'; \
++	 printf 'on\\n' > '$damon_admin/kdamonds/0/state'"
++damon_started=1
++
++cgroup2=0
++if [[ $(stat -fc %T /sys/fs/cgroup) = cgroup2fs && \
++		-e /sys/fs/cgroup/memory.reclaim ]]; then
++	cgroup2=1
++	phase26_run_root mkdir -p "$cgroup"
++	cgroup_created=1
++	phase26_run_root sh -c \
++		"printf '%s\\n' '$memory_max' > '$cgroup/memory.max'; printf '%s\\n' '$workload_pid' > '$cgroup/cgroup.procs'"
++	domain_id=$(stat -c %i "$cgroup")
++	phase26_run_root env PYTHONPATH="$PHASE26_WORK_TREE/tools/parp" python3 \
++		"$PHASE26_WORK_TREE/tools/parp/phase26_prior_submit.py" --count 5
++	phase26_state_set level3a_observe_status '"RUNNING_OBSERVE_COLLECTION"'
++	phase26_log "domain_id=$domain_id workload_pid=$workload_pid memory_max=$memory_max"
++else
++	phase26_state_set level3a_observe_status '"LEVEL3A_TARGET_MEMCG_RECLAIM_GATED_CGROUP_MODE"'
++	phase26_log "LEVEL3A_TARGET_MEMCG_RECLAIM_GATED_CGROUP_MODE; continuing raw DAMON collection"
++fi
++
++start=$SECONDS
++decision=0
++apps=(9001 9002 9003 9004)
++while ((SECONDS - start < duration)); do
++	if ((cgroup2)); then
++		app=${apps[decision % ${#apps[@]}]}
++		phase26_run_root sh -c \
++			"printf '%s %s 600000 %s 9\\n' '$domain_id' '$app' '$((decision + 1))' > '$parp_dir/app_bind'"
++		if ((decision > 0 && decision % 5 == 0)); then
++			phase26_run_root env PYTHONPATH="$PHASE26_WORK_TREE/tools/parp" python3 \
++				"$PHASE26_WORK_TREE/tools/parp/phase26_prior_submit.py" --count 1
++		fi
++		phase26_run_root sh -c "printf '4M\\n' > '$cgroup/memory.reclaim'"
++		printf '{"source":"RUNTIME_LEVEL3A","decision":%d,"app_id":%d,"domain_id":%d,"wall_time":"%s"}\n' \
++			"$decision" "$app" "$domain_id" "$(date --iso-8601=seconds)" \
++			>>"$PHASE26_OUTPUT_ROOT/cgroup/memory_reclaim_log.jsonl"
++		decision=$((decision + 1))
++	fi
++	sleep 5
++done
++
++kill "$workload_pid" 2>/dev/null || true
++wait "$workload_pid" 2>/dev/null || true
++workload_pid=""
++wait "$metrics_pid" 2>/dev/null || true
++metrics_pid=""
++phase26_run_root sh -c "printf 'off\\n' > '$damon_admin/kdamonds/0/state'; printf '0\\n' > '$trace_root/tracing_on'"
++damon_started=0
++phase26_run_root install -m 0644 "$trace_root/trace" \
++	"$PHASE26_OUTPUT_ROOT/traces/level3a_trace.raw"
++python3 "$PHASE26_WORK_TREE/tools/parp/damon_collect.py" \
++	--decode-trace "$PHASE26_OUTPUT_ROOT/traces/level3a_trace.raw" \
++	--output "$PHASE26_OUTPUT_ROOT/damon/raw_regions.jsonl" \
++	>"$PHASE26_OUTPUT_ROOT/damon/decode_summary.json"
++grep 'parp_scan_budget_decision:' "$PHASE26_OUTPUT_ROOT/traces/level3a_trace.raw" \
++	>"$PHASE26_OUTPUT_ROOT/traces/parp_scan_budget.raw" || true
++grep 'parp_region_evidence:' "$PHASE26_OUTPUT_ROOT/traces/level3a_trace.raw" \
++	>"$PHASE26_OUTPUT_ROOT/traces/parp_damon.raw" || true
++grep 'damon_aggregated:' "$PHASE26_OUTPUT_ROOT/traces/level3a_trace.raw" \
++	>"$PHASE26_OUTPUT_ROOT/traces/reclaim.raw" || true
++phase26_require_observe "$parp_dir"
++if ((cgroup2)); then
++	phase26_state_set level3a_observe_status '"COLLECTED_PENDING_ANALYSIS"'
++fi
++trap - EXIT INT TERM
++cleanup
++phase26_finish
+diff --git a/tools/parp/phase26/phase26_level3b_observe.sh b/tools/parp/phase26/phase26_level3b_observe.sh
+new file mode 100755
+index 000000000..eaec37813
+--- /dev/null
++++ b/tools/parp/phase26/phase26_level3b_observe.sh
+@@ -0,0 +1,26 @@
++#!/usr/bin/env bash
++# SPDX-License-Identifier: GPL-2.0
++set -euo pipefail
++source "$(dirname "$0")/_common.sh"
++phase26_init "$@"
++
++release=$(phase26_state_get target_kernel_release)
++[[ $(uname -r) = "$release" ]] || { phase26_log "TARGET_KERNEL_NOT_BOOTED"; exit 79; }
++"$PHASE26_SCRIPT_DIR/phase26_restore_observe.sh" --output-root "$PHASE26_OUTPUT_ROOT"
++if [[ -z ${DISPLAY:-} && -z ${WAYLAND_DISPLAY:-} ]]; then
++	phase26_state_set level3b_observe_status '"GUI_SESSION_GATED"'
++	phase26_log "GUI_SESSION_GATED"
++	exit 81
++fi
++scope_config="$PHASE26_PROJECT_ROOT/configs/runtime_app_scope.json"
++scenario="$PHASE26_PROJECT_ROOT/configs/automation/scenario_local_wps_files_qq_auto_login.json"
++test -r "$scope_config"
++test -r "$scenario"
++phase26_log "GUI ready scope_config=$scope_config scenario=$scenario"
++phase26_state_set level3b_observe_status '"READY_FOR_OBSERVE_AUTOMATION"'
++if [[ ${PHASE26_RUN_GUI_AUTOMATION:-0} = 1 ]]; then
++	phase26_run "$PHASE26_PROJECT_ROOT/automation/run_automation.sh" "$scenario"
++else
++	phase26_log "automation not started by wrapper; POSTBOOT orchestrator will collect baseline first"
++fi
++phase26_finish
+diff --git a/tools/parp/phase26/phase26_mount_interfaces.sh b/tools/parp/phase26/phase26_mount_interfaces.sh
+new file mode 100755
+index 000000000..dbcee42fe
+--- /dev/null
++++ b/tools/parp/phase26/phase26_mount_interfaces.sh
+@@ -0,0 +1,13 @@
++#!/usr/bin/env bash
++# SPDX-License-Identifier: GPL-2.0
++set -euo pipefail
++source "$(dirname "$0")/_common.sh"
++phase26_init "$@"
++
++if ! mountpoint -q /sys/kernel/debug; then
++	phase26_run_root mount -t debugfs debugfs /sys/kernel/debug
++fi
++if ! mountpoint -q /sys/kernel/tracing; then
++	phase26_run_root mount -t tracefs tracefs /sys/kernel/tracing
++fi
++phase26_finish
+diff --git a/tools/parp/phase26/phase26_package.sh b/tools/parp/phase26/phase26_package.sh
+new file mode 100755
+index 000000000..703fcb353
+--- /dev/null
++++ b/tools/parp/phase26/phase26_package.sh
+@@ -0,0 +1,28 @@
++#!/usr/bin/env bash
++# SPDX-License-Identifier: GPL-2.0
++set -euo pipefail
++source "$(dirname "$0")/_common.sh"
++phase26_init "$@"
++
++build_dir=$(phase26_state_get build_dir)
++release=$(phase26_state_get target_kernel_release)
++test -n "$release"
++mkdir -p "$PHASE26_OUTPUT_ROOT/packages"
++if command -v fakeroot >/dev/null 2>&1 && command -v dpkg-buildpackage >/dev/null 2>&1; then
++	phase26_run make -C "$PHASE26_WORK_TREE" O="$build_dir" -j"$(nproc)" \
++		KDEB_PKGVERSION="1phase26" bindeb-pkg
++	find "$(dirname "$build_dir")" "$(dirname "$PHASE26_WORK_TREE")" \
++		-maxdepth 1 -type f -name "*${release}*.*deb" \
++		-exec cp -n {} "$PHASE26_OUTPUT_ROOT/packages/" \;
++fi
++if ! compgen -G "$PHASE26_OUTPUT_ROOT/packages/*.deb" >/dev/null; then
++	stage="$PHASE26_OUTPUT_ROOT/packages/staged-root"
++	mkdir -p "$stage/boot" "$stage/lib/modules"
++	phase26_run make -C "$PHASE26_WORK_TREE" O="$build_dir" \
++		INSTALL_MOD_PATH="$stage" modules_install
++	cp -f "$build_dir/arch/x86/boot/bzImage" "$stage/boot/vmlinuz-$release"
++	cp -f "$build_dir/System.map" "$stage/boot/System.map-$release"
++	cp -f "$build_dir/.config" "$stage/boot/config-$release"
++	phase26_log "FALLBACK staged modules and boot files"
++fi
++phase26_finish
+diff --git a/tools/parp/phase26/phase26_postboot.sh b/tools/parp/phase26/phase26_postboot.sh
+new file mode 100755
+index 000000000..b13e48e25
+--- /dev/null
++++ b/tools/parp/phase26/phase26_postboot.sh
+@@ -0,0 +1,28 @@
++#!/usr/bin/env bash
++# SPDX-License-Identifier: GPL-2.0
++set -euo pipefail
++source "$(dirname "$0")/_common.sh"
++phase26_init "$@"
++
++release=$(phase26_state_get target_kernel_release)
++if [[ $(uname -r) != "$release" ]]; then
++	phase26_log "PARP_PHASE26_TARGET_KERNEL_NOT_BOOTED running=$(uname -r) target=$release"
++	exit 79
++fi
++mount_args=(--output-root "$PHASE26_OUTPUT_ROOT")
++((PHASE26_DRY_RUN)) && mount_args+=(--dry-run)
++"$PHASE26_SCRIPT_DIR/phase26_mount_interfaces.sh" "${mount_args[@]}"
++config="/boot/config-$release"
++for symbol in PARP DAMON DAMON_VADDR DAMON_SYSFS MEMCG LRU_GEN; do
++	grep -q "^CONFIG_${symbol}=y" "$config"
++done
++test -d /sys/kernel/debug/parp
++test -d /sys/kernel/tracing/events/parp
++test -e /sys/kernel/debug/parp/scan_budget_apply_domain
++test -d /sys/kernel/mm/damon/admin
++restore_args=(--output-root "$PHASE26_OUTPUT_ROOT")
++((PHASE26_DRY_RUN)) && restore_args+=(--dry-run)
++"$PHASE26_SCRIPT_DIR/phase26_restore_observe.sh" "${restore_args[@]}"
++phase26_state_set boot_verified true
++phase26_state_set stage '"POSTBOOT"'
++phase26_finish
+diff --git a/tools/parp/phase26/phase26_preflight.sh b/tools/parp/phase26/phase26_preflight.sh
+new file mode 100755
+index 000000000..f397cc62b
+--- /dev/null
++++ b/tools/parp/phase26/phase26_preflight.sh
+@@ -0,0 +1,21 @@
++#!/usr/bin/env bash
++# SPDX-License-Identifier: GPL-2.0
++set -euo pipefail
++source "$(dirname "$0")/_common.sh"
++phase26_init "$@"
++phase26_require_snapshot_marker
++
++phase26_run git -C "$PHASE26_WORK_TREE" fsck --no-progress
++for tree in \
++	"$PHASE26_PROJECT_ROOT/MGLRU-test/v4-parp/upstream/linux-6.17.13-clean" \
++	"$PHASE26_PROJECT_ROOT/MGLRU-test/v4-parp/work/linux-6.17.13-parp-v4" \
++	"$PHASE26_PROJECT_ROOT/MGLRU-test/v4-parp/work/linux-6.17.13-parp-v4-phase25"; do
++	test -z "$(git -C "$tree" status --porcelain)"
++done
++test "$(git -C "$PHASE26_PROJECT_ROOT/MGLRU-test/v4-parp/upstream/linux-6.17.13-clean" rev-parse HEAD)" = \
++	6609c4d49ebe220a5c40d3105c3f0e68f569ba1a
++phase26_run df -h / /boot /boot/efi
++phase26_run free -h
++phase26_run uname -a
++phase26_log "cgroup_fs=$(stat -fc %T /sys/fs/cgroup) memory_reclaim=$([[ -e /sys/fs/cgroup/memory.reclaim ]] && echo yes || echo no)"
++phase26_finish
+diff --git a/tools/parp/phase26/phase26_restore_observe.sh b/tools/parp/phase26/phase26_restore_observe.sh
+new file mode 100755
+index 000000000..5eacf1dbd
+--- /dev/null
++++ b/tools/parp/phase26/phase26_restore_observe.sh
+@@ -0,0 +1,16 @@
++#!/usr/bin/env bash
++# SPDX-License-Identifier: GPL-2.0
++set -euo pipefail
++source "$(dirname "$0")/_common.sh"
++phase26_init "$@"
++
++parp_dir=/sys/kernel/debug/parp
++test -d "$parp_dir"
++phase26_run_root sh -c "printf '1\\n' > '$parp_dir/scan_budget_mode'"
++phase26_run_root sh -c "printf '0\\n' > '$parp_dir/scan_budget_apply_domain'"
++phase26_run_root sh -c "printf '1\\n' > '$parp_dir/mode'"
++phase26_run_root sh -c "printf '0\\n' > '$parp_dir/evidence_mode'"
++phase26_require_observe "$parp_dir"
++test "$(phase26_read_root "$parp_dir/scan_budget_apply_domain")" = 0
++phase26_state_set observe_restored true
++phase26_finish
+diff --git a/tools/parp/phase26/phase26_resume.sh b/tools/parp/phase26/phase26_resume.sh
+new file mode 100755
+index 000000000..76399f129
+--- /dev/null
++++ b/tools/parp/phase26/phase26_resume.sh
+@@ -0,0 +1,19 @@
++#!/usr/bin/env bash
++# SPDX-License-Identifier: GPL-2.0
++set -euo pipefail
++source "$(dirname "$0")/_common.sh"
++phase26_init "$@"
++phase26_require_snapshot_marker
++
++release=$(phase26_state_get target_kernel_release)
++installed=$(phase26_state_get install_status)
++if [[ -n "$release" && $(uname -r) = "$release" ]]; then
++	phase26_log "RESUME_POSTBOOT"
++	exec "$PHASE26_SCRIPT_DIR/phase26_postboot.sh" --output-root "$PHASE26_OUTPUT_ROOT"
++fi
++if [[ $installed = INSTALLED ]]; then
++	phase26_log "PARP_PHASE26_TARGET_KERNEL_NOT_BOOTED target=$release"
++	exit 79
++fi
++phase26_log "RESUME_PREBOOT install_status=$installed"
++phase26_finish
+diff --git a/tools/parp/phase26/phase26_rollback.sh b/tools/parp/phase26/phase26_rollback.sh
+new file mode 100755
+index 000000000..54c6c1a98
+--- /dev/null
++++ b/tools/parp/phase26/phase26_rollback.sh
+@@ -0,0 +1,20 @@
++#!/usr/bin/env bash
++# SPDX-License-Identifier: GPL-2.0
++set -euo pipefail
++source "$(dirname "$0")/_common.sh"
++phase26_init "$@"
++
++release=$(phase26_state_get target_kernel_release)
++if [[ $(uname -r) = "$release" && -d /sys/kernel/debug/parp ]]; then
++	"$PHASE26_SCRIPT_DIR/phase26_restore_observe.sh" --output-root "$PHASE26_OUTPUT_ROOT" || true
++	phase26_log "running target kernel retained; reboot manually into 5.15 before removal"
++	exit 0
++fi
++if [[ ${PHASE26_REMOVE_KERNEL:-0} = 1 ]]; then
++	[[ $(uname -r) != "$release" ]]
++	mapfile -t packages < <(dpkg-query -W -f='${binary:Package}\n' 2>/dev/null | \
++		grep -F "$release" || true)
++	((${#packages[@]})) && phase26_run_root dpkg -r "${packages[@]}"
++	phase26_run_root update-grub
++fi
++phase26_finish
+diff --git a/tools/parp/phase26/phase26_select_boot.sh b/tools/parp/phase26/phase26_select_boot.sh
+new file mode 100755
+index 000000000..2b2dc9161
+--- /dev/null
++++ b/tools/parp/phase26/phase26_select_boot.sh
+@@ -0,0 +1,18 @@
++#!/usr/bin/env bash
++# SPDX-License-Identifier: GPL-2.0
++set -euo pipefail
++source "$(dirname "$0")/_common.sh"
++phase26_init "$@"
++
++release=$(phase26_state_get target_kernel_release)
++test -n "$release"
++entry="Ubuntu, with Linux $release"
++grep -F "$entry" /boot/grub/grub.cfg | tee -a "$PHASE26_LOG"
++phase26_log "MANUAL_MENU Advanced options for Ubuntu -> $entry"
++if [[ ${PHASE26_SET_ONCE:-0} = 1 ]]; then
++	phase26_run_root grub-reboot "Advanced options for Ubuntu>$entry"
++	phase26_state_set grub_status '"ONE_TIME_ENTRY_SET"'
++else
++	phase26_log "one-time selection not changed; set PHASE26_SET_ONCE=1 explicitly"
++fi
++phase26_finish
+diff --git a/tools/parp/phase26/state_tool.py b/tools/parp/phase26/state_tool.py
+new file mode 100755
+index 000000000..cb43e3218
+--- /dev/null
++++ b/tools/parp/phase26/state_tool.py
+@@ -0,0 +1,69 @@
++#!/usr/bin/env python3
++# SPDX-License-Identifier: GPL-2.0
++"""Small atomic state-file helper for Phase 2.6 shell entry points."""
++
++import json
++import os
++from pathlib import Path
++import sys
++import tempfile
++from datetime import datetime, timezone
++
++
++def lookup(data, dotted):
++    value = data
++    for component in dotted.split("."):
++        value = value[component]
++    return value
++
++
++def assign(data, dotted, value):
++    components = dotted.split(".")
++    target = data
++    for component in components[:-1]:
++        target = target.setdefault(component, {})
++    target[components[-1]] = value
++    data.setdefault("timestamps", {})["updated"] = datetime.now(
++        timezone.utc).astimezone().isoformat(timespec="seconds")
++
++
++def atomic_write(path, data):
++    descriptor, temporary = tempfile.mkstemp(
++        prefix=path.name + ".", dir=str(path.parent), text=True)
++    try:
++        with os.fdopen(descriptor, "w", encoding="utf-8") as stream:
++            json.dump(data, stream, indent=2, sort_keys=True)
++            stream.write("\n")
++            stream.flush()
++            os.fsync(stream.fileno())
++        os.replace(temporary, path)
++    except Exception:
++        try:
++            os.unlink(temporary)
++        except FileNotFoundError:
++            pass
++        raise
++
++
++def main(argv):
++    if len(argv) not in (4, 5):
++        raise SystemExit("usage: state_tool.py get FILE FIELD | set FILE FIELD JSON")
++    command, filename, field = argv[1:4]
++    path = Path(filename)
++    data = json.loads(path.read_text(encoding="utf-8"))
++    if command == "get" and len(argv) == 4:
++        value = lookup(data, field)
++        if isinstance(value, (dict, list, bool)) or value is None:
++            print(json.dumps(value, sort_keys=True))
++        else:
++            print(value)
++        return
++    if command == "set" and len(argv) == 5:
++        assign(data, field, json.loads(argv[4]))
++        atomic_write(path, data)
++        return
++    raise SystemExit("invalid state command")
++
++
++if __name__ == "__main__":
++    main(sys.argv)
+diff --git a/tools/parp/phase26_memory_workload.py b/tools/parp/phase26_memory_workload.py
+new file mode 100755
+index 000000000..578b3e1fc
+--- /dev/null
++++ b/tools/parp/phase26_memory_workload.py
+@@ -0,0 +1,119 @@
++#!/usr/bin/env python3
++# SPDX-License-Identifier: GPL-2.0
++"""Bounded anonymous and mmap file hot/cold workload for Phase 2.6."""
++
++import argparse
++import json
++import mmap
++import os
++from pathlib import Path
++import signal
++import tempfile
++import threading
++import time
++
++MIB = 1024 * 1024
++PAGE_SIZE = mmap.PAGESIZE
++ABSOLUTE_MAX_BYTES = 512 * MIB
++
++
++def memtotal_bytes():
++    with open("/proc/meminfo", encoding="ascii") as stream:
++        for line in stream:
++            if line.startswith("MemTotal:"):
++                return int(line.split()[1]) * 1024
++    raise RuntimeError("MemTotal is unavailable")
++
++
++def emit(phase, **fields):
++    record = {
++        "source": "RUNTIME_LEVEL3A",
++        "phase": phase,
++        "pid": os.getpid(),
++        "monotonic_ns": time.monotonic_ns(),
++        "wall_time_ns": time.time_ns(),
++    }
++    record.update(fields)
++    print(json.dumps(record, sort_keys=True), flush=True)
++
++
++def touch_pages(buffer, start, end, stride=PAGE_SIZE):
++    for offset in range(start, end, stride):
++        buffer[offset] = (buffer[offset] + 1) & 0xFF
++
++
++def run(args):
++    safe_limit = min(ABSOLUTE_MAX_BYTES, memtotal_bytes() // 10)
++    requested = args.total_mib * MIB
++    if requested <= 0 or requested > safe_limit:
++        raise ValueError("requested memory exceeds min(512MiB, MemTotal*10%)")
++    anon_bytes = requested // 2
++    file_bytes = requested - anon_bytes
++    hot_anon_end = max(PAGE_SIZE, anon_bytes // 4)
++    hot_file_end = max(PAGE_SIZE, file_bytes // 4)
++    stop = threading.Event()
++
++    def request_stop(signum, frame):
++        del frame
++        emit("signal", signal=signum)
++        stop.set()
++
++    signal.signal(signal.SIGTERM, request_stop)
++    signal.signal(signal.SIGINT, request_stop)
++    anonymous = bytearray(anon_bytes)
++    work_dir = Path(args.directory) if args.directory else None
++    descriptor, filename = tempfile.mkstemp(prefix="parp-phase26-", suffix=".bin",
++                                             dir=str(work_dir) if work_dir else None)
++    mapped = None
++    try:
++        os.ftruncate(descriptor, file_bytes)
++        mapped = mmap.mmap(descriptor, file_bytes, access=mmap.ACCESS_WRITE)
++        touch_pages(anonymous, 0, anon_bytes)
++        touch_pages(mapped, 0, file_bytes)
++        emit("ready", total_bytes=requested, anon_bytes=anon_bytes,
++             file_bytes=file_bytes, file_path=filename,
++             hot_anon_bytes=hot_anon_end, hot_file_bytes=hot_file_end)
++        deadline = time.monotonic() + args.duration
++        cold_anon = hot_anon_end
++        cold_file = hot_file_end
++        iteration = 0
++        while not stop.is_set() and time.monotonic() < deadline:
++            touch_pages(anonymous, 0, hot_anon_end)
++            touch_pages(mapped, 0, hot_file_end)
++            if cold_anon < anon_bytes:
++                anonymous[cold_anon] = (anonymous[cold_anon] + 1) & 0xFF
++                cold_anon += PAGE_SIZE
++            if cold_file < file_bytes:
++                mapped[cold_file] = (mapped[cold_file] + 1) & 0xFF
++                cold_file += PAGE_SIZE
++            iteration += 1
++            emit("access", iteration=iteration, cold_anon_offset=cold_anon,
++                 cold_file_offset=cold_file)
++            stop.wait(args.interval)
++        emit("stopping", iterations=iteration)
++    finally:
++        if mapped is not None:
++            mapped.flush()
++            mapped.close()
++        os.close(descriptor)
++        try:
++            os.unlink(filename)
++        except FileNotFoundError:
++            pass
++        emit("stopped")
++
++
++def main():
++    parser = argparse.ArgumentParser()
++    parser.add_argument("--total-mib", type=int, default=256)
++    parser.add_argument("--duration", type=int, default=600)
++    parser.add_argument("--interval", type=float, default=1.0)
++    parser.add_argument("--directory")
++    args = parser.parse_args()
++    if args.duration <= 0 or args.interval <= 0:
++        parser.error("duration and interval must be positive")
++    run(args)
++
++
++if __name__ == "__main__":
++    main()
+diff --git a/tools/parp/phase26_prior_submit.py b/tools/parp/phase26_prior_submit.py
+new file mode 100755
+index 000000000..923e27849
+--- /dev/null
++++ b/tools/parp/phase26_prior_submit.py
+@@ -0,0 +1,58 @@
++#!/usr/bin/env python3
++# SPDX-License-Identifier: GPL-2.0
++"""Submit bounded complete synthetic LSTM batches with generation resume."""
++
++import argparse
++import json
++import sys
++
++from lstm_prior_bridge import AsyncPriorBridge, BatchBuilder, DebugfsTransport
++
++
++def main():
++    parser = argparse.ArgumentParser()
++    parser.add_argument("--debugfs",
++                        default="/sys/kernel/debug/parp/app_prior_batch")
++    parser.add_argument("--count", type=int, default=5)
++    parser.add_argument("--foreground", default="SYNTHETIC_FG")
++    args = parser.parse_args()
++    if not 1 <= args.count <= 32:
++        parser.error("count must be between 1 and 32")
++    whitelist = {
++        "SYNTHETIC_FG": 9001,
++        "SYNTHETIC_HIGH": 9002,
++        "SYNTHETIC_MEDIUM": 9003,
++        "SYNTHETIC_LOW": 9004,
++    }
++    rows = [
++        {"app_key": "SYNTHETIC_FG", "probability": 0.95},
++        {"app_key": "SYNTHETIC_HIGH", "probability": 0.80},
++        {"app_key": "SYNTHETIC_MEDIUM", "probability": 0.50},
++        {"app_key": "SYNTHETIC_LOW", "probability": 0.10},
++    ]
++    transport = DebugfsTransport(args.debugfs)
++    bridge = AsyncPriorBridge(BatchBuilder(whitelist, model_version=9),
++                              transport)
++    try:
++        for index in range(args.count):
++            result = bridge.submit_event(
++                "phase26-synthetic-{}".format(index), rows,
++                args.foreground).result(5)
++            print(json.dumps(result, sort_keys=True), flush=True)
++            if not result.get("submitted"):
++                raise RuntimeError(result.get("error", "batch not submitted"))
++    finally:
++        bridge.close()
++    print(json.dumps({"source": "RUNTIME_LEVEL3A",
++                      "kernel_generation_at_start":
++                      bridge.kernel_generation_at_start,
++                      "submitted": args.count}, sort_keys=True))
++
++
++if __name__ == "__main__":
++    try:
++        main()
++    except Exception as exc:
++        print(json.dumps({"error": str(exc), "submitted": False}),
++              file=sys.stderr)
++        raise
+diff --git a/tools/parp/tests/test_phase26_tools.py b/tools/parp/tests/test_phase26_tools.py
+new file mode 100644
+index 000000000..c76898e2b
+--- /dev/null
++++ b/tools/parp/tests/test_phase26_tools.py
+@@ -0,0 +1,100 @@
++#!/usr/bin/env python3
++# SPDX-License-Identifier: GPL-2.0
++"""Regression tests for the Phase 2.6 resumable runtime tools."""
++
++import contextlib
++import importlib.util
++import io
++import json
++from pathlib import Path
++import subprocess
++import tempfile
++import types
++import unittest
++from unittest import mock
++
++
++PARP_DIR = Path(__file__).resolve().parents[1]
++PHASE26_DIR = PARP_DIR / "phase26"
++
++
++def load_module(name, path):
++    spec = importlib.util.spec_from_file_location(name, path)
++    module = importlib.util.module_from_spec(spec)
++    spec.loader.exec_module(module)
++    return module
++
++
++class StateToolTests(unittest.TestCase):
++    def test_atomic_nested_update(self):
++        tool = load_module("phase26_state_tool", PHASE26_DIR / "state_tool.py")
++        with tempfile.TemporaryDirectory() as directory:
++            path = Path(directory) / "state.json"
++            path.write_text('{"timestamps": {}}\n', encoding="utf-8")
++            data = json.loads(path.read_text(encoding="utf-8"))
++            tool.assign(data, "file_hashes.bzImage", "abc")
++            tool.atomic_write(path, data)
++            written = json.loads(path.read_text(encoding="utf-8"))
++            self.assertEqual(written["file_hashes"]["bzImage"], "abc")
++            self.assertIn("updated", written["timestamps"])
++
++
++class WorkloadTests(unittest.TestCase):
++    @classmethod
++    def setUpClass(cls):
++        cls.workload = load_module(
++            "phase26_memory_workload", PARP_DIR / "phase26_memory_workload.py")
++
++    def test_rejects_above_ten_percent_even_below_absolute_cap(self):
++        args = types.SimpleNamespace(total_mib=2, duration=1, interval=1,
++                                     directory=None)
++        with mock.patch.object(self.workload, "memtotal_bytes",
++                               return_value=10 * self.workload.MIB):
++            with self.assertRaises(ValueError):
++                self.workload.run(args)
++
++    def test_small_anon_and_file_run_is_bounded_and_cleans_file(self):
++        with tempfile.TemporaryDirectory() as directory:
++            args = types.SimpleNamespace(total_mib=2, duration=0.03,
++                                         interval=0.01, directory=directory)
++            output = io.StringIO()
++            with mock.patch.object(self.workload, "memtotal_bytes",
++                                   return_value=1024 * self.workload.MIB), \
++                    contextlib.redirect_stdout(output):
++                self.workload.run(args)
++            records = [json.loads(line) for line in output.getvalue().splitlines()]
++            self.assertEqual(records[0]["phase"], "ready")
++            self.assertEqual(records[0]["source"], "RUNTIME_LEVEL3A")
++            self.assertEqual(records[-1]["phase"], "stopped")
++            self.assertEqual(list(Path(directory).iterdir()), [])
++
++
++class ShellToolTests(unittest.TestCase):
++    def test_all_entry_points_are_strict_and_syntax_valid(self):
++        scripts = sorted(PHASE26_DIR.glob("phase26_*.sh"))
++        self.assertGreaterEqual(len(scripts), 14)
++        for script in scripts:
++            text = script.read_text(encoding="utf-8")
++            self.assertIn("set -euo pipefail", text, script.name)
++            self.assertIn('phase26_init "$@"', text, script.name)
++            subprocess.run(["bash", "-n", str(script)], check=True)
++
++    def test_apply_is_synthetic_only_and_restores_in_safe_order(self):
++        text = (PHASE26_DIR / "phase26_apply_guarded.sh").read_text(
++            encoding="utf-8")
++        self.assertIn("parp-phase26-synthetic.scope", text)
++        self.assertIn("trap restore EXIT INT TERM", text)
++        self.assertIn("scan_budget_apply_domain", text)
++        mode_restore = text.index("printf '1\\\\n'", text.index("restore()"))
++        domain_clear = text.index("printf '0\\\\n'", mode_restore)
++        self.assertLess(mode_restore, domain_clear)
++
++    def test_build_uses_empty_certificate_paths(self):
++        text = (PHASE26_DIR / "phase26_build.sh").read_text(encoding="utf-8")
++        self.assertIn('--set-str SYSTEM_TRUSTED_KEYS ""', text)
++        self.assertIn('--set-str SYSTEM_REVOCATION_KEYS ""', text)
++        self.assertNotIn("-d SYSTEM_TRUSTED_KEYS", text)
++
++
++if __name__ == "__main__":
++    unittest.main()
+-- 
+2.25.1
+

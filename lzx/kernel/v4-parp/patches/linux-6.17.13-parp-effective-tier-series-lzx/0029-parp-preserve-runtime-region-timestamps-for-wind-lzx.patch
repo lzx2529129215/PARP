@@ -1,0 +1,70 @@
+From ccad2e50f611f9f0fcc1c47d3e4e1f1871ff588d Mon Sep 17 00:00:00 2001
+From: Codex PARP Reproduction <codex@localhost>
+Date: Sat, 1 Aug 2026 16:15:37 +0800
+Subject: [PATCH 029/124] parp: preserve runtime region timestamps for window
+ analysis
+
+---
+ tools/parp/region_decode.py               | 11 +++++++++--
+ tools/parp/tests/test_region_alignment.py |  9 +++++++++
+ 2 files changed, 18 insertions(+), 2 deletions(-)
+
+diff --git a/tools/parp/region_decode.py b/tools/parp/region_decode.py
+index 2dc7e11fd..01dadfa1f 100755
+--- a/tools/parp/region_decode.py
++++ b/tools/parp/region_decode.py
+@@ -5,7 +5,8 @@
+ import re
+ from typing import Dict, Optional
+ 
+-FIELD = re.compile(r"([a-z_]+)=([0-9a-fx]+)")
++FIELD = re.compile(r"([a-z_][a-z0-9_]*)=([0-9a-fx]+)")
++TRACE_TIMESTAMP = re.compile(r"\s(\d+)\.(\d{1,9}):\s+parp_region_evidence:")
+ 
+ 
+ def decode_trace_line(line: str) -> Optional[Dict]:
+@@ -17,7 +18,7 @@ def decode_trace_line(line: str) -> Optional[Dict]:
+                 "access_evidence", "age", "confidence_q15", "reasons"}
+     if not required.issubset(values):
+         return None
+-    return {
++    record = {
+         "schema_version": 1,
+         "sample_id": values["sample"], "pid": values["pid"],
+         "tgid": values["tgid"], "domain_id": values["domain"],
+@@ -31,3 +32,9 @@ def decode_trace_line(line: str) -> Optional[Dict]:
+         "reason_flags": values["reasons"], "source": "parp_region_evidence",
+         "address_redacted": True,
+     }
++    timestamp = TRACE_TIMESTAMP.search(line)
++    if timestamp:
++        seconds, fraction = timestamp.groups()
++        record["timestamp_ns"] = (int(seconds) * 1_000_000_000 +
++                                  int(fraction.ljust(9, "0")))
++    return record
+diff --git a/tools/parp/tests/test_region_alignment.py b/tools/parp/tests/test_region_alignment.py
+index 2d1c79b7a..7c85d32ed 100755
+--- a/tools/parp/tests/test_region_alignment.py
++++ b/tools/parp/tests/test_region_alignment.py
+@@ -6,9 +6,18 @@ import unittest
+ 
+ from region_schema import (MAX_SPLITS, VMA, align_interval, anon_page_range,
+                            file_page_range, split_region, vma_signature)
++from region_decode import decode_trace_line
+ 
+ 
+ class RegionAlignmentTest(unittest.TestCase):
++    def test_runtime_trace_timestamp_is_preserved_for_windows(self):
++        line = ("worker-1 [000] .... 123.456789: parp_region_evidence: "
++                "sample=1 pid=2 tgid=2 domain=3 app=4 mm_cookie=5 "
++                "type=0 align=1 logical_start=6 nr_pages=7 "
++                "access_evidence=8 age=9 confidence_q15=10 reasons=0x0")
++        record = decode_trace_line(line)
++        self.assertEqual(record["timestamp_ns"], 123456789000)
++
+     def test_shared_vectors(self):
+         vectors = json.loads((Path(__file__).parents[1] / "configs" /
+                               "region_vectors.json").read_text())
+-- 
+2.25.1
+

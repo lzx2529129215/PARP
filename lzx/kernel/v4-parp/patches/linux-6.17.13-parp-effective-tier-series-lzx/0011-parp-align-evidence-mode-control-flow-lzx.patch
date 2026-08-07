@@ -1,0 +1,25 @@
+From b749f42f8a38a67545b878a1738f982e8ac7ba0e Mon Sep 17 00:00:00 2001
+From: Codex PARP Reproduction <codex@localhost>
+Date: Fri, 31 Jul 2026 19:32:04 +0800
+Subject: [PATCH 011/124] parp: align evidence mode control flow
+
+---
+ mm/parp/adapter/mglru_adapter.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/mm/parp/adapter/mglru_adapter.c b/mm/parp/adapter/mglru_adapter.c
+index 21b7da3ed..af54684f6 100644
+--- a/mm/parp/adapter/mglru_adapter.c
++++ b/mm/parp/adapter/mglru_adapter.c
+@@ -67,7 +67,7 @@ parp_adapter_score_folio(struct parp_reclaim_ctx *ctx, struct folio *folio,
+ 				.fallback = PARP_FALLBACK_EVIDENCE_ONLY,
+ 			};
+ 		} else {
+-		decision = parp_engine_score(ctx->snapshot, &sample);
++			decision = parp_engine_score(ctx->snapshot, &sample);
+ 		}
+ 	}
+ 	parp_stats_account(&decision);
+-- 
+2.25.1
+
