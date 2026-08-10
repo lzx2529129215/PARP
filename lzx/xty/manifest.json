@@ -1,0 +1,171 @@
+{
+  "bundle_name": "parp-github-repro-08010",
+  "generated_at_utc": "2026-08-10T05:08:23.549562+00:00",
+  "kernel_release": "6.17.13-myks-l02",
+  "uname": "Linux xty-virtual-machine 6.17.13-myks-l02 #4 SMP PREEMPT_DYNAMIC Mon Aug 10 11:47:59 CST 2026 x86_64 x86_64 x86_64 GNU/Linux",
+  "build": {
+    "src_root": "/home/xty/v4-parp/work/linux-6.17.13-parp",
+    "build_root": "/home/xty/v4-parp/work/build-linux-6.17.13-parp",
+    "bzImage_sha256": "e4bb1d7333e043cc8e5bf2564c5d3dd63294a4bf8145545c51750b501b9718cf",
+    "vmlinux_sha256": "baa0d344aea65a5c5dab68cd51f3b39ec539ca356749e232cdbb39d550be30ba",
+    "config_sha256": "2eacefe388a7789f195b18a57250073442df394411a23ec028bdbb45c8bd103f",
+    "boot_config_sha256": "2eacefe388a7789f195b18a57250073442df394411a23ec028bdbb45c8bd103f"
+  },
+  "patches": [
+    {
+      "relpath": "mm/vmscan.c",
+      "backup_rel": "mm/vmscan.c.bak",
+      "label": "vmscan parp bin selection",
+      "patch_name": "0001-mm-vmscan-parp-bin-priority.patch",
+      "sha256_current": "4f1827ef91204cd415c459dd87cfbd68a6cfe45cf2cee647afd89f7390d91861",
+      "sha256_backup": "b8dfc950630c5270d66dc87b064f8649822a5a8505fb018981f69b34cf4492e5",
+      "sha256_patch": "cc38df7a76d11042ce48abbd592f94d7ed739931e0521d9e738ee0f2a10a3b6e"
+    },
+    {
+      "relpath": "mm/memcontrol-v1.c",
+      "backup_rel": "mm/memcontrol-v1.c.bak",
+      "label": "memcontrol-v1 tier2 legacy cgroup files",
+      "patch_name": "0002-mm-memcontrol-v1-tier2-legacy.patch",
+      "sha256_current": "36b1e2164cdbf4233c92b610c1538c676b61c5c6f59d7068dcd69a4bc5eb830f",
+      "sha256_backup": "f97e87da368f7ebd8ec7a77f2f6ea33bd1d226f5b40e1c247eb40087d269f96b",
+      "sha256_patch": "0e3012adf0de085364316d7a736fae5157ba95779b302623e2a9c93b22278546"
+    },
+    {
+      "relpath": "kernel/trace/trace_events.c",
+      "backup_rel": "kernel/trace/trace_events.c.bak",
+      "label": "trace event dereference arg guard",
+      "patch_name": "0003-kernel-trace-trace-events-deref-arg-safe.patch",
+      "sha256_current": "edd4ffd91e99e98a5ad36df34695a3770a4fa9ce77c3c73af1d8b59391f2c69d",
+      "sha256_backup": "630cdfd65e8c260f1bde9a8e2b5fd58c672ec18f5ca26228d135f3c203130b0a",
+      "sha256_patch": "92a648ce6d41a49440da3c24c49a1ff96d49dd5b9a7c59c8ab540b07391bf4f5"
+    }
+  ],
+  "files": [
+    {
+      "path": "README.md",
+      "sha256": "997e8f598dc7cd49438990d44733c7df398062e2ccb2dca4d41577fe74b9cb4c"
+    },
+    {
+      "path": "configs/boot-config-6.17.13-myks-l02",
+      "sha256": "2eacefe388a7789f195b18a57250073442df394411a23ec028bdbb45c8bd103f"
+    },
+    {
+      "path": "configs/current.config",
+      "sha256": "2eacefe388a7789f195b18a57250073442df394411a23ec028bdbb45c8bd103f"
+    },
+    {
+      "path": "configs/kernel.release",
+      "sha256": "4c96a1bae3e985921b66da19d01d2b13d1d6289c41a39251cee1f3ea01c0b45c"
+    },
+    {
+      "path": "docs/reference/readme.md",
+      "sha256": "5e7ed899aa43c802b90ef50d140f39a5250e704ac42d00b1e1d8639b9482cda4"
+    },
+    {
+      "path": "docs/reference/交接文档_0809.docx",
+      "sha256": "79d4f3498414627d46a86c39ea4df05911d399df81d0fe58a7b4d9c68f087c8c"
+    },
+    {
+      "path": "docs/reference/改进报告.md",
+      "sha256": "2af28dcb9e946d1ec91fab6548f1ac68456dc759e69be780f24ba5ffbff07ded"
+    },
+    {
+      "path": "docs/reference/新增要求/page_alloc.md",
+      "sha256": "7dffc358a1fb7c14f4c2fb16a0ebf6b8aa2884bddf90928f424e46ee881b49e2"
+    },
+    {
+      "path": "docs/reference/新增要求/vmscan.md",
+      "sha256": "93a7c6501cd81bbc1273cbf34b65eb430aabbd3938b32ee4769bed2c59db801a"
+    },
+    {
+      "path": "docs/reference/新增要求/后续内核修改方向.md",
+      "sha256": "95726db9ae26ff1c2f47c35ba1d8e242a4b711d869b807d86052372f9c8068e3"
+    },
+    {
+      "path": "docs/reference/新增要求/录音.txt",
+      "sha256": "e595b7bff2ebc549cdba61b2631980eca4c06a86c8b4977e68de6377b368bc0c"
+    },
+    {
+      "path": "docs/reference/新增要求/录音适配截图.png",
+      "sha256": "62f8166f706425705e08c9745a50f18f2aebfd98483a33185ad04f92f58c3df6"
+    },
+    {
+      "path": "docs/交接说明.md",
+      "sha256": "ad7cdcb46717a23f443803af13a08083096b3cdb6b4c7f6a104aa206dd8f310e"
+    },
+    {
+      "path": "docs/复现手册.md",
+      "sha256": "91dc62424554b3156feaaa9e9537cccad03c151817c98ad1c9a6bba3f6ed38ef"
+    },
+    {
+      "path": "docs/源码说明.md",
+      "sha256": "848ea65699c4e4594ae4a7364bb51ef856bdef668482563a13f7e93013d5d668"
+    },
+    {
+      "path": "patches/0000-all-in-one.patch",
+      "sha256": "d62a5d050e8e5aad1473a5edcd384aae5fb883c0a90b2cf6687ebab928b2fc65"
+    },
+    {
+      "path": "patches/0001-mm-vmscan-parp-bin-priority.patch",
+      "sha256": "cc38df7a76d11042ce48abbd592f94d7ed739931e0521d9e738ee0f2a10a3b6e"
+    },
+    {
+      "path": "patches/0002-mm-memcontrol-v1-tier2-legacy.patch",
+      "sha256": "0e3012adf0de085364316d7a736fae5157ba95779b302623e2a9c93b22278546"
+    },
+    {
+      "path": "patches/0003-kernel-trace-trace-events-deref-arg-safe.patch",
+      "sha256": "92a648ce6d41a49440da3c24c49a1ff96d49dd5b9a7c59c8ab540b07391bf4f5"
+    },
+    {
+      "path": "patches/series.txt",
+      "sha256": "4cd11e62535d59b7835c79c6253f3cbd69a7536a36793fd06721dfc03ef581f6"
+    },
+    {
+      "path": "scripts/apply_patches.sh",
+      "sha256": "05add905dcee670bc557071d3f392e550aa07b97a1fd0ab602d2a269111e98c8"
+    },
+    {
+      "path": "scripts/build_install_verify.sh",
+      "sha256": "1b6c81e2fe849d9b1c4ef09c184c37431c8f61a3751adb4064cca9172fd78556"
+    },
+    {
+      "path": "scripts/validate_bundle.py",
+      "sha256": "520dc1182dbc9a2a0e4e43e29fc6f6f04230bc09a02e8401d65800e5833e066d"
+    },
+    {
+      "path": "scripts/verify_runtime.sh",
+      "sha256": "020dead2f1e380a54f19567de02ba951ef967cb00dcf14a85c6e8491f5d0b802"
+    },
+    {
+      "path": "source/baseline/kernel/trace/trace_events.c.bak",
+      "sha256": "630cdfd65e8c260f1bde9a8e2b5fd58c672ec18f5ca26228d135f3c203130b0a"
+    },
+    {
+      "path": "source/baseline/mm/memcontrol-v1.c.bak",
+      "sha256": "f97e87da368f7ebd8ec7a77f2f6ea33bd1d226f5b40e1c247eb40087d269f96b"
+    },
+    {
+      "path": "source/baseline/mm/vmscan.c.bak",
+      "sha256": "b8dfc950630c5270d66dc87b064f8649822a5a8505fb018981f69b34cf4492e5"
+    },
+    {
+      "path": "source/current/kernel/trace/trace_events.c",
+      "sha256": "edd4ffd91e99e98a5ad36df34695a3770a4fa9ce77c3c73af1d8b59391f2c69d"
+    },
+    {
+      "path": "source/current/mm/memcontrol-v1.c",
+      "sha256": "36b1e2164cdbf4233c92b610c1538c676b61c5c6f59d7068dcd69a4bc5eb830f"
+    },
+    {
+      "path": "source/current/mm/vmscan.c",
+      "sha256": "4f1827ef91204cd415c459dd87cfbd68a6cfe45cf2cee647afd89f7390d91861"
+    }
+  ],
+  "notes": [
+    "patches/series.txt defines the recommended patch order",
+    "source/current mirrors the final source state",
+    "source/baseline mirrors the pre-change backup state",
+    "docs/reference keeps the original handoff and requirement materials"
+  ]
+}

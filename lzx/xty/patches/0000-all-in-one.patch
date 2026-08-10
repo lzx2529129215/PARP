@@ -1,0 +1,214 @@
+--- a/mm/vmscan.c
++++ b/mm/vmscan.c
+@@ -59,6 +59,7 @@
+ #include <linux/mmu_notifier.h>
+ #include <linux/parser.h>
+ #include <linux/parp.h>
++#include "parp/adapter/adapter.h"
+ 
+ #include <asm/tlbflush.h>
+ #include <asm/div64.h>
+@@ -4387,12 +4388,63 @@
+ 	MEMCG_LRU_YOUNG,
+ };
+ 
++#ifdef CONFIG_PARP
++static unsigned int parp_memcg_reclaim_bin(struct mem_cgroup *memcg)
++{
++	struct parp_app_context app;
++	u64 now = ktime_get_mono_fast_ns();
++	u64 domain_id;
++	u32 score_q15 = 0;
++	bool have_signal = false;
++	u64 limit;
++	u64 headroom;
++
++	if (!memcg || mem_cgroup_is_root(memcg) ||
++	    parp_get_mode() == PARP_MODE_DISABLED)
++		return get_random_u32_below(MEMCG_NR_BINS);
++
++	domain_id = parp_memcg_domain_id(memcg);
++	if (domain_id && parp_context_lookup(domain_id, now, &app)) {
++		score_q15 = app.app_prior_q15;
++		have_signal = true;
++	}
++
++	limit = READ_ONCE(memcg->parp_tier2.limit_bytes);
++	headroom = READ_ONCE(memcg->parp_tier2.headroom_bytes);
++	if (limit && limit != U64_MAX) {
++		u32 headroom_q15;
++
++		if (headroom >= limit)
++			headroom_q15 = PARP_Q15_ONE;
++		else
++			headroom_q15 = mul_u64_u32_div(headroom, PARP_Q15_ONE, limit);
++
++		if (have_signal)
++			score_q15 = min(score_q15, headroom_q15);
++		else
++			score_q15 = headroom_q15;
++		have_signal = true;
++	}
++
++	if (!have_signal)
++		return get_random_u32_below(MEMCG_NR_BINS);
++
++	return min_t(unsigned int, score_q15 * MEMCG_NR_BINS >> 15,
++		     MEMCG_NR_BINS - 1);
++}
++#else
++static unsigned int parp_memcg_reclaim_bin(struct mem_cgroup *memcg)
++{
++	return get_random_u32_below(MEMCG_NR_BINS);
++}
++#endif
++
+ static void lru_gen_rotate_memcg(struct lruvec *lruvec, int op)
+ {
+ 	int seg;
+ 	int old, new;
+ 	unsigned long flags;
+-	int bin = get_random_u32_below(MEMCG_NR_BINS);
++	int bin = parp_memcg_reclaim_bin(lruvec_memcg(lruvec));
+ 	struct pglist_data *pgdat = lruvec_pgdat(lruvec);
+ 
+ 	spin_lock_irqsave(&pgdat->memcg_lru.lock, flags);
+@@ -4439,7 +4491,7 @@
+ {
+ 	int gen;
+ 	int nid;
+-	int bin = get_random_u32_below(MEMCG_NR_BINS);
++	int bin = parp_memcg_reclaim_bin(memcg);
+ 
+ 	for_each_node(nid) {
+ 		struct pglist_data *pgdat = NODE_DATA(nid);
+@@ -5323,7 +5375,8 @@
+ 	struct hlist_nulls_node *pos;
+ 
+ 	gen = get_memcg_gen(READ_ONCE(pgdat->memcg_lru.seq));
+-	bin = first_bin = get_random_u32_below(MEMCG_NR_BINS);
++	bin = first_bin = parp_get_mode() == PARP_MODE_DISABLED ?
++		get_random_u32_below(MEMCG_NR_BINS) : 0;
+ restart:
+ 	op = 0;
+ 	memcg = NULL;
+--- a/mm/memcontrol-v1.c
++++ b/mm/memcontrol-v1.c
+@@ -2132,6 +2132,52 @@
+ 		.write = mem_cgroup_reset,
+ 		.read_u64 = mem_cgroup_read_u64,
+ 	},
++
++#ifdef CONFIG_PARP
++	{
++		.name = "tier2_enabled",
++		.flags = CFTYPE_NOT_ON_ROOT,
++		.seq_show = parp_tier2_enabled_show,
++		.write = parp_tier2_enabled_write,
++	},
++	{
++		.name = "tier2_alloc_scale",
++		.flags = CFTYPE_NOT_ON_ROOT,
++		.seq_show = parp_tier2_alloc_scale_show,
++		.write = parp_tier2_alloc_scale_write,
++	},
++	{
++		.name = "tier2_demote_scale",
++		.flags = CFTYPE_NOT_ON_ROOT,
++		.seq_show = parp_tier2_demote_scale_show,
++		.write = parp_tier2_demote_scale_write,
++	},
++	{
++		.name = "tier2_alloc_wmark",
++		.flags = CFTYPE_NOT_ON_ROOT,
++		.seq_show = parp_tier2_alloc_wmark_show,
++	},
++	{
++		.name = "tier2_demote_wmark",
++		.flags = CFTYPE_NOT_ON_ROOT,
++		.seq_show = parp_tier2_demote_wmark_show,
++	},
++	{
++		.name = "tier2_headroom",
++		.flags = CFTYPE_NOT_ON_ROOT,
++		.seq_show = parp_tier2_headroom_show,
++	},
++	{
++		.name = "tier2_below",
++		.flags = CFTYPE_NOT_ON_ROOT,
++		.seq_show = parp_tier2_below_show,
++	},
++	{
++		.name = "tier2_stats",
++		.flags = CFTYPE_NOT_ON_ROOT,
++		.seq_show = parp_tier2_stats_show,
++	},
++#endif
+ 	{ },	/* terminate */
+ };
+ 
+--- a/kernel/trace/trace_events.c
++++ b/kernel/trace/trace_events.c
+@@ -398,6 +398,22 @@
+ 	field->needs_test = 1;
+ 
+ 	return true;
++}
++
++#define TRACE_EVENT_DEREF_ARG_BITS	(sizeof(u64) * 8)
++
++static bool trace_event_deref_arg_too_many(int arg,
++					   struct trace_event_call *call)
++{
++	return WARN_ONCE(arg >= TRACE_EVENT_DEREF_ARG_BITS,
++			 "Too many args for event: %s",
++			 trace_event_name(call));
++}
++
++static bool trace_event_deref_arg_set(u64 flags, int arg)
++{
++	return arg >= 0 && arg < TRACE_EVENT_DEREF_ARG_BITS &&
++	       (flags & (1ULL << arg));
+ }
+ 
+ static void handle_dereference_arg(const char *arg_str, u64 string_flags, int len,
+@@ -494,9 +510,7 @@
+ 				case 'a': case 'd': case 'D':
+ 				case 'g': case 't': case 'C':
+ 				case 'O': case 'f':
+-					if (WARN_ONCE(arg == 63,
+-						      "Too many args for event: %s",
+-						      trace_event_name(call)))
++					if (trace_event_deref_arg_too_many(arg, call))
+ 						return;
+ 					dereference_flags |= 1ULL << arg;
+ 				}
+@@ -524,9 +538,7 @@
+ 					if ((fmt[i + j] == 's')) {
+ 						if (star)
+ 							arg++;
+-						if (WARN_ONCE(arg == 63,
+-							      "Too many args for event: %s",
+-							      trace_event_name(call)))
++						if (trace_event_deref_arg_too_many(arg, call))
+ 							return;
+ 						dereference_flags |= 1ULL << arg;
+ 						string_flags |= 1ULL << arg;
+@@ -576,7 +588,7 @@
+ 				continue;
+ 			}
+ 
+-			if (dereference_flags & (1ULL << arg)) {
++			if (trace_event_deref_arg_set(dereference_flags, arg)) {
+ 				handle_dereference_arg(fmt + start_arg, string_flags,
+ 						       e - start_arg,
+ 						       &dereference_flags, arg, call);
+@@ -589,7 +601,7 @@
+ 		}
+ 	}
+ 
+-	if (dereference_flags & (1ULL << arg)) {
++	if (trace_event_deref_arg_set(dereference_flags, arg)) {
+ 		handle_dereference_arg(fmt + start_arg, string_flags,
+ 				       i - start_arg,
+ 				       &dereference_flags, arg, call);
