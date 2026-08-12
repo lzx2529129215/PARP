@@ -1,0 +1,1014 @@
+#!/usr/bin/env python3
+"""PARP/MGLRU acceptance experiment generator, runner, and reporter.
+
+This is intentionally a diagnostic-first harness.  It never changes PARP
+mode, MGLRU settings, swap configuration, reclaim sysctls, or drop_caches.
+The only runtime limits it sets are finite properties on its own user slice.
+"""
+
+from __future__ import annotations
+
+import argparse
+import csv
+import datetime as dt
+import json
+import math
+import os
+import random
+import re
+import shlex
+import shutil
+import signal
+import socket
+import subprocess
+import sys
+import time
+from dataclasses import dataclass
+from pathlib import Path
+from typing import Any
+
+
+TEST_DIR = Path(__file__).resolve().parent
+REPO_ROOT = TEST_DIR.parent
+DEFAULT_CONFIG = TEST_DIR / "parp-acceptance-config-lzx.json"
+AUTOMATION = REPO_ROOT / "lzx/tool/automation/run_automation.sh"
+FIXTURE = TEST_DIR / "memory-fixture-lzx.py"
+TRACE_HELPER = TEST_DIR / "trace-helper-lzx.sh"
+MIB = 1024 * 1024
+GIB = 1024 * MIB
+KEEPER_UNIT = "parp-acceptance-keeper.service"
+LOW_MEMORY_RE = re.compile(
+    r"low[ -]?memory|out of memory|not enough memory|内存不足|低内存|无法分配内存",
+    re.IGNORECASE,
+)
+
+
+@dataclass(frozen=True)
+class AppSpec:
+    key: str
+    name: str
+    executable: str
+    command: str
+    window_class: str
+    window_title: str
+    process_names: tuple[str, ...]
+    operation_key: str
+
+
+def app_specs(session_dir: Path) -> dict[str, AppSpec]:
+    firefox_profile = session_dir / "firefox-profile"
+    gimp_image = session_dir / "fixtures/gimp-test.ppm"
+    return {
+        "WPS": AppSpec("WPS", "wps", "wps", "wps", "wps|Wps", "WPS|Writer|文字", ("wps", "wpsoffice", "wpp", "et"), "Page_Down"),
+        "FILES": AppSpec("FILES", "files", "nautilus", f"nautilus --new-window {shlex.quote(str(REPO_ROOT))}", "org.gnome.Nautilus|Nautilus|nautilus", "文件|Files|Home|主文件夹|myself-kswapd", ("nautilus",), "Page_Down"),
+        "QQ": AppSpec("QQ", "qq", "qq", "qq", "qq|QQ|linuxqq", "QQ", ("qq", "linuxqq"), "Tab"),
+        "FIREFOX": AppSpec("FIREFOX", "firefox", "firefox", f"firefox --new-instance --no-remote -profile {shlex.quote(str(firefox_profile))} --new-window about:blank", "firefox|Firefox", "Mozilla Firefox|Firefox", ("firefox",), "ctrl+l"),
+        "GIMP": AppSpec("GIMP", "gimp", "gimp", f"gimp {shlex.quote(str(gimp_image))}", "gimp|Gimp", "GIMP|visible_paste_test", ("gimp", "gimp-2.10"), "plus"),
+        "LIBREOFFICE": AppSpec("LIBREOFFICE", "libreoffice", "libreoffice", "libreoffice --writer", "libreoffice-writer|soffice", "Writer|LibreOffice", ("soffice.bin", "soffice"), "Page_Down"),
+    }
+
+
+def load_config(path: Path) -> dict[str, Any]:
+    return json.loads(path.read_text(encoding="utf-8"))
+
+
+def write_json(path: Path, value: Any) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(value, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+
+
+def run(command: list[str], *, timeout: float = 30, check: bool = False, stdout: Any = subprocess.PIPE, stderr: Any = subprocess.PIPE) -> subprocess.CompletedProcess[str]:
+    return subprocess.run(command, text=True, stdout=stdout, stderr=stderr, timeout=timeout, check=check)
+
+
+def read_text(path: Path) -> str:
+    try:
+        return path.read_text(encoding="utf-8", errors="replace").strip()
+    except OSError:
+        return ""
+
+
+def read_kv(path: Path) -> dict[str, int]:
+    values: dict[str, int] = {}
+    for line in read_text(path).splitlines():
+        fields = line.split()
+        if len(fields) >= 2:
+            try:
+                values[fields[0].rstrip(":")] = int(fields[1])
+            except ValueError:
+                continue
+    return values
+
+
+def meminfo() -> dict[str, int]:
+    return {key: value * 1024 for key, value in read_kv(Path("/proc/meminfo")).items()}
+
+
+def vmstat() -> dict[str, int]:
+    return read_kv(Path("/proc/vmstat"))
+
+
+def psi_memory() -> dict[str, float]:
+    result: dict[str, float] = {}
+    for line in read_text(Path("/proc/pressure/memory")).splitlines():
+        fields = line.split()
+        if not fields:
+            continue
+        prefix = fields[0]
+        for item in fields[1:]:
+            if "=" not in item:
+                continue
+            key, value = item.split("=", 1)
+            try:
+                result[f"{prefix}_{key}"] = float(value)
+            except ValueError:
+                pass
+    return result
+
+
+def swap_bytes() -> int:
+    total = 0
+    for line in read_text(Path("/proc/swaps")).splitlines()[1:]:
+        fields = line.split()
+        if len(fields) >= 4:
+            try:
+                total += int(fields[2]) * 1024
+            except ValueError:
+                pass
+    return total
+
+
+def command_exists(command: str) -> bool:
+    return shutil.which(command) is not None
+
+
+def debugfs_value(name: str) -> str:
+    path = Path("/sys/kernel/debug/parp") / name
+    outcome = run(["sudo", "-n", "cat", str(path)], timeout=5)
+    return outcome.stdout.strip() if outcome.returncode == 0 else ""
+
+
+def parse_debug_stat(text: str, key: str) -> str:
+    match = re.search(rf"(?:^|\s){re.escape(key)}[=: ]+([^\s]+)", text, re.MULTILINE)
+    return match.group(1) if match else ""
+
+
+def output_root(config: dict[str, Any]) -> Path:
+    value = Path(str(config.get("output_root", "lzx/tool/outputs/parp_acceptance")))
+    return value if value.is_absolute() else REPO_ROOT / value
+
+
+def existing_parent(path: Path) -> Path:
+    candidate = path
+    while not candidate.exists() and candidate != candidate.parent:
+        candidate = candidate.parent
+    return candidate
+
+
+def inotify_watch_usage() -> dict[str, int]:
+    maximum_text = read_text(Path("/proc/sys/fs/inotify/max_user_watches"))
+    maximum = int(maximum_text) if maximum_text.isdigit() else 0
+    used = 0
+    uid = os.getuid()
+    for process_dir in Path("/proc").glob("[0-9]*"):
+        try:
+            if process_dir.stat().st_uid != uid:
+                continue
+        except OSError:
+            continue
+        for fdinfo in (process_dir / "fdinfo").glob("*"):
+            try:
+                used += sum(1 for line in fdinfo.read_text(encoding="utf-8", errors="replace").splitlines() if line.startswith("inotify"))
+            except OSError:
+                continue
+    return {"maximum": maximum, "used": used, "headroom": max(0, maximum - used)}
+
+
+def x11_environment() -> dict[str, str]:
+    uid = os.getuid()
+    display = os.environ.get("DISPLAY") or (":0" if Path("/tmp/.X11-unix/X0").exists() else "")
+    candidates = [
+        Path(os.environ.get("XAUTHORITY", "")),
+        Path(f"/run/user/{uid}/gdm/Xauthority"),
+        Path.home() / ".Xauthority",
+    ]
+    xauthority = next((str(path) for path in candidates if str(path) and path.is_file()), "")
+    return {
+        "DISPLAY": display,
+        "XAUTHORITY": xauthority,
+        "XDG_RUNTIME_DIR": f"/run/user/{uid}",
+        "DBUS_SESSION_BUS_ADDRESS": f"unix:path=/run/user/{uid}/bus",
+        "XDG_SESSION_TYPE": "x11",
+    }
+
+
+def preflight(config: dict[str, Any], profile: str, suite: str) -> dict[str, Any]:
+    memory = meminfo()
+    total = memory.get("MemTotal", 0)
+    available = memory.get("MemAvailable", 0)
+    gui = x11_environment()
+    specs = app_specs(output_root(config) / "preflight")
+    required_apps = config["hotcold"]["apps"] if suite == "hotcold" else config["peak"]["apps"] if suite == "peak" else sorted(set(config["hotcold"]["apps"] + config["peak"]["apps"]))
+    app_checks = {app: {"executable": specs[app].executable, "installed": command_exists(specs[app].executable)} for app in required_apps}
+    effective_stats = debugfs_value("effective_tier_stats")
+    effective_config = debugfs_value("effective_tier_config")
+    mode = debugfs_value("effective_tier_mode")
+    profile_cfg = config["profiles"][profile]
+    logical_ratio = max(
+        float(profile_cfg.get("hotcold_logical_ratio", 0)) if suite in {"hotcold", "all"} else 0,
+        float(profile_cfg.get("peak_logical_ratio", 0)) if suite in {"peak", "all"} else 0,
+    )
+    disk = shutil.disk_usage(existing_parent(output_root(config)))
+    inotify = inotify_watch_usage()
+    checks = {
+        "sudo_noninteractive": run(["sudo", "-n", "true"], timeout=5).returncode == 0,
+        "x11_display": bool(gui["DISPLAY"] and gui["XAUTHORITY"]),
+        "cgroup_v2_memory": "memory" in read_text(Path("/sys/fs/cgroup/cgroup.controllers")).split(),
+        "tracefs_page_fault_user": Path("/sys/kernel/tracing/events/exceptions/page_fault_user/format").is_file(),
+        "tracefs_parp_decision": Path("/sys/kernel/tracing/events/parp/parp_effective_tier_decision/format").is_file(),
+        "swap_present": swap_bytes() > 0,
+        "memory_16g_class": 14 * GIB <= total <= 18 * GIB,
+        "memavailable_floor": available >= int(config["safety"]["min_memavailable_bytes"]),
+        "disk_for_sparse_fixture": disk.free >= max(4 * GIB, int(total * min(logical_ratio, 0.25))),
+        "automation_present": AUTOMATION.is_file(),
+        "all_required_apps_installed": all(item["installed"] for item in app_checks.values()),
+        "xdotool_present": command_exists("xdotool"),
+        "wmctrl_present": command_exists("wmctrl"),
+        "inotify_watch_headroom": inotify["headroom"] >= int(config["safety"]["min_inotify_watch_headroom"]),
+    }
+    apply_compiled = parse_debug_stat(effective_stats, "apply_compiled")
+    model_provenance = parse_debug_stat(effective_config, "model_provenance")
+    diagnostic_only = apply_compiled in {"", "0"} or "UNTRAINED" in effective_config
+    return {
+        "status": "READY" if all(checks.values()) else "BLOCKED",
+        "diagnostic_only": diagnostic_only,
+        "diagnostic_reason": "SHADOW_APPLY_NOT_COMPILED_OR_MODEL_UNTRAINED" if diagnostic_only else "",
+        "timestamp": dt.datetime.now().isoformat(),
+        "kernel_release": os.uname().release,
+        "profile": profile,
+        "suite": suite,
+        "memory": {"total_bytes": total, "available_bytes": available},
+        "swap_bytes": swap_bytes(),
+        "disk_free_bytes": disk.free,
+        "inotify": inotify,
+        "gui": gui,
+        "apps": app_checks,
+        "checks": checks,
+        "parp": {
+            "effective_tier_mode": mode,
+            "apply_compiled": apply_compiled,
+            "model_provenance": model_provenance,
+            "effective_tier_stats": effective_stats,
+            "effective_tier_config": effective_config,
+        },
+    }
+
+
+def fixture_socket(session_dir: Path, app: str) -> Path:
+    return Path(f"/run/user/{os.getuid()}/parp-a-{session_dir.name[-18:]}-{app.lower()}.sock")
+
+
+def fixture_command(path: Path, command: str, timeout: float, wait_seconds: float = 0) -> str:
+    deadline = time.monotonic() + max(wait_seconds, 0)
+    last = ""
+    while True:
+        try:
+            with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as stream:
+                stream.settimeout(timeout)
+                stream.connect(str(path))
+                stream.sendall((command.strip() + "\n").encode("ascii"))
+                response = stream.recv(4096).decode("ascii", errors="replace").strip()
+            if not response.startswith("OK "):
+                raise RuntimeError(response or "empty fixture response")
+            return response
+        except (OSError, RuntimeError) as exc:
+            last = str(exc)
+            if time.monotonic() >= deadline:
+                raise RuntimeError(f"fixture {path}: {last}") from exc
+            time.sleep(0.2)
+
+
+def py_fixture_action(path: Path, command: str, *, timeout: int = 30, wait: int = 0, label: str = "") -> dict[str, Any]:
+    args = [sys.executable, str(Path(__file__).resolve()), "fixture-command", "--socket", str(path), "--command", command, "--timeout", str(timeout), "--wait", str(wait)]
+    return {"type": "shell", "command": shlex.join(args), "label": label}
+
+
+def trace_action(instance: str, operation: str, label: str) -> dict[str, Any]:
+    command = ["sudo", "-n", "bash", str(TRACE_HELPER), operation, instance]
+    return {"type": "shell", "command": shlex.join(command), "label": label}
+
+
+def app_launch_actions(spec: AppSpec) -> list[dict[str, Any]]:
+    return [
+        {"type": "launch", "name": spec.name, "scope_name": spec.name, "app_key": spec.key, "command": spec.command, "label": f"LAUNCH_{spec.key}"},
+        {"type": "wait_window", "name": spec.name, "app_key": spec.key, "class": spec.window_class, "title": spec.window_title, "timeout": 45, "label": f"WAIT_{spec.key}"},
+    ]
+
+
+def app_close_action(spec: AppSpec) -> dict[str, Any]:
+    return {
+        "type": "close", "name": spec.name, "app_key": spec.key,
+        "class": spec.window_class, "title": spec.window_title,
+        "process_names": list(spec.process_names), "wait_after_window_close": 0.2,
+        "force_after_seconds": 1, "label": f"CLOSE_{spec.key}",
+    }
+
+
+def allocation_by_app(total_bytes: int, apps: list[str], ratios: dict[str, float] | None = None) -> dict[str, int]:
+    if ratios:
+        ratio_total = sum(float(ratios[app]) for app in apps)
+        return {app: max(8 * MIB, int(total_bytes * float(ratios[app]) / ratio_total)) for app in apps}
+    each = total_bytes // len(apps)
+    return {app: max(8 * MIB, each) for app in apps}
+
+
+def generate_scenario(config: dict[str, Any], *, suite: str, profile: str, round_index: int, seed: int, session_dir: Path, trace_instance: str) -> dict[str, Any]:
+    profile_cfg = config["profiles"][profile]
+    suite_cfg = config[suite]
+    apps = list(suite_cfg["apps"])
+    specs = app_specs(session_dir)
+    total_memory = meminfo()["MemTotal"]
+    logical_ratio = float(profile_cfg[f"{suite}_logical_ratio"])
+    logical_total = int(total_memory * logical_ratio)
+    allocation = allocation_by_app(
+        logical_total,
+        apps,
+        suite_cfg.get("peak_ratio_by_app") if suite == "peak" else None,
+    )
+    anon_fraction = float(suite_cfg["anon_fraction"])
+    hot_fraction = float(suite_cfg["hot_fraction"])
+    steps = int(profile_cfg[f"{suite}_steps"])
+    rng = random.Random(seed)
+    ballast_dir = session_dir / "ballast"
+    fixture_dir = session_dir / "fixtures"
+    fixture_dir.mkdir(parents=True, exist_ok=True)
+    gimp_fixture = fixture_dir / "gimp-test.ppm"
+    if "GIMP" in apps and not gimp_fixture.exists():
+        width = 512
+        height = 512
+        pixels = bytearray()
+        for y in range(height):
+            for x in range(width):
+                pixels.extend(((x * 255) // (width - 1), (y * 255) // (height - 1), 128))
+        gimp_fixture.write_bytes(f"P6\n{width} {height}\n255\n".encode("ascii") + pixels)
+    actions: list[dict[str, Any]] = []
+    if "FIREFOX" in apps:
+        actions.append({"type": "shell", "command": f"mkdir -p {shlex.quote(str(session_dir / 'firefox-profile'))}", "label": "PREPARE_FIREFOX_PROFILE"})
+    if suite == "hotcold":
+        for app in apps:
+            actions.extend(app_launch_actions(specs[app]))
+    sockets: dict[str, Path] = {}
+    fixture_layout: dict[str, dict[str, int]] = {}
+    for app in apps:
+        logical = allocation[app]
+        anon_bytes = max(4 * MIB, int(logical * anon_fraction))
+        file_bytes = max(4 * MIB, logical - anon_bytes)
+        hot_bytes = max(4 * MIB, int(file_bytes * hot_fraction))
+        socket_path = fixture_socket(session_dir, app)
+        sockets[app] = socket_path
+        fixture_layout[app] = {"logical_bytes": logical, "file_bytes": file_bytes, "anon_bytes": anon_bytes, "hot_bytes": hot_bytes}
+        command = [
+            sys.executable, str(FIXTURE), "--app", app, "--socket", str(socket_path),
+            "--file", str(ballast_dir / f"{app.lower()}.sparse"),
+            "--log", str(ballast_dir / f"{app.lower()}-fixture.csv"),
+            "--file-bytes", str(file_bytes), "--anon-bytes", str(anon_bytes),
+            "--hot-bytes", str(hot_bytes),
+        ]
+        actions.append({"type": "launch", "name": f"fixture-{app.lower()}", "scope_name": f"fixture-{app.lower()}", "app_key": app, "command": shlex.join(command), "label": f"FIXTURE_LAUNCH_{app}"})
+        actions.append(py_fixture_action(socket_path, "STATUS", wait=30, label=f"FIXTURE_READY_{app}"))
+    for app in apps:
+        actions.append(py_fixture_action(sockets[app], "PREPARE", timeout=1200, label=f"FIXTURE_PREPARE_{app}"))
+    if suite == "peak":
+        launch_and_wait = {app: app_launch_actions(specs[app]) for app in apps}
+        for app in apps:
+            actions.append(launch_and_wait[app][0])
+        for app in apps:
+            actions.append(launch_and_wait[app][1])
+    filter_args = [sys.executable, str(Path(__file__).resolve()), "trace-filter", "--instance", trace_instance]
+    for app in apps:
+        filter_args.extend(["--socket", str(sockets[app])])
+    actions.append({"type": "shell", "command": shlex.join(filter_args), "label": "TRACE_FILTER_FIXTURE_PIDS"})
+    actions.append(trace_action(trace_instance, "enable", "TRACE_MEASURE_ENABLE"))
+    actions.append({"type": "trace_marker", "event_type": "ACCEPTANCE_MEASURE_START", "status": "running", "label": "MEASURE_START"})
+    previous = ""
+    for step in range(steps):
+        choices = [app for app in apps if app != previous] or apps
+        app = rng.choice(choices)
+        spec = specs[app]
+        actions.append({"type": "trace_marker", "event_type": f"{suite.upper()}_CASE_START", "status": "running", "app_key": app, "label": f"{suite.upper()}_CASE_{step:03d}_START", "metadata": {"seed": seed, "round": round_index, "case": step}})
+        actions.append({"type": "switch", "name": spec.name, "app_key": app, "class": spec.window_class, "title": spec.window_title, "label": f"{suite.upper()}_CASE_{step:03d}_SWITCH_{app}"})
+        actions.append({"type": "verify_foreground", "name": spec.name, "app_key": app, "class": spec.window_class, "title": spec.window_title, "label": f"{suite.upper()}_CASE_{step:03d}_VERIFY_{app}"})
+        actions.append(py_fixture_action(sockets[app], "TOUCH_HOT", timeout=120, label=f"{suite.upper()}_CASE_{step:03d}_HOT_{app}"))
+        sample_bytes = max(4 * MIB, int(fixture_layout[app]["file_bytes"] * float(suite_cfg["sample_fraction_per_step"])))
+        cold_start = fixture_layout[app]["hot_bytes"]
+        cold_span = max(4096, fixture_layout[app]["file_bytes"] - cold_start - sample_bytes)
+        offset = cold_start + rng.randrange(0, cold_span, 4096) if cold_span > 4096 else cold_start
+        if rng.random() < (0.35 if suite == "hotcold" else 0.20):
+            actions.append(py_fixture_action(sockets[app], f"TOUCH_SAMPLE {offset} {sample_bytes}", timeout=180, label=f"{suite.upper()}_CASE_{step:03d}_SAMPLE_{app}"))
+        actions.append({"type": "key", "name": spec.name, "app_key": app, "key": spec.operation_key, "optional": app == "FIREFOX", "label": f"{suite.upper()}_CASE_{step:03d}_UI_{app}"})
+        dwell = rng.uniform(float(profile_cfg["dwell_min_seconds"]), float(profile_cfg["dwell_max_seconds"]))
+        actions.append({"type": "wait", "seconds": round(dwell, 3), "label": f"{suite.upper()}_CASE_{step:03d}_DWELL"})
+        actions.append({"type": "trace_marker", "event_type": f"{suite.upper()}_CASE_DONE", "status": "success", "app_key": app, "label": f"{suite.upper()}_CASE_{step:03d}_DONE"})
+        previous = app
+    actions.append({"type": "trace_marker", "event_type": "ACCEPTANCE_MEASURE_DONE", "status": "success", "label": "MEASURE_DONE"})
+    actions.append(trace_action(trace_instance, "disable", "TRACE_MEASURE_DISABLE"))
+    for app in reversed(apps):
+        actions.append(py_fixture_action(sockets[app], "STOP", wait=2, label=f"FIXTURE_STOP_{app}"))
+    for app in reversed(apps):
+        actions.append(app_close_action(specs[app]))
+    workload_contract: dict[str, Any] = {
+        "logical_ratio": logical_ratio,
+        "logical_total_bytes": sum(allocation.values()),
+        "memtotal_bytes": total_memory,
+    }
+    if suite == "hotcold":
+        workload_contract.update({
+            "required_ratio_min": 1.50, "required_ratio_max": 2.00,
+            "ratio_requirement_met": 1.50 <= logical_ratio <= 2.00,
+        })
+    else:
+        normal_ratios = {app: float(suite_cfg["normal_ratio_by_app"][app]) for app in apps}
+        peak_ratios = {app: float(suite_cfg["peak_ratio_by_app"][app]) for app in apps}
+        workload_contract.update({
+            "normal_ratio_by_app": normal_ratios,
+            "normal_ratio_sum": sum(normal_ratios.values()),
+            "peak_ratio_by_app": peak_ratios,
+            "peak_ratio_sum": sum(peak_ratios.values()),
+            "normal_sum_le_physical": sum(normal_ratios.values()) <= 1.0,
+            "each_peak_le_physical": all(value <= 1.0 for value in peak_ratios.values()),
+            "concurrent_peak_ge_120_percent": sum(peak_ratios.values()) >= 1.20,
+        })
+    scenario = {
+        "description": f"PARP {suite} diagnostic acceptance round {round_index}",
+        "validation_mode": True,
+        "metadata": {
+            "suite": suite, "profile": profile, "round": round_index, "seed": seed,
+            "memtotal_bytes": total_memory, "logical_ratio": logical_ratio,
+            "logical_total_bytes": sum(allocation.values()), "fixture_layout": fixture_layout,
+            "scored_steps": steps, "workload_contract": workload_contract,
+        },
+        "actions": actions,
+    }
+    return scenario
+
+
+def slice_path(slice_name: str) -> Path | None:
+    result = run(["systemctl", "--user", "show", slice_name, "-p", "ControlGroup", "--value"], timeout=5)
+    value = result.stdout.strip()
+    return Path("/sys/fs/cgroup") / value.lstrip("/") if result.returncode == 0 and value else None
+
+
+def setup_slice(config: dict[str, Any]) -> Path:
+    slice_name = str(config["slice"])
+    total = meminfo()["MemTotal"]
+    high = int(total * float(config["safety"]["memory_high_ratio"]))
+    maximum = int(total * float(config["safety"]["memory_max_ratio"]))
+    command = [
+        "systemctl", "--user", "set-property", "--runtime", slice_name,
+        "MemoryAccounting=yes", f"MemoryHigh={high}", f"MemoryMax={maximum}",
+    ]
+    outcome = run(command, timeout=15)
+    if outcome.returncode != 0:
+        raise RuntimeError(outcome.stderr.strip() or "failed to configure test slice")
+    run(["systemctl", "--user", "stop", KEEPER_UNIT], timeout=15)
+    run(["systemctl", "--user", "reset-failed", KEEPER_UNIT], timeout=15)
+    keeper = run([
+        "systemd-run", "--user", f"--unit={KEEPER_UNIT}", "--collect",
+        f"--slice={slice_name}", "/bin/sleep", "3600",
+    ], timeout=15)
+    if keeper.returncode != 0:
+        raise RuntimeError(keeper.stderr.strip() or "failed to create test slice keeper")
+    path = slice_path(slice_name)
+    if path is None or not path.is_dir():
+        raise RuntimeError("test slice cgroup path unavailable")
+    return path
+
+
+def cleanup_slice(config: dict[str, Any]) -> None:
+    slice_name = str(config["slice"])
+    run(["systemctl", "--user", "stop", KEEPER_UNIT], timeout=30)
+    run(["systemctl", "--user", "stop", slice_name], timeout=30)
+    run(["systemctl", "--user", "revert", slice_name], timeout=30)
+
+
+def cgroup_snapshot(path: Path | None) -> dict[str, int | str]:
+    if path is None or not path.is_dir():
+        return {"status": "missing"}
+    stat = read_kv(path / "memory.stat")
+    events = read_kv(path / "memory.events")
+    return {
+        "status": "ok", "memory_current": int(read_text(path / "memory.current") or 0),
+        "pgfault": stat.get("pgfault", 0), "pgmajfault": stat.get("pgmajfault", 0),
+        "workingset_refault_file": stat.get("workingset_refault_file", 0),
+        "workingset_refault_anon": stat.get("workingset_refault_anon", 0),
+        "anon": stat.get("anon", 0), "file": stat.get("file", 0),
+        "events_high": events.get("high", 0), "events_max": events.get("max", 0),
+        "events_oom": events.get("oom", 0), "events_oom_kill": events.get("oom_kill", 0),
+    }
+
+
+def snapshot(path: Path | None) -> dict[str, Any]:
+    memory = meminfo()
+    return {
+        "timestamp_ns": time.time_ns(), "monotonic_ns": time.monotonic_ns(),
+        "memtotal": memory.get("MemTotal", 0), "memavailable": memory.get("MemAvailable", 0),
+        "swapfree": memory.get("SwapFree", 0), "psi": psi_memory(), "vmstat": vmstat(),
+        "cgroup": cgroup_snapshot(path),
+    }
+
+
+def popup_titles(env: dict[str, str]) -> list[str]:
+    outcome = subprocess.run(["wmctrl", "-l"], text=True, capture_output=True, env={**os.environ, **env}, timeout=5, check=False)
+    if outcome.returncode != 0:
+        return []
+    return [line.strip() for line in outcome.stdout.splitlines() if LOW_MEMORY_RE.search(line)]
+
+
+def write_monitor_header(stream: Any) -> csv.DictWriter:
+    fields = [
+        "timestamp_ns", "memavailable", "swapfree", "psi_some_avg10", "psi_full_avg10",
+        "vm_oom_kill", "pswpin", "pswpout", "cgroup_status", "memory_current",
+        "pgfault", "pgmajfault", "refault_file", "refault_anon", "events_high",
+        "events_max", "events_oom", "events_oom_kill", "low_memory_popup_count",
+    ]
+    writer = csv.DictWriter(stream, fieldnames=fields)
+    writer.writeheader()
+    return writer
+
+
+def trace_stats(instance: str, destination: Path) -> None:
+    result = run(["sudo", "-n", "bash", str(TRACE_HELPER), "stats", instance], timeout=30)
+    destination.write_text(result.stdout + result.stderr, encoding="utf-8")
+
+
+def parse_trace_stats(path: Path) -> dict[str, int]:
+    result = {"overrun": 0, "commit_overrun": 0, "dropped_events": 0, "read_events": 0}
+    patterns = {
+        "overrun": re.compile(r"^overrun:\s+(\d+)$", re.MULTILINE),
+        "commit_overrun": re.compile(r"^commit overrun:\s+(\d+)$", re.MULTILINE),
+        "dropped_events": re.compile(r"^dropped events:\s+(\d+)$", re.MULTILINE),
+        "read_events": re.compile(r"^read events:\s+(\d+)$", re.MULTILINE),
+    }
+    text = read_text(path)
+    for key, pattern in patterns.items():
+        result[key] = sum(int(value) for value in pattern.findall(text))
+    return result
+
+
+def count_trace_events(path: Path) -> dict[str, int]:
+    names = {
+        "page_fault_user": "page_fault_user:",
+        "page_fault_kernel": "page_fault_kernel:",
+        "parp_decision": "parp_effective_tier_decision:",
+        "parp_access": "parp_effective_tier_access:",
+        "parp_outcome": "parp_effective_tier_outcome:",
+        "direct_reclaim_begin": "mm_vmscan_direct_reclaim_begin:",
+        "kswapd_wake": "mm_vmscan_kswapd_wake:",
+    }
+    counts = {key: 0 for key in names}
+    try:
+        with path.open(encoding="utf-8", errors="replace") as stream:
+            for line in stream:
+                for key, marker in names.items():
+                    if marker in line:
+                        counts[key] += 1
+                        break
+    except OSError:
+        pass
+    return counts
+
+
+def csv_delta(path: Path, first_key: str, last_key: str) -> int:
+    rows = list(csv.DictReader(path.open(encoding="utf-8", newline=""))) if path.exists() else []
+    if not rows:
+        return 0
+    return int(rows[-1].get(last_key, 0) or 0) - int(rows[0].get(first_key, 0) or 0)
+
+
+def automation_counts(path: Path, suite: str) -> dict[str, int]:
+    result = {"case_start": 0, "case_done": 0, "failed_actions": 0, "launch_failures": 0, "launch_success": 0, "scenario_failed": 0}
+    if not path.exists():
+        return result
+    with path.open(encoding="utf-8", newline="") as stream:
+        for row in csv.DictReader(stream):
+            event = row.get("event_type", "")
+            status = row.get("status", "")
+            if event == f"{suite.upper()}_CASE_START":
+                result["case_start"] += 1
+            elif event == f"{suite.upper()}_CASE_DONE":
+                result["case_done"] += 1
+            elif event == "APP_LAUNCH" and status == "success" and row.get("label", "").startswith("LAUNCH_"):
+                result["launch_success"] += 1
+            elif event == "SCENARIO_FAILED":
+                result["scenario_failed"] += 1
+            if row.get("phase") == "end" and status == "failed":
+                result["failed_actions"] += 1
+                if row.get("label", "").startswith(("LAUNCH_", "WAIT_")):
+                    result["launch_failures"] += 1
+    return result
+
+
+def finalize_round(session_dir: Path, suite: str, expected_steps: int, automation_rc: int, abort_reason: str) -> dict[str, Any]:
+    trace_counts = count_trace_events(session_dir / "trace/trace.txt")
+    stats = parse_trace_stats(session_dir / "trace/stats-after.txt")
+    auto = automation_counts(session_dir / "automation_trace.csv", suite)
+    monitor_path = session_dir / "monitor.csv"
+    popup_count = 0
+    cgroup_oom = 0
+    cgroup_oom_kill = 0
+    cgroup_pgfault = 0
+    cgroup_pgmajfault = 0
+    if monitor_path.exists():
+        rows = list(csv.DictReader(monitor_path.open(encoding="utf-8", newline="")))
+        if rows:
+            popup_active = False
+            for row in rows:
+                active = int(row.get("low_memory_popup_count", 0) or 0) > 0
+                if active and not popup_active:
+                    popup_count += 1
+                popup_active = active
+            cgroup_oom = int(rows[-1].get("events_oom", 0) or 0) - int(rows[0].get("events_oom", 0) or 0)
+            cgroup_oom_kill = int(rows[-1].get("events_oom_kill", 0) or 0) - int(rows[0].get("events_oom_kill", 0) or 0)
+            cgroup_pgfault = int(rows[-1].get("pgfault", 0) or 0) - int(rows[0].get("pgfault", 0) or 0)
+            cgroup_pgmajfault = int(rows[-1].get("pgmajfault", 0) or 0) - int(rows[0].get("pgmajfault", 0) or 0)
+    trace_loss = stats["overrun"] + stats["commit_overrun"] + stats["dropped_events"]
+    valid = automation_rc == 0 and not abort_reason and auto["case_done"] == expected_steps and trace_loss == 0
+    result = {
+        "status": "VALID_DIAGNOSTIC" if valid else "INVALID",
+        "suite": suite, "expected_steps": expected_steps, "automation_rc": automation_rc,
+        "abort_reason": abort_reason, "automation": auto, "trace": {**trace_counts, **stats, "loss_total": trace_loss},
+        "cgroup": {"pgfault_delta": cgroup_pgfault, "pgmajfault_delta": cgroup_pgmajfault, "oom_delta": cgroup_oom, "oom_kill_delta": cgroup_oom_kill},
+        "events": {"launch_failures": auto["launch_failures"], "low_memory_popups": popup_count, "app_oom_kills": cgroup_oom_kill,
+                   "failure_total": auto["launch_failures"] + popup_count + cgroup_oom_kill},
+    }
+    write_json(session_dir / "round-result.json", result)
+    return result
+
+
+def run_round(config: dict[str, Any], *, suite: str, profile: str, round_index: int, seed: int, parent_dir: Path, preflight_data: dict[str, Any]) -> dict[str, Any]:
+    session_dir = parent_dir / f"round-{round_index:02d}"
+    for child in ("trace", "ballast", "screenshots"):
+        (session_dir / child).mkdir(parents=True, exist_ok=True)
+    instance = f"parp-accept-{os.getpid()}-{round_index}"
+    scenario = generate_scenario(config, suite=suite, profile=profile, round_index=round_index, seed=seed, session_dir=session_dir, trace_instance=instance)
+    scenario_path = session_dir / "scenario.json"
+    write_json(scenario_path, scenario)
+    write_json(session_dir / "preflight.json", preflight_data)
+    expected_steps = int(scenario["metadata"]["scored_steps"])
+    cgroup_path: Path | None = None
+    trace_stream: subprocess.Popen[Any] | None = None
+    trace_output: Any = None
+    automation: subprocess.Popen[Any] | None = None
+    abort_reason = ""
+    automation_rc = 1
+    gui = preflight_data["gui"]
+    safety = config["safety"]
+    low_available_count = 0
+    high_psi_count = 0
+    root_oom_before = vmstat().get("oom_kill", 0)
+    try:
+        cgroup_path = setup_slice(config)
+        before = snapshot(cgroup_path)
+        write_json(session_dir / "snapshot-before.json", before)
+        setup = run([
+            "sudo", "-n", "bash", str(TRACE_HELPER), "setup", instance,
+            str(int(safety["trace_buffer_kb_per_cpu"])),
+        ], timeout=30)
+        if setup.returncode != 0:
+            raise RuntimeError(setup.stderr.strip() or "trace setup failed")
+        trace_stats(instance, session_dir / "trace/stats-before.txt")
+        trace_output = (session_dir / "trace/trace.txt").open("w", encoding="utf-8")
+        trace_stream = subprocess.Popen(["sudo", "-n", "bash", str(TRACE_HELPER), "stream", instance], stdout=trace_output, stderr=(session_dir / "trace/stream-error.txt").open("w", encoding="utf-8"), text=True)
+        env = {**os.environ, **gui, "GDK_BACKEND": "x11", "MOZ_ENABLE_WAYLAND": "0", "WAYLAND_DISPLAY": ""}
+        automation_log = (session_dir / "automation.log").open("w", encoding="utf-8")
+        command = [
+            "bash", str(AUTOMATION), "--scenario", str(scenario_path), "--display", gui["DISPLAY"],
+            "--xauthority", gui["XAUTHORITY"], "--trace-output", str(session_dir / "automation_trace.csv"),
+            "--session-id", session_dir.name, "--scenario-id", f"parp_{suite}_{round_index}",
+            "--test-slice", str(config["slice"]), "--reset-files",
+        ]
+        automation = subprocess.Popen(command, stdout=automation_log, stderr=subprocess.STDOUT, text=True, env=env, start_new_session=True)
+        with (session_dir / "monitor.csv").open("w", encoding="utf-8", newline="") as monitor_stream:
+            writer = write_monitor_header(monitor_stream)
+            started = time.monotonic()
+            while automation.poll() is None:
+                current = snapshot(cgroup_path)
+                cg = current["cgroup"]
+                popups = popup_titles(gui)
+                writer.writerow({
+                    "timestamp_ns": current["timestamp_ns"], "memavailable": current["memavailable"], "swapfree": current["swapfree"],
+                    "psi_some_avg10": current["psi"].get("some_avg10", 0), "psi_full_avg10": current["psi"].get("full_avg10", 0),
+                    "vm_oom_kill": current["vmstat"].get("oom_kill", 0), "pswpin": current["vmstat"].get("pswpin", 0), "pswpout": current["vmstat"].get("pswpout", 0),
+                    "cgroup_status": cg.get("status", ""), "memory_current": cg.get("memory_current", 0), "pgfault": cg.get("pgfault", 0),
+                    "pgmajfault": cg.get("pgmajfault", 0), "refault_file": cg.get("workingset_refault_file", 0), "refault_anon": cg.get("workingset_refault_anon", 0),
+                    "events_high": cg.get("events_high", 0), "events_max": cg.get("events_max", 0), "events_oom": cg.get("events_oom", 0), "events_oom_kill": cg.get("events_oom_kill", 0),
+                    "low_memory_popup_count": len(popups),
+                })
+                monitor_stream.flush()
+                if popups:
+                    write_json(session_dir / "low-memory-popup.json", {"timestamp_ns": time.time_ns(), "windows": popups})
+                low_available_count = low_available_count + 1 if current["memavailable"] < int(safety["min_memavailable_bytes"]) else 0
+                psi_guard = (
+                    current["psi"].get("full_avg10", 0) > float(safety["psi_full_avg10_abort"])
+                    and current["memavailable"] < int(safety["psi_memavailable_guard_bytes"])
+                )
+                high_psi_count = high_psi_count + 1 if psi_guard else 0
+                if current["vmstat"].get("oom_kill", 0) > root_oom_before:
+                    abort_reason = "ROOT_OOM_KILL_INCREMENT"
+                elif low_available_count >= int(safety["abort_consecutive_samples"]):
+                    abort_reason = "MEMAVAILABLE_HARD_FLOOR"
+                elif high_psi_count >= int(safety["abort_consecutive_samples"]):
+                    abort_reason = "PSI_FULL_HARD_LIMIT"
+                elif time.monotonic() - started > float(safety["max_round_seconds"]):
+                    abort_reason = "ROUND_TIMEOUT"
+                if abort_reason:
+                    os.killpg(automation.pid, signal.SIGTERM)
+                    break
+                time.sleep(float(safety["sample_interval_seconds"]))
+        try:
+            automation_rc = automation.wait(timeout=30)
+        except subprocess.TimeoutExpired:
+            os.killpg(automation.pid, signal.SIGKILL)
+            automation_rc = automation.wait(timeout=10)
+        automation_log.close()
+        write_json(session_dir / "snapshot-after.json", snapshot(cgroup_path))
+    except Exception as exc:
+        abort_reason = abort_reason or f"HARNESS_ERROR:{type(exc).__name__}:{exc}"
+    finally:
+        try:
+            run(["sudo", "-n", "bash", str(TRACE_HELPER), "disable", instance], timeout=15)
+            run(["sudo", "-n", "bash", str(TRACE_HELPER), "stop-stream", instance], timeout=15)
+            if trace_stream is not None:
+                try:
+                    trace_stream.wait(timeout=10)
+                except subprocess.TimeoutExpired:
+                    run(["sudo", "-n", "bash", str(TRACE_HELPER), "stop-stream", instance], timeout=15)
+            if trace_output is not None:
+                trace_output.close()
+            trace_stats(instance, session_dir / "trace/stats-after.txt")
+            run(["sudo", "-n", "bash", str(TRACE_HELPER), "cleanup", instance], timeout=30)
+        finally:
+            cleanup_slice(config)
+            ballast_root = (session_dir / "ballast").resolve()
+            for sparse_file in ballast_root.glob("*.sparse"):
+                resolved = sparse_file.resolve()
+                if resolved.parent == ballast_root:
+                    resolved.unlink(missing_ok=True)
+    return finalize_round(session_dir, suite, expected_steps, automation_rc, abort_reason)
+
+
+def aggregate(parent: Path, preflight_data: dict[str, Any], results: list[dict[str, Any]], suite: str, profile: str) -> dict[str, Any]:
+    valid = [item for item in results if item["status"] == "VALID_DIAGNOSTIC"]
+    def mean(path: tuple[str, str]) -> float:
+        return sum(float(item[path[0]][path[1]]) for item in valid) / len(valid) if valid else 0.0
+    first_scenario = json.loads((parent / "round-01/scenario.json").read_text(encoding="utf-8"))
+    limitations = [
+        "当前 r9 为 Shadow，apply_compiled=0，不能计算优化改善率。",
+        "PageFault trace 只过滤到受控应用内存 sidecar PID；真实 GUI 应用及 sidecar 的总 fault 以测试 slice cgroup pgfault 复核。",
+        "正式验收必须用同源 Native/OFF 与 Apply 内核、完全相同的 seed/场景进行成对比较。",
+    ]
+    if suite == "peak" and valid and mean(("events", "failure_total")) == 0:
+        limitations.append("当前基线异常总数为 0，30% 降低率分母为 0；需要经过安全校准的更强峰值负载后才能评价该指标。")
+    summary = {
+        "status": "DIAGNOSTIC_BASELINE_COMPLETE" if len(valid) == len(results) else "DIAGNOSTIC_BASELINE_INCOMPLETE",
+        "acceptance_verdict": "NOT_EVALUABLE_SHADOW_NO_APPLY" if preflight_data["diagnostic_only"] else "BASELINE_ONLY_NO_OPTIMIZED_PAIR",
+        "kernel_release": preflight_data["kernel_release"], "suite": suite, "profile": profile,
+        "rounds_requested": len(results), "rounds_valid": len(valid),
+        "workload_contract": first_scenario.get("metadata", {}).get("workload_contract", {}),
+        "averages": {
+            "trace_page_fault_user": mean(("trace", "page_fault_user")),
+            "cgroup_pgfault": mean(("cgroup", "pgfault_delta")),
+            "cgroup_pgmajfault": mean(("cgroup", "pgmajfault_delta")),
+            "launch_failures": mean(("events", "launch_failures")),
+            "low_memory_popups": mean(("events", "low_memory_popups")),
+            "app_oom_kills": mean(("events", "app_oom_kills")),
+            "failure_total": mean(("events", "failure_total")),
+        },
+        "results": results,
+        "limitations": limitations,
+    }
+    write_json(parent / "summary.json", summary)
+    lines = [
+        f"# PARP {suite} 当前内核诊断结果", "",
+        f"- 状态：`{summary['status']}`", f"- 验收结论：`{summary['acceptance_verdict']}`",
+        f"- 内核：`{summary['kernel_release']}`", f"- 有效轮次：`{len(valid)}/{len(results)}`", "",
+        "## 平均值", "",
+    ]
+    for key, value in summary["averages"].items():
+        lines.append(f"- {key}: `{value:.3f}`")
+    lines += ["", "## 结论", "", "本结果是优化前诊断基线，不代表达到 PageFault 降低 20%/30% 或峰值异常降低 30%。"]
+    (parent / "summary.md").write_text("\n".join(lines) + "\n", encoding="utf-8")
+    return summary
+
+
+def execute(args: argparse.Namespace) -> int:
+    config = load_config(args.config)
+    pf = preflight(config, args.profile, args.suite)
+    root = output_root(config)
+    stamp = dt.datetime.now().strftime("%Y%m%d_%H%M%S")
+    parent = root / f"{args.suite}-{args.profile}-{stamp}-{os.uname().release}"
+    parent.mkdir(parents=True, exist_ok=True)
+    write_json(parent / "preflight.json", pf)
+    print(f"output={parent}", flush=True)
+    if pf["status"] != "READY":
+        print(json.dumps(pf, ensure_ascii=False, indent=2))
+        return 2
+    rounds = int(config["profiles"][args.profile][f"{args.suite}_repeats" if args.suite == "hotcold" else f"{args.suite}_rounds"])
+    if args.rounds:
+        rounds = args.rounds
+    results = []
+    for index in range(1, rounds + 1):
+        seed = args.seed + index - 1
+        print(f"round={index}/{rounds} seed={seed}", flush=True)
+        results.append(run_round(config, suite=args.suite, profile=args.profile, round_index=index, seed=seed, parent_dir=parent, preflight_data=pf))
+        print(f"round_status={results[-1]['status']}", flush=True)
+    summary = aggregate(parent, pf, results, args.suite, args.profile)
+    print(json.dumps(summary, ensure_ascii=False, indent=2))
+    return 0 if summary["rounds_valid"] == rounds else 1
+
+
+def suite_evidence(summary_path: Path) -> dict[str, Any]:
+    summary = json.loads(summary_path.read_text(encoding="utf-8"))
+    suite_root = summary_path.parent
+    monitor_rows: list[dict[str, str]] = []
+    for monitor_path in sorted(suite_root.glob("round-*/monitor.csv")):
+        with monitor_path.open(encoding="utf-8", newline="") as stream:
+            monitor_rows.extend(csv.DictReader(stream))
+    contract = summary.get("workload_contract", {})
+    if not contract:
+        scenario_path = suite_root / "round-01/scenario.json"
+        if scenario_path.exists():
+            scenario = json.loads(scenario_path.read_text(encoding="utf-8"))
+            contract = scenario.get("metadata", {}).get("workload_contract", {
+                "logical_ratio": scenario.get("metadata", {}).get("logical_ratio"),
+                "logical_total_bytes": scenario.get("metadata", {}).get("logical_total_bytes"),
+                "memtotal_bytes": scenario.get("metadata", {}).get("memtotal_bytes"),
+            })
+    def values(field: str) -> list[float]:
+        result: list[float] = []
+        for row in monitor_rows:
+            try:
+                result.append(float(row.get(field, 0) or 0))
+            except ValueError:
+                pass
+        return result
+    return {
+        "path": str(suite_root.resolve()), "summary": summary, "workload_contract": contract,
+        "monitor_extrema": {
+            "min_memavailable_bytes": min(values("memavailable"), default=0),
+            "max_psi_full_avg10": max(values("psi_full_avg10"), default=0),
+            "max_test_cgroup_memory_current_bytes": max(values("memory_current"), default=0),
+            "min_swapfree_bytes": min(values("swapfree"), default=0),
+        },
+        "trace_loss_total": sum(int(item["trace"]["loss_total"]) for item in summary.get("results", [])),
+        "case_done_total": sum(int(item["automation"]["case_done"]) for item in summary.get("results", [])),
+        "root_or_cgroup_oom_total": sum(int(item["cgroup"]["oom_kill_delta"]) for item in summary.get("results", [])),
+    }
+
+
+def combine_reports(args: argparse.Namespace) -> int:
+    hotcold = suite_evidence(args.hotcold)
+    peak = suite_evidence(args.peak)
+    hot_summary = hotcold["summary"]
+    peak_summary = peak["summary"]
+    if hot_summary.get("kernel_release") != peak_summary.get("kernel_release"):
+        raise RuntimeError("hotcold and peak results use different kernels")
+    payload = {
+        "status": "CURRENT_R9_DIAGNOSTIC_COMPLETE",
+        "acceptance_verdict": "NOT_EVALUABLE_SHADOW_NO_APPLY",
+        "kernel_release": hot_summary.get("kernel_release"),
+        "generated_at": dt.datetime.now().isoformat(),
+        "hotcold": hotcold,
+        "peak": peak,
+        "acceptance": {
+            "pagefault_improvement_percent": None,
+            "pagefault_target_percent": 20,
+            "pagefault_challenge_percent": 30,
+            "peak_failure_improvement_percent": None,
+            "peak_failure_target_percent": 30,
+            "reason": "当前内核 apply_compiled=0，且没有同源 Apply 配对结果；峰值基线异常总数为 0。",
+        },
+        "next_required": [
+            "安全校准更强的峰值匿名内存比例，使 Native/OFF 基线出现非零但仅限测试 cgroup 的异常事件。",
+            "构建同源 Apply 内核，并保留 Native/OFF 运行模式。",
+            "每组测试前重启，使用本报告保存的 seed 和 scenario 进行成对 10 轮/3 轮比较。",
+        ],
+    }
+    args.output_dir.mkdir(parents=True, exist_ok=True)
+    json_path = args.output_dir / "current-r9-diagnostic-lzx.json"
+    md_path = args.output_dir / "current-r9-diagnostic-lzx.md"
+    write_json(json_path, payload)
+    ha = hot_summary["averages"]
+    pa = peak_summary["averages"]
+    lines = [
+        "# 当前 r9 内核诊断基线", "",
+        f"- 状态：`{payload['status']}`",
+        f"- 验收结论：`{payload['acceptance_verdict']}`",
+        f"- 内核：`{payload['kernel_release']}`",
+        "- 原因：当前 r9 为 Shadow，`apply_compiled=0`，没有执行页面保护/降级动作。", "",
+        "## 冷热 PageFault", "",
+        f"- 有效轮次：`{hot_summary['rounds_valid']}/{hot_summary['rounds_requested']}`；有效步骤：`{hotcold['case_done_total']}`。",
+        f"- 受控内存 trace PageFault 均值：`{ha['trace_page_fault_user']:.3f}`。",
+        f"- 测试 slice pgfault / pgmajfault 均值：`{ha['cgroup_pgfault']:.3f}` / `{ha['cgroup_pgmajfault']:.3f}`。",
+        f"- trace 丢失总数：`{hotcold['trace_loss_total']}`。",
+        "- 20%/30% 改善率：`N/A`，尚无 Apply 配对结果。", "",
+        "## 峰值调度", "",
+        f"- 有效轮次：`{peak_summary['rounds_valid']}/{peak_summary['rounds_requested']}`；有效步骤：`{peak['case_done_total']}`。",
+        f"- 启动失败 / 低内存弹窗 / cgroup OOM kill 均值：`{pa['launch_failures']:.3f}` / `{pa['low_memory_popups']:.3f}` / `{pa['app_oom_kills']:.3f}`。",
+        f"- 异常总数均值：`{pa['failure_total']:.3f}`；trace 丢失总数：`{peak['trace_loss_total']}`。",
+        "- 30% 改善率：`N/A`；当前基线为 0，分母为 0，不能据此宣布达标。", "",
+        "## 结论", "",
+        "当前内核在本轮受控场景下能够完成全部操作且没有 OOM，但这只说明诊断场景可运行。它既没有执行 PARP Apply，也不能证明两个降低比例已经达到。下一步必须先安全校准出非零峰值基线，再运行同源 Native/OFF 与 Apply 成对实验。", "",
+        f"- 冷热原始结果：`{hotcold['path']}`",
+        f"- 峰值原始结果：`{peak['path']}`",
+    ]
+    md_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+    print(md_path)
+    print(json_path)
+    return 0
+
+
+def trace_filter(args: argparse.Namespace) -> int:
+    pids = []
+    for path in args.socket:
+        response = fixture_command(Path(path), "STATUS", 5, 5)
+        match = re.search(r"\bpid=(\d+)\b", response)
+        if not match:
+            raise RuntimeError(f"fixture pid missing: {path}")
+        pids.append(match.group(1))
+    outcome = run(["sudo", "-n", "bash", str(TRACE_HELPER), "filter-pids", args.instance, ",".join(pids)], timeout=30)
+    if outcome.returncode != 0:
+        raise RuntimeError(outcome.stderr.strip() or "trace pid filter failed")
+    print("OK pids=" + ",".join(pids))
+    return 0
+
+
+def parser() -> argparse.ArgumentParser:
+    root = argparse.ArgumentParser()
+    sub = root.add_subparsers(dest="subcommand", required=True)
+    check = sub.add_parser("preflight")
+    check.add_argument("--config", type=Path, default=DEFAULT_CONFIG)
+    check.add_argument("--profile", choices=["smoke", "full"], default="smoke")
+    check.add_argument("--suite", choices=["hotcold", "peak", "all"], default="all")
+    check.add_argument("--output", type=Path)
+    generate = sub.add_parser("generate")
+    generate.add_argument("--config", type=Path, default=DEFAULT_CONFIG)
+    generate.add_argument("--profile", choices=["smoke", "full"], required=True)
+    generate.add_argument("--suite", choices=["hotcold", "peak"], required=True)
+    generate.add_argument("--round", type=int, default=1)
+    generate.add_argument("--seed", type=int, default=20260809)
+    generate.add_argument("--session-dir", type=Path, required=True)
+    generate.add_argument("--trace-instance", default="parp-accept-generate")
+    generate.add_argument("--output", type=Path, required=True)
+    fixture = sub.add_parser("fixture-command")
+    fixture.add_argument("--socket", type=Path, required=True)
+    fixture.add_argument("--command", dest="fixture_value", required=True)
+    fixture.add_argument("--timeout", type=float, default=30)
+    fixture.add_argument("--wait", type=float, default=0)
+    filtering = sub.add_parser("trace-filter")
+    filtering.add_argument("--instance", required=True)
+    filtering.add_argument("--socket", action="append", required=True)
+    execute_parser = sub.add_parser("run")
+    execute_parser.add_argument("--config", type=Path, default=DEFAULT_CONFIG)
+    execute_parser.add_argument("--profile", choices=["smoke", "full"], default="smoke")
+    execute_parser.add_argument("--suite", choices=["hotcold", "peak"], required=True)
+    execute_parser.add_argument("--seed", type=int, default=20260809)
+    execute_parser.add_argument("--rounds", type=int)
+    combine = sub.add_parser("combine")
+    combine.add_argument("--hotcold", type=Path, required=True)
+    combine.add_argument("--peak", type=Path, required=True)
+    combine.add_argument("--output-dir", type=Path, required=True)
+    return root
+
+
+def main() -> int:
+    args = parser().parse_args()
+    if args.subcommand == "preflight":
+        data = preflight(load_config(args.config), args.profile, args.suite)
+        if args.output:
+            write_json(args.output, data)
+        print(json.dumps(data, ensure_ascii=False, indent=2))
+        return 0 if data["status"] == "READY" else 2
+    if args.subcommand == "generate":
+        scenario = generate_scenario(load_config(args.config), suite=args.suite, profile=args.profile, round_index=args.round, seed=args.seed, session_dir=args.session_dir.resolve(), trace_instance=args.trace_instance)
+        write_json(args.output, scenario)
+        print(args.output)
+        return 0
+    if args.subcommand == "fixture-command":
+        print(fixture_command(args.socket, args.fixture_value, args.timeout, args.wait))
+        return 0
+    if args.subcommand == "trace-filter":
+        return trace_filter(args)
+    if args.subcommand == "run":
+        return execute(args)
+    if args.subcommand == "combine":
+        return combine_reports(args)
+    return 2
+
+
+if __name__ == "__main__":
+    try:
+        raise SystemExit(main())
+    except (RuntimeError, OSError, subprocess.TimeoutExpired) as exc:
+        print(f"error: {exc}", file=sys.stderr)
+        raise SystemExit(1)

@@ -1,0 +1,70 @@
+{
+  "output_root": "lzx/tool/outputs/parp_acceptance",
+  "slice": "parp-acceptance.slice",
+  "safety": {
+    "memory_high_ratio": 0.65,
+    "memory_max_ratio": 0.75,
+    "min_memavailable_bytes": 2147483648,
+    "psi_full_avg10_abort": 0.20,
+    "psi_memavailable_guard_bytes": 4294967296,
+    "abort_consecutive_samples": 3,
+    "sample_interval_seconds": 1.0,
+    "trace_buffer_kb_per_cpu": 1024,
+    "min_inotify_watch_headroom": 1024,
+    "max_round_seconds": 1800
+  },
+  "profiles": {
+    "smoke": {
+      "hotcold_logical_ratio": 0.03,
+      "hotcold_repeats": 1,
+      "hotcold_steps": 6,
+      "peak_logical_ratio": 0.05,
+      "peak_rounds": 1,
+      "peak_steps": 12,
+      "dwell_min_seconds": 0.1,
+      "dwell_max_seconds": 0.2
+    },
+    "full": {
+      "hotcold_logical_ratio": 1.50,
+      "hotcold_repeats": 10,
+      "hotcold_steps": 24,
+      "peak_logical_ratio": 1.25,
+      "peak_rounds": 3,
+      "peak_steps": 100,
+      "dwell_min_seconds": 0.4,
+      "dwell_max_seconds": 1.2
+    }
+  },
+  "hotcold": {
+    "apps": ["WPS", "FILES", "QQ"],
+    "hot_fraction": 0.01,
+    "anon_fraction": 0.02,
+    "sample_fraction_per_step": 0.005,
+    "target_improvement_percent": 20,
+    "challenge_improvement_percent": 30
+  },
+  "peak": {
+    "apps": ["WPS", "FILES", "QQ", "FIREFOX", "GIMP", "LIBREOFFICE"],
+    "normal_ratio_by_app": {
+      "WPS": 0.13,
+      "FILES": 0.06,
+      "QQ": 0.09,
+      "FIREFOX": 0.14,
+      "GIMP": 0.11,
+      "LIBREOFFICE": 0.12
+    },
+    "peak_ratio_by_app": {
+      "WPS": 0.22,
+      "FILES": 0.12,
+      "QQ": 0.16,
+      "FIREFOX": 0.27,
+      "GIMP": 0.23,
+      "LIBREOFFICE": 0.25
+    },
+    "hot_fraction": 0.02,
+    "anon_fraction": 0.02,
+    "sample_fraction_per_step": 0.004,
+    "target_improvement_percent": 30
+  },
+  "optional_expansion_apps": ["BLENDER", "VIRT_MANAGER_QEMU", "OLLAMA"]
+}
