@@ -35,9 +35,9 @@
 
 | 项目 | 当前基线 | 轮次范围 | Apply 达到20%所需上限 | Apply 达到30%所需上限 |
 |---|---:|---:|---:|---:|
-| `page_fault_user` | `505343.7` 次/轮 | `453750～535907` | `404274.96` | `353740.59` |
-| slice `pgfault` | `7196092.6` 次/轮 | `7146007～7226197` | `5756874.08` | `5037264.82` |
-| slice `pgmajfault` | `9830.0` 次/轮 | `1979～16387` | `7864.0` | `6881.0` |
+| `page_fault_user` | `485051.9` 次/轮 | `451672～503242` | `388041.52` | `339536.33` |
+| slice `pgfault` | `7176296.5` 次/轮 | `7139702～7192663` | `5741037.2` | `5023407.55` |
+| slice `pgmajfault` | `1523.5` 次/轮 | `1409～1694` | `1218.8` | `1066.45` |
 
 - 有效轮次：`10/10`
 - 有效应用切换步骤：`240`
@@ -48,8 +48,8 @@
 
 | 指标 | 均值/轮 | 最小 | 最大 |
 |---|---:|---:|---:|
-| `workingset_refault_file` | `153565.4` | `79008` | `279258` |
-| `workingset_refault_anon` | `18691.3` | `752` | `32288` |
+| `workingset_refault_file` | `215392.1` | `125345` | `302543` |
+| `workingset_refault_anon` | `53.1` | `0` | `221` |
 
 其中 `page_fault_user` 是验收主指标；slice 的两个数值只作GUI应用和 sidecar 总体行为的交叉复核。目标上限由 `基线 × (1 - 目标改善率)` 换算。正式改善率应按以下公式计算：
 
@@ -65,9 +65,9 @@
 | 低内存弹窗 | `0.0` 次/轮 |
 | 测试 cgroup OOM kill | `0.0` 次/轮 |
 | 峰值异常总数 | `0.0` 次/轮 |
-| `page_fault_user`（辅助数据） | `1455405.0` 次/轮 |
-| slice `pgfault`（辅助数据） | `7619514.33` 次/轮 |
-| slice `pgmajfault`（辅助数据） | `20097.0` 次/轮 |
+| `page_fault_user`（辅助数据） | `1425034.33` 次/轮 |
+| slice `pgfault`（辅助数据） | `7574673.33` 次/轮 |
+| slice `pgmajfault`（辅助数据） | `4233.67` 次/轮 |
 
 - 有效轮次：`3/3`
 - 有效步骤：`300`
@@ -75,7 +75,9 @@
 - 日常内存比例总和：`65%`
 - 并发峰值比例总和：`125%`
 
-峰值场景真实refault为：`workingset_refault_file=170323.0` 次/轮，`workingset_refault_anon=34328.67` 次/轮。测试cgroup `oom=0`、`oom_kill=0`，宿主 `oom_kill=0`。
+峰值场景真实refault为：`workingset_refault_file=154880.33` 次/轮，`workingset_refault_anon=46.33` 次/轮。测试cgroup `oom=0`、`oom_kill=0`，宿主 `oom_kill=0`。
+
+本轮使用 `metrics_schema_version=2`，`workingset_activate/restore`、`pgscan/pgsteal`、direct/kswapd扫描回收量、direct/memcg reclaim延迟和kswapd CPU时间都已获得真实数值；详细均值、范围与各轮值见合并报告。
 
 当前峰值异常基线为 `0`，改善率分母为0，因此不能评价“降低30%”。这表示现有场景能够安全完成，但压力还没有校准到会稳定产生非零异常的边界。下一步应在宿主安全阈值不变的前提下逐级增强应用组合或峰值驻留量，先得到可重复的非零 Native/OFF 基线，再与 Apply 配对比较。
 
@@ -99,8 +101,8 @@ cd /home/lzxxxxxx/桌面/huawei/myself-kswapd
 python3 test/test-parp-acceptance-lzx.py -v
 python3 test/parp-acceptance-lzx.py preflight --profile smoke --suite all
 
-python3 test/parp-acceptance-lzx.py run --profile full --suite hotcold --seed 20260809
-python3 test/parp-acceptance-lzx.py run --profile full --suite peak --seed 20260809
+python3 test/parp-acceptance-lzx.py run --profile full --suite hotcold --seed 20260812
+python3 test/parp-acceptance-lzx.py run --profile full --suite peak --seed 20260812
 ```
 
 本次基线的本地合并报告位于：

@@ -109,6 +109,14 @@ class AcceptanceConfigTests(unittest.TestCase):
             self.assertEqual(metrics["direct_reclaim_latency_ns_p95"], 2_000_000)  #lzx
             self.assertEqual(metrics["direct_reclaim_pages_reclaimed"], 8)  #lzx
 
+    def test_metric_table_explains_what_each_metric_means(self) -> None:  #lzx
+        stats = REPORT.metric_stats_values([10.0, 20.0])  #lzx
+        table = "\n".join(REPORT.metric_table(  #lzx
+            "测试表", {"workingset_refault_file": stats}, "page_fault_user"  #lzx
+        ))  #lzx
+        self.assertIn("指标作用（能说明什么）", table)  #lzx
+        self.assertIn("用于识别文件页误回收和工作集抖动", table)  #lzx
+
 
 if __name__ == "__main__":
     unittest.main()

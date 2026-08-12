@@ -259,10 +259,46 @@ def metric_table(title: str, metrics: dict[str, dict[str, Any]], pagefault_label
         "failure_total": "峰值异常总数",
         "trace_loss_total": "trace 丢失",
     }
-    lines = [f"## {title}", "", "| 指标 | 均值 | 最小 | 最大 | 样本标准差 | 各轮原始值 |", "|---|---:|---:|---:|---:|---|"]
+    purposes = {  #lzx
+        "trace_page_fault_user": "反映受控应用访问时需要重新建立页映射的次数，是冷热切换的正式指标。",  #lzx
+        "cgroup_pgfault": "反映整个测试slice的总缺页活动，用于交叉复核GUI应用与sidecar的整体内存访问压力。",  #lzx
+        "cgroup_pgmajfault": "反映需要磁盘或swap I/O才能解决的重大缺页，与可感知卡顿风险直接相关。",  #lzx
+        "workingset_refault_file": "表示已回收文件页又被访问的次数，用于识别文件页误回收和工作集抖动。",  #lzx
+        "workingset_refault_anon": "表示已回收匿名页又被访问的次数，用于识别swap往返和匿名工作集抖动。",  #lzx
+        "workingset_activate_file": "表示因重用而进入活跃工作集的文件页，辅助判断文件热页识别是否及时。",  #lzx
+        "workingset_activate_anon": "表示因重用而进入活跃工作集的匿名页，辅助判断匿名热页识别是否及时。",  #lzx
+        "workingset_restore_file": "反映文件页被恢复回工作集的数量，用于观察文件工作集恢复压力。",  #lzx
+        "workingset_restore_anon": "反映匿名页被恢复回工作集的数量，用于观察匿名工作集恢复压力。",  #lzx
+        "pgscan": "内核回收路径扫描的总页数，反映为找到可回收页付出的搜索成本。",  #lzx
+        "pgsteal": "实际成功回收的页数，反映回收产出。",  #lzx
+        "scan_efficiency_percent": "pgsteal/pgscan，表示每扫描100页能成功回收多少；需结合refault判断，不是越高越好。",  #lzx
+        "pgscan_direct": "由申请内存的前台任务同步触发的扫描页数，反映应用被迫参与回收的压力。",  #lzx
+        "pgsteal_direct": "direct reclaim实际回收的页数，用于对照同步扫描成本和产出。",  #lzx
+        "pgscan_kswapd": "kswapd后台回收扫描页数，反映系统提前处理内存压力的工作量。",  #lzx
+        "pgsteal_kswapd": "kswapd后台实际回收页数，用于评估后台回收的有效产出。",  #lzx
+        "direct_reclaim_begin": "前台任务进入同步回收的次数；次数过多通常意味着更频繁的应用停顿。",  #lzx
+        "direct_reclaim_latency_p95_ms": "95%的direct reclaim停顿不超过该值，用于衡量前台同步回收的尾延迟。",  #lzx
+        "direct_reclaim_time_total_ms": "所有direct reclaim区间累计的墙钟时间，反映前台任务同步等待回收的总负担。",  #lzx
+        "direct_reclaim_pages_reclaimed": "direct reclaim期间实际回收页数，用于结合时间判断同步回收效率。",  #lzx
+        "memcg_reclaim_latency_p95_ms": "测试cgroup回收的P95墙钟延迟，反映容器/slice内存限制造成的尾部停顿。",  #lzx
+        "kswapd_wake": "kswapd被唤醒的次数，反映系统进入后台回收状态的频率。",  #lzx
+        "kswapd_active_time_total_ms": "kswapd从唤醒到休眠的累计墙钟时间，反映后台回收持续时长。",  #lzx
+        "kswapd_cpu_time_ms": "kswapd线程实际消耗的CPU时间，反映后台回收的处理器开销。",  #lzx
+        "parp_decision": "PARP做出页层级决策的trace事件数，用于确认策略是否实际进入决策路径。",  #lzx
+        "parp_access": "PARP记录的页访问事件数，用于检查特征/访问观测链路是否生效。",  #lzx
+        "parp_outcome": "PARP决策后结果事件数，用于检查决策与后续页行为的关联覆盖。",  #lzx
+        "launch_failures": "应用启动、窗口识别或自动化动作失败次数，反映用户任务可用性。",  #lzx
+        "low_memory_popups": "低内存告警窗口出现次数，反映用户可见的内存压力异常。",  #lzx
+        "cgroup_oom_events": "测试cgroup进入OOM处理的次数，可能未杀进程，用于识别已触及内存上限。",  #lzx
+        "app_oom_kills": "测试cgroup中进程真正被OOM killer终止的次数，是峰值异常正式组成项。",  #lzx
+        "host_oom_kills": "宿主系统OOM kill次数；非零表示安全边界被突破，该轮不应用于验收。",  #lzx
+        "failure_total": "启动/自动化失败+低内存弹窗+cgroup OOM kill，是峰值场景的正式异常总指标。",  #lzx
+        "trace_loss_total": "trace overrun、commit overrun和dropped events之和；非零表示采集不完整，该轮无效。",  #lzx
+    }  #lzx
+    lines = [f"## {title}", "", "| 指标 | 指标作用（能说明什么） | 均值 | 最小 | 最大 | 样本标准差 | 各轮原始值 |", "|---|---|---:|---:|---:|---:|---|"]  #lzx
     for key, stats in metrics.items():
         lines.append(
-            f"| {labels[key]} | `{number(stats['mean'])}` | `{number(stats['min'])}` | "
+            f"| {labels[key]} | {purposes[key]} | `{number(stats['mean'])}` | `{number(stats['min'])}` | "  #lzx
             f"`{number(stats['max'])}` | `{number(stats['sample_stdev'])}` | `{values_text(stats['round_values'])}` |"
         )
     lines.append("")
@@ -329,7 +365,8 @@ def build_report(hotcold_path: Path, peak_path: Path) -> tuple[dict[str, Any], s
         f"- 物理内存：`{gib(float(env['memory_total_bytes']))}`",
         f"- Swap：`{gib(float(env['swap_bytes']))}`",
         f"- effective-tier mode / apply_compiled：`{env['effective_tier_mode']}` / `{env['apply_compiled']}`",
-        f"- 模型来源：`{env['model_provenance']}`", "",
+        f"- 模型来源：`{env['model_provenance']}`",
+        f"- 指标schema版本：`{preflight.get('metrics_schema_version', 1)}`", "",  #lzx
         "## 最重要的验收基线", "",
         "| 正式指标 | 当前系统基线 | 20%目标上限 | 30%目标上限 | 当前结论 |",
         "|---|---:|---:|---:|---|",
@@ -362,7 +399,7 @@ def build_report(hotcold_path: Path, peak_path: Path) -> tuple[dict[str, Any], s
         "- 冷热正式指标是受控 sidecar PID 的 `exceptions:page_fault_user`；slice `pgfault/pgmajfault` 是交叉复核值。",
         "- 峰值正式指标是启动/自动化失败、低内存弹窗和测试 cgroup OOM kill 的总和。",
         "- `trace_loss_total` 必须为0，否则相应轮次无效。",
-        "- `N/A` 表示旧基线当时未采集该字段，不能解释成0；新增schema会在后续实验中采集。",  #lzx
+        "- 指标表若出现 `N/A`，表示该轮未采集字段，不能解释成0；本轮 schema-v2 回收指标均已完整采集。",  #lzx
         "- direct/memcg reclaim trace统计的是同步回收墙钟延迟；kswapd CPU时间来自 `/proc/<kswapd>/stat`，两者不能混用。",  #lzx
         "- 当前为Shadow内核且 `apply_compiled=0`，只用于建立优化前基线，不能给出改善率。",
         "- 峰值异常基线为0时没有可用分母，需要安全增强峰值场景后重新建立该项基线。", "",
