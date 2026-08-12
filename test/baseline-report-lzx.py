@@ -168,6 +168,8 @@ def suite_metrics(summary_path: Path) -> dict[str, Any]:
         "workingset_restore_anon": metric_stats_values(monitor("restore_anon")),  #lzx
         "pgscan": metric_stats_values(pgscan), "pgsteal": metric_stats_values(pgsteal),  #lzx
         "scan_efficiency_percent": metric_stats_values(scan_efficiency),  #lzx
+        "page_refault_ratio_percent": metric_stats(results, lambda item: item["cgroup"].get("page_refault_ratio_percent")),  #lzx
+        "direct_reclaim_scan_ratio_percent": metric_stats(results, lambda item: item["cgroup"].get("direct_reclaim_scan_ratio_percent")),  #lzx
         "pgscan_direct": metric_stats_values(monitor("pgscan_direct")),  #lzx
         "pgsteal_direct": metric_stats_values(monitor("pgsteal_direct")),  #lzx
         "pgscan_kswapd": metric_stats_values(monitor("pgscan_kswapd")),  #lzx
@@ -180,6 +182,15 @@ def suite_metrics(summary_path: Path) -> dict[str, Any]:
         "kswapd_wake": metric_stats(results, lambda item: item["trace"]["kswapd_wake"]),
         "kswapd_active_time_total_ms": metric_stats_values(scaled([item.get("kswapd_active_time_ns_total") for item in trace_rounds], 1_000_000)),  #lzx
         "kswapd_cpu_time_ms": metric_stats_values(scaled(monitor("kswapd_cpu_time_ns"), 1_000_000)),  #lzx
+        "cgroup_cpu_usage_ms": metric_stats(results, lambda item: item["cgroup"].get("cpu_usage_usec_delta") / 1000 if item["cgroup"].get("cpu_usage_usec_delta") is not None else None),  #lzx
+        "cgroup_cpu_one_core_percent": metric_stats(results, lambda item: item["cgroup"].get("cpu_one_core_percent")),  #lzx
+        "cgroup_cpu_machine_percent": metric_stats(results, lambda item: item["cgroup"].get("cpu_machine_percent")),  #lzx
+        "cgroup_io_read_mib": metric_stats(results, lambda item: item["cgroup"].get("io_read_bytes_delta") / 1024**2 if item["cgroup"].get("io_read_bytes_delta") is not None else None),  #lzx
+        "cgroup_io_write_mib": metric_stats(results, lambda item: item["cgroup"].get("io_write_bytes_delta") / 1024**2 if item["cgroup"].get("io_write_bytes_delta") is not None else None),  #lzx
+        "cgroup_io_read_mib_per_second": metric_stats(results, lambda item: item["cgroup"].get("io_read_mib_per_second")),  #lzx
+        "cgroup_io_write_mib_per_second": metric_stats(results, lambda item: item["cgroup"].get("io_write_mib_per_second")),  #lzx
+        "launch_ready_latency_mean_ms": metric_stats(results, lambda item: item.get("launch", {}).get("mean_ms")),  #lzx
+        "launch_ready_latency_p95_ms": metric_stats(results, lambda item: item.get("launch", {}).get("p95_ms")),  #lzx
         "parp_decision": metric_stats(results, lambda item: item["trace"]["parp_decision"]),
         "parp_access": metric_stats(results, lambda item: item["trace"]["parp_access"]),
         "parp_outcome": metric_stats(results, lambda item: item["trace"]["parp_outcome"]),
@@ -195,6 +206,14 @@ def suite_metrics(summary_path: Path) -> dict[str, Any]:
     preflight = load_json(preflight_path) if preflight_path.exists() else {}
     if int(preflight.get("metrics_schema_version", 1)) < 2:  #lzx
         metrics["memcg_reclaim_latency_p95_ms"] = metric_stats_values([None] * len(results))  #lzx
+    if int(preflight.get("metrics_schema_version", 1)) < 3:  #lzx
+        for name in (  #lzx
+            "page_refault_ratio_percent", "direct_reclaim_scan_ratio_percent",  #lzx
+            "cgroup_cpu_usage_ms", "cgroup_cpu_one_core_percent", "cgroup_cpu_machine_percent",  #lzx
+            "cgroup_io_read_mib", "cgroup_io_write_mib", "cgroup_io_read_mib_per_second", "cgroup_io_write_mib_per_second",  #lzx
+            "launch_ready_latency_mean_ms", "launch_ready_latency_p95_ms",  #lzx
+        ):  #lzx
+            metrics[name] = metric_stats_values([None] * len(results))  #lzx
     return {
         "summary_path": str(summary_path.resolve()),
         "kernel_release": summary.get("kernel_release", ""),
@@ -238,6 +257,8 @@ def metric_table(title: str, metrics: dict[str, dict[str, Any]], pagefault_label
         "workingset_restore_anon": "workingset_restore_anon",  #lzx
         "pgscan": "pgscan", "pgsteal": "pgsteal",  #lzx
         "scan_efficiency_percent": "扫描效率 pgsteal/pgscan（%）",  #lzx
+        "page_refault_ratio_percent": "refault/pgsteal（%）",  #lzx
+        "direct_reclaim_scan_ratio_percent": "direct扫描占比（%）",  #lzx
         "pgscan_direct": "pgscan_direct", "pgsteal_direct": "pgsteal_direct",  #lzx
         "pgscan_kswapd": "pgscan_kswapd", "pgsteal_kswapd": "pgsteal_kswapd",  #lzx
         "direct_reclaim_begin": "direct reclaim begin",
@@ -248,6 +269,15 @@ def metric_table(title: str, metrics: dict[str, dict[str, Any]], pagefault_label
         "kswapd_wake": "kswapd wake",
         "kswapd_active_time_total_ms": "kswapd活跃墙钟时间（ms）",  #lzx
         "kswapd_cpu_time_ms": "kswapd CPU时间（ms）",  #lzx
+        "cgroup_cpu_usage_ms": "测试slice CPU时间（ms）",  #lzx
+        "cgroup_cpu_one_core_percent": "测试slice CPU单核等价（%）",  #lzx
+        "cgroup_cpu_machine_percent": "测试slice CPU整机占比（%）",  #lzx
+        "cgroup_io_read_mib": "测试slice块层读取（MiB）",  #lzx
+        "cgroup_io_write_mib": "测试slice块层写入（MiB）",  #lzx
+        "cgroup_io_read_mib_per_second": "测试slice块层读取吞吐（MiB/s）",  #lzx
+        "cgroup_io_write_mib_per_second": "测试slice块层写入吞吐（MiB/s）",  #lzx
+        "launch_ready_latency_mean_ms": "应用启动到窗口就绪均值（ms）",  #lzx
+        "launch_ready_latency_p95_ms": "应用启动到窗口就绪P95（ms）",  #lzx
         "parp_decision": "PARP decision事件",
         "parp_access": "PARP access事件",
         "parp_outcome": "PARP outcome事件",
@@ -272,6 +302,8 @@ def metric_table(title: str, metrics: dict[str, dict[str, Any]], pagefault_label
         "pgscan": "内核回收路径扫描的总页数，反映为找到可回收页付出的搜索成本。",  #lzx
         "pgsteal": "实际成功回收的页数，反映回收产出。",  #lzx
         "scan_efficiency_percent": "pgsteal/pgscan，表示每扫描100页能成功回收多少；需结合refault判断，不是越高越好。",  #lzx
+        "page_refault_ratio_percent": "真实文件页与匿名页refault之和除以pgsteal，用于衡量每回收100页带来的短期误回收代价。",  #lzx
+        "direct_reclaim_scan_ratio_percent": "direct扫描页占direct与kswapd扫描总量的比例，越高通常表示越多回收成本落在前台任务。",  #lzx
         "pgscan_direct": "由申请内存的前台任务同步触发的扫描页数，反映应用被迫参与回收的压力。",  #lzx
         "pgsteal_direct": "direct reclaim实际回收的页数，用于对照同步扫描成本和产出。",  #lzx
         "pgscan_kswapd": "kswapd后台回收扫描页数，反映系统提前处理内存压力的工作量。",  #lzx
@@ -284,6 +316,15 @@ def metric_table(title: str, metrics: dict[str, dict[str, Any]], pagefault_label
         "kswapd_wake": "kswapd被唤醒的次数，反映系统进入后台回收状态的频率。",  #lzx
         "kswapd_active_time_total_ms": "kswapd从唤醒到休眠的累计墙钟时间，反映后台回收持续时长。",  #lzx
         "kswapd_cpu_time_ms": "kswapd线程实际消耗的CPU时间，反映后台回收的处理器开销。",  #lzx
+        "cgroup_cpu_usage_ms": "测试slice内全部受控进程累计CPU时间，用于比较策略是否增加总体处理器开销。",  #lzx
+        "cgroup_cpu_one_core_percent": "CPU时间除以轮次墙钟时间，100%代表持续占满一个逻辑CPU，可超过100%。",  #lzx
+        "cgroup_cpu_machine_percent": "单核等价CPU占比再除以逻辑CPU数，表示测试负载占整机总CPU容量的比例。",  #lzx
+        "cgroup_io_read_mib": "cgroup块层实际读字节，不包含页缓存命中，用于识别swap/文件回读放大。",  #lzx
+        "cgroup_io_write_mib": "cgroup块层实际写字节，用于识别swap写出和文件写入开销。",  #lzx
+        "cgroup_io_read_mib_per_second": "块层读取量除以轮次时间，反映持续读取压力；缓存命中不会计入。",  #lzx
+        "cgroup_io_write_mib_per_second": "块层写入量除以轮次时间，反映持续写盘压力。",  #lzx
+        "launch_ready_latency_mean_ms": "从GUI启动动作开始到对应X11窗口验证成功的平均代理延迟；不是首个可交互帧。",  #lzx
+        "launch_ready_latency_p95_ms": "同一轮各应用X11窗口验证代理延迟的P95；峰值并发场景中逐个验证会使其成为上界。",  #lzx
         "parp_decision": "PARP做出页层级决策的trace事件数，用于确认策略是否实际进入决策路径。",  #lzx
         "parp_access": "PARP记录的页访问事件数，用于检查特征/访问观测链路是否生效。",  #lzx
         "parp_outcome": "PARP决策后结果事件数，用于检查决策与后续页行为的关联覆盖。",  #lzx
@@ -330,6 +371,7 @@ def build_report(hotcold_path: Path, peak_path: Path) -> tuple[dict[str, Any], s
             "effective_tier_mode": preflight.get("parp", {}).get("effective_tier_mode", ""),
             "apply_compiled": preflight.get("parp", {}).get("apply_compiled", ""),
             "model_provenance": preflight.get("parp", {}).get("model_provenance", ""),
+            "system_metadata": preflight.get("system_metadata", {}),  #lzx
         },
         "official_acceptance_baseline": {
             "pagefault": {
@@ -367,6 +409,13 @@ def build_report(hotcold_path: Path, peak_path: Path) -> tuple[dict[str, Any], s
         f"- effective-tier mode / apply_compiled：`{env['effective_tier_mode']}` / `{env['apply_compiled']}`",
         f"- 模型来源：`{env['model_provenance']}`",
         f"- 指标schema版本：`{preflight.get('metrics_schema_version', 1)}`", "",  #lzx
+        "## 可复现系统元数据", "",  #lzx
+        f"- kernel config SHA-256：`{env['system_metadata'].get('kernel_config', {}).get('sha256') or 'N/A'}`",  #lzx
+        f"- CPU：`{env['system_metadata'].get('cpu_model') or 'N/A'}`，逻辑CPU：`{env['system_metadata'].get('cpu_count', 'N/A')}`",  #lzx
+        f"- CPU governor：`{', '.join(env['system_metadata'].get('cpu_governors', [])) or 'N/A'}`",  #lzx
+        f"- THP enabled / defrag：`{env['system_metadata'].get('transparent_hugepage', {}).get('enabled') or 'N/A'}` / `{env['system_metadata'].get('transparent_hugepage', {}).get('defrag') or 'N/A'}`",  #lzx
+        f"- vm sysctl：`{json.dumps(env['system_metadata'].get('vm_sysctls', {}), ensure_ascii=False, sort_keys=True)}`",  #lzx
+        f"- 结果文件系统：`{json.dumps(env['system_metadata'].get('result_storage'), ensure_ascii=False, sort_keys=True)}`", "",  #lzx
         "## 最重要的验收基线", "",
         "| 正式指标 | 当前系统基线 | 20%目标上限 | 30%目标上限 | 当前结论 |",
         "|---|---:|---:|---:|---|",
@@ -399,7 +448,9 @@ def build_report(hotcold_path: Path, peak_path: Path) -> tuple[dict[str, Any], s
         "- 冷热正式指标是受控 sidecar PID 的 `exceptions:page_fault_user`；slice `pgfault/pgmajfault` 是交叉复核值。",
         "- 峰值正式指标是启动/自动化失败、低内存弹窗和测试 cgroup OOM kill 的总和。",
         "- `trace_loss_total` 必须为0，否则相应轮次无效。",
-        "- 指标表若出现 `N/A`，表示该轮未采集字段，不能解释成0；本轮 schema-v2 回收指标均已完整采集。",  #lzx
+        "- schema-v3 要求 cgroup 路径、device/inode、memory/cpu/io 读取端点一致，trace begin/end无丢配；任一失败则该轮无效。",  #lzx
+        "- 指标表若出现 `N/A`，表示该轮未采集字段，不能解释成0；旧 schema-v2 基线中新增CPU/I/O/启动延迟将显示 `N/A`。",  #lzx
+        "- 应用启动延迟是启动动作到X11窗口验证成功的代理值，不是首个可交互帧；并发峰值场景中应视为上界。",  #lzx
         "- direct/memcg reclaim trace统计的是同步回收墙钟延迟；kswapd CPU时间来自 `/proc/<kswapd>/stat`，两者不能混用。",  #lzx
         "- 当前为Shadow内核且 `apply_compiled=0`，只用于建立优化前基线，不能给出改善率。",
         "- 峰值异常基线为0时没有可用分母，需要安全增强峰值场景后重新建立该项基线。", "",

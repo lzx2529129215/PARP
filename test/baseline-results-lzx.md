@@ -35,9 +35,9 @@
 
 | 项目 | 当前基线 | 轮次范围 | Apply 达到20%所需上限 | Apply 达到30%所需上限 |
 |---|---:|---:|---:|---:|
-| `page_fault_user` | `485051.9` 次/轮 | `451672～503242` | `388041.52` | `339536.33` |
-| slice `pgfault` | `7176296.5` 次/轮 | `7139702～7192663` | `5741037.2` | `5023407.55` |
-| slice `pgmajfault` | `1523.5` 次/轮 | `1409～1694` | `1218.8` | `1066.45` |
+| `page_fault_user` | `485826.2` 次/轮 | `452091～504358` | `388660.96` | `340078.34` |
+| slice `pgfault` | `7177823.6` 次/轮 | `7143923～7199159` | `5742258.88` | `5024476.52` |
+| slice `pgmajfault` | `1620.6` 次/轮 | `1459～1823` | `1296.48` | `1134.42` |
 
 - 有效轮次：`10/10`
 - 有效应用切换步骤：`240`
@@ -48,8 +48,8 @@
 
 | 指标 | 均值/轮 | 最小 | 最大 |
 |---|---:|---:|---:|
-| `workingset_refault_file` | `215392.1` | `125345` | `302543` |
-| `workingset_refault_anon` | `53.1` | `0` | `221` |
+| `workingset_refault_file` | `222839.3` | `136254` | `301577` |
+| `workingset_refault_anon` | `4.5` | `0` | `45` |
 
 其中 `page_fault_user` 是验收主指标；slice 的两个数值只作GUI应用和 sidecar 总体行为的交叉复核。目标上限由 `基线 × (1 - 目标改善率)` 换算。正式改善率应按以下公式计算：
 
@@ -65,9 +65,9 @@
 | 低内存弹窗 | `0.0` 次/轮 |
 | 测试 cgroup OOM kill | `0.0` 次/轮 |
 | 峰值异常总数 | `0.0` 次/轮 |
-| `page_fault_user`（辅助数据） | `1425034.33` 次/轮 |
-| slice `pgfault`（辅助数据） | `7574673.33` 次/轮 |
-| slice `pgmajfault`（辅助数据） | `4233.67` 次/轮 |
+| `page_fault_user`（辅助数据） | `1425979.33` 次/轮 |
+| slice `pgfault`（辅助数据） | `7577470.67` 次/轮 |
+| slice `pgmajfault`（辅助数据） | `5947.33` 次/轮 |
 
 - 有效轮次：`3/3`
 - 有效步骤：`300`
@@ -75,9 +75,21 @@
 - 日常内存比例总和：`65%`
 - 并发峰值比例总和：`125%`
 
-峰值场景真实refault为：`workingset_refault_file=154880.33` 次/轮，`workingset_refault_anon=46.33` 次/轮。测试cgroup `oom=0`、`oom_kill=0`，宿主 `oom_kill=0`。
+峰值场景真实refault为：`workingset_refault_file=202952.67` 次/轮，`workingset_refault_anon=87.67` 次/轮。测试cgroup `oom=0`、`oom_kill=0`，宿主 `oom_kill=0`。
 
-本轮使用 `metrics_schema_version=2`，`workingset_activate/restore`、`pgscan/pgsteal`、direct/kswapd扫描回收量、direct/memcg reclaim延迟和kswapd CPU时间都已获得真实数值；详细均值、范围与各轮值见合并报告。
+本轮使用 `metrics_schema_version=3`。在 schema-v2 回收指标基础上，新增 cgroup device/inode 与必需文件首尾一致性检查、trace begin/end 严格配对、CPU/I/O、`refault/pgsteal`、direct扫描占比、X11窗口就绪启动延迟和系统元数据。本次 `13/13` 轮中 trace 丢失、配对错误、cgroup端点失败、宿主/cgroup OOM kill 和启动样本缺失均为 `0`，启动就绪样本为 `48/48`。
+
+| schema-v3 扩展指标 | 冷热均值/轮 | 峰值均值/轮 |
+|---|---:|---:|
+| `refault/pgsteal` | `4.080%` | `3.728%` |
+| direct扫描占比 | `12.160%` | `11.894%` |
+| 测试slice CPU时间 | `36.363 s` | `64.739 s` |
+| 测试slice CPU整机占比 | `10.989%` | `7.149%` |
+| 块层读取/写入 | `1603.775 / 1.874 MiB` | `2860.720 / 88.242 MiB` |
+| 启动到X11窗口就绪均值 | `1478.607 ms` | `7610.268 ms` |
+| 启动到X11窗口就绪P95 | `2402.786 ms` | `10295.395 ms` |
+
+启动延迟是启动动作到X11匹配窗口验证成功的代理值，不是首个可交互帧；峰值场景中先并发启动再逐个验证，因此应视为上界。详细均值、范围与各轮值见合并报告。
 
 当前峰值异常基线为 `0`，改善率分母为0，因此不能评价“降低30%”。这表示现有场景能够安全完成，但压力还没有校准到会稳定产生非零异常的边界。下一步应在宿主安全阈值不变的前提下逐级增强应用组合或峰值驻留量，先得到可重复的非零 Native/OFF 基线，再与 Apply 配对比较。
 
@@ -86,7 +98,7 @@
 重启后已经满足以下内核条件：
 
 - 当前内核为 r9 effective-tier Shadow。
-- `/sys/fs/cgroup` 使用统一 cgroup v2，memory controller 可用。
+- `/sys/fs/cgroup` 使用统一 cgroup v2，memory、CPU 和 I/O controller 可用。
 - `exceptions:page_fault_user` 可用。
 - `parp:parp_effective_tier_decision` 可用。
 - swap、16 GiB 内存级别、磁盘空间和所需应用均通过预检。

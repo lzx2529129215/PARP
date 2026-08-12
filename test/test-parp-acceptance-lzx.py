@@ -109,6 +109,78 @@ class AcceptanceConfigTests(unittest.TestCase):
             self.assertEqual(metrics["direct_reclaim_latency_ns_p95"], 2_000_000)  #lzx
             self.assertEqual(metrics["direct_reclaim_pages_reclaimed"], 8)  #lzx
 
+    def test_trace_unmatched_reclaim_is_an_explicit_pairing_error(self) -> None:  #lzx
+        with tempfile.TemporaryDirectory() as temporary:  #lzx
+            trace = Path(temporary) / "trace.txt"  #lzx
+            trace.write_text(  #lzx
+                "python3-123 (  123) [000] ..... 10.000000: mm_vmscan_direct_reclaim_begin: order=0\n",  #lzx
+                encoding="utf-8",  #lzx
+            )  #lzx
+            metrics = MODULE.count_trace_events(trace)  #lzx
+            self.assertEqual(metrics["pairing_error_count"], 1)  #lzx
+            self.assertIn("left open", metrics["pairing_errors"][0])  #lzx
+
+    def test_cgroup_endpoint_identity_and_required_reads_are_strict(self) -> None:  #lzx
+        required_status = {name: {"ok": True, "error": None} for name in MODULE.REQUIRED_CGROUP_FILES}  #lzx
+        memory_stat = {  #lzx
+            "pgfault": 1, "pgmajfault": 0, "workingset_refault_file": 0, "workingset_refault_anon": 0,  #lzx
+            "pgscan": 0, "pgsteal": 0, "pgscan_direct": 0, "pgsteal_direct": 0, "pgscan_kswapd": 0, "pgsteal_kswapd": 0,  #lzx
+        }  #lzx
+        endpoint = {  #lzx
+            "path": "/sys/fs/cgroup/test", "identity": {"device": 1, "inode": 2},  #lzx
+            "read_status": required_status, "memory_stat": memory_stat,  #lzx
+            "memory_events": {"oom_kill": 0}, "cpu_stat": {"usage_usec": 1},  #lzx
+        }  #lzx
+        before = {"cgroup": endpoint}  #lzx
+        after = {"cgroup": {**endpoint, "identity": {"device": 1, "inode": 3}}}  #lzx
+        valid, reasons = MODULE.cgroup_endpoint_validity(before, after)  #lzx
+        self.assertFalse(valid)  #lzx
+        self.assertIn("cgroup was recreated during collection", reasons)  #lzx
+        missing_cpu = {**endpoint, "read_status": {**required_status, "cpu_stat": {"ok": False, "error": "missing"}}}  #lzx
+        valid, reasons = MODULE.cgroup_endpoint_validity({"cgroup": missing_cpu}, {"cgroup": missing_cpu})  #lzx
+        self.assertFalse(valid)  #lzx
+        self.assertTrue(any("cpu_stat unavailable" in value for value in reasons))  #lzx
+
+    def test_cgroup_cpu_io_and_reclaim_ratios_use_endpoint_deltas(self) -> None:  #lzx
+        before_cgroup = {  #lzx
+            "pgfault": 10, "pgmajfault": 1, "workingset_refault_file": 10, "workingset_refault_anon": 5,  #lzx
+            "workingset_activate_file": 0, "workingset_activate_anon": 0, "workingset_restore_file": 0, "workingset_restore_anon": 0,  #lzx
+            "pgscan": 100, "pgsteal": 100, "pgscan_direct": 20, "pgsteal_direct": 10, "pgscan_kswapd": 80, "pgsteal_kswapd": 90,  #lzx
+            "cgroup_pswpin": 0, "cgroup_pswpout": 0, "events_high": 0, "events_max": 0, "events_oom": 0, "events_oom_kill": 0,  #lzx
+            "cpu_usage_usec": 1_000_000, "cpu_user_usec": 800_000, "cpu_system_usec": 200_000,  #lzx
+            "io_rbytes": 0, "io_wbytes": 0, "io_rios": 0, "io_wios": 0,  #lzx
+        }  #lzx
+        after_cgroup = {key: value for key, value in before_cgroup.items()}  #lzx
+        after_cgroup.update({  #lzx
+            "workingset_refault_file": 30, "workingset_refault_anon": 15, "pgscan": 300, "pgsteal": 200,  #lzx
+            "pgscan_direct": 70, "pgscan_kswapd": 230, "cpu_usage_usec": 3_000_000,  #lzx
+            "io_rbytes": 20 * 1024**2, "io_wbytes": 10 * 1024**2,  #lzx
+        })  #lzx
+        metrics = MODULE.cgroup_endpoint_metrics(  #lzx
+            {"monotonic_ns": 0, "cgroup": before_cgroup},  #lzx
+            {"monotonic_ns": 2_000_000_000, "cgroup": after_cgroup},  #lzx
+        )  #lzx
+        self.assertEqual(metrics["cpu_usage_usec_delta"], 2_000_000)  #lzx
+        self.assertEqual(metrics["cpu_one_core_percent"], 100.0)  #lzx
+        self.assertEqual(metrics["io_read_mib_per_second"], 10.0)  #lzx
+        self.assertEqual(metrics["page_refault_ratio_percent"], 30.0)  #lzx
+        self.assertEqual(metrics["direct_reclaim_scan_ratio_percent"], 25.0)  #lzx
+
+    def test_launch_latency_pairs_launch_with_verified_window(self) -> None:  #lzx
+        with tempfile.TemporaryDirectory() as temporary:  #lzx
+            trace = Path(temporary) / "automation_trace.csv"  #lzx
+            trace.write_text(  #lzx
+                "ts_ns,phase,action,label,status,app_key\n"  #lzx
+                "1000000000,start,launch,LAUNCH_WPS,running,WPS\n"  #lzx
+                "1250000000,end,launch,LAUNCH_WPS,success,WPS\n"  #lzx
+                "1800000000,end,wait_window,WAIT_WPS,success,WPS\n",  #lzx
+                encoding="utf-8",  #lzx
+            )  #lzx
+            metrics = MODULE.launch_latency_metrics(trace)  #lzx
+            self.assertEqual(metrics["count"], 1)  #lzx
+            self.assertEqual(metrics["mean_ms"], 800.0)  #lzx
+            self.assertEqual(metrics["invalid_reasons"], [])  #lzx
+
     def test_metric_table_explains_what_each_metric_means(self) -> None:  #lzx
         stats = REPORT.metric_stats_values([10.0, 20.0])  #lzx
         table = "\n".join(REPORT.metric_table(  #lzx

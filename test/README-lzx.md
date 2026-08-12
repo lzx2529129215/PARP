@@ -20,6 +20,11 @@ python3 test/baseline-report-lzx.py \
 - PageFault 主采集来自 `exceptions:page_fault_user` tracepoint，并只过滤受控应用内存 sidecar PID；测试 slice 的 `pgfault/pgmajfault` 用于包含真实 GUI 应用的交叉复核。
 - 真实refault按每轮测试cgroup `memory.stat` 的首尾差值统计，分别报告 `workingset_refault_file` 与 `workingset_refault_anon`；禁止用未来访问标签代替真实refault。
 - 完整回收诊断同时记录 `workingset_activate/restore`、`pgscan/pgsteal`、direct/kswapd扫描回收量、扫描效率、direct/memcg reclaim延迟和kswapd CPU时间。旧基线没有采集的字段显示为 `N/A`，不能填0。
+- 当前 `schema-v3` 已把 zhj 中适合正式验收的严格检查合并到本主线：cgroup 首尾路径与 device/inode 必须一致，`memory.stat`、`memory.events`、`cpu.stat`、`io.stat` 和 `memory.current` 必须可读，必需计数器不得缺失或倒退；任一条件失败都使该轮无效，原始文件仍保留。
+- trace 除 ring 丢失外，还检查 direct reclaim 与 memcg reclaim 的 begin/end 嵌套、孤立 end、未闭合 begin 和关键事件解析失败；配对错误不会被静默丢弃，也不会用成功配对数掩盖。
+- CPU/I/O 使用同一个测试 slice 的 `cpu.stat` 与 `io.stat` 首尾差分，报告 CPU 总时间、单核等价占比、整机占比、块层读写量和吞吐；页缓存命中的读取不计入块层 I/O。
+- 每个应用报告“启动动作开始到匹配 X11 窗口验证成功”的就绪代理延迟，并输出轮内均值与 P95。该值不是首个可交互帧；峰值场景先并发启动再逐个验证，因此应视为启动就绪上界。
+- 每次实验根目录写出 `system-metadata-lzx.json`，记录内核 release/config 哈希/命令行、CPU、内存、swap、VM sysctl、THP、CPU governor、X11 会话和结果文件系统，用于检查 OFF/Apply 环境是否同源。
 - OOM必须拆分为测试cgroup `oom`、测试cgroup `oom_kill` 和宿主 `oom_kill`；前两项用于说明测试边界，宿主OOM会使该轮立即无效。
 - trace ring 固定为每 CPU 1 MiB 并持续流式读取；任一 `overrun/commit overrun/dropped events` 非零都使该轮无效，避免大 ring 自身污染内存压力。
 - 峰值异常总数为自动化动作/启动失败、低内存窗口命中和测试 cgroup `oom_kill` 的合计。宿主 `oom_kill` 不计入成绩，而是立即中止并判该轮无效。
@@ -96,6 +101,8 @@ python3 test/baseline-report-lzx.py \
 
 工具只在 `parp-acceptance.slice` 设置有限的 `MemoryHigh` 和 `MemoryMax`，不修改 PARP/MGLRU 模式、swappiness、水位、swap 配置，不调用 `drop_caches` 或 `memory.reclaim`。宿主 `oom_kill` 增加会立即停止；`MemAvailable < 2 GiB` 连续 3 个采样也会停止。PSI full avg10 大于 0.20 会持续记录，只有它与 `MemAvailable < 4 GiB` 同时连续出现 3 次才作为硬中止，避免把仍有大量可用内存的正常应用冷启动误判为危险。测试 cgroup 内的 OOM 会被记录，但不会放宽宿主保护线。
 
+为获得测试 slice 的 `cpu.stat`/`io.stat`，runner 会用已授权 sudo 对当前用户的 `user-UID.slice` 和 `user@UID.service` 设置运行时 `CPUAccounting=yes`/`IOAccounting=yes`。这只启用当前启动周期的 cgroup controller 计数，不写持久配置，重启后由下一次实验自动重新启用。
+
 预检还要求至少保留 1024 个 inotify watch。大型源码树的 IDE 文件监视器可能耗尽 watch，导致 systemd 无法观察测试 scope 退出并卡在清理阶段；这种情况下工具会在正式运行前阻止采集。
 
 稀疏文件 sidecar 在退出时自动删除；报告、trace 和自动化日志保留在 `lzx/tool/outputs/parp_acceptance/`。
@@ -119,7 +126,7 @@ python3 test/parp-acceptance-lzx.py run --profile full --suite hotcold --seed 20
 python3 test/parp-acceptance-lzx.py run --profile full --suite peak --seed 20260812
 ```
 
-每次运行首先打印 `output=...`。持续日志为该路径内的 `round-NN/automation.log`、`round-NN/monitor.csv` 和 `round-NN/trace/stream-error.txt`；汇总为 `summary.md` 与 `summary.json`。
+每次运行首先打印 `output=...`。持续日志为该路径内的 `round-NN/automation.log`、`round-NN/monitor.csv` 和 `round-NN/trace/stream-error.txt`；汇总为 `summary.md` 与 `summary.json`。`round-NN/round-result.json` 中的 `validity.invalid_reasons` 会列出 cgroup 端点、trace 配对、监控样本或启动就绪的具体失效原因；`launch`、`cgroup`和 `system` 分别保存启动延迟、CPU/I/O/回收和宿主差分指标。
 
 ## 扩展应用建议
 
