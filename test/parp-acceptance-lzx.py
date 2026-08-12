@@ -108,6 +108,22 @@ def vmstat() -> dict[str, int]:
     return read_kv(Path("/proc/vmstat"))
 
 
+def kswapd_cpu_time_ns() -> int:  #lzx
+    """Return cumulative CPU time for all live kswapd threads."""  #lzx
+    ticks = 0  #lzx
+    clock_ticks = int(os.sysconf("SC_CLK_TCK"))  #lzx
+    for process_dir in Path("/proc").glob("[0-9]*"):  #lzx
+        try:  #lzx
+            if not (process_dir / "comm").read_text(encoding="utf-8").strip().startswith("kswapd"):  #lzx
+                continue  #lzx
+            stat_text = (process_dir / "stat").read_text(encoding="utf-8")  #lzx
+            after_comm = stat_text[stat_text.rfind(")") + 2:].split()  #lzx
+            ticks += int(after_comm[11]) + int(after_comm[12])  # fields 14/15: utime/stime #lzx
+        except (OSError, ValueError, IndexError):  #lzx
+            continue  #lzx
+    return ticks * 1_000_000_000 // max(1, clock_ticks)  #lzx
+
+
 def psi_memory() -> dict[str, float]:
     result: dict[str, float] = {}
     for line in read_text(Path("/proc/pressure/memory")).splitlines():
@@ -241,6 +257,7 @@ def preflight(config: dict[str, Any], profile: str, suite: str) -> dict[str, Any
     diagnostic_only = apply_compiled in {"", "0"} or "UNTRAINED" in effective_config
     return {
         "status": "READY" if all(checks.values()) else "BLOCKED",
+        "metrics_schema_version": 2,  #lzx
         "diagnostic_only": diagnostic_only,
         "diagnostic_reason": "SHADOW_APPLY_NOT_COMPILED_OR_MODEL_UNTRAINED" if diagnostic_only else "",
         "timestamp": dt.datetime.now().isoformat(),
@@ -499,8 +516,16 @@ def cgroup_snapshot(path: Path | None) -> dict[str, int | str]:
     return {
         "status": "ok", "memory_current": int(read_text(path / "memory.current") or 0),
         "pgfault": stat.get("pgfault", 0), "pgmajfault": stat.get("pgmajfault", 0),
-        "workingset_refault_file": stat.get("workingset_refault_file", 0),
-        "workingset_refault_anon": stat.get("workingset_refault_anon", 0),
+        "workingset_refault_file": stat.get("workingset_refault_file", 0),  #lzx
+        "workingset_refault_anon": stat.get("workingset_refault_anon", 0),  #lzx
+        "workingset_activate_file": stat.get("workingset_activate_file", 0),  #lzx
+        "workingset_activate_anon": stat.get("workingset_activate_anon", 0),  #lzx
+        "workingset_restore_file": stat.get("workingset_restore_file", 0),  #lzx
+        "workingset_restore_anon": stat.get("workingset_restore_anon", 0),  #lzx
+        "pgscan": stat.get("pgscan", 0), "pgsteal": stat.get("pgsteal", 0),  #lzx
+        "pgscan_direct": stat.get("pgscan_direct", 0), "pgsteal_direct": stat.get("pgsteal_direct", 0),  #lzx
+        "pgscan_kswapd": stat.get("pgscan_kswapd", 0), "pgsteal_kswapd": stat.get("pgsteal_kswapd", 0),  #lzx
+        "cgroup_pswpin": stat.get("pswpin", 0), "cgroup_pswpout": stat.get("pswpout", 0),  #lzx
         "anon": stat.get("anon", 0), "file": stat.get("file", 0),
         "events_high": events.get("high", 0), "events_max": events.get("max", 0),
         "events_oom": events.get("oom", 0), "events_oom_kill": events.get("oom_kill", 0),
@@ -512,7 +537,8 @@ def snapshot(path: Path | None) -> dict[str, Any]:
     return {
         "timestamp_ns": time.time_ns(), "monotonic_ns": time.monotonic_ns(),
         "memtotal": memory.get("MemTotal", 0), "memavailable": memory.get("MemAvailable", 0),
-        "swapfree": memory.get("SwapFree", 0), "psi": psi_memory(), "vmstat": vmstat(),
+        "swapfree": memory.get("SwapFree", 0), "psi": psi_memory(), "vmstat": vmstat(),  #lzx
+        "kswapd_cpu_time_ns": kswapd_cpu_time_ns(),  #lzx
         "cgroup": cgroup_snapshot(path),
     }
 
@@ -527,9 +553,12 @@ def popup_titles(env: dict[str, str]) -> list[str]:
 def write_monitor_header(stream: Any) -> csv.DictWriter:
     fields = [
         "timestamp_ns", "memavailable", "swapfree", "psi_some_avg10", "psi_full_avg10",
-        "vm_oom_kill", "pswpin", "pswpout", "cgroup_status", "memory_current",
-        "pgfault", "pgmajfault", "refault_file", "refault_anon", "events_high",
-        "events_max", "events_oom", "events_oom_kill", "low_memory_popup_count",
+        "vm_oom_kill", "pswpin", "pswpout", "kswapd_cpu_time_ns", "cgroup_status", "memory_current",  #lzx
+        "pgfault", "pgmajfault", "refault_file", "refault_anon",  #lzx
+        "activate_file", "activate_anon", "restore_file", "restore_anon",  #lzx
+        "pgscan", "pgsteal", "pgscan_direct", "pgsteal_direct",  #lzx
+        "pgscan_kswapd", "pgsteal_kswapd", "cgroup_pswpin", "cgroup_pswpout",  #lzx
+        "events_high", "events_max", "events_oom", "events_oom_kill", "low_memory_popup_count",  #lzx
     ]
     writer = csv.DictWriter(stream, fieldnames=fields)
     writer.writeheader()
@@ -555,6 +584,14 @@ def parse_trace_stats(path: Path) -> dict[str, int]:
     return result
 
 
+def nearest_rank(values: list[int], percentile: float) -> int:  #lzx
+    if not values:  #lzx
+        return 0  #lzx
+    ordered = sorted(values)  #lzx
+    index = max(0, min(len(ordered) - 1, math.ceil(percentile * len(ordered)) - 1))  #lzx
+    return ordered[index]  #lzx
+
+
 def count_trace_events(path: Path) -> dict[str, int]:
     names = {
         "page_fault_user": "page_fault_user:",
@@ -563,9 +600,21 @@ def count_trace_events(path: Path) -> dict[str, int]:
         "parp_access": "parp_effective_tier_access:",
         "parp_outcome": "parp_effective_tier_outcome:",
         "direct_reclaim_begin": "mm_vmscan_direct_reclaim_begin:",
+        "direct_reclaim_end": "mm_vmscan_direct_reclaim_end:",  #lzx
+        "memcg_reclaim_begin": "mm_vmscan_memcg_reclaim_begin:",  #lzx
+        "memcg_reclaim_end": "mm_vmscan_memcg_reclaim_end:",  #lzx
         "kswapd_wake": "mm_vmscan_kswapd_wake:",
+        "kswapd_sleep": "mm_vmscan_kswapd_sleep:",  #lzx
     }
     counts = {key: 0 for key in names}
+    event_pattern = re.compile(r"-(\d+)\s+(?:\([^)]*\)\s+)?\[\d+\]\s+\S+\s+(\d+\.\d+):\s+(\w+):\s*(.*)$")  #lzx
+    direct_starts: dict[int, list[int]] = {}  #lzx
+    memcg_starts: dict[int, list[int]] = {}  #lzx
+    kswapd_starts: dict[int, int] = {}  #lzx
+    direct_durations: list[int] = []  #lzx
+    memcg_durations: list[int] = []  #lzx
+    kswapd_active_durations: list[int] = []  #lzx
+    direct_reclaimed_pages = 0  #lzx
     try:
         with path.open(encoding="utf-8", errors="replace") as stream:
             for line in stream:
@@ -573,8 +622,41 @@ def count_trace_events(path: Path) -> dict[str, int]:
                     if marker in line:
                         counts[key] += 1
                         break
+                match = event_pattern.search(line)  #lzx
+                if not match:  #lzx
+                    continue  #lzx
+                pid = int(match.group(1))  #lzx
+                timestamp_ns = int(float(match.group(2)) * 1_000_000_000)  #lzx
+                event = match.group(3)  #lzx
+                payload = match.group(4)  #lzx
+                if event == "mm_vmscan_direct_reclaim_begin":  #lzx
+                    direct_starts.setdefault(pid, []).append(timestamp_ns)  #lzx
+                elif event == "mm_vmscan_direct_reclaim_end":  #lzx
+                    starts = direct_starts.get(pid, [])  #lzx
+                    if starts:  #lzx
+                        direct_durations.append(max(0, timestamp_ns - starts.pop()))  #lzx
+                    reclaimed = re.search(r"\bnr_reclaimed=(\d+)", payload)  #lzx
+                    direct_reclaimed_pages += int(reclaimed.group(1)) if reclaimed else 0  #lzx
+                elif event == "mm_vmscan_memcg_reclaim_begin":  #lzx
+                    memcg_starts.setdefault(pid, []).append(timestamp_ns)  #lzx
+                elif event == "mm_vmscan_memcg_reclaim_end":  #lzx
+                    starts = memcg_starts.get(pid, [])  #lzx
+                    if starts:  #lzx
+                        memcg_durations.append(max(0, timestamp_ns - starts.pop()))  #lzx
+                elif event == "mm_vmscan_kswapd_wake":  #lzx
+                    kswapd_starts.setdefault(pid, timestamp_ns)  #lzx
+                elif event == "mm_vmscan_kswapd_sleep" and pid in kswapd_starts:  #lzx
+                    kswapd_active_durations.append(max(0, timestamp_ns - kswapd_starts.pop(pid)))  #lzx
     except OSError:
         pass
+    for prefix, durations in (("direct_reclaim", direct_durations), ("memcg_reclaim", memcg_durations), ("kswapd_active", kswapd_active_durations)):  #lzx
+        counts[f"{prefix}_pairs"] = len(durations)  #lzx
+        counts[f"{prefix}_time_ns_total"] = sum(durations)  #lzx
+        counts[f"{prefix}_time_ns_max"] = max(durations, default=0)  #lzx
+        counts[f"{prefix}_latency_ns_p50"] = nearest_rank(durations, 0.50)  #lzx
+        counts[f"{prefix}_latency_ns_p95"] = nearest_rank(durations, 0.95)  #lzx
+        counts[f"{prefix}_latency_ns_p99"] = nearest_rank(durations, 0.99)  #lzx
+    counts["direct_reclaim_pages_reclaimed"] = direct_reclaimed_pages  #lzx
     return counts
 
 
@@ -583,6 +665,15 @@ def csv_delta(path: Path, first_key: str, last_key: str) -> int:
     if not rows:
         return 0
     return int(rows[-1].get(last_key, 0) or 0) - int(rows[0].get(first_key, 0) or 0)
+
+
+def row_counter_delta(rows: list[dict[str, str]], key: str) -> int | None:  #lzx
+    if not rows or key not in rows[0] or key not in rows[-1]:  #lzx
+        return None  #lzx
+    try:  #lzx
+        return int(rows[-1][key]) - int(rows[0][key])  #lzx
+    except (KeyError, TypeError, ValueError):  #lzx
+        return None  #lzx
 
 
 def automation_counts(path: Path, suite: str) -> dict[str, int]:
@@ -614,10 +705,7 @@ def finalize_round(session_dir: Path, suite: str, expected_steps: int, automatio
     auto = automation_counts(session_dir / "automation_trace.csv", suite)
     monitor_path = session_dir / "monitor.csv"
     popup_count = 0
-    cgroup_oom = 0
-    cgroup_oom_kill = 0
-    cgroup_pgfault = 0
-    cgroup_pgmajfault = 0
+    rows: list[dict[str, str]] = []  #lzx
     if monitor_path.exists():
         rows = list(csv.DictReader(monitor_path.open(encoding="utf-8", newline="")))
         if rows:
@@ -627,17 +715,37 @@ def finalize_round(session_dir: Path, suite: str, expected_steps: int, automatio
                 if active and not popup_active:
                     popup_count += 1
                 popup_active = active
-            cgroup_oom = int(rows[-1].get("events_oom", 0) or 0) - int(rows[0].get("events_oom", 0) or 0)
-            cgroup_oom_kill = int(rows[-1].get("events_oom_kill", 0) or 0) - int(rows[0].get("events_oom_kill", 0) or 0)
-            cgroup_pgfault = int(rows[-1].get("pgfault", 0) or 0) - int(rows[0].get("pgfault", 0) or 0)
-            cgroup_pgmajfault = int(rows[-1].get("pgmajfault", 0) or 0) - int(rows[0].get("pgmajfault", 0) or 0)
+    counter_fields = {  #lzx
+        "pgfault_delta": "pgfault", "pgmajfault_delta": "pgmajfault",  #lzx
+        "workingset_refault_file_delta": "refault_file", "workingset_refault_anon_delta": "refault_anon",  #lzx
+        "workingset_activate_file_delta": "activate_file", "workingset_activate_anon_delta": "activate_anon",  #lzx
+        "workingset_restore_file_delta": "restore_file", "workingset_restore_anon_delta": "restore_anon",  #lzx
+        "pgscan_delta": "pgscan", "pgsteal_delta": "pgsteal",  #lzx
+        "pgscan_direct_delta": "pgscan_direct", "pgsteal_direct_delta": "pgsteal_direct",  #lzx
+        "pgscan_kswapd_delta": "pgscan_kswapd", "pgsteal_kswapd_delta": "pgsteal_kswapd",  #lzx
+        "pswpin_delta": "cgroup_pswpin", "pswpout_delta": "cgroup_pswpout",  #lzx
+        "events_high_delta": "events_high", "events_max_delta": "events_max",  #lzx
+        "oom_delta": "events_oom", "oom_kill_delta": "events_oom_kill",  #lzx
+    }  #lzx
+    cgroup_metrics = {name: row_counter_delta(rows, field) for name, field in counter_fields.items()}  #lzx
+    scan = cgroup_metrics["pgscan_delta"]  #lzx
+    steal = cgroup_metrics["pgsteal_delta"]  #lzx
+    cgroup_metrics["scan_efficiency_percent"] = (100.0 * steal / scan) if scan and steal is not None else None  #lzx
+    system_metrics = {  #lzx
+        "host_oom_kill_delta": row_counter_delta(rows, "vm_oom_kill"),  #lzx
+        "global_pswpin_delta": row_counter_delta(rows, "pswpin"),  #lzx
+        "global_pswpout_delta": row_counter_delta(rows, "pswpout"),  #lzx
+        "kswapd_cpu_time_ns_delta": row_counter_delta(rows, "kswapd_cpu_time_ns"),  #lzx
+    }  #lzx
+    cgroup_oom_kill = int(cgroup_metrics.get("oom_kill_delta") or 0)  #lzx
     trace_loss = stats["overrun"] + stats["commit_overrun"] + stats["dropped_events"]
     valid = automation_rc == 0 and not abort_reason and auto["case_done"] == expected_steps and trace_loss == 0
     result = {
         "status": "VALID_DIAGNOSTIC" if valid else "INVALID",
         "suite": suite, "expected_steps": expected_steps, "automation_rc": automation_rc,
         "abort_reason": abort_reason, "automation": auto, "trace": {**trace_counts, **stats, "loss_total": trace_loss},
-        "cgroup": {"pgfault_delta": cgroup_pgfault, "pgmajfault_delta": cgroup_pgmajfault, "oom_delta": cgroup_oom, "oom_kill_delta": cgroup_oom_kill},
+        "cgroup": cgroup_metrics,  #lzx
+        "system": system_metrics,  #lzx
         "events": {"launch_failures": auto["launch_failures"], "low_memory_popups": popup_count, "app_oom_kills": cgroup_oom_kill,
                    "failure_total": auto["launch_failures"] + popup_count + cgroup_oom_kill},
     }
@@ -698,9 +806,16 @@ def run_round(config: dict[str, Any], *, suite: str, profile: str, round_index: 
                 writer.writerow({
                     "timestamp_ns": current["timestamp_ns"], "memavailable": current["memavailable"], "swapfree": current["swapfree"],
                     "psi_some_avg10": current["psi"].get("some_avg10", 0), "psi_full_avg10": current["psi"].get("full_avg10", 0),
-                    "vm_oom_kill": current["vmstat"].get("oom_kill", 0), "pswpin": current["vmstat"].get("pswpin", 0), "pswpout": current["vmstat"].get("pswpout", 0),
+                    "vm_oom_kill": current["vmstat"].get("oom_kill", 0), "pswpin": current["vmstat"].get("pswpin", 0), "pswpout": current["vmstat"].get("pswpout", 0),  #lzx
+                    "kswapd_cpu_time_ns": current["kswapd_cpu_time_ns"],  #lzx
                     "cgroup_status": cg.get("status", ""), "memory_current": cg.get("memory_current", 0), "pgfault": cg.get("pgfault", 0),
-                    "pgmajfault": cg.get("pgmajfault", 0), "refault_file": cg.get("workingset_refault_file", 0), "refault_anon": cg.get("workingset_refault_anon", 0),
+                    "pgmajfault": cg.get("pgmajfault", 0), "refault_file": cg.get("workingset_refault_file", 0), "refault_anon": cg.get("workingset_refault_anon", 0),  #lzx
+                    "activate_file": cg.get("workingset_activate_file", 0), "activate_anon": cg.get("workingset_activate_anon", 0),  #lzx
+                    "restore_file": cg.get("workingset_restore_file", 0), "restore_anon": cg.get("workingset_restore_anon", 0),  #lzx
+                    "pgscan": cg.get("pgscan", 0), "pgsteal": cg.get("pgsteal", 0),  #lzx
+                    "pgscan_direct": cg.get("pgscan_direct", 0), "pgsteal_direct": cg.get("pgsteal_direct", 0),  #lzx
+                    "pgscan_kswapd": cg.get("pgscan_kswapd", 0), "pgsteal_kswapd": cg.get("pgsteal_kswapd", 0),  #lzx
+                    "cgroup_pswpin": cg.get("cgroup_pswpin", 0), "cgroup_pswpout": cg.get("cgroup_pswpout", 0),  #lzx
                     "events_high": cg.get("events_high", 0), "events_max": cg.get("events_max", 0), "events_oom": cg.get("events_oom", 0), "events_oom_kill": cg.get("events_oom_kill", 0),
                     "low_memory_popup_count": len(popups),
                 })
@@ -759,8 +874,10 @@ def run_round(config: dict[str, Any], *, suite: str, profile: str, round_index: 
 
 def aggregate(parent: Path, preflight_data: dict[str, Any], results: list[dict[str, Any]], suite: str, profile: str) -> dict[str, Any]:
     valid = [item for item in results if item["status"] == "VALID_DIAGNOSTIC"]
-    def mean(path: tuple[str, str]) -> float:
-        return sum(float(item[path[0]][path[1]]) for item in valid) / len(valid) if valid else 0.0
+    def mean(path: tuple[str, str]) -> float | None:  #lzx
+        values = [item.get(path[0], {}).get(path[1]) for item in valid]  #lzx
+        present = [float(value) for value in values if value is not None]  #lzx
+        return sum(present) / len(present) if present else None  #lzx
     first_scenario = json.loads((parent / "round-01/scenario.json").read_text(encoding="utf-8"))
     limitations = [
         "当前 r9 为 Shadow，apply_compiled=0，不能计算优化改善率。",
@@ -779,6 +896,13 @@ def aggregate(parent: Path, preflight_data: dict[str, Any], results: list[dict[s
             "trace_page_fault_user": mean(("trace", "page_fault_user")),
             "cgroup_pgfault": mean(("cgroup", "pgfault_delta")),
             "cgroup_pgmajfault": mean(("cgroup", "pgmajfault_delta")),
+            "workingset_refault_file": mean(("cgroup", "workingset_refault_file_delta")),  #lzx
+            "workingset_refault_anon": mean(("cgroup", "workingset_refault_anon_delta")),  #lzx
+            "workingset_activate_file": mean(("cgroup", "workingset_activate_file_delta")),  #lzx
+            "workingset_activate_anon": mean(("cgroup", "workingset_activate_anon_delta")),  #lzx
+            "pgscan": mean(("cgroup", "pgscan_delta")), "pgsteal": mean(("cgroup", "pgsteal_delta")),  #lzx
+            "scan_efficiency_percent": mean(("cgroup", "scan_efficiency_percent")),  #lzx
+            "cgroup_oom": mean(("cgroup", "oom_delta")), "cgroup_oom_kill": mean(("cgroup", "oom_kill_delta")),  #lzx
             "launch_failures": mean(("events", "launch_failures")),
             "low_memory_popups": mean(("events", "low_memory_popups")),
             "app_oom_kills": mean(("events", "app_oom_kills")),
@@ -795,7 +919,8 @@ def aggregate(parent: Path, preflight_data: dict[str, Any], results: list[dict[s
         "## 平均值", "",
     ]
     for key, value in summary["averages"].items():
-        lines.append(f"- {key}: `{value:.3f}`")
+        rendered = "N/A" if value is None else f"{value:.3f}"  #lzx
+        lines.append(f"- {key}: `{rendered}`")  #lzx
     lines += ["", "## 结论", "", "本结果是优化前诊断基线，不代表达到 PageFault 降低 20%/30% 或峰值异常降低 30%。"]
     (parent / "summary.md").write_text("\n".join(lines) + "\n", encoding="utf-8")
     return summary

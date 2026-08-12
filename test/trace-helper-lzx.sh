@@ -16,6 +16,7 @@ path="$TRACEFS/instances/$instance"
 set_events() {
   local value="$1"
   local event
+  # Include memcg reclaim timing in the acceptance trace. #lzx
   for event in \
     exceptions/page_fault_user \
     exceptions/page_fault_kernel \
@@ -24,6 +25,8 @@ set_events() {
     parp/parp_effective_tier_outcome \
     vmscan/mm_vmscan_direct_reclaim_begin \
     vmscan/mm_vmscan_direct_reclaim_end \
+    vmscan/mm_vmscan_memcg_reclaim_begin \
+    vmscan/mm_vmscan_memcg_reclaim_end \
     vmscan/mm_vmscan_kswapd_wake \
     vmscan/mm_vmscan_kswapd_sleep; do
     if [[ -e "$path/events/$event/enable" ]]; then

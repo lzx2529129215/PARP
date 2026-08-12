@@ -4,13 +4,20 @@ from __future__ import annotations
 import argparse
 import csv
 import datetime as dt
+import importlib.util  #lzx
 import json
 import statistics
+import sys  #lzx
 from pathlib import Path
 from typing import Any, Callable
 
 
 VALID_STATUS = "VALID_DIAGNOSTIC"
+RUNNER_SPEC = importlib.util.spec_from_file_location("parp_acceptance_metrics_lzx", Path(__file__).with_name("parp-acceptance-lzx.py"))  #lzx
+assert RUNNER_SPEC is not None and RUNNER_SPEC.loader is not None  #lzx
+RUNNER = importlib.util.module_from_spec(RUNNER_SPEC)  #lzx
+sys.modules[RUNNER_SPEC.name] = RUNNER  #lzx
+RUNNER_SPEC.loader.exec_module(RUNNER)  #lzx
 
 
 def load_json(path: Path) -> dict[str, Any]:
@@ -21,18 +28,58 @@ def write_json(path: Path, value: dict[str, Any]) -> None:
     path.write_text(json.dumps(value, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
 
 
-def metric_stats(results: list[dict[str, Any]], getter: Callable[[dict[str, Any]], float]) -> dict[str, Any]:
-    values = [float(getter(item)) for item in results]
+def metric_stats_values(values: list[float | None]) -> dict[str, Any]:  #lzx
+    present = [float(value) for value in values if value is not None]  #lzx
     return {
-        "mean": statistics.mean(values) if values else 0.0,
-        "min": min(values, default=0.0),
-        "max": max(values, default=0.0),
-        "sample_stdev": statistics.stdev(values) if len(values) > 1 else 0.0,
+        "available": bool(present),  #lzx
+        "available_rounds": len(present),  #lzx
+        "mean": statistics.mean(present) if present else None,  #lzx
+        "min": min(present) if present else None,  #lzx
+        "max": max(present) if present else None,  #lzx
+        "sample_stdev": statistics.stdev(present) if len(present) > 1 else (0.0 if present else None),  #lzx
         "round_values": values,
     }
 
 
-def monitor_extrema(suite_root: Path) -> dict[str, float]:
+def metric_stats(results: list[dict[str, Any]], getter: Callable[[dict[str, Any]], float | None]) -> dict[str, Any]:
+    values: list[float | None] = []  #lzx
+    for item in results:  #lzx
+        try:  #lzx
+            value = getter(item)  #lzx
+            values.append(float(value) if value is not None else None)  #lzx
+        except (KeyError, TypeError, ValueError):  #lzx
+            values.append(None)  #lzx
+    return metric_stats_values(values)  #lzx
+
+
+def monitor_round_values(suite_root: Path, field: str, round_indices: list[int] | None = None) -> list[float | None]:  #lzx
+    values: list[float | None] = []  #lzx
+    paths = (  #lzx
+        [suite_root / f"round-{index + 1:02d}/monitor.csv" for index in round_indices]  #lzx
+        if round_indices is not None  #lzx
+        else sorted(suite_root.glob("round-*/monitor.csv"))  #lzx
+    )  #lzx
+    for path in paths:  #lzx
+        if not path.exists():  #lzx
+            values.append(None)  #lzx
+            continue  #lzx
+        with path.open(encoding="utf-8", newline="") as stream:  #lzx
+            rows = list(csv.DictReader(stream))  #lzx
+        if not rows or field not in rows[0] or field not in rows[-1]:  #lzx
+            values.append(None)  #lzx
+            continue  #lzx
+        try:  #lzx
+            values.append(float(rows[-1][field]) - float(rows[0][field]))  #lzx
+        except (KeyError, TypeError, ValueError):  #lzx
+            values.append(None)  #lzx
+    return values  #lzx
+
+
+def scaled(values: list[float | None], divisor: float) -> list[float | None]:  #lzx
+    return [None if value is None else value / divisor for value in values]  #lzx
+
+
+def monitor_extrema(suite_root: Path, round_indices: list[int] | None = None) -> dict[str, float]:  #lzx
     values: dict[str, list[float]] = {
         "memavailable": [],
         "swapfree": [],
@@ -50,7 +97,14 @@ def monitor_extrema(suite_root: Path) -> dict[str, float]:
     }
     delta_keys = ("vm_oom_kill", "pswpin", "pswpout", "events_high", "events_max", "events_oom", "events_oom_kill")
     cumulative_deltas = {key: 0.0 for key in delta_keys}
-    for path in sorted(suite_root.glob("round-*/monitor.csv")):
+    paths = (  #lzx
+        [suite_root / f"round-{index + 1:02d}/monitor.csv" for index in round_indices]  #lzx
+        if round_indices is not None  #lzx
+        else sorted(suite_root.glob("round-*/monitor.csv"))  #lzx
+    )  #lzx
+    for path in paths:  #lzx
+        if not path.exists():  #lzx
+            continue  #lzx
         round_values = {key: [] for key in delta_keys}
         with path.open(encoding="utf-8", newline="") as stream:
             for row in csv.DictReader(stream):
@@ -84,25 +138,63 @@ def monitor_extrema(suite_root: Path) -> dict[str, float]:
 
 def suite_metrics(summary_path: Path) -> dict[str, Any]:
     summary = load_json(summary_path)
-    results = [item for item in summary.get("results", []) if item.get("status") == VALID_STATUS]
+    all_results = summary.get("results", [])  #lzx
+    valid_indices = [index for index, item in enumerate(all_results) if item.get("status") == VALID_STATUS]  #lzx
+    results = [all_results[index] for index in valid_indices]  #lzx
+    suite_root = summary_path.parent  #lzx
+    trace_rounds = [  #lzx
+        RUNNER.count_trace_events(path) if path.exists() else {}  #lzx
+        for index in valid_indices  #lzx
+        for path in [suite_root / f"round-{index + 1:02d}/trace/trace.txt"]  #lzx
+    ]  #lzx
+    monitor = lambda field: monitor_round_values(suite_root, field, valid_indices)  #lzx
+    refault_file = monitor("refault_file")  #lzx
+    refault_anon = monitor("refault_anon")  #lzx
+    pgscan = monitor("pgscan")  #lzx
+    pgsteal = monitor("pgsteal")  #lzx
+    scan_efficiency = [  #lzx
+        (100.0 * steal / scan) if scan not in (None, 0) and steal is not None else None  #lzx
+        for scan, steal in zip(pgscan, pgsteal)  #lzx
+    ]  #lzx
     metrics = {
         "trace_page_fault_user": metric_stats(results, lambda item: item["trace"]["page_fault_user"]),
         "cgroup_pgfault": metric_stats(results, lambda item: item["cgroup"]["pgfault_delta"]),
         "cgroup_pgmajfault": metric_stats(results, lambda item: item["cgroup"]["pgmajfault_delta"]),
+        "workingset_refault_file": metric_stats_values(refault_file),  #lzx
+        "workingset_refault_anon": metric_stats_values(refault_anon),  #lzx
+        "workingset_activate_file": metric_stats_values(monitor("activate_file")),  #lzx
+        "workingset_activate_anon": metric_stats_values(monitor("activate_anon")),  #lzx
+        "workingset_restore_file": metric_stats_values(monitor("restore_file")),  #lzx
+        "workingset_restore_anon": metric_stats_values(monitor("restore_anon")),  #lzx
+        "pgscan": metric_stats_values(pgscan), "pgsteal": metric_stats_values(pgsteal),  #lzx
+        "scan_efficiency_percent": metric_stats_values(scan_efficiency),  #lzx
+        "pgscan_direct": metric_stats_values(monitor("pgscan_direct")),  #lzx
+        "pgsteal_direct": metric_stats_values(monitor("pgsteal_direct")),  #lzx
+        "pgscan_kswapd": metric_stats_values(monitor("pgscan_kswapd")),  #lzx
+        "pgsteal_kswapd": metric_stats_values(monitor("pgsteal_kswapd")),  #lzx
         "direct_reclaim_begin": metric_stats(results, lambda item: item["trace"]["direct_reclaim_begin"]),
+        "direct_reclaim_latency_p95_ms": metric_stats_values(scaled([item.get("direct_reclaim_latency_ns_p95") for item in trace_rounds], 1_000_000)),  #lzx
+        "direct_reclaim_time_total_ms": metric_stats_values(scaled([item.get("direct_reclaim_time_ns_total") for item in trace_rounds], 1_000_000)),  #lzx
+        "direct_reclaim_pages_reclaimed": metric_stats_values([item.get("direct_reclaim_pages_reclaimed") for item in trace_rounds]),  #lzx
+        "memcg_reclaim_latency_p95_ms": metric_stats_values(scaled([item.get("memcg_reclaim_latency_ns_p95") for item in trace_rounds], 1_000_000)),  #lzx
         "kswapd_wake": metric_stats(results, lambda item: item["trace"]["kswapd_wake"]),
+        "kswapd_active_time_total_ms": metric_stats_values(scaled([item.get("kswapd_active_time_ns_total") for item in trace_rounds], 1_000_000)),  #lzx
+        "kswapd_cpu_time_ms": metric_stats_values(scaled(monitor("kswapd_cpu_time_ns"), 1_000_000)),  #lzx
         "parp_decision": metric_stats(results, lambda item: item["trace"]["parp_decision"]),
         "parp_access": metric_stats(results, lambda item: item["trace"]["parp_access"]),
         "parp_outcome": metric_stats(results, lambda item: item["trace"]["parp_outcome"]),
         "launch_failures": metric_stats(results, lambda item: item["events"]["launch_failures"]),
         "low_memory_popups": metric_stats(results, lambda item: item["events"]["low_memory_popups"]),
+        "cgroup_oom_events": metric_stats_values(monitor("events_oom")),  #lzx
         "app_oom_kills": metric_stats(results, lambda item: item["events"]["app_oom_kills"]),
+        "host_oom_kills": metric_stats_values(monitor("vm_oom_kill")),  #lzx
         "failure_total": metric_stats(results, lambda item: item["events"]["failure_total"]),
         "trace_loss_total": metric_stats(results, lambda item: item["trace"]["loss_total"]),
     }
-    suite_root = summary_path.parent
     preflight_path = suite_root / "round-01/preflight.json"
     preflight = load_json(preflight_path) if preflight_path.exists() else {}
+    if int(preflight.get("metrics_schema_version", 1)) < 2:  #lzx
+        metrics["memcg_reclaim_latency_p95_ms"] = metric_stats_values([None] * len(results))  #lzx
     return {
         "summary_path": str(summary_path.resolve()),
         "kernel_release": summary.get("kernel_release", ""),
@@ -112,7 +204,7 @@ def suite_metrics(summary_path: Path) -> dict[str, Any]:
         "case_done_total": sum(int(item["automation"]["case_done"]) for item in results),
         "workload_contract": summary.get("workload_contract", {}),
         "metrics": metrics,
-        "monitor_extrema": monitor_extrema(suite_root),
+        "monitor_extrema": monitor_extrema(suite_root, valid_indices),  #lzx
         "preflight": preflight,
     }
 
@@ -121,13 +213,15 @@ def gib(value: float) -> str:
     return f"{value / 1024**3:.3f} GiB"
 
 
-def number(value: float) -> str:
+def number(value: float | None) -> str:  #lzx
+    if value is None:  #lzx
+        return "N/A"  #lzx
     if float(value).is_integer():
         return str(int(value))
     return f"{value:.3f}"
 
 
-def values_text(values: list[float]) -> str:
+def values_text(values: list[float | None]) -> str:  #lzx
     return ", ".join(number(value) for value in values)
 
 
@@ -136,14 +230,32 @@ def metric_table(title: str, metrics: dict[str, dict[str, Any]], pagefault_label
         "trace_page_fault_user": pagefault_label,
         "cgroup_pgfault": "slice pgfault",
         "cgroup_pgmajfault": "slice pgmajfault",
+        "workingset_refault_file": "workingset_refault_file（真实文件页refault）",  #lzx
+        "workingset_refault_anon": "workingset_refault_anon（真实匿名页refault）",  #lzx
+        "workingset_activate_file": "workingset_activate_file",  #lzx
+        "workingset_activate_anon": "workingset_activate_anon",  #lzx
+        "workingset_restore_file": "workingset_restore_file",  #lzx
+        "workingset_restore_anon": "workingset_restore_anon",  #lzx
+        "pgscan": "pgscan", "pgsteal": "pgsteal",  #lzx
+        "scan_efficiency_percent": "扫描效率 pgsteal/pgscan（%）",  #lzx
+        "pgscan_direct": "pgscan_direct", "pgsteal_direct": "pgsteal_direct",  #lzx
+        "pgscan_kswapd": "pgscan_kswapd", "pgsteal_kswapd": "pgsteal_kswapd",  #lzx
         "direct_reclaim_begin": "direct reclaim begin",
+        "direct_reclaim_latency_p95_ms": "direct reclaim P95延迟（ms）",  #lzx
+        "direct_reclaim_time_total_ms": "direct reclaim总墙钟时间（ms）",  #lzx
+        "direct_reclaim_pages_reclaimed": "direct reclaim回收页数",  #lzx
+        "memcg_reclaim_latency_p95_ms": "memcg reclaim P95延迟（ms）",  #lzx
         "kswapd_wake": "kswapd wake",
+        "kswapd_active_time_total_ms": "kswapd活跃墙钟时间（ms）",  #lzx
+        "kswapd_cpu_time_ms": "kswapd CPU时间（ms）",  #lzx
         "parp_decision": "PARP decision事件",
         "parp_access": "PARP access事件",
         "parp_outcome": "PARP outcome事件",
         "launch_failures": "启动/自动化失败",
         "low_memory_popups": "低内存弹窗",
+        "cgroup_oom_events": "测试 cgroup OOM事件",  #lzx
         "app_oom_kills": "测试 cgroup OOM kill",
+        "host_oom_kills": "宿主 OOM kill",  #lzx
         "failure_total": "峰值异常总数",
         "trace_loss_total": "trace 丢失",
     }
@@ -164,6 +276,10 @@ def build_report(hotcold_path: Path, peak_path: Path) -> tuple[dict[str, Any], s
         raise RuntimeError("hotcold 与 peak 不是同一个内核，不能合并为一份基线")
     hot_baseline = hotcold["metrics"]["trace_page_fault_user"]["mean"]
     peak_baseline = peak["metrics"]["failure_total"]["mean"]
+    hot_refault_file = hotcold["metrics"]["workingset_refault_file"]["mean"]  #lzx
+    hot_refault_anon = hotcold["metrics"]["workingset_refault_anon"]["mean"]  #lzx
+    peak_refault_file = peak["metrics"]["workingset_refault_file"]["mean"]  #lzx
+    peak_refault_anon = peak["metrics"]["workingset_refault_anon"]["mean"]  #lzx
     pagefault_target_20 = hot_baseline * 0.80
     pagefault_target_30 = hot_baseline * 0.70
     peak_target_30 = peak_baseline * 0.70 if peak_baseline > 0 else None
@@ -194,6 +310,13 @@ def build_report(hotcold_path: Path, peak_path: Path) -> tuple[dict[str, Any], s
                 "verdict": "ZERO_BASELINE_REQUIRES_CALIBRATION" if peak_baseline == 0 else "BASELINE_ONLY_WAITING_FOR_APPLY_PAIR",
             },
         },
+        "diagnostic_safety_baseline": {  #lzx
+            "hotcold_workingset_refault_file_mean": hot_refault_file,  #lzx
+            "hotcold_workingset_refault_anon_mean": hot_refault_anon,  #lzx
+            "peak_workingset_refault_file_mean": peak_refault_file,  #lzx
+            "peak_workingset_refault_anon_mean": peak_refault_anon,  #lzx
+            "comparison_rule": "Apply不得显著增加真实workingset refault；必须在相同seed/场景下配对比较。",  #lzx
+        },  #lzx
         "hotcold": hotcold,
         "peak": peak,
     }
@@ -215,6 +338,12 @@ def build_report(hotcold_path: Path, peak_path: Path) -> tuple[dict[str, Any], s
         "> 改进后必须复用相同内核源码基线、seed、场景和轮数。改善率 = (本报告基线均值 - Apply均值) / 本报告基线均值 × 100%。", "",
         f"- 冷热有效轮次/步骤：`{hotcold['rounds_valid']}/{hotcold['rounds_requested']}` / `{hotcold['case_done_total']}`",
         f"- 峰值有效轮次/步骤：`{peak['rounds_valid']}/{peak['rounds_requested']}` / `{peak['case_done_total']}`", "",
+        "## 真实refault与OOM基线", "",  #lzx
+        "| 场景 | workingset_refault_file | workingset_refault_anon | cgroup OOM | cgroup OOM kill | 宿主OOM kill |",  #lzx
+        "|---|---:|---:|---:|---:|---:|",  #lzx
+        f"| 冷热 | `{number(hot_refault_file)}` | `{number(hot_refault_anon)}` | `{number(hotcold['metrics']['cgroup_oom_events']['mean'])}` | `{number(hotcold['metrics']['app_oom_kills']['mean'])}` | `{number(hotcold['metrics']['host_oom_kills']['mean'])}` |",  #lzx
+        f"| 峰值 | `{number(peak_refault_file)}` | `{number(peak_refault_anon)}` | `{number(peak['metrics']['cgroup_oom_events']['mean'])}` | `{number(peak['metrics']['app_oom_kills']['mean'])}` | `{number(peak['metrics']['host_oom_kills']['mean'])}` |", "",  #lzx
+        "> refault是已被真实回收的页再次进入工作集，不等同于未来访问标签。Apply相对OFF不得显著增加该值；OOM/OOM kill必须分别报告。", "",  #lzx
     ]
     lines.extend(metric_table("冷热实验：全部采集指标", hotcold["metrics"], "page_fault_user（正式冷热指标）"))
     lines.extend(metric_table("峰值实验：全部采集指标", peak["metrics"], "page_fault_user（辅助指标）"))
@@ -233,6 +362,8 @@ def build_report(hotcold_path: Path, peak_path: Path) -> tuple[dict[str, Any], s
         "- 冷热正式指标是受控 sidecar PID 的 `exceptions:page_fault_user`；slice `pgfault/pgmajfault` 是交叉复核值。",
         "- 峰值正式指标是启动/自动化失败、低内存弹窗和测试 cgroup OOM kill 的总和。",
         "- `trace_loss_total` 必须为0，否则相应轮次无效。",
+        "- `N/A` 表示旧基线当时未采集该字段，不能解释成0；新增schema会在后续实验中采集。",  #lzx
+        "- direct/memcg reclaim trace统计的是同步回收墙钟延迟；kswapd CPU时间来自 `/proc/<kswapd>/stat`，两者不能混用。",  #lzx
         "- 当前为Shadow内核且 `apply_compiled=0`，只用于建立优化前基线，不能给出改善率。",
         "- 峰值异常基线为0时没有可用分母，需要安全增强峰值场景后重新建立该项基线。", "",
         "## 原始数据", "",

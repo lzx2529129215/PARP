@@ -18,6 +18,9 @@ python3 test/baseline-report-lzx.py \
 - 冷热识别：WPS、Files、QQ；总受控逻辑内存为物理内存的 150%，启用 swap，按 seed 生成随机但可重放的窗口切换序列；完整模式运行 10 轮。
 - 峰值调度：WPS、Files、QQ、Firefox、GIMP、LibreOffice；日常内存比例合计 65%，并发峰值比例合计 125%，任一应用峰值不超过物理内存；先建立峰值压力，再连续发出 6 个应用启动并验证窗口，每轮至少 100 个有效步骤，完整模式运行 3 轮。
 - PageFault 主采集来自 `exceptions:page_fault_user` tracepoint，并只过滤受控应用内存 sidecar PID；测试 slice 的 `pgfault/pgmajfault` 用于包含真实 GUI 应用的交叉复核。
+- 真实refault按每轮测试cgroup `memory.stat` 的首尾差值统计，分别报告 `workingset_refault_file` 与 `workingset_refault_anon`；禁止用未来访问标签代替真实refault。
+- 完整回收诊断同时记录 `workingset_activate/restore`、`pgscan/pgsteal`、direct/kswapd扫描回收量、扫描效率、direct/memcg reclaim延迟和kswapd CPU时间。旧基线没有采集的字段显示为 `N/A`，不能填0。
+- OOM必须拆分为测试cgroup `oom`、测试cgroup `oom_kill` 和宿主 `oom_kill`；前两项用于说明测试边界，宿主OOM会使该轮立即无效。
 - trace ring 固定为每 CPU 1 MiB 并持续流式读取；任一 `overrun/commit overrun/dropped events` 非零都使该轮无效，避免大 ring 自身污染内存压力。
 - 峰值异常总数为自动化动作/启动失败、低内存窗口命中和测试 cgroup `oom_kill` 的合计。宿主 `oom_kill` 不计入成绩，而是立即中止并判该轮无效。
 

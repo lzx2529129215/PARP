@@ -15,6 +15,11 @@ assert SPEC is not None and SPEC.loader is not None
 MODULE = importlib.util.module_from_spec(SPEC)
 sys.modules[SPEC.name] = MODULE
 SPEC.loader.exec_module(MODULE)
+REPORT_SPEC = importlib.util.spec_from_file_location("baseline_report_lzx", ROOT / "baseline-report-lzx.py")  #lzx
+assert REPORT_SPEC is not None and REPORT_SPEC.loader is not None  #lzx
+REPORT = importlib.util.module_from_spec(REPORT_SPEC)  #lzx
+sys.modules[REPORT_SPEC.name] = REPORT  #lzx
+REPORT_SPEC.loader.exec_module(REPORT)  #lzx
 
 
 class AcceptanceConfigTests(unittest.TestCase):
@@ -71,6 +76,38 @@ class AcceptanceConfigTests(unittest.TestCase):
             if not path.is_file():
                 continue
             self.assertTrue(path.stem.endswith("-lzx"), path.name)
+
+    def test_refault_and_oom_deltas_are_reported_without_filling_missing_with_zero(self) -> None:  #lzx
+        with tempfile.TemporaryDirectory() as temporary:  #lzx
+            root = Path(temporary)  #lzx
+            round_dir = root / "round-01"  #lzx
+            round_dir.mkdir()  #lzx
+            monitor = round_dir / "monitor.csv"  #lzx
+            monitor.write_text(  #lzx
+                "refault_file,refault_anon,events_oom,events_oom_kill,vm_oom_kill\n"  #lzx
+                "10,20,1,0,4\n"  #lzx
+                "110,70,3,1,4\n",  #lzx
+                encoding="utf-8",  #lzx
+            )  #lzx
+            self.assertEqual(REPORT.monitor_round_values(root, "refault_file"), [100.0])  #lzx
+            self.assertEqual(REPORT.monitor_round_values(root, "refault_anon"), [50.0])  #lzx
+            self.assertEqual(REPORT.monitor_round_values(root, "events_oom"), [2.0])  #lzx
+            self.assertEqual(REPORT.monitor_round_values(root, "events_oom_kill"), [1.0])  #lzx
+            self.assertEqual(REPORT.monitor_round_values(root, "activate_file"), [None])  #lzx
+            self.assertIsNone(REPORT.metric_stats_values([None])["mean"])  #lzx
+
+    def test_trace_reclaim_latency_pairs_are_calculated(self) -> None:  #lzx
+        with tempfile.TemporaryDirectory() as temporary:  #lzx
+            trace = Path(temporary) / "trace.txt"  #lzx
+            trace.write_text(  #lzx
+                "python3-123 (  123) [000] ..... 10.000000: mm_vmscan_direct_reclaim_begin: order=0\n"  #lzx
+                "python3-123 (  123) [000] ..... 10.002000: mm_vmscan_direct_reclaim_end: nr_reclaimed=8\n",  #lzx
+                encoding="utf-8",  #lzx
+            )  #lzx
+            metrics = MODULE.count_trace_events(trace)  #lzx
+            self.assertEqual(metrics["direct_reclaim_pairs"], 1)  #lzx
+            self.assertEqual(metrics["direct_reclaim_latency_ns_p95"], 2_000_000)  #lzx
+            self.assertEqual(metrics["direct_reclaim_pages_reclaimed"], 8)  #lzx
 
 
 if __name__ == "__main__":
