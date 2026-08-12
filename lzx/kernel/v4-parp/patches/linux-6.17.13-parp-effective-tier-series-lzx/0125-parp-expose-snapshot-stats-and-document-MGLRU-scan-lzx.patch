@@ -1,0 +1,457 @@
+From 0dc853bbe5b1261a1cad5f02c8a4c88b15587e72 Mon Sep 17 00:00:00 2001
+From: lzx2529129215 <lzx2529129215@users.noreply.github.com>
+Date: Wed, 12 Aug 2026 16:02:30 +0800
+Subject: [PATCH 125/126] parp: expose snapshot stats and document MGLRU scan
+
+---
+ mm/parp/control/debugfs.c | 126 ++++++++++++++++++++++++-------------
+ mm/vmscan.c               | 128 ++++++++++++++++++++++++++++++++++++--
+ 2 files changed, 207 insertions(+), 47 deletions(-)
+
+diff --git a/mm/parp/control/debugfs.c b/mm/parp/control/debugfs.c
+index 720e8a4ef..c35a41ee8 100644
+--- a/mm/parp/control/debugfs.c
++++ b/mm/parp/control/debugfs.c
+@@ -3,6 +3,7 @@
+ #include <linux/fs.h>
+ #include <linux/init.h>
+ #include <linux/module.h>
++#include <linux/seq_file.h> /* #lzx */
+ #include <linux/uaccess.h>
+ #include "../internal.h"
+ 
+@@ -70,13 +71,9 @@ static const struct file_operations evidence_mode_fops = {
+ 	.llseek = default_llseek,
+ };
+ 
+-static ssize_t evidence_stats_read(struct file *file, char __user *buf,
+-				   size_t len, loff_t *ppos)
++static int evidence_stats_show(struct seq_file *m, void *v) /* #lzx */
+ {
+-	char text[1024];
+-	int size;
+-
+-	size = scnprintf(text, sizeof(text),
++	seq_printf(m,
+ 		"samples_queued %lld\n"
+ 		"samples_dropped %lld\n"
+ 		"queue_depth %lld\n"
+@@ -115,14 +112,10 @@ static ssize_t evidence_stats_read(struct file *file, char __user *buf,
+ 		atomic64_read(&parp_evidence_stats.file_folio_no_mapping),
+ 		atomic64_read(&parp_evidence_stats.file_folio_no_region),
+ 		atomic64_read(&parp_evidence_stats.file_folio_expired));
+-	return simple_read_from_buffer(buf, len, ppos, text, size);
++	return 0;
+ }
+ 
+-static const struct file_operations evidence_stats_fops = {
+-	.owner = THIS_MODULE,
+-	.read = evidence_stats_read,
+-	.llseek = default_llseek,
+-};
++DEFINE_SHOW_ATTRIBUTE(evidence_stats); /* #lzx */
+ 
+ #ifdef CONFIG_PARP_FRONTIER_SCORE
+ static ssize_t frontier_mode_read(struct file *file, char __user *buf,
+@@ -373,13 +366,9 @@ static const struct file_operations scan_budget_apply_domain_fops = {
+ 	.llseek = default_llseek,
+ };
+ 
+-static ssize_t scan_budget_stats_read(struct file *file, char __user *buf,
+-				      size_t len, loff_t *ppos)
++static int scan_budget_stats_show(struct seq_file *m, void *v) /* #lzx */
+ {
+-	char text[1536];
+-	int size;
+-
+-	size = scnprintf(text, sizeof(text),
++	seq_printf(m,
+ 		"scan_budget_queries %lld\n"
+ 		"target_memcg_queries %lld\n"
+ 		"global_kswapd_bypass %lld\n"
+@@ -425,14 +414,10 @@ static ssize_t scan_budget_stats_read(struct file *file, char __user *buf,
+ 		atomic64_read(&parp_scan_budget_stats.invalid_batch),
+ 		atomic64_read(&parp_scan_budget_stats.stale_batch),
+ 		atomic64_read(&parp_scan_budget_stats.circuit_breaker_count));
+-	return simple_read_from_buffer(buf, len, ppos, text, size);
++	return 0;
+ }
+ 
+-static const struct file_operations scan_budget_stats_fops = {
+-	.owner = THIS_MODULE,
+-	.read = scan_budget_stats_read,
+-	.llseek = default_llseek,
+-};
++DEFINE_SHOW_ATTRIBUTE(scan_budget_stats); /* #lzx */
+ 
+ static int parp_parse_prior_entry(char **argv, struct parp_app_prior *entry)
+ {
+@@ -557,34 +542,25 @@ static const struct file_operations scan_budget_clear_fops = {
+ 	.llseek = noop_llseek,
+ };
+ 
+-static ssize_t scan_budget_circuits_read(struct file *file, char __user *buf,
+-					 size_t len, loff_t *ppos)
++static int scan_budget_circuits_show(struct seq_file *m, void *v) /* #lzx */
+ {
+-	struct parp_scan_guard_view views[PARP_MAX_DOMAINS];
+-	char *text;
++	struct parp_scan_guard_view *views;
+ 	unsigned int i, nr;
+-	int size = 0;
+-	ssize_t result;
+ 
+-	text = kzalloc(PAGE_SIZE, GFP_KERNEL);
+-	if (!text)
++	views = kcalloc(PARP_MAX_DOMAINS, sizeof(*views), GFP_KERNEL);
++	if (!views)
+ 		return -ENOMEM;
+-	nr = parp_scan_budget_guard_snapshot(views, ARRAY_SIZE(views));
+-	for (i = 0; i < nr && size < PAGE_SIZE; i++)
+-		size += scnprintf(text + size, PAGE_SIZE - size,
++	nr = parp_scan_budget_guard_snapshot(views, PARP_MAX_DOMAINS);
++	for (i = 0; i < nr; i++)
++		seq_printf(m,
+ 			"domain=%llu generation=%u failures=%u tripped=%u\n",
+ 			views[i].domain_id, views[i].generation,
+ 			views[i].failures, views[i].tripped);
+-	result = simple_read_from_buffer(buf, len, ppos, text, size);
+-	kfree(text);
+-	return result;
++	kfree(views);
++	return 0;
+ }
+ 
+-static const struct file_operations scan_budget_circuits_fops = {
+-	.owner = THIS_MODULE,
+-	.read = scan_budget_circuits_read,
+-	.llseek = default_llseek,
+-};
++DEFINE_SHOW_ATTRIBUTE(scan_budget_circuits); /* #lzx */
+ 
+ static ssize_t bind_write(struct file *file, const char __user *buf,
+ 			  size_t len, loff_t *ppos)
+@@ -647,6 +623,68 @@ static const struct file_operations prior_fops = {
+ 	.llseek = noop_llseek,
+ };
+ 
++static int snapshot_show(struct seq_file *m, void *v) /* #lzx */
++{
++	const struct parp_snapshot *snapshot = parp_snapshot_acquire();
++
++	if (!snapshot) {
++		seq_puts(m, "version=0\ncreated_ns=0\nexpires_ns=0\n"
++			 "nr_priors=0\nnr_bindings=0\n");
++		parp_snapshot_release();
++		return 0;
++	}
++
++	seq_printf(m, "version=%llu\ncreated_ns=%llu\nexpires_ns=%llu\n"
++		   "nr_priors=%u\nnr_bindings=%u\n",
++		   snapshot->version, snapshot->created_ns, snapshot->expires_ns,
++		   snapshot->nr_priors, snapshot->nr_bindings);
++	parp_snapshot_release();
++	return 0;
++}
++
++static int snapshot_open(struct inode *inode, struct file *file) /* #lzx */
++{
++	return single_open(file, snapshot_show, inode->i_private);
++}
++
++static const struct file_operations snapshot_fops = { /* #lzx */
++	.owner = THIS_MODULE,
++	.open = snapshot_open,
++	.read = seq_read,
++	.llseek = seq_lseek,
++	.release = single_release,
++};
++
++static int stats_show(struct seq_file *m, void *v) /* #lzx */
++{
++	unsigned int i;
++
++	seq_printf(m, "prepare=%lld\nscored=%lld\nfinish=%lld\n",
++		   atomic64_read(&parp_stats.prepare),
++		   atomic64_read(&parp_stats.scored),
++		   atomic64_read(&parp_stats.finish));
++	for (i = 0; i < ARRAY_SIZE(parp_stats.proposed); i++)
++		seq_printf(m, "proposed[%u]=%lld\n", i,
++			   atomic64_read(&parp_stats.proposed[i]));
++	for (i = 0; i < ARRAY_SIZE(parp_stats.fallback); i++)
++		seq_printf(m, "fallback[%u]=%lld\n", i,
++			   atomic64_read(&parp_stats.fallback[i]));
++	return 0;
++}
++
++static int stats_open(struct inode *inode, struct file *file) /* #lzx */
++{
++	return single_open(file, stats_show, inode->i_private);
++}
++
++static const struct file_operations stats_fops = { /* #lzx */
++	.owner = THIS_MODULE,
++	.open = stats_open,
++	.read = seq_read,
++	.llseek = seq_lseek,
++	.release = single_release,
++};
++
+ static int __init parp_init(void)
+ {
+ 	parp_dir = debugfs_create_dir("parp", NULL);
+@@ -685,6 +723,8 @@ static int __init parp_init(void)
+ 			    &scan_budget_circuits_fops);
+ 	debugfs_create_file("app_bind", 0200, parp_dir, NULL, &bind_fops);
+ 	debugfs_create_file("app_prior", 0200, parp_dir, NULL, &prior_fops);
++	debugfs_create_file("snapshot", 0400, parp_dir, NULL, &snapshot_fops); /* #lzx */
++	debugfs_create_file("stats", 0400, parp_dir, NULL, &stats_fops); /* #lzx */
+ 	return 0;
+ }
+ subsys_initcall(parp_init);
+diff --git a/mm/vmscan.c b/mm/vmscan.c
+index 06ce78a37..c26e54818 100644
+--- a/mm/vmscan.c
++++ b/mm/vmscan.c
+@@ -4808,6 +4808,23 @@ static bool isolate_folio(struct lruvec *lruvec, struct folio *folio, struct sca
+ 	return true;
+ }
+ 
++/* #lzx
++ * 从 @type 对应的最老一代中挑选 folio。
++ *
++ * 调用者已持有 lruvec->lru_lock。本函数会直接重排
++ * MGLRU 链表，并把成功隔离的 folio 放入 @list，
++ * 供锁外的 shrink_folio_list() 实际回收。
++ *
++ * 这里有两种计数单位，需要特别区分：
++ *
++ *  - remaining 每处理一个 folio 减一，用于限制
++ *    本次持锁扫描的 folio 数。
++ *  - scanned、sorted、isolated 和 skipped 都以基础页
++ *    为单位，因此大 folio 会一次增加多页。
++ *
++ * 返回值是本轮可计入上层扫描进度的基础页数；
++ * 若未隔离任何页且仍有扫描额度，则返回 0。
++ */
+ static int scan_folios(unsigned long nr_to_scan, struct lruvec *lruvec,
+ 		       struct scan_control *sc, int type, int tier,
+ 		       struct list_head *list, u8 *parp_run_epoch,
+@@ -4826,12 +4843,29 @@ static int scan_folios(unsigned long nr_to_scan, struct lruvec *lruvec,
+ 	struct lru_gen_folio *lrugen = &lruvec->lrugen;
+ 	struct mem_cgroup *memcg = lruvec_memcg(lruvec);
+ 
++	/* @list 是本轮的输出链表，入口时必须为空。 */
+ 	VM_WARN_ON_ONCE(!list_empty(list));
+ 
++	/*
++	 * MGLRU 仅有规定的最少代数时，没有可供
++	 * 本路径继续驱逐的冷代，由 aging 路径先推进代际。
++	 */
+ 	if (get_nr_gens(lruvec, type) == MIN_NR_GENS)
+ 		return 0;
+ 
++	/* min_seq 指向当前最老、也是本轮候选回收的一代。 */
+ 	gen = lru_gen_from_seq(lrugen->min_seq[type]);
++
++	/*
++	 * 准备三类 PARP 上下文：
++	 *
++	 *  1. adapter 对所有被扫到的 folio 采样、打分；
++	 *     当前 apply 实现保持 native action，不改变控制流；
++	 *  2. frontier 只观察最终获准进入隔离路径的候选页，
++	 *     remaining_demand 是尚未满足的回收需求；
++	 *  3. effective-tier 在 sort_folio() 的 tier 边界上
++	 *     产生预测保护/降级决策，并记录批次数据。
++	 */
+ 	parp_adapter_prepare(&parp_ctx, lruvec, sc);
+ 	parp_frontier_prepare(&frontier_ctx, lruvec,
+ 			      sc->target_mem_cgroup == memcg, type,
+@@ -4841,94 +4875,180 @@ static int scan_folios(unsigned long nr_to_scan, struct lruvec *lruvec,
+ 	parp_effective_tier_prepare(tier_ctx, lruvec, type, sc->priority,
+ 		sc->nr_to_reclaim, sc->nr_reclaimed, current_is_kswapd(),
+ 		cgroup_reclaim(sc), sc->proactive); /* #lzx */
++	/*
++	 * 保存本轮的回收来源和运行 epoch。后者会在
++	 * 真实回收结束后用于将 feedback 与本批决策对齐。
++	 */
+ 	if (tier_ctx->enabled)
+ 		tier_ctx->reclaim_context = parp_tier_reclaim_context(sc);
+ 	if (tier_ctx->enabled)
+ 		*parp_run_epoch = tier_ctx->run_epoch;
+ 
++	/*
++	 * zone 顺序从 reclaim_idx 开始递减并取模。
++	 * 因此先查看本次允许回收的 zone，再经取模
++	 * 访问 zone > reclaim_idx 的项。后者只会被
++	 * sort_folio() 重分类，不会被隔离回收。
++	 */
+ 	for (i = MAX_NR_ZONES; i > 0; i--) {
++		/* 暂存当前 zone 中隔离失败的 folio。 */
+ 		LIST_HEAD(moved);
+ 		int skipped_zone = 0;
+ 		int zone = (sc->reclaim_idx + i) % MAX_NR_ZONES;
++		/* 只扫描最老代、指定类型与当前 zone 的链表。 */
+ 		struct list_head *head = &lrugen->folios[gen][type][zone];
+ 
+ 		while (!list_empty(head)) {
++			/* lru_to_folio() 从链表尾部取下一个候选项。 */
+ 			struct folio *folio = lru_to_folio(head);
+ 			struct parp_decision parp_decision;
++			/* 未启用 effective-tier 时，evaluated 保持为假。 */
+ 			struct parp_tier_decision tier_decision = { };
+ 			bool sort_result;
+ 			int delta = folio_nr_pages(folio);
+ 
++			/*
++			 * 在 lruvec 锁保护下校验链表的四个核心不变式：
++			 * folio 未标记 unevictable、非 active、类型一致
++			 * 且 zone 一致。实际可驱逐性稍后由 sort_folio() 复查。
++			 */
+ 			VM_WARN_ON_ONCE_FOLIO(folio_test_unevictable(folio), folio);
+ 			VM_WARN_ON_ONCE_FOLIO(folio_test_active(folio), folio);
+ 			VM_WARN_ON_ONCE_FOLIO(folio_is_file_lru(folio) != type, folio);
+ 			VM_WARN_ON_ONCE_FOLIO(folio_zonenum(folio) != zone, folio);
+ 
++			/* 页数统计按 delta 增加；remaining 仍只按 folio 递减。 */
+ 			scanned += delta;
+-				tier_ctx->batch_scanned_pages += delta; /* #lzx */
++			tier_ctx->batch_scanned_pages += delta; /* #lzx */
++
++			/*
++			 * adapter 先基于页类型、代号和 folio 状态打分，
++			 * 再把决策写回当前执行结果。后续原生
++			 * MGLRU 排序始终在此之后运行。
++			 */
+ 			parp_decision = parp_adapter_score_folio(&parp_ctx, folio,
+ 								type, gen);
+ 			parp_adapter_apply_decision(&parp_ctx, folio,
+ 						   &parp_decision);
+ 
++			/*
++			 * sort_folio() 先执行 MGLRU 分类，并在普通 tier
++			 * 保护边界上调用 effective-tier。返回 true 表示
++			 * folio 已被重新安置：例如不可驱逐、已晋代、
++			 * 受 tier 保护、zone 不合格，或正在等待回写。
++			 * 只有 false 才表示经 MGLRU 原生规则和
++			 * effective-tier 决策后，它最终可以进入隔离路径。
++			 */
+ 			sort_result = sort_folio(lruvec, folio, sc, tier,
+ 						 tier_ctx, &tier_decision);
+ 			if (sort_result) {
+ 				sorted += delta;
++				/* 本页已排序，未尝试隔离；完成决策记账。 */
+ 				parp_effective_tier_finish(tier_ctx, lruvec, folio,
+ 						   &tier_decision, true,
+ 						   false, false);
+ 			} else {
+ 				bool isolated_folio;
+ 
+-				/* Native MGLRU has declared this folio reclaimable. */
++				/*
++				 * frontier 只对最终获准进入回收路径的
++				 * folio 进行影子评分，不改变本次隔离结果。
++				 */
+ 				parp_frontier_consider(&frontier_ctx, lruvec, folio);
++
++				/*
++				 * isolate_folio() 还会检查 IO 约束和并发竞争；
++				 * 返回 true 时 folio 已离开 LRU 并持有额外引用。
++				 */
+ 				isolated_folio = isolate_folio(lruvec, folio, sc);
++				/* 记录“已尝试隔离”及其真实结果。 */
+ 				parp_effective_tier_finish(tier_ctx, lruvec, folio,
+ 						   &tier_decision, false,
+ 						   true, isolated_folio);
+ 				if (isolated_folio) {
++					/*
++					 * 交给调用者在释放 LRU 锁后
++					 * 执行真正回收。
++					 */
+ 					list_add(&folio->lru, list);
+ 					isolated += delta;
+ 					tier_ctx->batch_isolated_pages += delta; /* #lzx */
+ 				} else {
++					/*
++					 * 失败页先移出原链表，避免本轮立即
++					 * 反复命中同一个链表尾部 folio。
++					 */
+ 					list_move(&folio->lru, &moved);
+ 					skipped_zone += delta;
+ 				}
+ 			}
+ 
++			/*
++			 * remaining 控制单批处理的 folio 个数。
++			 * 隔离成功或单 zone 隔离失败达到一个小批次时，
++			 * 也先结束当前 zone，以限制持锁时间。
++			 */
+ 			if (!--remaining || max(isolated, skipped_zone) >= MIN_LRU_BATCH)
+ 				break;
+ 		}
+ 
+ 		if (skipped_zone) {
++			/*
++			 * 把失败页接回原链表头部。下次仍从尾部
++			 * 扫描时，会先尝试其他 folio，避免空转。
++			 */
+ 			list_splice(&moved, head);
+ 			__count_zid_vm_events(PGSCAN_SKIP, zone, skipped_zone);
+ 			skipped += skipped_zone;
+ 		}
+ 
++		/*
++		 * 总额度用尽或已隔离一个小批次就结束。
++		 * 若只是当前 zone 失败过多，则继续尝试其他 zone。
++		 */
+ 		if (!remaining || isolated >= MIN_LRU_BATCH)
+ 			break;
+ 	}
+ 
++	/*
++	 * PGSCAN_* 的具体项由回收者来源决定，包括
++	 * kswapd、直接回收、khugepaged 和主动 memcg 回收。
++	 * MGLRU 在这组 VM 事件中以 isolated 页数计 PGSCAN，
++	 * 以 sorted 页数计 PGREFILL。
++	 */
+ 	item = PGSCAN_KSWAPD + reclaimer_offset(sc);
+ 	if (!cgroup_reclaim(sc)) {
++		/* memcg 回收不重复计入这组全局事件。 */
+ 		__count_vm_events(item, isolated);
+ 		__count_vm_events(PGREFILL, sorted);
+ 	}
++	/* 无论回收来源如何，都更新当前 memcg 的对应统计。 */
+ 	count_memcg_events(memcg, item, isolated);
+ 	count_memcg_events(memcg, PGREFILL, sorted);
++	/* type 与 PGSCAN_ANON/PGSCAN_FILE 的相对编号一致。 */
+ 	__count_vm_events(PGSCAN_ANON + type, isolated);
++
++	/* trace 同时保留查看、跳过和成功隔离的页数。 */
+ 	trace_mm_vmscan_lru_isolate(sc->reclaim_idx, sc->order, MAX_LRU_BATCH,
+ 				scanned, skipped, isolated,
+ 				type ? LRU_INACTIVE_FILE : LRU_INACTIVE_ANON);
++	/* file_taken 还要包含已移交给 shrink_folio_list() 的文件页。 */
+ 	if (type == LRU_GEN_FILE)
+ 		sc->nr.file_taken += isolated;
++
++	/*
++	 * 结束 PARP 批次：effective-tier 输出隔离阶段记录
++	 * 并释放其 RCU 读锁；adapter 释放本轮模型快照。
++	 * 真正的回收结果稍后由 evict_folios() 补充反馈。
++	 */
+ 	parp_effective_tier_batch_finish(tier_ctx, isolated); /* #lzx */
+ 	parp_adapter_finish(&parp_ctx, scanned, isolated);
+ 	/*
+-	 * There might not be eligible folios due to reclaim_idx. Check the
+-	 * remaining to prevent livelock if it's not making progress.
++	 * reclaim_idx 可能使链表中没有合格 folio。若本轮
++	 * 既未隔离页、又未用完扫描额度，返回 0 让上层
++	 * 换类型或停止，避免把无实际进展当成扫描进展。
++	 * 若额度已用完，则返回 scanned，使上层能够正常
++	 * 消耗扫描预算，防止回收循环活锁。
+ 	 */
+ 	return isolated || !remaining ? scanned : 0;
+ }
+-- 
+2.25.1
+

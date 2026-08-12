@@ -2,6 +2,20 @@
 
 v4.1-PARP 基于 [`../v4-parp`](../v4-parp)，目标是验证“应用间 LSTM 的 next-App 预测是否真的改善 PARP 的 App 级内存决策”。它不把 PyTorch 放进内核回收热路径，也不打开 PARP Apply。
 
+## 共用的内核源码
+
+v4.1 不再维护另一套 Linux 源码或构建目录。内核修改直接位于
+[`../v4-parp/src/linux-6.17.13-parp-lzx`](../v4-parp/src/linux-6.17.13-parp-lzx)，
+并且始终复用 `../v4-parp/build/effective-tier-live-shadow-r9-lzx`。
+`kernel/patches/v4.1-snapshot-observability.patch` 作为可移植补丁保留，其
+`snapshot`/`stats` 功能已合入共用源码。
+
+增量编译统一使用：
+
+```bash
+../v4-parp/scripts/build-kernel-lzx.sh
+```
+
 ## 验证闭环
 
 ```text
@@ -23,7 +37,7 @@ v4.1 的评估是用户态、只读、反事实计算：不会写 debugfs，不�
 ## 快速运行可复现 fixture
 
 ```bash
-cd /home/lzx/Desktop/myself-kswapd/lzx/kernel/v4.1-parp
+cd /home/lzxxxxxx/桌面/huawei/myself-kswapd/lzx/kernel/v4.1-parp
 python3 tools/make_fixture.py
 python3 tools/evaluate_app_lstm_effect.py \
   --samples samples/fixture/samples.csv \

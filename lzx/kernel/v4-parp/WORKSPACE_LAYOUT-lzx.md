@@ -1,39 +1,45 @@
-# PARP workspace layout
+# PARP 单一源码工作区
 
-The active PARP project root is lzx/kernel/v4-parp. Its Linux source and build trees
-remain local experiment dependencies; they are intentionally excluded from the
-outer myself-kswapd repository.
+`lzx/kernel/v4-parp` 现在只保留一套可修改的 Linux 源码和一套可复用的构建输出：
 
-## Versioned dependencies
+- 源码：`src/linux-6.17.13-parp-lzx/`
+- 构建输出：`build/effective-tier-live-shadow-r9-lzx/`
+- 统一构建入口：`scripts/build-kernel-lzx.sh`
 
-- patches/parp-v4-full.patch is the existing base PARP patch.
-- patches/linux-6.17.13-parp-effective-tier-series-lzx/ is the ordered,
-  124-patch effective-tier series.
-- configs/, docs/, reference/, and scripts/ carry project configuration and
-  documentation.
-- ../../tool/automation supplies the WPS, Files, and QQ automation dependency.
-- ../../tool/runtime_monitor supplies runtime observation and the PARP bridge.
+源码目录是独立 Git 仓库，当前分支为
+`feat/parp-effective-tier-live-shadow`，当前 HEAD 为
+`54812ffd8e0fc0acbf02c7df051333827f7d1caa`。它不再是依附其他 clean tree
+的 linked worktree。旧实验分支和提交对象仍保留在该仓库的 `.git`
+中，但不再占用多套工作目录。
 
-The workspace_layout-lzx.py tool under the active live-shadow worktree locates
-these explicit workspace dependencies from any path below v4-parp. It does not start an
-experiment or change system state.
+## 增量编译
 
-## Reproducible kernel source
+直接运行：
 
-The patch series starts from Linux commit
-6609c4d49ebe220a5c40d3105c3f0e68f569ba1a. The current live-shadow source tip
-is ec43965d1d0a65c3ac768ecf03441e0b184e9410.
+```bash
+cd /home/lzxxxxxx/桌面/huawei/myself-kswapd/lzx/kernel/v4-parp
+./scripts/build-kernel-lzx.sh
+```
 
-From a clean checkout at the recorded Linux commit, apply the series in lexical
-order with git am --3way
-patches/linux-6.17.13-parp-effective-tier-series-lzx/*.patch. The outer
-repository deliberately does not track upstream/, work/, build/, or outputs/;
-keeping them local avoids committing source mirrors, compiled objects, installed
-artifacts, and experimental data.
+无参数时默认增量构建 `bzImage`。也可以把任意 make 参数传给它，例如：
 
-## Active worktree
+```bash
+./scripts/build-kernel-lzx.sh -j4 bzImage
+./scripts/build-kernel-lzx.sh kernelrelease
+```
 
-Use work/linux-6.17.13-parp-effective-tier-live-shadow for new PARP
-effective-tier source work. The frozen
-work/linux-6.17.13-parp-effective-tier worktree is retained for comparison
-only.
+不要再创建新的 `O=` 目录；该脚本始终复用上面的 r9 输出。
+现有 r9 的 Kbuild 文本依赖缓存已迁移到上述新路径，不需要兼容
+符号链接或第二套源码。
+
+## v4.1 集成
+
+`../v4.1-parp` 保留用户态评估、配置、测试和可移植补丁，不再维护自己的
+Linux `src/` 或 `build/`。v4.1 的 `snapshot`/`stats` 观测接口已合入这套源码。
+
+## 可复现资料
+
+- `patches/parp-v4-full.patch` 是原始 PARP 基础补丁。
+- `patches/linux-6.17.13-parp-effective-tier-series-lzx/` 保留截至 0126 的有序补丁系列。
+- `configs/`、`docs/`、`reference/` 和 `scripts/` 保留配置、设计和工具。
+- Linux 上游基线提交为 `6609c4d49ebe220a5c40d3105c3f0e68f569ba1a`。

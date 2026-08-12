@@ -1,0 +1,1146 @@
+From 54812ffd8e0fc0acbf02c7df051333827f7d1caa Mon Sep 17 00:00:00 2001
+From: lzx2529129215 <lzx2529129215@users.noreply.github.com>
+Date: Wed, 12 Aug 2026 16:02:34 +0800
+Subject: [PATCH 126/126] tools: add kernel-only operation inference contracts
+
+---
+ .../kernel_operation_inference/__init__.py    |   4 +
+ .../config/operation_taxonomy.json            |  31 ++
+ .../kernel_operation_inference/contracts.py   |  64 +++++
+ .../kernel_operation_inference/dataset.py     | 266 ++++++++++++++++++
+ .../kernel_operation_inference/features.py    |  70 +++++
+ .../parp/kernel_operation_inference/models.py | 208 ++++++++++++++
+ .../kernel_operation_inference/provenance.py  |  14 +
+ .../kernel_operation_inference/taxonomy.py    |  26 ++
+ .../tests/test_contracts.py                   | 164 +++++++++++
+ .../kernel_operation_inference/vectors.py     | 208 ++++++++++++++
+ 10 files changed, 1055 insertions(+)
+ create mode 100644 tools/parp/kernel_operation_inference/__init__.py
+ create mode 100644 tools/parp/kernel_operation_inference/config/operation_taxonomy.json
+ create mode 100644 tools/parp/kernel_operation_inference/contracts.py
+ create mode 100644 tools/parp/kernel_operation_inference/dataset.py
+ create mode 100644 tools/parp/kernel_operation_inference/features.py
+ create mode 100644 tools/parp/kernel_operation_inference/models.py
+ create mode 100644 tools/parp/kernel_operation_inference/provenance.py
+ create mode 100644 tools/parp/kernel_operation_inference/taxonomy.py
+ create mode 100644 tools/parp/kernel_operation_inference/tests/test_contracts.py
+ create mode 100644 tools/parp/kernel_operation_inference/vectors.py
+
+diff --git a/tools/parp/kernel_operation_inference/__init__.py b/tools/parp/kernel_operation_inference/__init__.py
+new file mode 100644
+index 000000000..73a608d72
+--- /dev/null
++++ b/tools/parp/kernel_operation_inference/__init__.py
+@@ -0,0 +1,4 @@
++"""Kernel-only current user operation inference for PARP Phase2.8A."""
++
++SCHEMA_VERSION = 1
++
+diff --git a/tools/parp/kernel_operation_inference/config/operation_taxonomy.json b/tools/parp/kernel_operation_inference/config/operation_taxonomy.json
+new file mode 100644
+index 000000000..9357badcb
+--- /dev/null
++++ b/tools/parp/kernel_operation_inference/config/operation_taxonomy.json
+@@ -0,0 +1,31 @@
++{
++  "schema_version": 1,
++  "source": "RUNTIME_PHASE27B_REAL_FRESH_OPERATION_SCHEMA",
++  "mapping": {
++    "BROWSE_LIST": "NAVIGATION",
++    "CLOSE_DOCUMENT": "OPEN_CLOSE",
++    "EDIT": "EDIT",
++    "ENTER_DIRECTORY": "NAVIGATION",
++    "IDLE_VIEW": "VIEW_IDLE",
++    "JUMP_POSITION": "NAVIGATION",
++    "MINIMIZE": "FOREGROUND_BACKGROUND",
++    "OPEN": "OPEN_CLOSE",
++    "OPEN_DIRECTORY": "NAVIGATION",
++    "RECENT_DOCUMENTS": "NAVIGATION",
++    "REOPEN": "OPEN_CLOSE",
++    "RESTORE": "FOREGROUND_BACKGROUND",
++    "RETURN_DIRECTORY": "NAVIGATION",
++    "SAVE": "SAVE_WRITE",
++    "SCROLL_DOWN": "NAVIGATION",
++    "SCROLL_LIST": "NAVIGATION",
++    "SCROLL_UP": "NAVIGATION",
++    "SEARCH": "NAVIGATION"
++  },
++  "merge_rationale": {
++    "SEARCH": "Merged into NAVIGATION because each WPS train session has fewer than eight PURE standalone SEARCH windows.",
++    "RECENT_DOCUMENTS": "Navigation into the application's recent-document view.",
++    "directory_operations": "Files browsing operations share the NAVIGATION parent."
++  },
++  "support_thresholds": {"train": 8, "validation": 3, "test": 3},
++  "taxonomy_frozen_before_test": true
++}
+diff --git a/tools/parp/kernel_operation_inference/contracts.py b/tools/parp/kernel_operation_inference/contracts.py
+new file mode 100644
+index 000000000..74f0f4ec5
+--- /dev/null
++++ b/tools/parp/kernel_operation_inference/contracts.py
+@@ -0,0 +1,64 @@
++"""Leakage and online input contracts."""
++
++FORBIDDEN_FEATURE_TOKENS = (
++    "operation", "action", "automation", "scenario", "label",
++    "ground_truth", "next_op", "current_op", "dominant_op", "window_title",
++    "keyboard", "mouse", "file_path", "absolute_path", "basename",
++    "extension", "file_id", "inode", "dev_major", "dev_minor",
++)
++
++ALLOWED_SOURCE_TYPES = {
++    "UPPER_LAYER_APP_ID", "PARP_FILE", "PARP_ANON", "CGROUP_MEMORY",
++    "CGROUP_CPU", "CGROUP_IO", "CGROUP_PSI", "PROC_KERNEL",
++    "DERIVED_KERNEL_HISTORY", "AVAILABILITY_MASK",
++}
++
++
++def validate_feature_names(names):
++    seen = set()
++    for name in names:
++        lowered = name.lower()
++        if name in seen:
++            raise ValueError("duplicate feature: %s" % name)
++        seen.add(name)
++        matches = [token for token in FORBIDDEN_FEATURE_TOKENS if token in lowered]
++        if matches:
++            raise ValueError("forbidden feature %s (%s)" % (name, matches[0]))
++    return True
++
++
++def validate_source_map(names, source_map):
++    validate_feature_names(names)
++    missing = set(names) - set(source_map)
++    extra = set(source_map) - set(names)
++    if missing or extra:
++        raise ValueError("source map missing=%s extra=%s" %
++                         (sorted(missing), sorted(extra)))
++    upper = []
++    for name in names:
++        source = source_map[name]
++        if source.get("source_type") not in ALLOWED_SOURCE_TYPES:
++            raise ValueError("unsafe source type for %s" % name)
++        if source.get("allowed_online") is not True:
++            raise ValueError("feature not allowed online: %s" % name)
++        if source["source_type"] == "UPPER_LAYER_APP_ID":
++            upper.append(name)
++    if upper != ["foreground_app_id"]:
++        raise ValueError("foreground_app_id must be the only upper-layer input")
++    return True
++
++
++def validate_online_payload(payload):
++    required = {"schema_version", "foreground_app_id", "kernel_features",
++                "past_predictions"}
++    if set(payload) != required:
++        raise ValueError("online input keys must be exactly %s" % sorted(required))
++    if payload["schema_version"] != 1:
++        raise ValueError("unsupported schema")
++    if not isinstance(payload["foreground_app_id"], int):
++        raise ValueError("foreground_app_id must be integer")
++    if not isinstance(payload["kernel_features"], dict):
++        raise ValueError("kernel_features must be an object")
++    validate_feature_names(payload["kernel_features"].keys())
++    return True
++
+diff --git a/tools/parp/kernel_operation_inference/dataset.py b/tools/parp/kernel_operation_inference/dataset.py
+new file mode 100644
+index 000000000..68a935b20
+--- /dev/null
++++ b/tools/parp/kernel_operation_inference/dataset.py
+@@ -0,0 +1,266 @@
++"""Streaming multi-resolution kernel window builder for Phase2.8A."""
++
++from collections import defaultdict
++import hashlib
++import json
++import math
++import os
++from pathlib import Path
++import statistics
++import time
++
++from intra_app_prediction.real_pipeline import parse_real_trace_line
++from intra_app_prediction.segmenter import all_segments, page_to_segment
++from intra_app_prediction.weighted_coverage import IntervalEvidence, coverage_summary
++
++from .features import label_quality
++from .taxonomy import map_operation
++
++WINDOW_SECONDS = (2, 5, 10)
++MAX_ACCESSES = 200.0
++
++
++def atomic_json(path, payload):
++    temporary = path.with_name(path.name + ".tmp")
++    with temporary.open("w", encoding="utf-8") as stream:
++        json.dump(payload, stream, indent=2, sort_keys=True)
++        stream.write("\n")
++        stream.flush()
++        os.fsync(stream.fileno())
++    os.replace(str(temporary), str(path))
++
++
++def atomic_jsonl(path, rows):
++    temporary = path.with_name(path.name + ".tmp")
++    with temporary.open("w", encoding="utf-8") as stream:
++        for row in rows:
++            stream.write(json.dumps(row, sort_keys=True) + "\n")
++    os.replace(str(temporary), str(path))
++
++
++def _file_key(row):
++    raw = "%d:%d:%d:%d" % row["file_id_tuple"]
++    return hashlib.sha256(raw.encode()).hexdigest()[:24]
++
++
++def _empty_window(session, app_id, domain_id, start, width_ns):
++    return {"session_id": session, "app_id": app_id, "domain_id": domain_id,
++            "window_start_ns": start, "window_end_ns": start + width_ns,
++            "file_groups": {}, "anon_latest": {}, "evidence_count": 0}
++
++
++def _add_file(window, row):
++    key = _file_key(row)
++    group = window["file_groups"].setdefault(key, {
++        "file_key": key, "file_size": row["file_size_bytes"],
++        "file_pages": row["file_page_count"], "intervals": [],
++        "nr_accesses": [], "ages": [], "regions": 0,
++    })
++    if row["file_page_count"] <= 0:
++        return
++    start = max(0, min(row["file_page_start"], row["file_page_count"] - 1))
++    end = max(start + 1, min(row["file_page_end_exclusive"], row["file_page_count"]))
++    ratio = max(0.0, min(1.0, row["nr_accesses"] / MAX_ACCESSES))
++    group["intervals"].append(IntervalEvidence(start, end, ratio, row["age"]))
++    group["nr_accesses"].append(row["nr_accesses"])
++    group["ages"].append(row["age"])
++    group["regions"] += 1
++
++
++def _add_anon(window, row):
++    key = (str(row["mm_cookie"]), row["foreground_epoch"],
++           row["region_start"], row["region_end"])
++    previous = window["anon_latest"].get(key)
++    if previous is None or row["event_time_ns"] > previous[0]:
++        window["anon_latest"][key] = (row["event_time_ns"], row)
++
++
++def _segment_shape(group):
++    pages = group["file_pages"]
++    coverage, weighted = [], []
++    active_100 = set()
++    for segment in all_segments(pages, 10):
++        summary = coverage_summary(segment.start_page, segment.end_page_exclusive,
++                                   group["intervals"])
++        coverage.append(summary.coverage_ratio)
++        weighted.append(summary.weighted_coverage_ratio)
++    for item in group["intervals"]:
++        if item.active_ratio <= 0:
++            continue
++        start = page_to_segment(item.start_page, pages, 100).segment_id
++        end = page_to_segment(item.end_page_exclusive - 1, pages, 100).segment_id
++        active_100.update(range(start, end + 1))
++    return coverage, weighted, len(active_100)
++
++
++def _finalize_files(groups):
++    files = []
++    for group in groups.values():
++        pages = group["file_pages"]
++        if pages <= 0 or not group["intervals"]:
++            continue
++        summary = coverage_summary(0, pages, group["intervals"])
++        shape, weighted_shape, active_100 = _segment_shape(group)
++        files.append({
++            "file_key": group["file_key"],
++            "file_size": group["file_size"], "file_pages": pages,
++            "observed_pages": summary.observed_unique_pages,
++            "active_pages": summary.accessed_unique_pages,
++            "weighted_pages": summary.weighted_access_pages,
++            "coverage": summary.coverage_ratio,
++            "weighted_coverage": summary.weighted_coverage_ratio,
++            "intensity": summary.access_intensity,
++            "region_count": group["regions"],
++            "mean_nr_accesses": statistics.mean(group["nr_accesses"]),
++            "max_nr_accesses": max(group["nr_accesses"]),
++            "mean_age": statistics.mean(group["ages"]),
++            "max_age": max(group["ages"]),
++            "active_segments_l10": sum(value > 0 for value in shape),
++            "active_segments_l100": active_100,
++            "shape_l10": shape, "weighted_shape_l10": weighted_shape,
++        })
++    maximum = max((math.log1p(row["active_pages"]) for row in files), default=1.0) or 1.0
++    for row in files:
++        row["score_unique"] = math.log1p(row["active_pages"]) / maximum
++        row["score_weighted"] = row["weighted_coverage"]
++        row["activity_score"] = (.5 * row["score_unique"] +
++                                 .3 * row["weighted_coverage"] +
++                                 .2 * min(1.0, row["intensity"]))
++    return files
++
++
++def _finalize_anon(latest):
++    total = observed = hot = warm = cold = active_regions = 0
++    accesses, ages = [], []
++    identities = set()
++    for (_, epoch, _, _), (_, row) in latest.items():
++        size = row["nr_pages"] * 4096
++        ratio = max(0.0, min(1.0, row["nr_accesses"] / MAX_ACCESSES))
++        total += size; observed += size; accesses.append(ratio); ages.append(row["age"])
++        identities.add((str(row["mm_cookie"]), epoch))
++        if ratio >= .5: hot += size
++        elif ratio > 0: warm += size
++        else: cold += size
++        active_regions += ratio > 0
++    return {"anon_total_bytes": total, "anon_observed_bytes": observed,
++            "anon_hot_bytes": hot, "anon_warm_bytes": warm,
++            "anon_cold_bytes": cold, "anon_active_region_count": active_regions,
++            "anon_region_count": len(latest),
++            "anon_mean_access_ratio": statistics.mean(accesses) if accesses else 0.0,
++            "anon_max_access_ratio": max(accesses, default=0.0),
++            "anon_mean_age": statistics.mean(ages) if ages else 0.0,
++            "anon_max_age": max(ages, default=0),
++            "anon_recently_active_ratio": (active_regions / len(latest)) if latest else 0.0,
++            "anon_cooling_ratio": (cold / total) if total else 0.0,
++            "unresolved_anon_bytes": 0, "unresolved_anon_ratio": 0.0,
++            "anon_identity_count": len(identities)}
++
++
++def _label(window, operations):
++    overlaps = []
++    for operation in operations:
++        overlap = max(0, min(window["window_end_ns"], operation["end_ns"]) -
++                      max(window["window_start_ns"], operation["start_ns"]))
++        if overlap:
++            overlaps.append((overlap, operation["operation_type"],
++                             operation["operation_id"]))
++    width = window["window_end_ns"] - window["window_start_ns"]
++    if not overlaps:
++        return {"raw_operation": "UNKNOWN", "coarse_operation": "UNKNOWN",
++                "operation_coverage_ratio": 0.0, "label_quality": "LOW_CONFIDENCE",
++                "operation_count": 0}
++    overlaps.sort(key=lambda item: (-item[0], item[1], item[2]))
++    dominant = overlaps[0][1]
++    coverage = min(1.0, sum(item[0] for item in overlaps) / width)
++    return {"raw_operation": dominant, "coarse_operation": map_operation(dominant),
++            "operation_coverage_ratio": coverage, "label_quality": label_quality(coverage),
++            "operation_count": len(overlaps)}
++
++
++class KernelWindowBuilder:
++    def __init__(self, real_root, output_root):
++        self.real = Path(real_root)
++        self.output = Path(output_root)
++        self.inventory = json.load((self.real / "validation/session_inventory.json").open())
++        self.operations = defaultdict(list)
++        with (self.real / "dataset/operation_events.jsonl").open() as stream:
++            for line in stream:
++                row = json.loads(line)
++                self.operations[row["session_id"]].append(row)
++        self.latencies = []
++
++    def _build_session(self, metadata, seconds):
++        width = seconds * 1_000_000_000
++        windows = {}
++        minimum = maximum = None
++        path = self.real / metadata["trace_path"]
++        with path.open(errors="replace") as stream:
++            for line in stream:
++                if "parp_region_evidence:" not in line:
++                    continue
++                row = parse_real_trace_line(line, metadata["session_id"],
++                                            metadata["boot_id"], "20260802_194342")
++                if row is None or row["validity"] != "VALID":
++                    continue
++                event = row["event_time_ns"]
++                minimum = event if minimum is None else min(minimum, event)
++                maximum = event if maximum is None else max(maximum, event)
++                start = event // width * width
++                window = windows.setdefault(start, _empty_window(
++                    metadata["session_id"], metadata["app_id"],
++                    metadata["domain_id"], start, width))
++                window["evidence_count"] += 1
++                if row["region_type"] == "FILE": _add_file(window, row)
++                else: _add_anon(window, row)
++        output = []
++        previous_anon = 0
++        for start in sorted(windows):
++            began = time.perf_counter_ns()
++            window = windows[start]
++            files = _finalize_files(window.pop("file_groups"))
++            anon = _finalize_anon(window.pop("anon_latest"))
++            anon["anon_working_set_delta"] = anon["anon_total_bytes"] - previous_anon
++            previous_anon = anon["anon_total_bytes"]
++            window["files"] = files
++            window["anon"] = anon
++            window["partial_start"] = start < minimum
++            window["partial_end"] = start + width > maximum
++            window["is_complete"] = not window["partial_start"] and not window["partial_end"]
++            output.append((window, _label(window, self.operations[metadata["session_id"]])))
++            self.latencies.append(time.perf_counter_ns() - began)
++        return output
++
++    def build(self):
++        summary = {"schema_version": 1, "window_seconds": {},
++                   "streaming": True, "source": "RUNTIME_PHASE27B_REAL_FRESH"}
++        for seconds in WINDOW_SECONDS:
++            kernel_rows, labels = [], []
++            for metadata in self.inventory["sessions"]:
++                rows = self._build_session(metadata, seconds)
++                for window, label in rows:
++                    key = hashlib.sha256(("%s:%d:%d" % (
++                        window["session_id"], seconds,
++                        window["window_start_ns"])).encode()).hexdigest()[:24]
++                    window["window_id"] = key
++                    label_row = {"window_id": key, "session_id": window["session_id"],
++                                 "app_id": window["app_id"],
++                                 "window_start_ns": window["window_start_ns"],
++                                 "window_end_ns": window["window_end_ns"], **label}
++                    labels.append(label_row); kernel_rows.append(window)
++            atomic_jsonl(self.output / ("dataset/kernel_windows_%ds.jsonl" % seconds),
++                         kernel_rows)
++            atomic_jsonl(self.output / ("dataset/supervision_labels_%ds.jsonl" % seconds),
++                         labels)
++            complete = sum(row["is_complete"] for row in kernel_rows)
++            quality = defaultdict(int)
++            for row in labels: quality[row["label_quality"]] += 1
++            summary["window_seconds"][str(seconds)] = {
++                "windows": len(kernel_rows), "complete_windows": complete,
++                "quality": dict(quality)}
++            atomic_json(self.output / "work/builder_checkpoint.json", {
++                "schema_version": 1, "last_successful_window_seconds": seconds,
++                "completed_sessions": [row["session_id"] for row in self.inventory["sessions"]],
++                "resume_supported": True})
++        summary["per_window_finalize_latency_ns"] = self.latencies
++        atomic_json(self.output / "dataset/window_build_summary.json", summary)
++        return summary
+diff --git a/tools/parp/kernel_operation_inference/features.py b/tools/parp/kernel_operation_inference/features.py
+new file mode 100644
+index 000000000..9457a917d
+--- /dev/null
++++ b/tools/parp/kernel_operation_inference/features.py
+@@ -0,0 +1,70 @@
++"""Feature construction primitives with deterministic and causal semantics."""
++
++import math
++
++
++def stable_top_files(files, count):
++    return sorted(files, key=lambda row: (
++        -row.get("activity_score", 0.0),
++        -row.get("weighted_pages", 0.0),
++        -row.get("active_pages", 0),
++        str(row["file_key"]),
++    ))[:count]
++
++
++def aggregate_other(files, top):
++    selected = {row["file_key"] for row in top}
++    other = [row for row in files if row["file_key"] not in selected]
++    return {
++        "other_file_count": len(other),
++        "other_active_pages": sum(row.get("active_pages", 0) for row in other),
++        "other_weighted_pages": sum(row.get("weighted_pages", 0.0) for row in other),
++        "other_region_count": sum(row.get("region_count", 0) for row in other),
++    }
++
++
++def causal_history(rows, index, length):
++    session = rows[index]["session_id"]
++    start = max(0, index - length + 1)
++    return [row for row in rows[start:index + 1] if row["session_id"] == session]
++
++
++def label_quality(coverage):
++    if coverage >= .8:
++        return "PURE"
++    if coverage >= .5:
++        return "MIXED"
++    return "LOW_CONFIDENCE"
++
++
++def signed_log1p(value):
++    return math.copysign(math.log1p(abs(value)), value) if value else 0.0
++
++
++class TrainOnlyStandardizer:
++    def __init__(self):
++        self.means = []
++        self.scales = []
++        self.fit_sessions = []
++
++    def fit(self, rows, sessions):
++        if not rows or len(rows) != len(sessions):
++            raise ValueError("training rows and sessions are required")
++        self.fit_sessions = sorted(set(sessions))
++        columns = list(zip(*rows))
++        self.means = [sum(column) / len(column) for column in columns]
++        self.scales = []
++        for column, mean in zip(columns, self.means):
++            variance = sum((value - mean) ** 2 for value in column) / len(column)
++            self.scales.append(math.sqrt(variance) or 1.0)
++        return self
++
++    def transform(self, rows):
++        return [[(value - mean) / scale
++                 for value, mean, scale in zip(row, self.means, self.scales)]
++                for row in rows]
++
++    def payload(self):
++        return {"schema_version": 1, "means": self.means, "scales": self.scales,
++                "fit_sessions": self.fit_sessions}
++
+diff --git a/tools/parp/kernel_operation_inference/models.py b/tools/parp/kernel_operation_inference/models.py
+new file mode 100644
+index 000000000..7d2104fab
+--- /dev/null
++++ b/tools/parp/kernel_operation_inference/models.py
+@@ -0,0 +1,208 @@
++"""Dependency-free classification, metrics, smoothing, and rejection."""
++
++from collections import Counter, defaultdict
++import math
++
++
++def percentile(values, fraction):
++    values = sorted(values)
++    if not values:
++        return None
++    position = (len(values) - 1) * fraction
++    lower = int(position)
++    upper = min(lower + 1, len(values) - 1)
++    weight = position - lower
++    return values[lower] * (1 - weight) + values[upper] * weight
++
++
++def select_unknown_thresholds(validation_scores, targets=(.10, .25, .50)):
++    if not validation_scores:
++        raise ValueError("validation scores required")
++    return {"schema_version": 1, "selection_source": "validation_only",
++            "thresholds": {str(target): percentile(validation_scores, target)
++                           for target in targets}}
++
++
++def entropy(probabilities):
++    return -sum(value * math.log(value) for value in probabilities if value > 0)
++
++
++def _softmax(values):
++    maximum = max(values)
++    exponents = [math.exp(min(50.0, value - maximum)) for value in values]
++    total = sum(exponents)
++    return [value / total for value in exponents]
++
++
++class MajorityClassifier:
++    def fit(self, rows, labels):
++        del rows
++        counts = Counter(labels)
++        self.classes = sorted(counts)
++        total = sum(counts.values())
++        self.prior = [counts[name] / total for name in self.classes]
++        self.majority = max(self.classes, key=lambda name: (counts[name], name))
++        return self
++
++    def predict_proba(self, rows):
++        return [list(self.prior) for _ in rows]
++
++
++class SoftmaxRegression:
++    def __init__(self, l2=.01, learning_rate=.08, max_iter=180):
++        self.l2 = l2
++        self.learning_rate = learning_rate
++        self.max_iter = max_iter
++
++    def fit(self, rows, labels):
++        if not rows:
++            raise ValueError("training rows required")
++        self.classes = sorted(set(labels))
++        class_index = {name: index for index, name in enumerate(self.classes)}
++        counts = Counter(labels)
++        class_weights = {name: len(labels) / (len(self.classes) * count)
++                         for name, count in counts.items()}
++        dimension = len(rows[0]) + 1
++        self.weights = [[0.0] * dimension for _ in self.classes]
++        for iteration in range(self.max_iter):
++            gradient = [[0.0] * dimension for _ in self.classes]
++            loss = 0.0
++            for row, label in zip(rows, labels):
++                extended = row + [1.0]
++                scores = [sum(weight * value for weight, value in zip(class_row, extended))
++                          for class_row in self.weights]
++                probabilities = _softmax(scores)
++                target = class_index[label]
++                sample_weight = class_weights[label]
++                loss -= sample_weight * math.log(max(1e-15, probabilities[target]))
++                for class_id in range(len(self.classes)):
++                    error = sample_weight * (probabilities[class_id] -
++                                             float(class_id == target))
++                    for feature_id, value in enumerate(extended):
++                        gradient[class_id][feature_id] += error * value
++            rate = self.learning_rate / (1.0 + iteration / 50.0)
++            scale = 1.0 / len(rows)
++            for class_id, class_row in enumerate(self.weights):
++                for feature_id in range(dimension):
++                    penalty = self.l2 * class_row[feature_id] if feature_id < dimension - 1 else 0.0
++                    class_row[feature_id] -= rate * (gradient[class_id][feature_id] * scale + penalty)
++            if not math.isfinite(loss):
++                raise ValueError("non-finite logistic loss")
++        return self
++
++    def predict_proba(self, rows):
++        output = []
++        for row in rows:
++            extended = row + [1.0]
++            output.append(_softmax([
++                sum(weight * value for weight, value in zip(class_row, extended))
++                for class_row in self.weights]))
++        return output
++
++    def payload(self):
++        return {"schema_version": 1, "type": "balanced_multinomial_logistic_regression",
++                "classes": self.classes, "weights": self.weights, "l2": self.l2,
++                "learning_rate": self.learning_rate, "max_iter": self.max_iter}
++
++
++class TransitionSmoother:
++    def __init__(self, classes, alpha=.5):
++        self.classes = list(classes)
++        self.alpha = alpha
++
++    def fit(self, session_labels):
++        counts = {left: Counter({right: 1 for right in self.classes})
++                  for left in self.classes}
++        for labels in session_labels:
++            for left, right in zip(labels, labels[1:]):
++                if left in counts and right in self.classes:
++                    counts[left][right] += 1
++        self.transitions = {}
++        for left, row in counts.items():
++            total = sum(row.values())
++            self.transitions[left] = {right: row[right] / total for right in self.classes}
++        return self
++
++    def smooth(self, base_probabilities, sessions):
++        output, previous = [], {}
++        for probabilities, session in zip(base_probabilities, sessions):
++            prior_label = previous.get(session)
++            if prior_label is None:
++                combined = list(probabilities)
++            else:
++                combined = [probability * (self.transitions[prior_label][name] ** self.alpha)
++                            for name, probability in zip(self.classes, probabilities)]
++                total = sum(combined) or 1.0
++                combined = [value / total for value in combined]
++            selected = max(range(len(self.classes)), key=lambda index: (combined[index],
++                                                                         self.classes[index]))
++            previous[session] = self.classes[selected]
++            output.append(combined)
++        return output
++
++
++def classification_metrics(labels, probabilities, classes, unknown=None):
++    unknown = unknown or [False] * len(labels)
++    matrix = {actual: Counter() for actual in classes}
++    ranked = []
++    for truth, row, rejected in zip(labels, probabilities, unknown):
++        order = sorted(range(len(classes)), key=lambda index: (-row[index], classes[index]))
++        predicted = "UNKNOWN" if rejected else classes[order[0]]
++        matrix[truth][predicted] += 1
++        ranked.append(order)
++    per_class = {}
++    for name in classes:
++        tp = matrix[name][name]
++        fp = sum(matrix[other][name] for other in classes if other != name)
++        fn = sum(value for predicted, value in matrix[name].items() if predicted != name)
++        precision = tp / (tp + fp) if tp + fp else 0.0
++        recall = tp / (tp + fn) if tp + fn else 0.0
++        per_class[name] = {"support": sum(matrix[name].values()),
++                           "precision": precision, "recall": recall,
++                           "f1": 2 * precision * recall / (precision + recall)
++                                 if precision + recall else 0.0}
++    count = len(labels) or 1
++    correct = sum(matrix[name][name] for name in classes)
++    supports = sum(value["support"] for value in per_class.values()) or 1
++    macro_precision = sum(value["precision"] for value in per_class.values()) / len(classes)
++    macro_recall = sum(value["recall"] for value in per_class.values()) / len(classes)
++    macro_f1 = sum(value["f1"] for value in per_class.values()) / len(classes)
++    weighted_f1 = sum(value["f1"] * value["support"] for value in per_class.values()) / supports
++    top2 = sum(classes.index(truth) in order[:2] for truth, order in zip(labels, ranked)) / count
++    top3 = sum(classes.index(truth) in order[:3] for truth, order in zip(labels, ranked)) / count
++    brier = 0.0
++    confidences, correctness = [], []
++    for truth, row, order in zip(labels, probabilities, ranked):
++        brier += sum((value - float(classes[index] == truth)) ** 2
++                     for index, value in enumerate(row))
++        confidences.append(row[order[0]])
++        correctness.append(float(classes[order[0]] == truth))
++    ece = 0.0
++    for lower in [index / 10 for index in range(10)]:
++        selected = [index for index, value in enumerate(confidences)
++                    if lower <= value < lower + .1 or (lower == .9 and value == 1.0)]
++        if selected:
++            accuracy = sum(correctness[index] for index in selected) / len(selected)
++            confidence = sum(confidences[index] for index in selected) / len(selected)
++            ece += len(selected) / count * abs(accuracy - confidence)
++    covered = [index for index, rejected in enumerate(unknown) if not rejected]
++    if covered and len(covered) != len(labels):
++        covered_metrics = classification_metrics([labels[i] for i in covered],
++                                                  [probabilities[i] for i in covered],
++                                                  classes)
++        covered_macro = covered_metrics["macro_f1"]
++        covered_accuracy = covered_metrics["accuracy"]
++    elif covered:
++        covered_macro, covered_accuracy = macro_f1, correct / count
++    else:
++        covered_macro = covered_accuracy = 0.0
++    return {"accuracy": correct / count, "balanced_accuracy": macro_recall,
++            "macro_precision": macro_precision, "macro_recall": macro_recall,
++            "macro_f1": macro_f1, "weighted_f1": weighted_f1,
++            "top2_accuracy": top2, "top3_accuracy": top3,
++            "unknown_rate": sum(unknown) / count, "coverage": len(covered) / count,
++            "covered_macro_f1": covered_macro, "covered_accuracy": covered_accuracy,
++            "expected_calibration_error": ece, "brier_score": brier / count,
++            "prediction_entropy_mean": sum(entropy(row) for row in probabilities) / count,
++            "per_class": per_class,
++            "confusion_matrix": {truth: dict(matrix[truth]) for truth in classes}}
+diff --git a/tools/parp/kernel_operation_inference/provenance.py b/tools/parp/kernel_operation_inference/provenance.py
+new file mode 100644
+index 000000000..64ef0c81c
+--- /dev/null
++++ b/tools/parp/kernel_operation_inference/provenance.py
+@@ -0,0 +1,14 @@
++"""Immutable input provenance helpers."""
++
++import hashlib
++
++
++def hash_paths(root, paths):
++    rows = []
++    for path in sorted(paths):
++        digest = hashlib.sha256()
++        with path.open("rb") as stream:
++            for block in iter(lambda: stream.read(1024 * 1024), b""):
++                digest.update(block)
++        rows.append((str(path.relative_to(root)), digest.hexdigest(), path.stat().st_size))
++    return rows
+diff --git a/tools/parp/kernel_operation_inference/taxonomy.py b/tools/parp/kernel_operation_inference/taxonomy.py
+new file mode 100644
+index 000000000..aea1b00e3
+--- /dev/null
++++ b/tools/parp/kernel_operation_inference/taxonomy.py
+@@ -0,0 +1,26 @@
++"""Frozen mapping from all observed Phase2.7B operation labels."""
++
++import json
++from pathlib import Path
++
++_CONFIG = Path(__file__).with_name("config") / "operation_taxonomy.json"
++with _CONFIG.open(encoding="utf-8") as _stream:
++    OPERATION_TAXONOMY = json.load(_stream)["mapping"]
++
++
++def map_operation(name):
++    if name not in OPERATION_TAXONOMY:
++        raise ValueError("unmapped real operation: %s" % name)
++    return OPERATION_TAXONOMY[name]
++
++
++def eligible_classes(support, train_min=8, validation_min=3, test_min=3):
++    eligible, insufficient = [], []
++    for name, values in sorted(support.items()):
++        target = eligible if (values.get("train", 0) >= train_min and
++                              values.get("validation", 0) >= validation_min and
++                              values.get("test", 0) >= test_min) else insufficient
++        target.append(name)
++    return {"eligible": eligible, "insufficient": insufficient,
++            "thresholds": {"train": train_min, "validation": validation_min,
++                           "test": test_min}}
+diff --git a/tools/parp/kernel_operation_inference/tests/test_contracts.py b/tools/parp/kernel_operation_inference/tests/test_contracts.py
+new file mode 100644
+index 000000000..339eec8fc
+--- /dev/null
++++ b/tools/parp/kernel_operation_inference/tests/test_contracts.py
+@@ -0,0 +1,164 @@
++import hashlib
++import tempfile
++import unittest
++from pathlib import Path
++
++from kernel_operation_inference.contracts import (
++    validate_feature_names,
++    validate_online_payload,
++    validate_source_map,
++)
++from kernel_operation_inference.features import (
++    TrainOnlyStandardizer,
++    aggregate_other,
++    causal_history,
++    label_quality,
++    stable_top_files,
++)
++from kernel_operation_inference.models import select_unknown_thresholds
++from kernel_operation_inference.provenance import hash_paths
++from kernel_operation_inference.taxonomy import (
++    OPERATION_TAXONOMY,
++    eligible_classes,
++)
++
++
++class LeakageContractTests(unittest.TestCase):
++    def test_operation_label_field_is_rejected(self):
++        with self.assertRaises(ValueError):
++            validate_feature_names(["dominant_operation"])
++
++    def test_automation_field_is_rejected(self):
++        with self.assertRaises(ValueError):
++            validate_feature_names(["automation_phase"])
++
++    def test_file_path_is_rejected(self):
++        with self.assertRaises(ValueError):
++            validate_feature_names(["absolute_file_path"])
++
++    def test_file_id_is_not_a_feature(self):
++        with self.assertRaises(ValueError):
++            validate_feature_names(["top1_file_id"])
++
++    def test_source_map_is_complete_and_kernel_only(self):
++        names = ["foreground_app_id", "top1_active_pages_log"]
++        source = {
++            "foreground_app_id": {"source_type": "UPPER_LAYER_APP_ID", "allowed_online": True},
++            "top1_active_pages_log": {"source_type": "PARP_FILE", "allowed_online": True},
++        }
++        self.assertTrue(validate_source_map(names, source))
++        del source["top1_active_pages_log"]
++        with self.assertRaises(ValueError):
++            validate_source_map(names, source)
++
++    def test_foreground_app_is_only_upper_layer_semantic_input(self):
++        payload = {
++            "schema_version": 1, "foreground_app_id": 1,
++            "kernel_features": {"anon_hot_ratio": .2},
++            "past_predictions": ["VIEW_IDLE"],
++        }
++        self.assertTrue(validate_online_payload(payload))
++        payload["current_operation"] = "EDIT"
++        with self.assertRaises(ValueError):
++            validate_online_payload(payload)
++
++
++class TopKTests(unittest.TestCase):
++    def setUp(self):
++        self.files = [
++            {"file_key": "b", "activity_score": .5, "weighted_pages": 2,
++             "active_pages": 3, "region_count": 2},
++            {"file_key": "a", "activity_score": .5, "weighted_pages": 2,
++             "active_pages": 3, "region_count": 1},
++            {"file_key": "c", "activity_score": .1, "weighted_pages": 1,
++             "active_pages": 2, "region_count": 4},
++        ]
++
++    def test_top3_selection_is_stable(self):
++        one = stable_top_files(self.files, 3)
++        two = stable_top_files(list(reversed(self.files)), 3)
++        self.assertEqual([row["file_key"] for row in one], ["a", "b", "c"])
++        self.assertEqual(one, two)
++
++    def test_other_summary_conserves_counts(self):
++        top = stable_top_files(self.files, 1)
++        other = aggregate_other(self.files, top)
++        self.assertEqual(other["other_file_count"] + len(top), len(self.files))
++        self.assertEqual(other["other_active_pages"] + sum(x["active_pages"] for x in top),
++                         sum(x["active_pages"] for x in self.files))
++
++
++class WindowAndHistoryTests(unittest.TestCase):
++    def test_window_history_never_crosses_session(self):
++        rows = [{"session_id": "a", "value": 1}, {"session_id": "a", "value": 2},
++                {"session_id": "b", "value": 3}]
++        self.assertEqual(causal_history(rows, 2, 3), [rows[2]])
++
++    def test_history_never_reads_future(self):
++        rows = [{"session_id": "a", "value": i} for i in range(5)]
++        self.assertEqual([x["value"] for x in causal_history(rows, 2, 3)], [0, 1, 2])
++
++    def test_pure_mixed_low_quality(self):
++        self.assertEqual(label_quality(.8), "PURE")
++        self.assertEqual(label_quality(.5), "MIXED")
++        self.assertEqual(label_quality(.49), "LOW_CONFIDENCE")
++
++
++class TrainSelectionTests(unittest.TestCase):
++    def test_scaler_is_fitted_on_train_only(self):
++        scaler = TrainOnlyStandardizer().fit([[0.0], [2.0]], ["wps_01", "wps_01"])
++        self.assertEqual(scaler.fit_sessions, ["wps_01"])
++        self.assertEqual(scaler.transform([[100.0]])[0][0], 99.0)
++
++    def test_unknown_thresholds_are_validation_only(self):
++        result = select_unknown_thresholds([.1, .2, .3, .9], targets=(.25,))
++        self.assertEqual(result["selection_source"], "validation_only")
++        self.assertIn("0.25", result["thresholds"])
++
++    def test_test_values_cannot_enter_threshold_selection(self):
++        with self.assertRaises(TypeError):
++            select_unknown_thresholds([.1, .2], test_scores=[.9])
++
++
++class TaxonomyTests(unittest.TestCase):
++    def test_all_eighteen_real_operations_are_mapped(self):
++        self.assertEqual(len(OPERATION_TAXONOMY), 18)
++        self.assertEqual(OPERATION_TAXONOMY["EDIT"], "EDIT")
++        self.assertEqual(OPERATION_TAXONOMY["SAVE"], "SAVE_WRITE")
++
++    def test_insufficient_classes_are_not_fabricated(self):
++        support = {"EDIT": {"train": 7, "validation": 9, "test": 9},
++                   "NAVIGATION": {"train": 8, "validation": 3, "test": 3}}
++        result = eligible_classes(support)
++        self.assertEqual(result["eligible"], ["NAVIGATION"])
++        self.assertEqual(result["insufficient"], ["EDIT"])
++
++
++class OnlineAndProvenanceTests(unittest.TestCase):
++    def test_online_contract_rejects_future_kernel_state(self):
++        payload = {"schema_version": 1, "foreground_app_id": 1,
++                   "kernel_features": {}, "past_predictions": [],
++                   "future_kernel_features": {}}
++        with self.assertRaises(ValueError):
++            validate_online_payload(payload)
++
++    def test_online_contract_rejects_current_truth(self):
++        payload = {"schema_version": 1, "foreground_app_id": 1,
++                   "kernel_features": {}, "past_predictions": [],
++                   "ground_truth": "EDIT"}
++        with self.assertRaises(ValueError):
++            validate_online_payload(payload)
++
++    def test_raw_hash_change_is_detected(self):
++        with tempfile.TemporaryDirectory() as temporary:
++            path = Path(temporary) / "raw"
++            path.write_bytes(b"a")
++            before = hash_paths(Path(temporary), [path])
++            path.write_bytes(b"b")
++            after = hash_paths(Path(temporary), [path])
++            self.assertNotEqual(before, after)
++            self.assertEqual(before[0][1], hashlib.sha256(b"a").hexdigest())
++
++
++if __name__ == "__main__":
++    unittest.main()
+diff --git a/tools/parp/kernel_operation_inference/vectors.py b/tools/parp/kernel_operation_inference/vectors.py
+new file mode 100644
+index 000000000..e12e3bb38
+--- /dev/null
++++ b/tools/parp/kernel_operation_inference/vectors.py
+@@ -0,0 +1,208 @@
++"""Fixed-length kernel-only vector schemas and causal materialization."""
++
++from collections import defaultdict
++import math
++
++from .contracts import validate_source_map
++from .features import aggregate_other, signed_log1p, stable_top_files
++
++VERSIONS = ("V1_PAGE_ONLY", "V2_PAGE_VM", "V3_PAGE_VM_IO_CPU", "V4_TEMPORAL")
++
++VM_FIELDS = (
++    "memory_current_log", "memory_anon_bytes_log", "memory_file_bytes_log",
++    "inactive_anon_log", "active_anon_log", "inactive_pagecache_log",
++    "active_pagecache_log", "slab_log", "kernel_stack_log", "pagetables_log",
++    "swap_current_log", "pgfault_delta", "pgmajfault_delta",
++    "refault_anon_delta", "refault_pagecache_delta", "pgscan_delta",
++    "pgsteal_delta", "scan_efficiency", "refault_rate",
++)
++
++SYSTEM_FIELDS = (
++    "read_bytes_delta", "write_bytes_delta", "read_ios_delta",
++    "write_ios_delta", "discard_bytes_delta", "dirty_bytes",
++    "writeback_bytes", "version_change_count", "cpu_usage_usec_delta",
++    "user_usec_delta", "system_usec_delta", "nr_periods_delta",
++    "nr_throttled_delta", "throttled_usec_delta", "task_count",
++    "context_switch_delta", "runnable_time", "blocked_time",
++    "memory_psi_some", "memory_psi_full", "cpu_psi_some", "io_psi_some",
++    "io_psi_full",
++)
++
++
++def _source(source_type, source_file, interface, transformation,
++            availability=True, scope="APP_DOMAIN"):
++    return {"source_type": source_type, "source_file": source_file,
++            "kernel_interface": interface, "scope": scope,
++            "transformation": transformation, "availability": availability,
++            "allowed_online": True}
++
++
++def _jaccard(left, right):
++    return len(left & right) / len(left | right) if left or right else 1.0
++
++
++def _centroid(shape):
++    total = sum(shape)
++    return sum(index * value for index, value in enumerate(shape)) / total if total else 0.0
++
++
++def current_features(row, previous, top_k):
++    files = row["files"]
++    top = stable_top_files(files, top_k)
++    other = aggregate_other(files, top)
++    total_weight = sum(item["weighted_pages"] for item in files) or 1.0
++    total_active = sum(item["active_pages"] for item in files) or 1
++    values = {"pagecache_object_count": float(len(files)),
++              "active_pagecache_object_count": float(sum(item["active_pages"] > 0 for item in files)),
++              "total_active_pages_log": math.log1p(sum(item["active_pages"] for item in files)),
++              "total_weighted_pages_log": math.log1p(sum(item["weighted_pages"] for item in files))}
++    sources = {name: _source("PARP_FILE", "parp_region_evidence.raw",
++                             "parp:parp_region_evidence", "window aggregate")
++               for name in values}
++    previous_by_key = {item["file_key"]: item for item in previous["files"]} if previous else {}
++    previous_rank = {item["file_key"]: index + 1 for index, item in enumerate(
++        stable_top_files(previous["files"], top_k))} if previous else {}
++    for index in range(top_k):
++        prefix = "slot%d_" % (index + 1)
++        item = top[index] if index < len(top) else None
++        prior = previous_by_key.get(item["file_key"]) if item else None
++        rank_before = previous_rank.get(item["file_key"], 0) if item else 0
++        fields = {
++            "valid": float(item is not None),
++            "size_log": math.log1p(item["file_size"]) if item else 0.0,
++            "page_count_log": math.log1p(item["file_pages"]) if item else 0.0,
++            "active_pages_log": math.log1p(item["active_pages"]) if item else 0.0,
++            "observed_pages_log": math.log1p(item["observed_pages"]) if item else 0.0,
++            "coverage": item["coverage"] if item else 0.0,
++            "weighted_coverage": item["weighted_coverage"] if item else 0.0,
++            "region_count_log": math.log1p(item["region_count"]) if item else 0.0,
++            "mean_accesses": item["mean_nr_accesses"] if item else 0.0,
++            "max_accesses": item["max_nr_accesses"] if item else 0.0,
++            "mean_age": item["mean_age"] if item else 0.0,
++            "max_age": item["max_age"] if item else 0.0,
++            "active_segments_l10": item["active_segments_l10"] if item else 0.0,
++            "active_segments_l100": item["active_segments_l100"] if item else 0.0,
++            "activity_share": item["weighted_pages"] / total_weight if item else 0.0,
++            "active_previous": float(prior is not None and prior["active_pages"] > 0),
++            "activity_score_delta": (item["activity_score"] - prior["activity_score"])
++                                    if item and prior else 0.0,
++            "rank_previous": float(rank_before),
++            "rank_changed": float(bool(item and rank_before and rank_before != index + 1)),
++            "shape_jaccard_previous": _jaccard(
++                {i for i, x in enumerate(item["shape_l10"]) if x > 0} if item else set(),
++                {i for i, x in enumerate(prior["shape_l10"]) if x > 0} if prior else set()),
++            "centroid_shift": (_centroid(item["shape_l10"]) - _centroid(prior["shape_l10"]))
++                              if item and prior else 0.0,
++        }
++        for shape_index in range(10):
++            fields["shape_coverage_%d" % shape_index] = (
++                item["shape_l10"][shape_index] if item and shape_index < len(item["shape_l10"]) else 0.0)
++            fields["shape_weighted_%d" % shape_index] = (
++                item["weighted_shape_l10"][shape_index]
++                if item and shape_index < len(item["weighted_shape_l10"]) else 0.0)
++        for name, value in fields.items():
++            values[prefix + name] = value
++            sources[prefix + name] = _source(
++                "DERIVED_KERNEL_HISTORY" if name in ("active_previous", "activity_score_delta",
++                    "rank_previous", "rank_changed", "shape_jaccard_previous", "centroid_shift")
++                else "PARP_FILE", "parp_region_evidence.raw",
++                "parp:parp_region_evidence", "top-k stable aggregate")
++    other_values = {
++        "other_object_count": other["other_file_count"],
++        "other_active_pages_log": math.log1p(other["other_active_pages"]),
++        "other_weighted_pages_log": math.log1p(other["other_weighted_pages"]),
++        "other_region_count_log": math.log1p(other["other_region_count"]),
++        "top1_activity_share": top[0]["weighted_pages"] / total_weight if top else 0.0,
++        "topk_activity_share": sum(item["weighted_pages"] for item in top) / total_weight,
++        "topk_active_page_share": sum(item["active_pages"] for item in top) / total_active,
++        "other_mean_coverage": (sum(item["coverage"] for item in files if item not in top) /
++                                other["other_file_count"] if other["other_file_count"] else 0.0),
++        "other_max_coverage": max((item["coverage"] for item in files if item not in top), default=0.0),
++    }
++    for name, value in other_values.items():
++        values[name] = float(value)
++        sources[name] = _source("PARP_FILE", "parp_region_evidence.raw",
++                                "parp:parp_region_evidence", "other conservation aggregate")
++    anon = row["anon"]
++    total = anon["anon_total_bytes"] or 1
++    anon_values = {
++        "anon_total_bytes_log": math.log1p(anon["anon_total_bytes"]),
++        "anon_observed_bytes_log": math.log1p(anon["anon_observed_bytes"]),
++        "anon_hot_ratio": anon["anon_hot_bytes"] / total,
++        "anon_warm_ratio": anon["anon_warm_bytes"] / total,
++        "anon_cold_ratio": anon["anon_cold_bytes"] / total,
++        "anon_recently_active_ratio": anon["anon_recently_active_ratio"],
++        "anon_cooling_ratio": anon["anon_cooling_ratio"],
++        "anon_mean_access_ratio": anon["anon_mean_access_ratio"],
++        "anon_max_access_ratio": anon["anon_max_access_ratio"],
++        "anon_mean_age_log": math.log1p(anon["anon_mean_age"]),
++        "anon_max_age_log": math.log1p(anon["anon_max_age"]),
++        "anon_region_count_log": math.log1p(anon["anon_region_count"]),
++        "anon_active_region_count_log": math.log1p(anon["anon_active_region_count"]),
++        "anon_working_set_delta_signed_log": signed_log1p(anon["anon_working_set_delta"]),
++        "unresolved_anon_ratio": anon["unresolved_anon_ratio"],
++    }
++    for name, value in anon_values.items():
++        values[name] = value
++        sources[name] = _source("PARP_ANON", "parp_region_evidence.raw",
++                                "parp:parp_region_evidence", "anonymous domain aggregate")
++    current_keys = {item["file_key"] for item in files if item["active_pages"] > 0}
++    prior_keys = ({item["file_key"] for item in previous["files"] if item["active_pages"] > 0}
++                  if previous else set())
++    values["pagecache_set_jaccard_previous"] = _jaccard(current_keys, prior_keys)
++    sources["pagecache_set_jaccard_previous"] = _source(
++        "DERIVED_KERNEL_HISTORY", "parp_region_evidence.raw",
++        "parp:parp_region_evidence", "causal set overlap")
++    return values, sources
++
++
++def _missing_group(fields, source_type, interface):
++    values, sources = {}, {}
++    for name in fields:
++        values[name] = 0.0
++        values[name + "_available"] = 0.0
++        sources[name] = _source(source_type, "NOT_COLLECTED", interface,
++                                "zero fill", availability=False)
++        sources[name + "_available"] = _source(
++            "AVAILABILITY_MASK", "NOT_COLLECTED", interface,
++            "boolean availability", availability=False)
++    return values, sources
++
++
++def materialize(rows, version, top_k, history_length):
++    if version not in VERSIONS or history_length not in (1, 2, 3):
++        raise ValueError("unsupported vector configuration")
++    current = []
++    for index, row in enumerate(rows):
++        previous = rows[index - 1] if index and rows[index - 1]["session_id"] == row["session_id"] else None
++        values, sources = current_features(row, previous, top_k)
++        if version in ("V2_PAGE_VM", "V3_PAGE_VM_IO_CPU", "V4_TEMPORAL"):
++            extra, extra_sources = _missing_group(VM_FIELDS, "CGROUP_MEMORY", "cgroup v2 memory.*")
++            values.update(extra); sources.update(extra_sources)
++        if version in ("V3_PAGE_VM_IO_CPU", "V4_TEMPORAL"):
++            extra, extra_sources = _missing_group(SYSTEM_FIELDS, "CGROUP_CPU", "cgroup v2 cpu/io/psi")
++            values.update(extra); sources.update(extra_sources)
++        current.append((values, sources))
++    base_names = sorted(current[0][0]) if current else []
++    names = ["foreground_app_id"]
++    source_map = {"foreground_app_id": _source(
++        "UPPER_LAYER_APP_ID", "online request", "AppBind", "app-specific selection")}
++    for lag in range(history_length):
++        for name in base_names:
++            final = "lag%d_%s" % (lag, name)
++            names.append(final); source_map[final] = dict(current[0][1][name])
++            if lag: source_map[final]["source_type"] = "DERIVED_KERNEL_HISTORY"
++    examples = []
++    for index, row in enumerate(rows):
++        vector = [float(row["app_id"])]
++        for lag in range(history_length):
++            target = index - lag
++            valid = target >= 0 and rows[target]["session_id"] == row["session_id"]
++            values = current[target][0] if valid else {}
++            vector.extend(float(values.get(name, 0.0)) for name in base_names)
++        examples.append({"window_id": row["window_id"], "session_id": row["session_id"],
++                         "app_id": row["app_id"], "domain_id": row["domain_id"],
++                         "window_start_ns": row["window_start_ns"],
++                         "window_end_ns": row["window_end_ns"], "vector": vector})
++    validate_source_map(names, source_map)
++    return examples, names, source_map
+-- 
+2.25.1
+

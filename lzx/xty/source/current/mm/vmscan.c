@@ -4389,36 +4389,83 @@ enum {
 };
 
 #ifdef CONFIG_PARP
+/* #lzx
+ * 为 @memcg 计算全局回收时使用的 memcg LRU 分桶编号。
+ *
+ * PARP 启用时，shrink_many() 会从 0 号桶开始依次扫描。
+ * 因此分数越低，memcg 越靠近前面的桶，越早成为回收候选；
+ * 分数越高，则越靠近后面的桶，获得更强的回收保护。
+ *
+ * 分数由两类 Q15 信号组成：
+ *
+ *  - 应用先验 app_prior_q15，表示当前应用的使用价值；
+ *  - tier2 剩余空间比例 headroom / limit，表示距离上限
+ *    还有多少余量。
+ *
+ * 两个信号同时有效时取较小值，即任一个信号表明
+ * memcg 应当更早被回收，最终就选择更靠前的桶。
+ * 根 memcg、PARP 关闭或没有任何有效信号时，回退为随机分桶，
+ * 保留原有 memcg LRU 的公平性与扰动特性。
+ *
+ * 返回值始终位于 [0, MEMCG_NR_BINS - 1]。
+ */
 static unsigned int parp_memcg_reclaim_bin(struct mem_cgroup *memcg)
 {
 	struct parp_app_context app;
+	/* 使用单调时间校验 PARP 快照、绑定和先验是否过期。 */
 	u64 now = ktime_get_mono_fast_ns();
 	u64 domain_id;
+	/* PARP_Q15_ONE 代表 1.0；0 代表最低保护分数。 */
 	u32 score_q15 = 0;
+	/* 区分“分数真的为 0”与“尚未取得信号”。 */
 	bool have_signal = false;
 	u64 limit;
 	u64 headroom;
 
+	/*
+	 * 根 memcg 不参与普通 memcg 优先级排序。PARP 未启用时
+	 * 也不应用模型信号，因此两种情况均使用随机桶。
+	 */
 	if (!memcg || mem_cgroup_is_root(memcg) ||
 	    parp_get_mode() == PARP_MODE_DISABLED)
 		return get_random_u32_below(MEMCG_NR_BINS);
 
+	/*
+	 * domain_id 将 memcg 映射到 PARP 应用域。只有映射存在，
+	 * 且 context_lookup() 找到尚未过期、模型版本匹配的
+	 * 绑定与应用先验时，app_prior_q15 才可作为有效信号。
+	 */
 	domain_id = parp_memcg_domain_id(memcg);
 	if (domain_id && parp_context_lookup(domain_id, now, &app)) {
 		score_q15 = app.app_prior_q15;
 		have_signal = true;
 	}
 
+	/*
+	 * tier2 采样路径并发更新这两个 64 位字段，
+	 * READ_ONCE() 防止编译器合并或重复读取单个字段。
+	 * 两次读取不构成原子快照，这里只需要近似的分桶信号。
+	 */
 	limit = READ_ONCE(memcg->parp_tier2.limit_bytes);
 	headroom = READ_ONCE(memcg->parp_tier2.headroom_bytes);
+	/* 0 或 U64_MAX 表示没有可用的有限上限，忽略 headroom 信号。 */
 	if (limit && limit != U64_MAX) {
 		u32 headroom_q15;
 
+		/*
+		 * 将 headroom / limit 归一化到 Q15 区间。若由于
+		 * 并发采样或状态变化使 headroom >= limit，则饱和为 1.0，
+		 * 避免比例超出 Q15 有效范围。
+		 */
 		if (headroom >= limit)
 			headroom_q15 = PARP_Q15_ONE;
 		else
 			headroom_q15 = mul_u64_u32_div(headroom, PARP_Q15_ONE, limit);
 
+		/*
+		 * 已有应用先验时取两者中更保守的低分；
+		 * 否则直接以 tier2 剩余空间作为唯一排序信号。
+		 */
 		if (have_signal)
 			score_q15 = min(score_q15, headroom_q15);
 		else
@@ -4426,9 +4473,19 @@ static unsigned int parp_memcg_reclaim_bin(struct mem_cgroup *memcg)
 		have_signal = true;
 	}
 
+	/*
+	 * 既无有效应用上下文，也无有限 tier2 上限时，
+	 * 不把 score_q15 的初始值 0 误解为最低保护等级。
+	 */
 	if (!have_signal)
 		return get_random_u32_below(MEMCG_NR_BINS);
 
+	/*
+	 * 把 Q15 分数线性映射到分桶编号。右移 15 位等价于
+	 * 按 2^15 缩放；由于 Q15 的 1.0 是 32767 而不是 32768，
+	 * 正常输入本身已落在有效桶内。min_t() 作为最终防线，
+	 * 即使上游出现超范围分数，也不会访问越界的 fifo 桶。
+	 */
 	return min_t(unsigned int, score_q15 * MEMCG_NR_BINS >> 15,
 		     MEMCG_NR_BINS - 1);
 }
