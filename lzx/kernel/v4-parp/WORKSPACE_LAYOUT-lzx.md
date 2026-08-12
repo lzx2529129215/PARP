@@ -40,6 +40,7 @@ Linux `src/` 或 `build/`。v4.1 的 `snapshot`/`stats` 观测接口已合入这
 ## 可复现资料
 
 - `patches/parp-v4-full.patch` 是原始 PARP 基础补丁。
-- `patches/linux-6.17.13-parp-effective-tier-series-lzx/` 保留截至 0126 的有序补丁系列。
+- `patches/linux-6.17.13-parp-effective-tier-series-lzx/linux-6.17.13-parp-effective-tier-squashed-lzx.patch`
+  是从上游基线到当前 HEAD 的单一总补丁；原 126 个细粒度提交仍保留在源码仓库 Git 历史中。
 - `configs/`、`docs/`、`reference/` 和 `scripts/` 保留配置、设计和工具。
 - Linux 上游基线提交为 `6609c4d49ebe220a5c40d3105c3f0e68f569ba1a`。
