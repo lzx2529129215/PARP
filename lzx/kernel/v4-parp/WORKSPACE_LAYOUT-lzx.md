@@ -37,6 +37,17 @@ cd /home/lzxxxxxx/桌面/huawei/myself-kswapd/lzx/kernel/v4-parp
 `../v4.1-parp` 保留用户态评估、配置、测试和可移植补丁，不再维护自己的
 Linux `src/` 或 `build/`。v4.1 的 `snapshot`/`stats` 观测接口已合入这套源码。
 
+## 当前设计文档
+
+旧 `docs/parp/` 记录的是已退出主线的 Phase 2/2.5 固定概率、LSTM scan-budget
+和 observe-only 方案，已删除以避免与 effective-tier 实现混淆。当前资料以源码仓库为准：
+
+- `src/linux-6.17.13-parp-lzx/docs/parp_effective_tier_implementation.md`：内核 effective-tier 实现。
+- `src/linux-6.17.13-parp-lzx/docs/parp_effective_tier_pairwise_ranking.md`：短期重用排序设计。
+- `src/linux-6.17.13-parp-lzx/docs/parp_effective_tier_live_shadow_audit-lzx.md`：live-shadow 审计结果。
+- `src/linux-6.17.13-parp-lzx/tools/parp/effective_tier/README.md`：实验和评估工具。
+- `src/linux-6.17.13-parp-lzx/tools/parp/frontier_score/README.md`：frontier-score 基线工具。
+
 ## 可复现资料
 
 - `patches/parp-v4-full.patch` 是原始 PARP 基础补丁。
