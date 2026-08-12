@@ -1,0 +1,134 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://parp.invalid/effective-tier/observability-v2",
+  "title": "PARP effective-tier exported observability record",
+  "type": "object",
+  "required": ["schema_version", "event_kind", "timestamp_ns", "experiment_id", "session_id", "mode"],
+  "properties": {
+    "schema_version": { "const": 2 },
+    "event_kind": { "enum": ["score_latency", "lock_latency", "reclaim_latency", "reclaim_efficiency", "app_latency", "app_session_summary", "vm_counter_delta", "trace_loss"] },
+    "timestamp_ns": { "type": "integer", "minimum": 0 },
+    "experiment_id": { "type": ["string", "integer"] },
+    "session_id": { "type": ["string", "integer"] },
+    "mode": { "enum": ["OFF", "SHADOW_EFFECTIVE_TIER", "APPLY_PROTECT_ONLY", "APPLY_BIDIRECTIONAL", "APPLY_RANDOM_MATCHED", "APPLY_RECENCY_BASELINE", "PRODUCT_ABLATION", "ORACLE_OFFLINE_ONLY"] }
+  },
+  "allOf": [
+    {
+      "if": { "properties": { "event_kind": { "const": "score_latency" } } },
+      "then": {
+        "required": ["component", "duration_ns"],
+        "properties": {
+          "component": { "enum": ["score", "effective_tier", "quadrant_classification", "batch_model_total"] },
+          "duration_ns": { "type": "integer", "minimum": 0 },
+          "batch_id": { "type": ["string", "integer", "null"] }
+        }
+      }
+    },
+    {
+      "if": { "properties": { "event_kind": { "const": "lock_latency" } } },
+      "then": {
+        "required": ["lock_name", "scope", "held_ns", "wait_ns", "irq_disabled_ns", "wait_measured", "irq_disabled_measured"],
+        "properties": {
+          "lock_name": { "const": "lru_lock" },
+          "scope": { "enum": ["scan_folios", "batch"] },
+          "held_ns": { "type": "integer", "minimum": 0 },
+          "wait_ns": { "type": ["integer", "null"], "minimum": 0 },
+          "irq_disabled_ns": { "type": ["integer", "null"], "minimum": 0 },
+          "wait_measured": { "type": "boolean" },
+          "irq_disabled_measured": { "type": "boolean" }
+        },
+        "allOf": [
+          {
+            "if": { "properties": { "wait_measured": { "const": true } } },
+            "then": { "properties": { "wait_ns": { "type": "integer", "minimum": 0 } } },
+            "else": { "properties": { "wait_ns": { "type": "null" } } }
+          },
+          {
+            "if": { "properties": { "irq_disabled_measured": { "const": true } } },
+            "then": { "properties": { "irq_disabled_ns": { "type": "integer", "minimum": 0 } } },
+            "else": { "properties": { "irq_disabled_ns": { "type": "null" } } }
+          }
+        ]
+      }
+    },
+    {
+      "if": { "properties": { "event_kind": { "const": "reclaim_latency" } } },
+      "then": {
+        "required": ["scope", "duration_ns"],
+        "properties": {
+          "scope": { "enum": ["direct_reclaim", "memcg_reclaim", "kswapd_round", "isolate_batch", "shrink_folio_list", "full_request"] },
+          "duration_ns": { "type": "integer", "minimum": 0 }
+        }
+      }
+    },
+    {
+      "if": { "properties": { "event_kind": { "const": "reclaim_efficiency" } } },
+      "then": {
+        "required": ["scanned", "isolated", "reclaimed", "native_protected", "predictive_upgraded", "predictive_downgraded", "pgscan", "pgsteal", "no_progress_rounds", "priority_drops", "younger_generation_moves"],
+        "properties": {
+          "scanned": { "type": "integer", "minimum": 0 },
+          "isolated": { "type": "integer", "minimum": 0 },
+          "reclaimed": { "type": "integer", "minimum": 0 },
+          "native_protected": { "type": "integer", "minimum": 0 },
+          "predictive_upgraded": { "type": "integer", "minimum": 0 },
+          "predictive_downgraded": { "type": "integer", "minimum": 0 },
+          "pgscan": { "type": "integer", "minimum": 0 },
+          "pgsteal": { "type": "integer", "minimum": 0 },
+          "no_progress_rounds": { "type": "integer", "minimum": 0 },
+          "priority_drops": { "type": "integer", "minimum": 0 },
+          "younger_generation_moves": { "type": "integer", "minimum": 0 }
+        }
+      }
+    },
+    {
+      "if": { "properties": { "event_kind": { "const": "app_latency" } } },
+      "then": {
+        "required": ["app", "operation", "duration_ns", "success"],
+        "properties": {
+          "app": { "enum": ["WPS", "FILES", "QQ", "OTHER"] },
+          "operation": { "type": "string", "minLength": 1 },
+          "duration_ns": { "type": "integer", "minimum": 0 },
+          "success": { "type": "boolean" },
+          "failure_kind": { "type": ["string", "null"] }
+        }
+      }
+    },
+    {
+      "if": { "properties": { "event_kind": { "const": "app_session_summary" } } },
+      "then": {
+        "required": ["app", "total_duration_ns", "stalls", "timeouts", "failures"],
+        "properties": {
+          "app": { "enum": ["WPS", "FILES", "QQ", "OTHER"] },
+          "total_duration_ns": { "type": "integer", "minimum": 0 },
+          "stalls": { "type": "integer", "minimum": 0 },
+          "timeouts": { "type": "integer", "minimum": 0 },
+          "failures": { "type": "integer", "minimum": 0 }
+        }
+      }
+    },
+    {
+      "if": { "properties": { "event_kind": { "const": "vm_counter_delta" } } },
+      "then": {
+        "required": ["counter", "delta"],
+        "properties": {
+          "counter": { "enum": ["workingset_refault_file", "workingset_refault_anon", "pgfault", "pgmajfault", "swapin", "swapout", "psi_some_us", "psi_full_us", "memory_high", "memory_oom", "memory_oom_kill"] },
+          "delta": { "type": "integer" }
+        }
+      }
+    },
+    {
+      "if": { "properties": { "event_kind": { "const": "trace_loss" } } },
+      "then": {
+        "required": ["measured", "source", "before", "after", "lost"],
+        "properties": {
+          "measured": { "type": "boolean" },
+          "source": { "type": ["string", "null"] },
+          "before": { "type": ["integer", "null"], "minimum": 0 },
+          "after": { "type": ["integer", "null"], "minimum": 0 },
+          "lost": { "type": ["integer", "null"], "minimum": 0 },
+          "per_cpu": { "type": "object", "additionalProperties": { "type": "integer", "minimum": 0 } }
+        }
+      }
+    }
+  ]
+}

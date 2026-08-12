@@ -1,0 +1,30 @@
+{
+  "schema_version": 1,
+  "q15_one": 32767,
+  "thresholds": {"high": 24576, "medium": 12288},
+  "multipliers": {
+    "foreground": 16384,
+    "high": 19661,
+    "medium": 26214,
+    "low": 39321,
+    "minimum": 16384,
+    "maximum": 49152
+  },
+  "cases": [
+    {"name": "wps_foreground_observe", "native": 1000, "score": 30000,
+     "foreground": true, "pressure": "NORMAL", "mode": "OBSERVE",
+     "proposed": 500, "applied": 1000, "reason": "FOREGROUND"},
+    {"name": "qq_high_observe", "native": 1000, "score": 28000,
+     "foreground": false, "pressure": "NORMAL", "mode": "OBSERVE",
+     "proposed": 600, "applied": 1000, "reason": "HIGH_PRIOR"},
+    {"name": "files_low_observe", "native": 1000, "score": 4000,
+     "foreground": false, "pressure": "NORMAL", "mode": "OBSERVE",
+     "proposed": 1200, "applied": 1000, "reason": "LOW_PRIOR"},
+    {"name": "medium_apply", "native": 1000, "score": 18000,
+     "foreground": false, "pressure": "NORMAL", "mode": "APPLY",
+     "proposed": 800, "applied": 800, "reason": "MEDIUM_PRIOR"},
+    {"name": "emergency", "native": 1000, "score": 30000,
+     "foreground": true, "pressure": "EMERGENCY", "mode": "APPLY",
+     "proposed": 1000, "applied": 1000, "reason": "PRESSURE_BYPASS"}
+  ]
+}

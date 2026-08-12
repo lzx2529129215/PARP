@@ -1,0 +1,18 @@
+{
+  "page_size": 4096,
+  "align": [
+    {"input": [4097, 12287], "output": [4096, 12288]},
+    {"input": [65536, 69632], "output": [65536, 69632]}
+  ],
+  "file_offset": {
+    "vma_start": 65536,
+    "vm_pgoff": 7,
+    "region": [73728, 86016],
+    "output": [9, 3]
+  },
+  "anon_offset": {
+    "vma_start": 131072,
+    "region": [143360, 151552],
+    "output": [3, 2]
+  }
+}

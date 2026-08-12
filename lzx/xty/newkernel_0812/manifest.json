@@ -1,0 +1,48 @@
+{
+  "bundle_name": "hwe-to-linux-6.17.13-parp-github-0812",
+  "generated_at": "2026-08-12T08:28:52.958799+00:00",
+  "source_initial": "/home/xty/v4-parp/work/linux-hwe-6.17-parp",
+  "source_target": "/home/xty/v4-parp/work/linux-6.17.13-parp",
+  "runtime_kernel": "6.17.13-myks-l02",
+  "strategy": "delete_paths_then_overlay",
+  "counts": {
+    "added": 244,
+    "modified": 1169,
+    "type_changed": 0,
+    "deleted_files": 42,
+    "deleted_dirs": 7,
+    "overlay_files_listed": 1413,
+    "diff_qr_lines": 1289,
+    "overlay_files_actual": 1413,
+    "overlay_bytes": 57727337
+  },
+  "key_paths": [
+    "Makefile",
+    "Kconfig",
+    "mm/Makefile",
+    "mm/Kconfig",
+    "mm/parp/Makefile",
+    "mm/parp/Kconfig",
+    "mm/parp/internal.h",
+    "mm/parp/core/watermark.c",
+    "mm/tier2_watermark.c",
+    "include/linux/parp_tier2.h",
+    "include/linux/tier2_watermark.h",
+    "include/linux/memcontrol.h",
+    "mm/memcontrol.c",
+    "mm/memcontrol-v1.c",
+    "mm/vmscan.c",
+    "kernel/trace/trace_events.c",
+    "include/trace/events/parp.h",
+    "Documentation/admin-guide/mm/parp-tier2.rst",
+    "Documentation/admin-guide/mm/index.rst",
+    "docs/交接说明.md",
+    "docs/复现手册.md",
+    "docs/源码说明.md"
+  ],
+  "notes": [
+    "source/overlay is authoritative for reproduction",
+    "patches/0001-key-parp-tier2-bin-review.patch is for key PARP review",
+    "patches/0000-full-tree-diff.patch.gz is a text diff reference"
+  ]
+}

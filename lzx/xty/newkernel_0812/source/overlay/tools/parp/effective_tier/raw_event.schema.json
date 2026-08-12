@@ -1,0 +1,239 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://parp.invalid/effective-tier/raw-event-v2",
+  "title": "PARP effective-tier exported raw event",
+  "oneOf": [
+    { "$ref": "#/$defs/tier_gate_candidate" },
+    { "$ref": "#/$defs/real_access" }
+  ],
+  "$defs": {
+    "identifier": { "type": ["string", "integer"] },
+    "nullableBoolean": { "type": ["boolean", "null"] },
+    "nullableInteger": { "type": ["integer", "null"] },
+    "features": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "time_since_last_real_access_ms",
+        "previous_real_access_interval_ms",
+        "reuse_interval_ema_ms",
+        "consecutive_reclaim_candidate_count",
+        "time_in_current_generation_ms",
+        "access_ema_q8"
+      ],
+      "properties": {
+        "time_since_last_real_access_ms": { "type": ["integer", "null"], "minimum": 0 },
+        "previous_real_access_interval_ms": { "type": ["integer", "null"], "minimum": 0 },
+        "reuse_interval_ema_ms": { "type": ["integer", "null"], "minimum": 0 },
+        "consecutive_reclaim_candidate_count": { "type": ["integer", "null"], "minimum": 0 },
+        "time_in_current_generation_ms": { "type": ["integer", "null"], "minimum": 0 },
+        "access_ema_q8": { "type": ["integer", "null"], "minimum": 0, "maximum": 255 }
+      }
+    },
+    "validFeatures": {
+      "type": "object",
+      "properties": {
+        "time_since_last_real_access_ms": { "type": "integer", "minimum": 0 },
+        "previous_real_access_interval_ms": { "type": "integer", "minimum": 0 },
+        "reuse_interval_ema_ms": { "type": "integer", "minimum": 0 },
+        "consecutive_reclaim_candidate_count": { "type": "integer", "minimum": 0 },
+        "time_in_current_generation_ms": { "type": "integer", "minimum": 0 },
+        "access_ema_q8": { "type": "integer", "minimum": 0, "maximum": 255 }
+      }
+    },
+    "nullFeatures": {
+      "type": "object",
+      "properties": {
+        "time_since_last_real_access_ms": { "type": "null" },
+        "previous_real_access_interval_ms": { "type": "null" },
+        "reuse_interval_ema_ms": { "type": "null" },
+        "consecutive_reclaim_candidate_count": { "type": "null" },
+        "time_in_current_generation_ms": { "type": "null" },
+        "access_ema_q8": { "type": "null" }
+      }
+    },
+    "tier_gate_candidate": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": [
+        "schema_version", "event_kind", "timestamp_ns", "experiment_id",
+        "session_id", "folio_cookie", "folio_lifetime_epoch",
+        "memcg_anon_id", "nid", "page_type", "source_seq",
+        "generation_index", "native_tier", "native_tier_idx", "mode",
+        "special_native_protect", "native_protect", "model_valid",
+        "features_valid", "features", "model_type", "model_version",
+        "expected_model_version", "feature_schema_version",
+        "model_checksum", "model_provenance", "pairwise_model_checksum", "rank_score_bin",
+        "score_percentile",
+        "reuse_score", "cold_threshold", "hot_threshold_1",
+        "hot_threshold_2", "hot_threshold_3", "delta_tier_q8", "effective_tier_q8",
+        "score_threshold_cold", "score_threshold_hot_1",
+        "score_threshold_hot_2", "score_threshold_hot_3", "predictive_delta_tier_q8",
+        "effective_protect", "action", "bypass_reason", "folio_nr_pages",
+        "batch_id", "reclaim_epoch", "priority", "score_duration_ns",
+        "actual_native_behavior", "isolate_result", "reclaimed", "putback",
+        "activated", "gate_reached", "candidate_scope"
+      ],
+      "$comment": "#lzx: pressure-aware trace fields below",
+      "properties": {
+        "schema_version": { "const": 2 },
+        "event_kind": { "const": "tier_gate_candidate" },
+        "timestamp_ns": { "type": "integer", "minimum": 0 },
+        "experiment_id": { "$ref": "#/$defs/identifier" },
+        "session_id": { "$ref": "#/$defs/identifier" },
+        "folio_cookie": { "$ref": "#/$defs/identifier" },
+        "folio_lifetime_epoch": { "type": "integer", "minimum": 0 },
+        "memcg_anon_id": { "$ref": "#/$defs/identifier" },
+        "nid": { "type": "integer", "minimum": 0 },
+        "page_type": { "enum": ["anon", "file"] },
+        "source_seq": { "type": "integer", "minimum": 0 },
+        "generation_index": { "type": "integer", "minimum": 0 },
+        "native_tier": { "type": "integer", "minimum": 0, "maximum": 3 },
+        "native_tier_idx": { "type": "integer", "minimum": 0, "maximum": 3 },
+        "mode": { "enum": ["OFF", "SHADOW_EFFECTIVE_TIER", "APPLY_PROTECT_ONLY", "APPLY_BIDIRECTIONAL", "APPLY_RANDOM_MATCHED", "APPLY_RECENCY_BASELINE"] },
+        "special_native_protect": { "type": "boolean" },
+        "native_protect": { "type": "boolean" },
+        "model_valid": { "type": "boolean" },
+        "features_valid": { "type": "boolean" },
+        "features": { "$ref": "#/$defs/features" },
+        "model_type": { "enum": ["pairwise_linear_ranker", "recency_baseline", "random_matched_baseline"] },
+        "model_version": { "type": "integer", "minimum": 1 },
+        "expected_model_version": { "type": "integer", "minimum": 1 },
+        "feature_schema_version": { "type": "integer", "minimum": 1 },
+        "model_checksum": { "type": ["string", "null"], "pattern": "^[0-9a-f]{64}$" },
+        "model_provenance": { "enum": ["ENGINEERING_FIXTURE_UNTRAINED", "TRAINED_PAIRWISE_OFFLINE", "CONTROL_BASELINE"] },
+        "pairwise_model_checksum": { "type": ["string", "null"], "pattern": "^[0-9a-f]{64}$" },
+        "rank_score_bin": { "type": ["integer", "null"], "minimum": 0, "maximum": 4 },
+        "score_percentile": { "type": "null" },
+        "reuse_score": { "type": "integer" },
+        "cold_threshold": { "type": ["integer", "null"], "deprecated": true, "description": "Deprecated v2 compatibility alias for score_threshold_cold." },
+        "hot_threshold_1": { "type": ["integer", "null"], "deprecated": true, "description": "Deprecated v2 compatibility alias for score_threshold_hot_1." },
+        "hot_threshold_2": { "type": ["integer", "null"], "deprecated": true, "description": "Deprecated v2 compatibility alias for score_threshold_hot_2." },
+        "hot_threshold_3": { "type": ["integer", "null"], "deprecated": true, "description": "Deprecated v2 experimental compatibility alias for score_threshold_hot_3." },
+        "delta_tier_q8": { "enum": [-256, 0, 256, 512, 768], "deprecated": true, "description": "Deprecated v2 compatibility alias for predictive_delta_tier_q8." },
+        "score_threshold_cold": { "type": ["integer", "null"] },
+        "score_threshold_hot_1": { "type": ["integer", "null"] },
+        "score_threshold_hot_2": { "type": ["integer", "null"] },
+        "score_threshold_hot_3": { "type": ["integer", "null"] },
+        "predictive_delta_tier_q8": { "enum": [-256, 0, 256, 512, 768] },
+        "effective_tier_q8": { "type": "integer", "minimum": 0, "maximum": 768 },
+        "effective_protect": { "type": "boolean" },
+        "action": { "enum": ["KEEP_RECLAIM", "PREDICTIVE_UPGRADE", "KEEP_PROTECT", "PREDICTIVE_DOWNGRADE", "SPECIAL_NATIVE_PROTECT"] },
+        "bypass_reason": { "type": "string" },
+        "folio_nr_pages": { "type": "integer", "minimum": 1 },
+        "batch_id": { "$ref": "#/$defs/identifier" },
+        "reclaim_epoch": { "$ref": "#/$defs/identifier" },
+        "priority": { "type": "integer" },
+        "score_duration_ns": { "type": "integer", "minimum": 0 },
+        "actual_native_behavior": { "enum": ["protect", "reclaim", "unknown"] },
+        "isolate_result": { "enum": ["not_attempted", "succeeded", "failed", "unknown"] },
+        "reclaimed": { "$ref": "#/$defs/nullableBoolean" },
+        "putback": { "$ref": "#/$defs/nullableBoolean" },
+        "activated": { "$ref": "#/$defs/nullableBoolean" },
+        "gate_reached": { "const": true },
+        "candidate_scope": { "const": "ALL_NATIVE_TIER_GATE_FOLIOS" },
+        "pressure_level_kernel": { "type": "integer", "minimum": 0, "maximum": 3 },
+        "reclaim_context": { "type": "integer", "minimum": 0, "maximum": 4 },
+        "sc_priority": { "type": "integer" },
+        "nr_to_reclaim": { "type": "integer", "minimum": 0 },
+        "nr_reclaimed_before": { "type": "integer", "minimum": 0 },
+        "epoch_reclaimed_pages": { "type": "integer", "minimum": 0 },
+        "batch_scanned_pages": { "type": "integer", "minimum": 0 },
+        "batch_isolated_pages": { "type": "integer", "minimum": 0 },
+        "batch_reclaimed_pages": { "type": "integer", "minimum": 0 },
+        "batch_reclaim_result_observed": { "type": "boolean" },
+        "consecutive_no_progress_batches": { "type": "integer", "minimum": 0 },
+        "fixed_delta_q8": { "enum": [-256, 0, 256, 512, 768] },
+        "binary_bypass_delta_q8": { "enum": [-256, 0, 256, 512, 768] },
+        "pressure_aware_delta_q8": { "enum": [-256, -128, 0, 64, 128, 192, 256, 384, 512, 576, 768] },
+        "fixed_effective_protect": { "type": "boolean" },
+        "pressure_aware_effective_protect": { "type": "boolean" },
+        "pressure_policy_version": { "const": 1 },
+        "pressure_policy_provenance": { "const": "ENGINEERING_PRESSURE_POLICY_UNVALIDATED" },
+        "pressure_bypass_reason": { "type": "string" }
+      },
+      "allOf": [
+        {
+          "if": { "properties": { "features_valid": { "const": true } } },
+          "then": { "properties": { "features": { "$ref": "#/$defs/validFeatures" } } },
+          "else": { "properties": { "features": { "$ref": "#/$defs/nullFeatures" } } }
+        },
+        {
+          "if": { "properties": { "model_valid": { "const": true } } },
+          "then": {
+            "properties": {
+              "features_valid": { "const": true },
+              "rank_score_bin": { "type": "integer", "minimum": 0, "maximum": 4 },
+              "cold_threshold": { "type": "integer" },
+              "hot_threshold_1": { "type": "integer" },
+              "hot_threshold_2": { "type": "integer" },
+              "hot_threshold_3": { "type": "integer" },
+              "score_threshold_cold": { "type": "integer" },
+              "score_threshold_hot_1": { "type": "integer" },
+              "score_threshold_hot_2": { "type": "integer" },
+              "score_threshold_hot_3": { "type": "integer" }
+            }
+          },
+          "else": {
+            "properties": {
+              "rank_score_bin": { "type": "null" },
+              "cold_threshold": { "type": "null" },
+              "hot_threshold_1": { "type": "null" },
+              "hot_threshold_2": { "type": "null" },
+              "hot_threshold_3": { "type": "null" },
+              "score_threshold_cold": { "type": "null" },
+              "score_threshold_hot_1": { "type": "null" },
+              "score_threshold_hot_2": { "type": "null" },
+              "score_threshold_hot_3": { "type": "null" },
+              "delta_tier_q8": { "const": 0 },
+              "predictive_delta_tier_q8": { "const": 0 }
+            }
+          }
+        },
+        {
+          "if": { "properties": { "model_type": { "const": "pairwise_linear_ranker" } } },
+          "then": {
+            "properties": {
+              "model_checksum": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+              "pairwise_model_checksum": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+              "model_provenance": { "enum": ["ENGINEERING_FIXTURE_UNTRAINED", "TRAINED_PAIRWISE_OFFLINE"] }
+            }
+          },
+          "else": {
+            "properties": {
+              "model_checksum": { "type": "null" },
+              "pairwise_model_checksum": { "type": "null" },
+              "model_provenance": { "const": "CONTROL_BASELINE" }
+            }
+          }
+        },
+        {
+          "if": { "properties": { "mode": { "const": "APPLY_RANDOM_MATCHED" } } },
+          "then": { "properties": { "model_type": { "const": "random_matched_baseline" } } }
+        },
+        {
+          "if": { "properties": { "mode": { "const": "APPLY_RECENCY_BASELINE" } } },
+          "then": { "properties": { "model_type": { "const": "recency_baseline" } } }
+        }
+      ]
+    },
+    "real_access": {
+      "type": "object",
+      "additionalProperties": true,
+      "$comment": "#lzx: real accesses must be emitted only after a candidate gate observation",
+      "required": ["schema_version", "event_kind", "timestamp_ns", "experiment_id", "session_id", "folio_cookie", "folio_lifetime_epoch", "access_source", "is_real_access", "candidate_count"],
+      "properties": {
+        "schema_version": { "const": 2 },
+        "event_kind": { "const": "real_access" },
+        "timestamp_ns": { "type": "integer", "minimum": 0 },
+        "experiment_id": { "$ref": "#/$defs/identifier" },
+        "session_id": { "$ref": "#/$defs/identifier" },
+        "folio_cookie": { "$ref": "#/$defs/identifier" },
+        "folio_lifetime_epoch": { "type": "integer", "minimum": 0 },
+        "access_source": { "enum": ["PTE_YOUNG", "MARK_ACCESSED", "FD_REFERENCE"] },
+        "is_real_access": { "const": true },
+        "candidate_count": { "type": "integer", "minimum": 1, "$comment": "#lzx: count captured before the real access clears candidate state" }
+      }
+    }
+  }
+}

@@ -1,0 +1,64 @@
+# SPDX-License-Identifier: GPL-2.0
+config PARP
+	bool "Page-Access Reclaim Predictor"
+	depends on LRU_GEN
+	depends on MEMCG
+	select DEBUG_FS
+	help
+	  Build the low-intrusion Page-Access Reclaim Predictor. The default
+	  mode is observe-only: recommendations are traced but native MGLRU
+	  reclaim decisions remain unchanged.
+
+config PARP_KUNIT_TEST
+	tristate "KUnit tests for PARP" if !KUNIT_ALL_TESTS
+	depends on PARP && KUNIT
+	default KUNIT_ALL_TESTS
+	help
+	  Test fixed-point scoring, expiry, state assignment and observe-only
+	  behavior.
+
+config PARP_DAMON_ALIGNMENT
+	bool "Collect DAMON VADDR aggregation evidence for PARP"
+	depends on PARP && DAMON_VADDR
+	default y
+	help
+	  Copy DAMON aggregation records into an asynchronous PARP alignment
+	  worker. This remains evidence-only by default and never changes
+	  reclaim, prefetch, pageout, generations, or scan budgets. Records are
+	  classified against referenced process VMAs and published through bounded,
+	  immutable evidence snapshots for later PARP observation.
+
+config PARP_FRONTIER_SCORE
+	bool "Observe PARP per-folio scores at the MGLRU reclaim frontier"
+	depends on PARP
+	select PAGE_EXTENSION
+	default n
+	help
+	  Build the fixed-cost, integer-only reclaim-frontier scorer. Runtime
+	  mode is disabled by default. The only enabled non-zero mode is SHADOW:
+	  it records decisions after native MGLRU sorting, but never changes a
+	  folio generation or isolation result. APPLY is deliberately rejected
+	  until separate runtime validation authorizes it.
+
+config PARP_EFFECTIVE_TIER
+	bool "Predict MGLRU effective tiers from short-term folio reuse"
+	depends on PARP && !PARP_FRONTIER_SCORE
+	select PAGE_EXTENSION
+	default n
+	help
+	  Build a fixed-cost, integer-only GLOBAL reuse scorer at the native
+	  MGLRU tier-protection gate. The scorer computes a virtual Q8 tier
+	  adjustment without changing the native LRU_REFS tier. Runtime is OFF by
+	  default; SHADOW records native and effective decisions while preserving
+	  native behavior. This option is mutually exclusive with the older
+	  post-sort frontier experiment.
+
+config PARP_EFFECTIVE_TIER_EXPERIMENTAL_APPLY
+	bool "Allow experimental PARP effective-tier APPLY modes"
+	depends on PARP_EFFECTIVE_TIER
+	default n
+	help
+	  Permit the protect-only, bounded bidirectional, random-matched and
+	  recency-baseline APPLY modes. Keep this disabled until live SHADOW,
+	  KUnit runtime and reclaim-lock latency gates have passed. When disabled,
+	  every APPLY mode setter returns -EOPNOTSUPP.

@@ -1,0 +1,87 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://parp.local/schemas/phase27-prediction-v1.json",
+  "title": "PARP Phase2.7 observe-only page segment prediction",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "run_id",
+    "app_id",
+    "domain_id",
+    "model_type",
+    "model_version",
+    "prediction_generation",
+    "generated_ns",
+    "ttl_ns",
+    "file_segments",
+    "anon_prediction",
+    "kernel_write"
+  ],
+  "properties": {
+    "schema_version": {"const": 1},
+    "run_id": {"type": "string", "minLength": 1},
+    "app_id": {"type": ["string", "integer"]},
+    "domain_id": {"type": "integer", "minimum": 0},
+    "session_id": {"type": "string", "minLength": 1},
+    "unknown_reason": {"type": ["string", "null"]},
+    "future_features_used": {"const": false},
+    "model_type": {"const": "page_state_markov"},
+    "model_version": {"type": "integer", "minimum": 1},
+    "prediction_generation": {"type": "integer", "minimum": 1},
+    "generated_ns": {"type": "integer", "minimum": 0},
+    "ttl_ns": {"type": "integer", "minimum": 1},
+    "kernel_write": {"const": false},
+    "file_segments": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "dev_major",
+          "dev_minor",
+          "inode",
+          "file_version",
+          "partition_generation",
+          "file_page_count",
+          "requested_bins",
+          "effective_bins",
+          "segment_id",
+          "probability_10s_q15",
+          "probability_30s_q15",
+          "probability_60s_q15",
+          "confidence_q15"
+        ],
+        "properties": {
+          "dev_major": {"type": "integer", "minimum": 0},
+          "dev_minor": {"type": "integer", "minimum": 0},
+          "inode": {"type": "integer", "minimum": 0},
+          "file_version": {"type": "integer", "minimum": 0},
+          "partition_generation": {"type": "integer", "minimum": 1},
+          "file_page_count": {"type": "integer", "minimum": 1},
+          "requested_bins": {"enum": [10, 100, 1000]},
+          "effective_bins": {"type": "integer", "minimum": 1},
+          "segment_id": {"type": "integer", "minimum": 0},
+          "probability_10s_q15": {"type": "integer", "minimum": 0, "maximum": 32767},
+          "probability_30s_q15": {"type": "integer", "minimum": 0, "maximum": 32767},
+          "probability_60s_q15": {"type": "integer", "minimum": 0, "maximum": 32767},
+          "confidence_q15": {"type": "integer", "minimum": 0, "maximum": 32767}
+        }
+      }
+    },
+    "anon_prediction": {
+      "type": "object",
+      "required": [
+        "hot_bytes_10s",
+        "hot_bytes_30s",
+        "hot_bytes_60s",
+        "cooling_probability_q15"
+      ],
+      "properties": {
+        "hot_bytes_10s": {"type": "integer", "minimum": 0},
+        "hot_bytes_30s": {"type": "integer", "minimum": 0},
+        "hot_bytes_60s": {"type": "integer", "minimum": 0},
+        "cooling_probability_q15": {"type": "integer", "minimum": 0, "maximum": 32767}
+      }
+    }
+  }
+}

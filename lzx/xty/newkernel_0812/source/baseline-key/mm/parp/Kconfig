@@ -1,0 +1,18 @@
+# SPDX-License-Identifier: GPL-2.0
+config PARP
+	bool "Page-Access Reclaim Predictor"
+	depends on LRU_GEN
+	depends on MEMCG
+	select DEBUG_FS
+	help
+	  Build the low-intrusion Page-Access Reclaim Predictor. The default
+	  mode is observe-only: recommendations are traced but native MGLRU
+	  reclaim decisions remain unchanged.
+
+config PARP_KUNIT_TEST
+	tristate "KUnit tests for PARP" if !KUNIT_ALL_TESTS
+	depends on PARP && KUNIT
+	default KUNIT_ALL_TESTS
+	help
+	  Test fixed-point scoring, expiry, state assignment and observe-only
+	  behavior.

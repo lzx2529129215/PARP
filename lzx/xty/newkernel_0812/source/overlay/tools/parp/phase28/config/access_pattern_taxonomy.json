@@ -1,0 +1,10 @@
+{
+  "schema_version": 1,
+  "labels": ["SEQUENTIAL_FORWARD", "SEQUENTIAL_BACKWARD", "LOCAL_LOOP",
+    "RANDOM_JUMP", "EXPANDING_WORKING_SET", "CONTRACTING_WORKING_SET",
+    "LONG_REUSE", "BURST_WRITE", "IDLE_COOLING", "MIXED", "UNKNOWN"],
+  "inputs": ["access centroid movement", "segment continuity", "segment gaps",
+    "working-set delta", "writeback burst", "reuse interval", "access entropy"],
+  "operation_labels_used": false,
+  "note": "Weak rules are kernel/page-derived and must be audited against unsupervised structure."
+}

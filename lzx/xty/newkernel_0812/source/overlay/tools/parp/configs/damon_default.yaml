@@ -1,0 +1,13 @@
+# SPDX-License-Identifier: GPL-2.0
+schema_version: 1
+sampling_interval_us: 5000
+aggregation_interval_us: 1000000
+operations_update_interval_us: 60000000
+collection_duration_seconds: 300
+max_splits_per_region: 64
+out_of_order_tolerance_seconds: 2
+export_raw_virtual_addresses: false
+target_policy: controlled_test_process_only
+apply_enabled: false
+prefetch_enabled: false
+anon_pageout_enabled: false

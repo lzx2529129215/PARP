@@ -1,0 +1,441 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://parp.invalid/schemas/effective-tier-ranking-model-v2.json",
+  "title": "PARP effective-tier pairwise linear ranking model",
+  "type": "object",
+  "additionalProperties": false,
+  "oneOf": [
+    {
+      "required": [
+    "schema_version",
+    "primary_task",
+    "model_type",
+    "model_provenance",
+    "training_status",
+    "selected_for_live_use",
+    "score_semantics",
+    "score_is_probability",
+    "runtime_pairwise_comparison",
+    "runtime_sorting",
+    "runtime_candidate_sorting",
+    "runtime_sigmoid",
+    "feature_names",
+    "bin_boundaries",
+    "quantized_weights",
+    "quantized_bias",
+    "score_q_format",
+    "training_horizon_ns",
+    "tie_margin_ns",
+    "pair_sampling",
+    "runtime_thresholds_validation_selected",
+    "threshold_selection_split",
+    "score_threshold_cold",
+    "score_threshold_hot_1",
+    "score_threshold_hot_2",
+    "score_threshold_hot_3",
+    "cold_threshold",
+    "hot_threshold_1",
+    "hot_threshold_2",
+    "hot_threshold_3",
+    "delta_tier_q8",
+    "predictive_delta_tier_q8",
+    "experimental_plus3",
+    "model_version",
+    "feature_schema_version",
+    "kernel_shape_compatible_v1",
+    "kernel_deployable_v1",
+    "scorer_checksum",
+    "scorer_checksum_scope",
+        "checksum"
+      ],
+      "not": {
+        "anyOf": [
+          {"required": ["artifact_kind"]},
+          {"required": ["status"]},
+          {"required": ["reason"]},
+          {"required": ["intended_feature_names"]},
+          {"required": ["learned_parameters"]},
+          {"required": ["model"]}
+        ]
+      },
+      "properties": {
+        "model_provenance": {
+          "enum": [
+            "SYNTHETIC_TEST_FIXTURE",
+            "ENGINEERING_FIXTURE_UNTRAINED",
+            "TRAINED_PAIRWISE_OFFLINE"
+          ]
+        },
+        "training_status": {
+          "enum": [
+            "SYNTHETIC_TEST_ONLY",
+            "ENGINEERING_FIXTURE_UNTRAINED",
+            "TRAINED_OFFLINE_CANDIDATE_NOT_DEPLOYED"
+          ]
+        },
+        "model_version": {"const": 1},
+        "score_threshold_cold": {"$ref": "#/$defs/threshold"},
+        "score_threshold_hot_1": {"$ref": "#/$defs/threshold"},
+        "score_threshold_hot_2": {"$ref": "#/$defs/threshold"},
+        "scorer_checksum": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "checksum": {
+          "type": "string",
+          "pattern": "^sha256:[0-9a-f]{64}$"
+        }
+      }
+    },
+    {
+      "required": [
+        "schema_version",
+        "artifact_kind",
+        "status",
+        "reason",
+        "primary_task",
+        "model_type",
+        "model_provenance",
+        "training_status",
+        "selected_for_live_use",
+        "score_semantics",
+        "score_is_probability",
+        "runtime_pairwise_comparison",
+        "runtime_sorting",
+        "runtime_candidate_sorting",
+        "runtime_sigmoid",
+        "feature_schema_version",
+        "model_version",
+        "intended_feature_names",
+        "learned_parameters",
+        "score_threshold_cold",
+        "score_threshold_hot_1",
+        "score_threshold_hot_2",
+        "score_threshold_hot_3",
+        "scorer_checksum",
+        "checksum",
+        "model"
+      ],
+      "properties": {
+        "artifact_kind": {"const": "no_exportable_ranking_model"},
+        "status": {"type": "string", "minLength": 1},
+        "reason": {"type": "string", "minLength": 1},
+        "model_provenance": {"type": "null"},
+        "training_status": {
+          "enum": [
+            "NOT_TRAINED",
+            "SCORER_TRAINED_POLICY_NOT_EXPORTABLE"
+          ]
+        },
+        "model_version": {"type": "null"},
+        "intended_feature_names": {
+          "const": [
+            "time_since_last_real_access_ms",
+            "previous_real_access_interval_ms",
+            "reuse_interval_ema_ms",
+            "consecutive_reclaim_candidate_count",
+            "time_in_current_generation_ms",
+            "access_ema_q8"
+          ]
+        },
+        "learned_parameters": {"type": "null"},
+        "score_threshold_cold": {"type": "null"},
+        "score_threshold_hot_1": {"type": "null"},
+        "score_threshold_hot_2": {"type": "null"},
+        "score_threshold_hot_3": {"type": "null"},
+        "scorer_checksum": {"type": "null"},
+        "checksum": {"type": "null"},
+        "model": {"type": "null"}
+      }
+    }
+  ],
+  "$defs": {
+    "threshold": {
+      "type": "integer",
+      "minimum": -2147483648,
+      "maximum": 2147483647
+    },
+    "delta_mapping": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["cold", "neutral", "hot_1", "hot_2"],
+      "properties": {
+        "cold": {"const": -256},
+        "neutral": {"const": 0},
+        "hot_1": {"const": 256},
+        "hot_2": {"const": 512}
+      }
+    }
+  },
+  "properties": {
+    "schema_version": {"const": 2},
+    "primary_task": {"const": "pairwise_next-reuse_ranking"},
+    "model_type": {"const": "pairwise_linear_ranker"},
+    "model_provenance": {
+      "enum": [
+        null,
+        "SYNTHETIC_TEST_FIXTURE",
+        "ENGINEERING_FIXTURE_UNTRAINED",
+        "TRAINED_PAIRWISE_OFFLINE"
+      ]
+    },
+    "training_status": {
+      "enum": [
+        "SYNTHETIC_TEST_ONLY",
+        "ENGINEERING_FIXTURE_UNTRAINED",
+        "TRAINED_OFFLINE_CANDIDATE_NOT_DEPLOYED",
+        "NOT_TRAINED",
+        "SCORER_TRAINED_POLICY_NOT_EXPORTABLE"
+      ]
+    },
+    "selected_for_live_use": {"const": false},
+    "score_semantics": {
+      "const": "higher_score_means_earlier_next_real_access"
+    },
+    "score_is_probability": {"const": false},
+    "runtime_pairwise_comparison": {"const": false},
+    "runtime_sorting": {"const": false},
+    "runtime_candidate_sorting": {"const": false},
+    "runtime_sigmoid": {"const": false},
+    "feature_names": {
+      "oneOf": [
+        {
+          "const": [
+            "time_since_last_real_access_ms",
+            "previous_real_access_interval_ms",
+            "reuse_interval_ema_ms",
+            "consecutive_reclaim_candidate_count",
+            "time_in_current_generation_ms",
+            "access_ema_q8"
+          ]
+        },
+        {
+          "const": [
+            "time_since_last_real_access_ms",
+            "previous_real_access_interval_ms",
+            "reuse_interval_ema_ms",
+            "consecutive_reclaim_candidate_count",
+            "time_in_current_generation_ms",
+            "access_ema_q8",
+            "native_tier"
+          ]
+        },
+        {
+          "const": [
+            "time_since_last_real_access_ms",
+            "previous_real_access_interval_ms",
+            "reuse_interval_ema_ms",
+            "consecutive_reclaim_candidate_count",
+            "time_in_current_generation_ms",
+            "access_ema_q8",
+            "native_tier",
+            "native_tier_idx"
+          ]
+        },
+        {"const": ["time_since_last_real_access_ms"]},
+        {
+          "const": [
+            "time_since_last_real_access_ms",
+            "consecutive_reclaim_candidate_count",
+            "access_ema_q8"
+          ]
+        }
+      ]
+    },
+    "bin_boundaries": {
+      "type": "object",
+      "minProperties": 1,
+      "additionalProperties": {
+        "type": "array",
+        "minItems": 3,
+        "maxItems": 5,
+        "items": {"type": "integer"}
+      }
+    },
+    "quantized_weights": {
+      "type": "object",
+      "minProperties": 1,
+      "additionalProperties": {
+        "type": "array",
+        "minItems": 4,
+        "maxItems": 6,
+        "items": {
+          "type": "integer",
+          "minimum": -32768,
+          "maximum": 32767
+        }
+      }
+    },
+    "quantized_bias": {
+      "type": "integer",
+      "minimum": -32768,
+      "maximum": 32767
+    },
+    "score_q_format": {
+      "type": "string",
+      "pattern": "^s16_lookup_weights_scale_[1-9][0-9]*$"
+    },
+    "training_horizon_ns": {"const": 5000000000},
+    "tie_margin_ns": {"enum": [0, 10000000, 50000000]},
+    "pair_sampling": {"type": "object"},
+    "runtime_thresholds_validation_selected": {"type": "boolean"},
+    "threshold_selection_split": {"enum": [null, "validation"]},
+    "score_threshold_cold": {
+      "oneOf": [{"$ref": "#/$defs/threshold"}, {"type": "null"}]
+    },
+    "score_threshold_hot_1": {
+      "oneOf": [{"$ref": "#/$defs/threshold"}, {"type": "null"}]
+    },
+    "score_threshold_hot_2": {
+      "oneOf": [{"$ref": "#/$defs/threshold"}, {"type": "null"}]
+    },
+    "score_threshold_hot_3": {
+      "oneOf": [{"$ref": "#/$defs/threshold"}, {"type": "null"}]
+    },
+    "cold_threshold": {
+      "$ref": "#/$defs/threshold",
+      "deprecated": true
+    },
+    "hot_threshold_1": {
+      "$ref": "#/$defs/threshold",
+      "deprecated": true
+    },
+    "hot_threshold_2": {
+      "$ref": "#/$defs/threshold",
+      "deprecated": true
+    },
+    "hot_threshold_3": {
+      "oneOf": [{"$ref": "#/$defs/threshold"}, {"type": "null"}],
+      "deprecated": true
+    },
+    "delta_tier_q8": {"$ref": "#/$defs/delta_mapping"},
+    "predictive_delta_tier_q8": {"$ref": "#/$defs/delta_mapping"},
+    "experimental_plus3": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "status",
+        "offline_ablation_supported",
+        "shadow_supported",
+        "apply_supported",
+        "default_enabled",
+        "threshold_selected_on_split",
+        "score_threshold_hot_3",
+        "predictive_delta_tier_q8"
+      ],
+      "properties": {
+        "status": {"enum": ["NOT_SELECTED", "VALIDATION_SELECTED"]},
+        "offline_ablation_supported": {"const": true},
+        "shadow_supported": {"const": true},
+        "apply_supported": {"const": false},
+        "default_enabled": {"const": false},
+        "threshold_selected_on_split": {
+          "enum": [null, "validation"]
+        },
+        "score_threshold_hot_3": {
+          "oneOf": [{"$ref": "#/$defs/threshold"}, {"type": "null"}]
+        },
+        "predictive_delta_tier_q8": {"const": 768}
+      }
+    },
+    "model_version": {"enum": [null, 1]},
+    "feature_schema_version": {"const": 1},
+    "kernel_shape_compatible_v1": {"type": "boolean"},
+    "kernel_deployable_v1": {"const": false},
+    "scorer_checksum": {
+      "oneOf": [
+        {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+        {"type": "null"}
+      ]
+    },
+    "scorer_checksum_scope": {
+      "const": "sorted compact JSON of model_type, model_version, ordered feature_names, bin_boundaries by name, quantized_weights by name, and quantized_bias"
+    },
+    "checksum": {
+      "oneOf": [
+        {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+        {"type": "null"}
+      ]
+    },
+    "artifact_kind": {"const": "no_exportable_ranking_model"},
+    "status": {"type": "string", "minLength": 1},
+    "reason": {"type": "string", "minLength": 1},
+    "intended_feature_names": {"type": "array"},
+    "learned_parameters": {"type": "null"},
+    "model": {"type": "null"}
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "model_provenance": {"const": "SYNTHETIC_TEST_FIXTURE"}
+        }
+      },
+      "then": {
+        "properties": {
+          "training_status": {"const": "SYNTHETIC_TEST_ONLY"},
+          "runtime_thresholds_validation_selected": {"const": false},
+          "threshold_selection_split": {"type": "null"}
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "model_provenance": {"const": "ENGINEERING_FIXTURE_UNTRAINED"}
+        }
+      },
+      "then": {
+        "properties": {
+          "training_status": {"const": "ENGINEERING_FIXTURE_UNTRAINED"},
+          "runtime_thresholds_validation_selected": {"const": false},
+          "threshold_selection_split": {"type": "null"}
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "model_provenance": {"const": "TRAINED_PAIRWISE_OFFLINE"}
+        }
+      },
+      "then": {
+        "properties": {
+          "training_status": {
+            "const": "TRAINED_OFFLINE_CANDIDATE_NOT_DEPLOYED"
+          },
+          "runtime_thresholds_validation_selected": {"const": true},
+          "threshold_selection_split": {"const": "validation"}
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "score_threshold_hot_3": {"type": "null"}
+        }
+      },
+      "then": {
+        "properties": {
+          "experimental_plus3": {
+            "properties": {
+              "status": {"const": "NOT_SELECTED"},
+              "threshold_selected_on_split": {"type": "null"},
+              "score_threshold_hot_3": {"type": "null"}
+            }
+          }
+        }
+      },
+      "else": {
+        "properties": {
+          "experimental_plus3": {
+            "properties": {
+              "status": {"const": "VALIDATION_SELECTED"},
+              "threshold_selected_on_split": {"const": "validation"}
+            }
+          }
+        }
+      }
+    }
+  ]
+}

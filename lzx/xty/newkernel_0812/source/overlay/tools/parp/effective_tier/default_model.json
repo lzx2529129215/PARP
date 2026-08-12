@@ -1,0 +1,53 @@
+{
+  "schema_name": "parp_effective_tier_global_features_v1",
+  "feature_schema_version": 1,
+  "artifact_status": "REFERENCE_UNTRAINED_ENGINEERING_FIXTURE",
+  "model_provenance": "ENGINEERING_FIXTURE_UNTRAINED",
+  "training_status": "ENGINEERING_FIXTURE_UNTRAINED",
+  "selected_for_live_use": false,
+  "model_type": "pairwise_linear_ranker",
+  "primary_task": "pairwise_next-reuse_ranking",
+  "score_semantics": "higher_score_means_earlier_next_real_access",
+  "score_is_probability": false,
+  "runtime_pairwise_comparison": false,
+  "runtime_sorting": false,
+  "runtime_candidate_sorting": false,
+  "runtime_sigmoid": false,
+  "embedded_parameter_checksum": "1d5cc9918ae0e2caea316d36841fd61bef562e68f0820188c1cc0a6195f1fa5e",
+  "checksum_scope": "sorted compact JSON of model_type, model_version, ordered feature_names, bin_boundaries by name, quantized_weights by name, and quantized_bias",
+  "feature_names": [
+    "time_since_last_real_access_ms",
+    "previous_real_access_interval_ms",
+    "reuse_interval_ema_ms",
+    "consecutive_reclaim_candidate_count",
+    "time_in_current_generation_ms",
+    "access_ema_q8"
+  ],
+  "model": {
+    "model_name": "GLOBAL_REUSE_MODEL",
+    "model_version": 1,
+    "bias": 0,
+    "cold_threshold": -48,
+    "hot_threshold_1": 48,
+    "hot_threshold_2": 96,
+    "hot_threshold_3": 144,
+    "max_upgrade_tiers": 2,
+    "max_downgrade_tiers": 1,
+    "bin_edges": [
+      [10, 100, 500, 2000, 10000],
+      [10, 100, 500, 2000, 10000],
+      [10, 100, 500, 2000, 10000],
+      [0, 1, 2, 4, 8],
+      [10, 100, 500, 2000, 10000],
+      [8, 32, 96, 160, 224]
+    ],
+    "weights": [
+      [64, 48, 24, 0, -32, -64],
+      [32, 24, 12, 0, -12, -24],
+      [32, 24, 12, 0, -12, -24],
+      [24, 12, 0, -12, -24, -36],
+      [16, 12, 8, 0, -8, -16],
+      [-24, -12, 0, 12, 24, 36]
+    ]
+  }
+}

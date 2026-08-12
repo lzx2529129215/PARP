@@ -1,0 +1,175 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://parp.invalid/effective-tier/feature-schema-v1",
+  "schema_name": "parp_effective_tier_offline_features_v1",
+  "feature_schema_version": 1,
+  "candidate_scope": "ALL_NATIVE_TIER_GATE_FOLIOS",
+  "model_family": "GLOBAL_REUSE_MODEL",
+  "model_type": "pairwise_linear_ranker",
+  "primary_task": "pairwise_next-reuse_ranking",
+  "score_semantics": "higher_score_means_earlier_next_real_access",
+  "score_is_probability": false,
+  "online_constraints": {
+    "integer_only": true,
+    "app_routing": false,
+    "future_information": false,
+    "native_tier_field_modified": false,
+    "frontier_features": false,
+    "runtime_pairwise_comparison": false,
+    "runtime_sorting": false,
+    "runtime_candidate_sorting": false,
+    "runtime_sigmoid": false
+  },
+  "runtime_base_features": [
+    {
+      "name": "time_since_last_real_access_ms",
+      "type": "u32",
+      "unit": "ms",
+      "bin_edges": [10, 100, 500, 2000, 10000],
+      "source": "page real-access state before the tier-gate timestamp"
+    },
+    {
+      "name": "previous_real_access_interval_ms",
+      "type": "u32",
+      "unit": "ms",
+      "bin_edges": [10, 100, 500, 2000, 10000],
+      "source": "two prior real accesses before the tier-gate timestamp"
+    },
+    {
+      "name": "reuse_interval_ema_ms",
+      "type": "u32",
+      "unit": "ms",
+      "bin_edges": [10, 100, 500, 2000, 10000],
+      "source": "real-access interval state before the tier-gate timestamp"
+    },
+    {
+      "name": "consecutive_reclaim_candidate_count",
+      "type": "u8",
+      "unit": "candidates",
+      "bin_edges": [0, 1, 2, 4, 8],
+      "source": "past tier-gate candidate history"
+    },
+    {
+      "name": "time_in_current_generation_ms",
+      "type": "u32",
+      "unit": "ms",
+      "bin_edges": [10, 100, 500, 2000, 10000],
+      "source": "native generation-entry state before the tier-gate timestamp"
+    },
+    {
+      "name": "access_ema_q8",
+      "type": "u8",
+      "unit": "Q8",
+      "bin_edges": [8, 32, 96, 160, 224],
+      "source": "real-access-only EMA before the tier-gate timestamp"
+    }
+  ],
+  "offline_ablations": [
+    {
+      "id": "rank_base",
+      "model_name": "GLOBAL_REUSE_MODEL",
+      "features": [
+        "time_since_last_real_access_ms",
+        "previous_real_access_interval_ms",
+        "reuse_interval_ema_ms",
+        "consecutive_reclaim_candidate_count",
+        "time_in_current_generation_ms",
+        "access_ema_q8"
+      ],
+      "kernel_shape_compatible_v1": true
+    },
+    {
+      "id": "rank_plus_native_tier",
+      "model_name": "GLOBAL_REUSE_MODEL",
+      "features": [
+        "time_since_last_real_access_ms",
+        "previous_real_access_interval_ms",
+        "reuse_interval_ema_ms",
+        "consecutive_reclaim_candidate_count",
+        "time_in_current_generation_ms",
+        "access_ema_q8",
+        "native_tier"
+      ],
+      "kernel_shape_compatible_v1": false
+    },
+    {
+      "id": "rank_plus_native_tier_and_tier_idx",
+      "model_name": "GLOBAL_REUSE_MODEL",
+      "features": [
+        "time_since_last_real_access_ms",
+        "previous_real_access_interval_ms",
+        "reuse_interval_ema_ms",
+        "consecutive_reclaim_candidate_count",
+        "time_in_current_generation_ms",
+        "access_ema_q8",
+        "native_tier",
+        "native_tier_idx"
+      ],
+      "kernel_shape_compatible_v1": false
+    },
+    {
+      "id": "recency_only_rank",
+      "model_name": "GLOBAL_REUSE_MODEL",
+      "features": ["time_since_last_real_access_ms"],
+      "kernel_shape_compatible_v1": false
+    },
+    {
+      "id": "recent_frequency_rank",
+      "model_name": "GLOBAL_REUSE_MODEL",
+      "features": [
+        "time_since_last_real_access_ms",
+        "consecutive_reclaim_candidate_count",
+        "access_ema_q8"
+      ],
+      "kernel_shape_compatible_v1": false
+    }
+  ],
+  "offline_only_feature_edges": {
+    "native_tier": [0, 1, 2],
+    "native_tier_idx": [0, 1, 2]
+  },
+  "ranking_target": {
+    "primary": "next_real_access_order_within_context",
+    "horizon_ns": 5000000000,
+    "default_tie_margin_ns": 10000000,
+    "tie_margin_ablations_ns": [0, 10000000, 50000000],
+    "right_censored_value": "INF_WITHIN_HORIZON",
+    "session_end_censoring_is_negative": false,
+    "pair_cap_per_group": 64,
+    "pair_cap_ablations_per_group": [32, 64, 128],
+    "pair_seed": "parp-rank-pairs-v1",
+    "fallback_time_window_ns": 100000000
+  },
+  "auxiliary_fixed_window_labels": {
+    "names": [
+      "reuse_within_100ms",
+      "reuse_within_500ms",
+      "reuse_within_1s",
+      "reuse_within_5s"
+    ],
+    "windows_ns": {
+      "reuse_within_100ms": 100000000,
+      "reuse_within_500ms": 500000000,
+      "reuse_within_1s": 1000000000,
+      "reuse_within_5s": 5000000000
+    },
+    "source": "strictly later real-access event with matching experiment, session, folio cookie, and lifetime epoch",
+    "training_objective": false,
+    "not_probability_calibration": true,
+    "not_refault": true,
+    "censoring": "null unless the complete window was observed or a positive real access occurred"
+  },
+  "prohibited_model_features": [
+    "app",
+    "app_id",
+    "process_name",
+    "file_path",
+    "user_operation",
+    "session_id",
+    "workload",
+    "future_access",
+    "future_label",
+    "frontier_seq",
+    "frontier_headroom"
+  ]
+}

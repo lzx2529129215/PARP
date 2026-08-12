@@ -1,0 +1,145 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://parp.invalid/effective-tier/experiment-manifest-v1",
+  "title": "PARP effective-tier controlled experiment manifest",
+  "type": "object",
+  "required": ["schema_version", "experiment_id", "phase", "status", "safety", "collection", "session_split", "ranking", "global_model_ablations", "probability_classifier_ablation", "policy_ablations", "experiment_groups", "pressure_levels", "workloads", "repetitions", "gates", "artifacts"],
+  "properties": {
+    "schema_version": { "const": 1 },
+    "experiment_id": { "type": "string", "minLength": 1 },
+    "phase": { "const": "E" },
+    "status": { "const": "PARP_EFFECTIVE_TIER_LIVE_AUTH_REQUIRED" },
+    "safety": {
+      "type": "object",
+      "required": ["harness_capability", "dry_run_default", "live_reads_executed", "cgroup_writes_authorized", "pressure_authorized", "apply_authorized", "kernel_install_authorized", "reboot_authorized"],
+      "properties": {
+        "harness_capability": { "const": "PLAN_ONLY" },
+        "dry_run_default": { "const": true },
+        "live_reads_executed": { "const": false },
+        "cgroup_writes_authorized": { "const": false },
+        "pressure_authorized": { "const": false },
+        "apply_authorized": { "const": false },
+        "kernel_install_authorized": { "const": false },
+        "reboot_authorized": { "const": false }
+      }
+    },
+    "collection": {
+      "type": "object",
+      "required": ["candidate_scope", "shadow_behavior", "label_semantics", "label_windows", "trace_lost_required", "tier_gate_counter_required", "observability"],
+      "properties": {
+        "candidate_scope": { "const": "ALL_NATIVE_TIER_GATE_FOLIOS" },
+        "shadow_behavior": { "const": "NATIVE_ONLY" },
+        "label_semantics": { "const": "FUTURE_REAL_ACCESS_NOT_REFAULT" },
+        "label_windows": { "const": ["100ms", "500ms", "1s", "5s"] },
+        "trace_lost_required": { "const": true },
+        "tier_gate_counter_required": { "const": true },
+        "observability": { "type": "array", "minItems": 4 }
+      }
+    },
+    "session_split": {
+      "type": "object",
+      "required": ["unit", "train_percent", "validation_percent", "test_percent", "random_page_row_split_forbidden"],
+      "properties": {
+        "unit": { "const": "session" },
+        "train_percent": { "const": 70 },
+        "validation_percent": { "const": 15 },
+        "test_percent": { "const": 15 },
+        "random_page_row_split_forbidden": { "const": true }
+      }
+    },
+    "ranking": {
+      "type": "object",
+      "required": ["primary_task", "score_semantics", "ranking_horizon_ns", "default_tie_margin_ns", "tie_margin_ablations_ns", "pair_cap_per_group", "pair_cap_ablations_per_group", "pair_sampling_seed", "fallback_time_window_ns", "primary_group", "fallback_group", "cross_session_pairs_forbidden", "runtime_pairwise_comparison", "runtime_candidate_sorting", "runtime_sigmoid"],
+      "properties": {
+        "primary_task": { "const": "pairwise_next-reuse_ranking" },
+        "score_semantics": { "const": "higher_score_means_earlier_next_real_access" },
+        "ranking_horizon_ns": { "const": 5000000000 },
+        "default_tie_margin_ns": { "const": 10000000 },
+        "tie_margin_ablations_ns": { "const": [0, 10000000, 50000000] },
+        "pair_cap_per_group": { "const": 64 },
+        "pair_cap_ablations_per_group": { "const": [32, 64, 128] },
+        "pair_sampling_seed": { "const": "parp-rank-pairs-v1" },
+        "fallback_time_window_ns": { "const": 100000000 },
+        "primary_group": { "const": ["session_id", "batch_id", "page_type"] },
+        "fallback_group": { "const": ["session_id", "reclaim_epoch", "page_type"] },
+        "cross_session_pairs_forbidden": { "const": true },
+        "runtime_pairwise_comparison": { "const": false },
+        "runtime_candidate_sorting": { "const": false },
+        "runtime_sigmoid": { "const": false }
+      }
+    },
+    "global_model_ablations": {
+      "type": "array",
+      "minItems": 5,
+      "maxItems": 5,
+      "items": {
+        "type": "object",
+        "required": ["id", "model_name", "features"],
+        "properties": {
+          "id": { "enum": ["rank_base", "rank_plus_native_tier", "rank_plus_native_tier_and_tier_idx", "recency_only_rank", "recent_frequency_rank"] },
+          "model_name": { "const": "GLOBAL_REUSE_MODEL" },
+          "features": { "type": "array", "minItems": 1 }
+        }
+      }
+    },
+    "probability_classifier_ablation": {
+      "type": "object",
+      "required": ["status", "legacy_available", "probability_model_mainline", "product_q15_calibrated"],
+      "properties": {
+        "status": { "const": "NOT_IMPLEMENTED" },
+        "legacy_available": { "const": "LEGACY_1S_LOG_ODDS" },
+        "probability_model_mainline": { "const": false },
+        "product_q15_calibrated": { "const": false }
+      }
+    },
+    "policy_ablations": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["upgrade_ratio_percent", "downgrade_ratio_percent", "max_upgrade_tiers_apply", "experimental_plus3", "max_downgrade_tiers", "special_native_protect_mutable", "strong_native_tier_protect_mutable"],
+      "properties": {
+        "upgrade_ratio_percent": { "const": [1, 5, 10] },
+        "downgrade_ratio_percent": { "const": [0.5, 1, 2] },
+        "max_upgrade_tiers_apply": { "const": [1, 2] },
+        "experimental_plus3": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["max_upgrade_tiers", "allowed_modes", "apply_supported"],
+          "properties": {
+            "max_upgrade_tiers": { "const": [3] },
+            "allowed_modes": { "const": ["SHADOW_EFFECTIVE_TIER", "ORACLE_OFFLINE_ONLY"] },
+            "apply_supported": { "const": false }
+          }
+        },
+        "max_downgrade_tiers": { "const": [1] },
+        "special_native_protect_mutable": { "const": false },
+        "strong_native_tier_protect_mutable": { "const": false }
+      }
+    },
+    "experiment_groups": {
+      "type": "array",
+      "minItems": 8,
+      "items": {
+        "type": "object",
+        "required": ["id", "mode", "execution", "requires_explicit_authorization"],
+        "properties": {
+          "execution": { "const": "PLAN_ONLY" },
+          "requires_explicit_authorization": { "type": "boolean" }
+        }
+      }
+    },
+    "pressure_levels": { "type": "array", "minItems": 5 },
+    "workloads": { "const": ["WPS", "FILES", "QQ"] },
+    "repetitions": {
+      "type": "object",
+      "required": ["minimum", "recommended", "paired", "randomized_or_interleaved"],
+      "properties": {
+        "minimum": { "minimum": 5 },
+        "recommended": { "minimum": 10 },
+        "paired": { "const": true },
+        "randomized_or_interleaved": { "const": true }
+      }
+    },
+    "gates": { "type": "object" },
+    "artifacts": { "type": "array", "minItems": 8 }
+  }
+}

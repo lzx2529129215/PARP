@@ -1,0 +1,57 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://parp.invalid/effective-tier/session-metadata-v1",
+  "title": "PARP effective-tier session metadata",
+  "type": "object",
+  "required": ["schema_version", "sessions"],
+  "properties": {
+    "schema_version": { "const": 1 },
+    "sessions": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": true,
+        "required": ["schema_version", "experiment_id", "session_id", "app", "workload", "mode", "pressure_level", "start_ns", "observation_end_ns", "tier_gate_counter", "trace_loss"],
+        "properties": {
+          "schema_version": { "const": 1 },
+          "experiment_id": { "type": ["string", "integer"] },
+          "session_id": { "type": ["string", "integer"] },
+          "app": { "enum": ["WPS", "FILES", "QQ", "OTHER"] },
+          "workload": { "type": "string", "minLength": 1 },
+          "mode": { "enum": ["OFF", "SHADOW_EFFECTIVE_TIER", "APPLY_PROTECT_ONLY", "APPLY_BIDIRECTIONAL", "APPLY_RANDOM_MATCHED", "APPLY_RECENCY_BASELINE", "PRODUCT_ABLATION", "ORACLE_OFFLINE_ONLY"] },
+          "pressure_level": { "enum": ["P0", "P1", "P2", "P3", "P4"] },
+          "start_ns": { "type": "integer", "minimum": 0 },
+          "observation_end_ns": { "type": "integer", "minimum": 1 },
+          "split": { "enum": ["train", "validation", "test"] },
+          "tier_gate_counter": { "$ref": "#/$defs/counterMeasurement" },
+          "trace_loss": { "$ref": "#/$defs/lossMeasurement" }
+        }
+      }
+    }
+  },
+  "$defs": {
+    "counterMeasurement": {
+      "type": "object",
+      "required": ["measured", "source", "before", "after", "delta"],
+      "properties": {
+        "measured": { "type": "boolean" },
+        "source": { "type": ["string", "null"] },
+        "before": { "type": ["integer", "null"], "minimum": 0 },
+        "after": { "type": ["integer", "null"], "minimum": 0 },
+        "delta": { "type": ["integer", "null"], "minimum": 0 }
+      }
+    },
+    "lossMeasurement": {
+      "type": "object",
+      "required": ["measured", "source", "before", "after", "lost"],
+      "properties": {
+        "measured": { "type": "boolean" },
+        "source": { "type": ["string", "null"] },
+        "before": { "type": ["integer", "null"], "minimum": 0 },
+        "after": { "type": ["integer", "null"], "minimum": 0 },
+        "lost": { "type": ["integer", "null"], "minimum": 0 },
+        "per_cpu": { "type": "object", "additionalProperties": { "type": "integer", "minimum": 0 } }
+      }
+    }
+  }
+}

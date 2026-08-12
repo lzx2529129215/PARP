@@ -1,0 +1,212 @@
+{
+  "schema_version": 1,
+  "experiment_id": "REPLACE_WITH_UNIQUE_EXPERIMENT_ID",
+  "phase": "E",
+  "status": "PARP_EFFECTIVE_TIER_LIVE_AUTH_REQUIRED",
+  "safety": {
+    "harness_capability": "PLAN_ONLY",
+    "dry_run_default": true,
+    "live_reads_executed": false,
+    "cgroup_writes_authorized": false,
+    "pressure_authorized": false,
+    "apply_authorized": false,
+    "kernel_install_authorized": false,
+    "reboot_authorized": false
+  },
+  "collection": {
+    "candidate_scope": "ALL_NATIVE_TIER_GATE_FOLIOS",
+    "shadow_behavior": "NATIVE_ONLY",
+    "label_semantics": "FUTURE_REAL_ACCESS_NOT_REFAULT",
+    "label_windows": ["100ms", "500ms", "1s", "5s"],
+    "trace_lost_required": true,
+    "tier_gate_counter_required": true,
+    "observability": [
+      "score/effective-tier/quadrant/batch latency",
+      "lru_lock held/wait/IRQ-disabled latency",
+      "direct/memcg/kswapd/isolate/shrink/full reclaim latency",
+      "reclaim efficiency and no-progress counters",
+      "workingset_refault_file/anon and VM/PSI/memory.events deltas",
+      "WPS/FILES/QQ operation latency, failures, and session duration"
+    ]
+  },
+  "session_split": {
+    "unit": "session",
+    "train_percent": 70,
+    "validation_percent": 15,
+    "test_percent": 15,
+    "random_page_row_split_forbidden": true
+  },
+  "ranking": {
+    "primary_task": "pairwise_next-reuse_ranking",
+    "score_semantics": "higher_score_means_earlier_next_real_access",
+    "ranking_horizon_ns": 5000000000,
+    "default_tie_margin_ns": 10000000,
+    "tie_margin_ablations_ns": [0, 10000000, 50000000],
+    "pair_cap_per_group": 64,
+    "pair_cap_ablations_per_group": [32, 64, 128],
+    "pair_sampling_seed": "parp-rank-pairs-v1",
+    "fallback_time_window_ns": 100000000,
+    "primary_group": ["session_id", "batch_id", "page_type"],
+    "fallback_group": ["session_id", "reclaim_epoch", "page_type"],
+    "cross_session_pairs_forbidden": true,
+    "runtime_pairwise_comparison": false,
+    "runtime_candidate_sorting": false,
+    "runtime_sigmoid": false
+  },
+  "global_model_ablations": [
+    {
+      "id": "rank_base",
+      "model_name": "GLOBAL_REUSE_MODEL",
+      "features": [
+        "time_since_last_real_access_ms",
+        "previous_real_access_interval_ms",
+        "reuse_interval_ema_ms",
+        "consecutive_reclaim_candidate_count",
+        "time_in_current_generation_ms",
+        "access_ema_q8"
+      ]
+    },
+    {
+      "id": "rank_plus_native_tier",
+      "model_name": "GLOBAL_REUSE_MODEL",
+      "features": [
+        "time_since_last_real_access_ms",
+        "previous_real_access_interval_ms",
+        "reuse_interval_ema_ms",
+        "consecutive_reclaim_candidate_count",
+        "time_in_current_generation_ms",
+        "access_ema_q8",
+        "native_tier"
+      ]
+    },
+    {
+      "id": "rank_plus_native_tier_and_tier_idx",
+      "model_name": "GLOBAL_REUSE_MODEL",
+      "features": [
+        "time_since_last_real_access_ms",
+        "previous_real_access_interval_ms",
+        "reuse_interval_ema_ms",
+        "consecutive_reclaim_candidate_count",
+        "time_in_current_generation_ms",
+        "access_ema_q8",
+        "native_tier",
+        "native_tier_idx"
+      ]
+    },
+    {
+      "id": "recency_only_rank",
+      "model_name": "GLOBAL_REUSE_MODEL",
+      "features": ["time_since_last_real_access_ms"]
+    },
+    {
+      "id": "recent_frequency_rank",
+      "model_name": "GLOBAL_REUSE_MODEL",
+      "features": [
+        "time_since_last_real_access_ms",
+        "consecutive_reclaim_candidate_count",
+        "access_ema_q8"
+      ]
+    }
+  ],
+  "probability_classifier_ablation": {
+    "status": "NOT_IMPLEMENTED",
+    "legacy_available": "LEGACY_1S_LOG_ODDS",
+    "probability_model_mainline": false,
+    "product_q15_calibrated": false
+  },
+  "policy_ablations": {
+    "upgrade_ratio_percent": [1, 5, 10],
+    "downgrade_ratio_percent": [0.5, 1, 2],
+    "max_upgrade_tiers_apply": [1, 2],
+    "experimental_plus3": {
+      "max_upgrade_tiers": [3],
+      "allowed_modes": ["SHADOW_EFFECTIVE_TIER", "ORACLE_OFFLINE_ONLY"],
+      "apply_supported": false
+    },
+    "max_downgrade_tiers": [1],
+    "special_native_protect_mutable": false,
+    "strong_native_tier_protect_mutable": false
+  },
+  "experiment_groups": [
+    { "id": "A", "mode": "OFF", "execution": "PLAN_ONLY", "requires_explicit_authorization": true },
+    { "id": "B", "mode": "SHADOW_EFFECTIVE_TIER", "execution": "PLAN_ONLY", "requires_explicit_authorization": true },
+    { "id": "C", "mode": "APPLY_PROTECT_ONLY", "execution": "PLAN_ONLY", "requires_explicit_authorization": true },
+    { "id": "D", "mode": "APPLY_BIDIRECTIONAL", "execution": "PLAN_ONLY", "requires_explicit_authorization": true },
+    { "id": "E", "mode": "APPLY_RANDOM_MATCHED", "execution": "PLAN_ONLY", "requires_explicit_authorization": true },
+    { "id": "F", "mode": "APPLY_RECENCY_BASELINE", "execution": "PLAN_ONLY", "requires_explicit_authorization": true },
+    { "id": "G", "mode": "PRODUCT_ABLATION", "execution": "PLAN_ONLY", "requires_explicit_authorization": true },
+    { "id": "H", "mode": "ORACLE_OFFLINE_ONLY", "execution": "PLAN_ONLY", "requires_explicit_authorization": false }
+  ],
+  "comparisons": [
+    { "left": "C", "right": "A", "question": "Does protect-only beat Native?" },
+    { "left": "D", "right": "C", "question": "Does conservative downgrade improve reclaim without extra mistakes?" },
+    { "left": "D", "right": "E", "question": "Does the model beat matched random decisions?" },
+    { "left": "D", "right": "F", "question": "Does the full model beat recency?" },
+    { "left": "D", "right": "G", "question": "Does additive effective tier beat calibrated product gating?" }
+  ],
+  "pressure_levels": [
+    { "id": "P0", "purpose": "near-zero reclaim; plan only", "formal_benefit_run": false },
+    { "id": "P1", "purpose": "light reclaim; plan only", "formal_benefit_run": false },
+    { "id": "P2", "purpose": "stable reclaim; plan only", "formal_benefit_run": true },
+    { "id": "P3", "purpose": "sustained controlled reclaim; plan only", "formal_benefit_run": true },
+    { "id": "P4", "purpose": "stop-boundary discovery only; plan only", "formal_benefit_run": false }
+  ],
+  "workloads": ["WPS", "FILES", "QQ"],
+  "repetitions": {
+    "minimum": 5,
+    "recommended": 10,
+    "paired": true,
+    "randomized_or_interleaved": true,
+    "same_kernel_script_initial_state_cgroup_pressure_time_seed": true,
+    "restore_stable_state_between_runs": true
+  },
+  "gates": {
+    "protect_only": [
+      "at least four complete SHADOW sessions per App",
+      "trace_lost measured and acceptable",
+      "upgrade hit rate exceeds KEEP_RECLAIM reuse rate",
+      "not weaker than Recent+Frequency",
+      "lru_lock and direct-reclaim tails acceptable",
+      "runtime KUnit passed"
+    ],
+    "bidirectional": [
+      "protect-only gate passed",
+      "enough native-protected boundary candidates",
+      "downgrade reuse below KEEP_PROTECT across sessions",
+      "cold threshold not dominated by one App",
+      "downgrade mistake confidence interval acceptable",
+      "zero special-native-protect overrides"
+    ]
+  },
+  "stop_conditions": [
+    "OOM or oom_kill",
+    "severe PSI or no-progress regression",
+    "unexpected cgroup or mode state",
+    "trace-loss or tier-gate coverage failure",
+    "special native protection override",
+    "App failure, timeout, or unacceptable P95/P99 regression"
+  ],
+  "artifacts": [
+    "collection_summary.json",
+    "session_splits.json",
+    "feature_schema.json",
+    "ranking_dataset.json",
+    "pair_sampling.json",
+    "ranking_model.json",
+    "ranking_quality.json",
+    "score_distribution.json",
+    "score_reuse_monotonicity.json",
+    "threshold_selection.json",
+    "ranking_quantization.json",
+    "probability_ablation.json",
+    "model_quality.json",
+    "tier_reclassification.json",
+    "upgrade_analysis.json",
+    "downgrade_analysis.json",
+    "latency.json",
+    "lock_latency.json",
+    "reclaim_efficiency.json",
+    "app_latency.json",
+    "experiment_manifest.json"
+  ]
+}
