@@ -9,6 +9,29 @@ config PARP
 	  mode is observe-only: recommendations are traced but native MGLRU
 	  reclaim decisions remain unchanged.
 
+config PARP_TIER2_WATERMARK
+	bool "Enable PARP secondary memcg watermarks"
+	depends on PARP
+	default y
+	help
+	  /* xty-test */
+	  Build the secondary per-memcg watermark tracker and EWMA headroom
+	  predictor. This adds tier2_* cgroup files, vm.tier2_* sysctls, and
+	  memcg charge/lifecycle sampling hooks used by the PARP experiments.
+	  Turn this off to remove the extra watermark state and keep native
+	  memcg charging and lifecycle behavior.
+
+config PARP_RECLAIM_BIN_SCORE
+	bool "Enable PARP memcg reclaim-bin scoring"
+	depends on PARP_TIER2_WATERMARK
+	default y
+	help
+	  /* xty-test */
+	  Build the PARP memcg reclaim-bin scorer. The scorer combines the app
+	  prior signal with secondary-watermark headroom and maps the Q15 score
+	  into the existing MGLRU memcg bins. Turn this off to restore the
+	  original random memcg-bin assignment.
+
 config PARP_KUNIT_TEST
 	tristate "KUnit tests for PARP" if !KUNIT_ALL_TESTS
 	depends on PARP && KUNIT

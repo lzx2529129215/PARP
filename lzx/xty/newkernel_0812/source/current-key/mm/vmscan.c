@@ -4388,7 +4388,9 @@ enum {
 	MEMCG_LRU_YOUNG,
 };
 
-#ifdef CONFIG_PARP
+/* xty-test */
+/* Compile-time switch for the PARP memcg-bin scoring experiment. */
+#ifdef CONFIG_PARP_RECLAIM_BIN_SCORE
 static unsigned int parp_memcg_reclaim_bin(struct mem_cgroup *memcg)
 {
 	struct parp_app_context app;
@@ -4403,6 +4405,8 @@ static unsigned int parp_memcg_reclaim_bin(struct mem_cgroup *memcg)
 	    parp_get_mode() == PARP_MODE_DISABLED)
 		return get_random_u32_below(MEMCG_NR_BINS);
 
+	/* xty-test */
+	/* Combine app prior and tier2 headroom into one Q15 bin score. */
 	domain_id = parp_memcg_domain_id(memcg);
 	if (domain_id && parp_context_lookup(domain_id, now, &app)) {
 		score_q15 = app.app_prior_q15;
@@ -4433,6 +4437,8 @@ static unsigned int parp_memcg_reclaim_bin(struct mem_cgroup *memcg)
 		     MEMCG_NR_BINS - 1);
 }
 #else
+/* xty-test */
+/* Disabled builds keep the original random memcg-bin assignment. */
 static unsigned int parp_memcg_reclaim_bin(struct mem_cgroup *memcg)
 {
 	return get_random_u32_below(MEMCG_NR_BINS);

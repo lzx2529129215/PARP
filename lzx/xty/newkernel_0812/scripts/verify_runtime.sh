@@ -16,6 +16,14 @@ done
 
 echo "--- cgroup tier2 files ---"
 find /sys/fs/cgroup -maxdepth 3 \( -name 'memory.tier2_enabled' -o -name 'memory.tier2_stats' \) 2>/dev/null | head -20 || true
+echo "--- expected tier2 files in a child cgroup ---"
+tmp_cgroup="/sys/fs/cgroup/parp-kcfg-verify-$$"
+if mkdir "$tmp_cgroup" 2>/dev/null; then
+  find "$tmp_cgroup" -maxdepth 1 -type f -name 'memory.tier2_*' -printf '%f\n' 2>/dev/null | sort || true
+  rmdir "$tmp_cgroup" 2>/dev/null || true
+else
+  echo "cannot create temporary cgroup; run as root to inspect child-cgroup files"
+fi
 
 echo "--- dmesg marker ---"
 dmesg | grep -E 'PARP tier2|tier2_watermark' | tail -20 || true

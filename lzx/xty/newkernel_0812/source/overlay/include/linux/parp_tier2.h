@@ -10,8 +10,9 @@ struct kernfs_open_file;
 struct mem_cgroup;
 struct seq_file;
 
-#ifdef CONFIG_PARP
+#ifdef CONFIG_PARP_TIER2_WATERMARK
 
+/* xty-test */
 /*
  * All mutable prediction state is embedded in a memcg.  In particular, no
  * EWMA sample is shared by siblings, which keeps differently paced workloads
@@ -72,8 +73,10 @@ int parp_tier2_headroom_show(struct seq_file *m, void *v);
 int parp_tier2_below_show(struct seq_file *m, void *v);
 int parp_tier2_stats_show(struct seq_file *m, void *v);
 
-#else /* !CONFIG_PARP */
+#else /* !CONFIG_PARP_TIER2_WATERMARK */
 
+/* xty-test */
+/* Disabled builds keep memcg hooks as no-op native fallbacks. */
 static inline void parp_tier2_memcg_init(struct mem_cgroup *memcg) { }
 static inline void parp_tier2_memcg_online(struct mem_cgroup *memcg) { }
 static inline void parp_tier2_memcg_offline(struct mem_cgroup *memcg) { }
@@ -82,6 +85,6 @@ static inline void parp_tier2_memcg_destroy(struct mem_cgroup *memcg) { }
 static inline void parp_tier2_memcg_sample(struct mem_cgroup *memcg) { }
 static inline void parp_tier2_memcg_charge(struct mem_cgroup *memcg) { }
 
-#endif /* CONFIG_PARP */
+#endif /* CONFIG_PARP_TIER2_WATERMARK */
 
 #endif /* _LINUX_PARP_TIER2_H */

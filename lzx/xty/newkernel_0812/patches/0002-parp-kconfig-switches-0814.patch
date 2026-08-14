@@ -1,0 +1,311 @@
+# Incremental patch for the PARP Kconfig feature switches.
+# Apply after source/overlay has been applied to the initial v4-parp tree.
+#
+# CONFIG_PARP_TIER2_WATERMARK gates the secondary memcg watermark code.
+# CONFIG_PARP_RECLAIM_BIN_SCORE gates the app-prior/tier2 bin scorer.
+
+diff --git a/include/linux/memcontrol.h b/include/linux/memcontrol.h
+--- a/include/linux/memcontrol.h
++++ b/include/linux/memcontrol.h
+@@ -209,8 +209,9 @@
+ 	/* Range enforcement for interrupt charges */
+ 	struct work_struct high_work;
+ 
+-#ifdef CONFIG_PARP
+-	/* Per-cgroup secondary watermarks and EWMA arrival predictor. */
++#ifdef CONFIG_PARP_TIER2_WATERMARK
++	/* xty-test */
++	/* Per-cgroup secondary watermarks and EWMA headroom predictor. */
+ 	struct parp_tier2_memcg parp_tier2;
+ #endif
+ 
+diff --git a/include/linux/parp_tier2.h b/include/linux/parp_tier2.h
+--- a/include/linux/parp_tier2.h
++++ b/include/linux/parp_tier2.h
+@@ -10,8 +10,9 @@
+ struct mem_cgroup;
+ struct seq_file;
+ 
+-#ifdef CONFIG_PARP
++#ifdef CONFIG_PARP_TIER2_WATERMARK
+ 
++/* xty-test */
+ /*
+  * All mutable prediction state is embedded in a memcg.  In particular, no
+  * EWMA sample is shared by siblings, which keeps differently paced workloads
+@@ -72,8 +73,10 @@
+ int parp_tier2_below_show(struct seq_file *m, void *v);
+ int parp_tier2_stats_show(struct seq_file *m, void *v);
+ 
+-#else /* !CONFIG_PARP */
++#else /* !CONFIG_PARP_TIER2_WATERMARK */
+ 
++/* xty-test */
++/* Disabled builds keep memcg hooks as no-op native fallbacks. */
+ static inline void parp_tier2_memcg_init(struct mem_cgroup *memcg) { }
+ static inline void parp_tier2_memcg_online(struct mem_cgroup *memcg) { }
+ static inline void parp_tier2_memcg_offline(struct mem_cgroup *memcg) { }
+@@ -82,6 +85,6 @@
+ static inline void parp_tier2_memcg_sample(struct mem_cgroup *memcg) { }
+ static inline void parp_tier2_memcg_charge(struct mem_cgroup *memcg) { }
+ 
+-#endif /* CONFIG_PARP */
++#endif /* CONFIG_PARP_TIER2_WATERMARK */
+ 
+ #endif /* _LINUX_PARP_TIER2_H */
+diff --git a/mm/memcontrol-v1.c b/mm/memcontrol-v1.c
+--- a/mm/memcontrol-v1.c
++++ b/mm/memcontrol-v1.c
+@@ -2133,7 +2133,9 @@
+ 		.read_u64 = mem_cgroup_read_u64,
+ 	},
+ 
+-#ifdef CONFIG_PARP
++#ifdef CONFIG_PARP_TIER2_WATERMARK
++	/* xty-test */
++	/* Expose tier2 watermark controls only when compiled in. */
+ 	{
+ 		.name = "tier2_enabled",
+ 		.flags = CFTYPE_NOT_ON_ROOT,
+diff --git a/mm/memcontrol.c b/mm/memcontrol.c
+--- a/mm/memcontrol.c
++++ b/mm/memcontrol.c
+@@ -2503,6 +2503,8 @@
+ 	if (ret)
+ 		return ret;
+ 
++	/* xty-test */
++	/* Update tier2 watermark samples after a successful charge. */
+ 	parp_tier2_memcg_charge(memcg);
+ 
+ 	return 0;
+@@ -3782,6 +3784,8 @@
+ 	memcg->deferred_split_queue.split_queue_len = 0;
+ #endif
+ 	lru_gen_init_memcg(memcg);
++	/* xty-test */
++	/* Initialize optional tier2 watermark state for this memcg. */
+ 	parp_tier2_memcg_init(memcg);
+ 	return memcg;
+ fail:
+@@ -3862,6 +3866,8 @@
+ 		queue_delayed_work(system_unbound_wq, &stats_flush_dwork,
+ 				   FLUSH_TIME);
+ 	lru_gen_online_memcg(memcg);
++	/* xty-test */
++	/* Mark optional tier2 watermark state online with memcg css. */
+ 	parp_tier2_memcg_online(memcg);
+ 
+ 	/* Online state pins memcg ID, memcg ID pins CSS */
+@@ -3892,6 +3898,8 @@
+ {
+ 	struct mem_cgroup *memcg = mem_cgroup_from_css(css);
+ 
++	/* xty-test */
++	/* Stop tier2 watermark prediction before memcg offline cleanup. */
+ 	parp_tier2_memcg_offline(memcg);
+ 	memcg1_css_offline(memcg);
+ 
+@@ -3938,6 +3946,8 @@
+ 
+ 	vmpressure_cleanup(&memcg->vmpressure);
+ 	cancel_work_sync(&memcg->high_work);
++	/* xty-test */
++	/* Cancel delayed tier2 watermark work before freeing memcg. */
+ 	parp_tier2_memcg_destroy(memcg);
+ 	memcg1_remove_from_trees(memcg);
+ 	free_shrinker_info(memcg);
+@@ -3973,6 +3983,8 @@
+ 	memcg1_soft_limit_reset(memcg);
+ 	page_counter_set_high(&memcg->swap, PAGE_COUNTER_MAX);
+ 	memcg_wb_domain_size_changed(memcg);
++	/* xty-test */
++	/* Reset optional tier2 watermark state on cgroup reinit. */
+ 	parp_tier2_memcg_reset(memcg);
+ }
+ 
+@@ -4664,7 +4676,9 @@
+ 		.flags = CFTYPE_NS_DELEGATABLE,
+ 		.write = memory_reclaim,
+ 	},
+-#ifdef CONFIG_PARP
++#ifdef CONFIG_PARP_TIER2_WATERMARK
++	/* xty-test */
++	/* Expose tier2 watermark controls only when compiled in. */
+ 	{
+ 		.name = "tier2_enabled",
+ 		.flags = CFTYPE_NOT_ON_ROOT,
+diff --git a/mm/vmscan.c b/mm/vmscan.c
+--- a/mm/vmscan.c
++++ b/mm/vmscan.c
+@@ -4388,7 +4388,9 @@
+ 	MEMCG_LRU_YOUNG,
+ };
+ 
+-#ifdef CONFIG_PARP
++/* xty-test */
++/* Compile-time switch for the PARP memcg-bin scoring experiment. */
++#ifdef CONFIG_PARP_RECLAIM_BIN_SCORE
+ static unsigned int parp_memcg_reclaim_bin(struct mem_cgroup *memcg)
+ {
+ 	struct parp_app_context app;
+@@ -4403,6 +4405,8 @@
+ 	    parp_get_mode() == PARP_MODE_DISABLED)
+ 		return get_random_u32_below(MEMCG_NR_BINS);
+ 
++	/* xty-test */
++	/* Combine app prior and tier2 headroom into one Q15 bin score. */
+ 	domain_id = parp_memcg_domain_id(memcg);
+ 	if (domain_id && parp_context_lookup(domain_id, now, &app)) {
+ 		score_q15 = app.app_prior_q15;
+@@ -4433,6 +4437,8 @@
+ 		     MEMCG_NR_BINS - 1);
+ }
+ #else
++/* xty-test */
++/* Disabled builds keep the original random memcg-bin assignment. */
+ static unsigned int parp_memcg_reclaim_bin(struct mem_cgroup *memcg)
+ {
+ 	return get_random_u32_below(MEMCG_NR_BINS);
+diff --git a/mm/parp/Kconfig b/mm/parp/Kconfig
+--- a/mm/parp/Kconfig
++++ b/mm/parp/Kconfig
+@@ -8,6 +8,29 @@
+ 	  Build the low-intrusion Page-Access Reclaim Predictor. The default
+ 	  mode is observe-only: recommendations are traced but native MGLRU
+ 	  reclaim decisions remain unchanged.
++
++config PARP_TIER2_WATERMARK
++	bool "Enable PARP secondary memcg watermarks"
++	depends on PARP
++	default y
++	help
++	  /* xty-test */
++	  Build the secondary per-memcg watermark tracker and EWMA headroom
++	  predictor. This adds tier2_* cgroup files, vm.tier2_* sysctls, and
++	  memcg charge/lifecycle sampling hooks used by the PARP experiments.
++	  Turn this off to remove the extra watermark state and keep native
++	  memcg charging and lifecycle behavior.
++
++config PARP_RECLAIM_BIN_SCORE
++	bool "Enable PARP memcg reclaim-bin scoring"
++	depends on PARP_TIER2_WATERMARK
++	default y
++	help
++	  /* xty-test */
++	  Build the PARP memcg reclaim-bin scorer. The scorer combines the app
++	  prior signal with secondary-watermark headroom and maps the Q15 score
++	  into the existing MGLRU memcg bins. Turn this off to restore the
++	  original random memcg-bin assignment.
+ 
+ config PARP_KUNIT_TEST
+ 	tristate "KUnit tests for PARP" if !KUNIT_ALL_TESTS
+diff --git a/mm/parp/Makefile b/mm/parp/Makefile
+--- a/mm/parp/Makefile
++++ b/mm/parp/Makefile
+@@ -1,7 +1,6 @@
+ # SPDX-License-Identifier: GPL-2.0
+ obj-y += parp.o
+ parp-y := core/engine.o core/domain.o core/snapshot.o core/policy.o \
+-	  core/watermark.o \
+ 	  core/budget.o core/scan_budget.o core/fallback.o core/stats.o core/evidence.o \
+ 	  model/model_store.o model/app_prior.o model/state_assigner.o \
+ 	  model/state_predictor.o model/file_predictor.o model/anon_predictor.o \
+@@ -11,6 +10,8 @@
+ 	  adapter/file_adapter.o adapter/anon_adapter.o adapter/feedback_adapter.o \
+ 	  adapter/scan_budget_adapter.o \
+ 	  control/debugfs.o control/sysfs.o control/genl.o control/trace.o
++# /* xty-test */ Build tier2 watermark code only when enabled.
++parp-$(CONFIG_PARP_TIER2_WATERMARK) += core/watermark.o
+ parp-$(CONFIG_PARP_DAMON_ALIGNMENT) += adapter/damon_adapter.o
+ parp-$(CONFIG_PARP_FRONTIER_SCORE) += core/frontier_score.o
+ parp-$(CONFIG_PARP_EFFECTIVE_TIER) += core/effective_tier.o
+diff --git a/mm/parp/internal.h b/mm/parp/internal.h
+--- a/mm/parp/internal.h
++++ b/mm/parp/internal.h
+@@ -487,11 +487,15 @@
+ 
+ u16 parp_q15_mul(u16 a, u16 b);
+ s16 parp_q15_sat_add(s16 a, s16 b);
++/* xty-test */
++/* Tier2 watermark helper declarations only exist when built. */
++#ifdef CONFIG_PARP_TIER2_WATERMARK
+ u64 parp_tier2_scaled_wmark(u64 limit_bytes, u32 scale, u64 floor);
+ u64 parp_tier2_ewma_next(u64 previous, u64 sample);
+ s64 parp_tier2_predict_ms(u64 previous_ewma, u64 ewma,
+ 			  u64 headroom, u64 demote_wmark,
+ 			  u64 elapsed_ms);
++#endif
+ int parp_assign_state(const s16 *features, const s16 *centers,
+ 		      unsigned int nr_features, unsigned int nr_states,
+ 		      u32 unknown_threshold);
+diff --git a/mm/parp/core/watermark.c b/mm/parp/core/watermark.c
+--- a/mm/parp/core/watermark.c
++++ b/mm/parp/core/watermark.c
+@@ -1,4 +1,5 @@
+ // SPDX-License-Identifier: GPL-2.0
++/* xty-test */
+ /*
+  * Per-memcg secondary watermarks and EWMA arrival prediction.
+  *
+diff --git a/mm/parp/tests/parp_test.c b/mm/parp/tests/parp_test.c
+--- a/mm/parp/tests/parp_test.c
++++ b/mm/parp/tests/parp_test.c
+@@ -13,6 +13,9 @@
+ 	KUNIT_EXPECT_EQ(test, parp_q15_sat_add(30000, 10000), (s16)S16_MAX);
+ }
+ 
++#ifdef CONFIG_PARP_TIER2_WATERMARK
++/* xty-test */
++/* Tier2 watermark helper tests are built only with the feature. */
+ static void parp_tier2_ewma_test(struct kunit *test)
+ {
+ 	KUNIT_EXPECT_EQ(test, parp_tier2_scaled_wmark(1000000, 100, 4096),
+@@ -30,6 +33,7 @@
+ 	KUNIT_EXPECT_EQ(test,
+ 			parp_tier2_predict_ms(1000, 900, 800, 300, 0), -1LL);
+ }
++#endif
+ 
+ static void parp_state_test(struct kunit *test)
+ {
+@@ -897,6 +901,8 @@
+ {
+ 	struct parp_tier_decision upgrade;
+ 	struct parp_tier_decision downgrade;
++	struct parp_tier_policy plus_three = parp_effective_test_policy;
++	struct parp_tier_decision saturated_upgrade;
+ 
+ 	parp_effective_tier_classify(96, true, 1, 1, false,
+ 		&parp_effective_test_policy, &upgrade);
+@@ -908,6 +914,18 @@
+ 		PARP_EFFECTIVE_TIER_SHADOW, &upgrade));
+ 	KUNIT_EXPECT_TRUE(test, parp_effective_tier_actual_protect(
+ 		PARP_EFFECTIVE_TIER_PROTECT_ONLY, &upgrade));
++	plus_three.max_upgrade_tiers = 3;
++	parp_effective_tier_classify(144, true, 0, PARP_MAX_TIER, false,
++		&plus_three, &saturated_upgrade);
++	KUNIT_EXPECT_EQ(test, saturated_upgrade.action,
++		(u8)PARP_TIER_PREDICTIVE_UPGRADE);
++	KUNIT_EXPECT_EQ(test, saturated_upgrade.effective_tier_q8,
++		PARP_MAX_TIER * PARP_TIER_SCALE);
++	KUNIT_EXPECT_TRUE(test, saturated_upgrade.effective_protect);
++	KUNIT_EXPECT_TRUE(test, parp_effective_tier_actual_protect(
++		PARP_EFFECTIVE_TIER_PROTECT_ONLY, &saturated_upgrade));
++	KUNIT_EXPECT_FALSE(test, parp_effective_tier_actual_protect(
++		PARP_EFFECTIVE_TIER_SHADOW, &saturated_upgrade));
+ 
+ 	parp_effective_tier_classify(-48, true, 2, 1, false,
+ 		&parp_effective_test_policy, &downgrade);
+@@ -1292,7 +1310,11 @@
+ 
+ static struct kunit_case parp_cases[] = {
+ 	KUNIT_CASE(parp_q15_test),
++#ifdef CONFIG_PARP_TIER2_WATERMARK
++	/* xty-test */
++	/* Keep KUnit linkage valid when tier2 watermark is disabled. */
+ 	KUNIT_CASE(parp_tier2_ewma_test),
++#endif
+ 	KUNIT_CASE(parp_state_test),
+ 	KUNIT_CASE(parp_predictor_test),
+ 	KUNIT_CASE(parp_metadata_test),

@@ -1,7 +1,6 @@
 # SPDX-License-Identifier: GPL-2.0
 obj-y += parp.o
 parp-y := core/engine.o core/domain.o core/snapshot.o core/policy.o \
-	  core/watermark.o \
 	  core/budget.o core/scan_budget.o core/fallback.o core/stats.o core/evidence.o \
 	  model/model_store.o model/app_prior.o model/state_assigner.o \
 	  model/state_predictor.o model/file_predictor.o model/anon_predictor.o \
@@ -11,6 +10,8 @@ parp-y := core/engine.o core/domain.o core/snapshot.o core/policy.o \
 	  adapter/file_adapter.o adapter/anon_adapter.o adapter/feedback_adapter.o \
 	  adapter/scan_budget_adapter.o \
 	  control/debugfs.o control/sysfs.o control/genl.o control/trace.o
+# /* xty-test */ Build tier2 watermark code only when enabled.
+parp-$(CONFIG_PARP_TIER2_WATERMARK) += core/watermark.o
 parp-$(CONFIG_PARP_DAMON_ALIGNMENT) += adapter/damon_adapter.o
 parp-$(CONFIG_PARP_FRONTIER_SCORE) += core/frontier_score.o
 parp-$(CONFIG_PARP_EFFECTIVE_TIER) += core/effective_tier.o

@@ -2133,7 +2133,9 @@ struct cftype mem_cgroup_legacy_files[] = {
 		.read_u64 = mem_cgroup_read_u64,
 	},
 
-#ifdef CONFIG_PARP
+#ifdef CONFIG_PARP_TIER2_WATERMARK
+	/* xty-test */
+	/* Expose tier2 watermark controls only when compiled in. */
 	{
 		.name = "tier2_enabled",
 		.flags = CFTYPE_NOT_ON_ROOT,

@@ -209,8 +209,9 @@ struct mem_cgroup {
 	/* Range enforcement for interrupt charges */
 	struct work_struct high_work;
 
-#ifdef CONFIG_PARP
-	/* Per-cgroup secondary watermarks and EWMA arrival predictor. */
+#ifdef CONFIG_PARP_TIER2_WATERMARK
+	/* xty-test */
+	/* Per-cgroup secondary watermarks and EWMA headroom predictor. */
 	struct parp_tier2_memcg parp_tier2;
 #endif
 

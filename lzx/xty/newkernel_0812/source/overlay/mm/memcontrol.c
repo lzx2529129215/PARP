@@ -2503,6 +2503,8 @@ static inline int try_charge(struct mem_cgroup *memcg, gfp_t gfp_mask,
 	if (ret)
 		return ret;
 
+	/* xty-test */
+	/* Update tier2 watermark samples after a successful charge. */
 	parp_tier2_memcg_charge(memcg);
 
 	return 0;
@@ -3782,6 +3784,8 @@ static struct mem_cgroup *mem_cgroup_alloc(struct mem_cgroup *parent)
 	memcg->deferred_split_queue.split_queue_len = 0;
 #endif
 	lru_gen_init_memcg(memcg);
+	/* xty-test */
+	/* Initialize optional tier2 watermark state for this memcg. */
 	parp_tier2_memcg_init(memcg);
 	return memcg;
 fail:
@@ -3862,6 +3866,8 @@ static int mem_cgroup_css_online(struct cgroup_subsys_state *css)
 		queue_delayed_work(system_unbound_wq, &stats_flush_dwork,
 				   FLUSH_TIME);
 	lru_gen_online_memcg(memcg);
+	/* xty-test */
+	/* Mark optional tier2 watermark state online with memcg css. */
 	parp_tier2_memcg_online(memcg);
 
 	/* Online state pins memcg ID, memcg ID pins CSS */
@@ -3892,6 +3898,8 @@ static void mem_cgroup_css_offline(struct cgroup_subsys_state *css)
 {
 	struct mem_cgroup *memcg = mem_cgroup_from_css(css);
 
+	/* xty-test */
+	/* Stop tier2 watermark prediction before memcg offline cleanup. */
 	parp_tier2_memcg_offline(memcg);
 	memcg1_css_offline(memcg);
 
@@ -3938,6 +3946,8 @@ static void mem_cgroup_css_free(struct cgroup_subsys_state *css)
 
 	vmpressure_cleanup(&memcg->vmpressure);
 	cancel_work_sync(&memcg->high_work);
+	/* xty-test */
+	/* Cancel delayed tier2 watermark work before freeing memcg. */
 	parp_tier2_memcg_destroy(memcg);
 	memcg1_remove_from_trees(memcg);
 	free_shrinker_info(memcg);
@@ -3973,6 +3983,8 @@ static void mem_cgroup_css_reset(struct cgroup_subsys_state *css)
 	memcg1_soft_limit_reset(memcg);
 	page_counter_set_high(&memcg->swap, PAGE_COUNTER_MAX);
 	memcg_wb_domain_size_changed(memcg);
+	/* xty-test */
+	/* Reset optional tier2 watermark state on cgroup reinit. */
 	parp_tier2_memcg_reset(memcg);
 }
 
@@ -4664,7 +4676,9 @@ static struct cftype memory_files[] = {
 		.flags = CFTYPE_NS_DELEGATABLE,
 		.write = memory_reclaim,
 	},
-#ifdef CONFIG_PARP
+#ifdef CONFIG_PARP_TIER2_WATERMARK
+	/* xty-test */
+	/* Expose tier2 watermark controls only when compiled in. */
 	{
 		.name = "tier2_enabled",
 		.flags = CFTYPE_NOT_ON_ROOT,

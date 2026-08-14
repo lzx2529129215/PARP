@@ -487,11 +487,15 @@ extern struct parp_scan_budget_stats parp_scan_budget_stats;
 
 u16 parp_q15_mul(u16 a, u16 b);
 s16 parp_q15_sat_add(s16 a, s16 b);
+/* xty-test */
+/* Tier2 watermark helper declarations only exist when built. */
+#ifdef CONFIG_PARP_TIER2_WATERMARK
 u64 parp_tier2_scaled_wmark(u64 limit_bytes, u32 scale, u64 floor);
 u64 parp_tier2_ewma_next(u64 previous, u64 sample);
 s64 parp_tier2_predict_ms(u64 previous_ewma, u64 ewma,
 			  u64 headroom, u64 demote_wmark,
 			  u64 elapsed_ms);
+#endif
 int parp_assign_state(const s16 *features, const s16 *centers,
 		      unsigned int nr_features, unsigned int nr_states,
 		      u32 unknown_threshold);
