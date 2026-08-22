@@ -1,0 +1,21 @@
+{
+  "application": "io.github.msojocs.bilibili",
+  "executable": "/opt/apps/io.github.msojocs.bilibili/files/bin/bin/bilibili",
+  "groups": {
+    "audio": {
+      "cmdline_regex": "--utility-sub-type=audio\\.mojom\\.AudioService"
+    },
+    "gpu": {
+      "cmdline_regex": "--type=gpu-process"
+    },
+    "network": {
+      "cmdline_regex": "--utility-sub-type=network\\.mojom\\.NetworkService"
+    },
+    "renderer": {
+      "cmdline_regex": "--type=renderer"
+    },
+    "other": {
+      "fallback": true
+    }
+  }
+}
