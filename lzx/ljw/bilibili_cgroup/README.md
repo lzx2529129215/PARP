@@ -180,12 +180,4 @@ systemctl --user stop UNIT.service
 
 - 不要在未测量峰值前给 `audio`、`gpu` 或主进程设置严格内存上限。
 
-## 后续工作
 
-1. 加固管理器的异常退出、PID 重用和迁移后验证逻辑。
-2. 增加分类和异常路径自动化测试。
-3. 建立用户级 systemd/desktop entry 集成，同时保留原始启动回滚入口。
-4. 先采集五个子组的 CPU、内存、I/O 和 PSI 基线。
-5. 在基线稳定后逐项实验资源权重或软限制。
-
-详细交接顺序可参考 `CONTINUE_PROMPT.md`。
