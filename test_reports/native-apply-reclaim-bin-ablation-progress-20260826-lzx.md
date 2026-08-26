@@ -1,6 +1,6 @@
 # Native / APPLY reclaim-bin 消融实验进度
 
-状态：`RECLAIM_HIERARCHY_FIXED_AWAITING_FULL_APPLY_REBOOT`
+状态：`COMPLETE_SEE_FINAL_REPORT`
 
 更新时间：2026-08-26（Asia/Shanghai）
 
@@ -95,4 +95,53 @@ Native 原始目录：
 - 两份配置除 `CONFIG_LOCALVERSION` 和 `CONFIG_PARP_RECLAIM_BIN_SCORE` 外逐项一致。
 - 可复现补丁：`/home/lzx/Desktop/PARP/lzx/kernel/v4.2/patches/0005-reclaim-bin-hierarchy-and-stats.patch`
 
-GRUB 下一次启动已经设置为完整 APPLY：`6.17.13-parp-lzx-v4.2-apply-reclaim-bin`。
+## 完整 APPLY 内核实测进度
+
+本轮已确认启动的是修正后的完整 APPLY `#10`，内核 release 为
+`6.17.13-parp-lzx-v4.2-apply-reclaim-bin`，配置 SHA256 为
+`2b17262e80c14302ac64ee7ceded6d055db011e941b3534f356275a012326762`。
+
+有效结果目录：
+
+- B 完整 APPLY：`peak-full-combined-20260826_112334-6.17.13-parp-lzx-v4.2-apply-reclaim-bin` 的 `round-01/02`，以及补跑目录 `peak-full-combined-20260826_112841-6.17.13-parp-lzx-v4.2-apply-reclaim-bin` 的 `round-01`。
+- C effective-tier-only：`peak-full-effective-20260826_113058-6.17.13-parp-lzx-v4.2-apply-reclaim-bin`。
+- D Tier2 + reclaim-bin：`peak-full-tier2-20260826_113507-6.17.13-parp-lzx-v4.2-apply-reclaim-bin`。
+
+B 的种子 `20260823` 首次运行因 LibreOffice “Tip of the Day” 模态窗口抢占焦点而标记为 `INVALID`；随后不修改 test 代码，严格重放同一 Native 计划并得到 `VALID_DIAGNOSTIC`。无效轮保留审计但不进入均值。A/B/C/D 的三份计划已经逐轮做 canonical SHA256 比较，全部相同。
+
+### A/B/C/D 三轮有效均值
+
+| 组别 | PageFault | Major | Refault file | pgscan | pgsteal | Direct scan | Direct steal | Memcg calls | Memcg ms | OOM | OOM kill | Failure | Launch mean ms |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
+| A Native | 4,504,657.33 | 1,382.00 | 521,897.00 | 1,406,115.00 | 1,333,986.33 | 1,406,115.00 | 1,333,986.33 | 9,216.67 | 658.35 | 1.00 | 1.00 | 1.00 | 3,775.29 |
+| B Full APPLY | 4,502,784.00 | 1,535.67 | 476,121.00 | 2,001,622.00 | 1,350,961.00 | 457,192.33 | 14,111.00 | 2,888.67 | 1,355.06 | 1.33 | 1.00 | 1.00 | 2,617.46 |
+| C Effective only | 4,500,621.67 | 903.00 | 448,705.33 | 1,194,863.67 | 1,194,237.33 | 1,194,863.67 | 1,194,237.33 | 6,442.00 | 302.76 | 1.00 | 1.00 | 1.00 | 2,120.73 |
+| D Tier2 + reclaim-bin | 4,499,481.00 | 899.33 | 443,148.00 | 1,195,711.33 | 1,190,318.00 | 454.33 | 2.33 | 1,230.67 | 277.01 | 1.67 | 1.00 | 1.00 | 2,107.39 |
+
+相对 Native，B 的 PageFault 仅下降 `0.04%`，direct scan 下降 `67.49%`，但总 pgscan 增加 `42.35%`、major fault 增加 `11.12%`、memcg reclaim 总耗时增加 `105.83%`，OOM kill 没有下降。因此目前不能声称完整 APPLY 达到整体优化目标。
+
+D 的 direct scan 相对 Native 下降 `99.97%`，而 C 只下降 `15.02%`，说明 direct reclaim 路径转移主要来自 Tier2/reclaim-bin 组合。D 的总 pgscan 下降 `14.96%`、major fault 下降 `34.93%`、memcg reclaim 总耗时下降 `57.92%`，但 OOM kill 仍未下降。
+
+### reclaim-bin 生效证据
+
+完成 B/C/D 后的启动累计统计：
+
+```text
+lookups 67437
+policy_hits 67375
+inherited_hits 67368
+context_hits 0
+headroom_hits 67375
+scored 67375
+fallbacks 62
+```
+
+`scored` 与 `inherited_hits` 大幅增长，证明动态 systemd 子 cgroup 已通过最近启用祖先进入 reclaim-bin scorer；层级修复生效。`context_hits=0` 同时表明当前常驻服务是纯观测服务，本轮 scorer 只有 cgroup headroom 信号，没有应用预测上下文。因此这些结果仍是诊断数据，不能代表完整 LSTM 在线策略收益。
+
+随后已启动 `6.17.13-parp-lzx-v4.2-apply-no-reclaim-bin #11`，完成 E 组三轮编译宏消融，并生成 A/B/C/D/E 最终报告。
+
+## 最终完成
+
+E 组已在 `6.17.13-parp-lzx-v4.2-apply-no-reclaim-bin #11` 上完成三轮有效结果；宏、符号和 debugfs 接口均确认不存在。A/B/C/D/E 的最终汇总、逐轮数据、PSI、reclaim-bin 单独贡献、局限和验收判定见：
+
+`/home/lzx/Desktop/PARP/test_reports/native-v4.2-reclaim-bin-ablation-final-20260826-lzx.md`
