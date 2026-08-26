@@ -1,7 +1,0 @@
-sample_id,timestamp,current_app_id,current_app,actual_next_app_id,actual_next_app,available_pages,base_headroom_pages,burst_pages
-s001,2026-08-05 09:00:00,0,WPS,2,腾讯QQ,2500,3500,500
-s002,2026-08-05 09:05:00,2,腾讯QQ,0,WPS,3000,3500,500
-s003,2026-08-05 09:10:00,1,飞书,2,腾讯QQ,5000,3500,500
-s004,2026-08-05 09:15:00,0,WPS,1,飞书,2200,3500,500
-s005,2026-08-05 09:20:00,2,腾讯QQ,0,WPS,6000,3500,500
-s006,2026-08-05 09:25:00,1,飞书,0,WPS,2400,3500,500

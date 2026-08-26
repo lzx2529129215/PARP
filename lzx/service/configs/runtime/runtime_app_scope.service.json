@@ -1,0 +1,111 @@
+{
+  "slice": "",
+  "implementation_note": "lzx-note: resident service observes matching applications across test slices",
+  "apps": [
+    {
+      "app_key": "FIREFOX", "app_id": 1, "vocab_name": "Firefox",
+      "scope_name": "automation-firefox.scope", "unit_name": "automation-firefox",
+      "workload_enabled": true, "prediction_enabled": true,
+      "window_keywords": ["epiphany", "org.gnome.Epiphany", "Web", "PARP LSAPP"],
+      "process_keywords": ["epiphany", "epiphany-browser"]
+    },
+    {
+      "app_key": "LIBREOFFICE", "app_id": 2, "vocab_name": "LibreOffice",
+      "scope_name": "automation-libreoffice.scope", "unit_name": "automation-libreoffice",
+      "workload_enabled": true, "prediction_enabled": true,
+      "window_keywords": ["libreoffice", "soffice", "writer"],
+      "process_keywords": ["soffice.bin", "soffice", "lowriter"]
+    },
+    {
+      "app_key": "VLC", "app_id": 3, "vocab_name": "VLC",
+      "scope_name": "automation-vlc.scope", "unit_name": "automation-vlc",
+      "workload_enabled": true, "prediction_enabled": true,
+      "window_keywords": ["vlc", "videolan", "audio-test"],
+      "process_keywords": ["vlc"]
+    },
+    {
+      "app_key": "GIMP", "app_id": 4, "vocab_name": "GIMP",
+      "scope_name": "automation-gimp.scope", "unit_name": "automation-gimp",
+      "workload_enabled": true, "prediction_enabled": true,
+      "window_keywords": ["gimp", "gnu image manipulation", "image-test"],
+      "process_keywords": ["gimp", "gimp-2.10"]
+    },
+    {
+      "app_key": "AUDACITY", "app_id": 5, "vocab_name": "Audacity",
+      "scope_name": "automation-audacity.scope", "unit_name": "automation-audacity",
+      "workload_enabled": true, "prediction_enabled": true,
+      "window_keywords": ["audacity", "audio-test"],
+      "process_keywords": ["audacity"]
+    },
+    {
+      "app_key": "THUNDERBIRD", "app_id": 6, "vocab_name": "Thunderbird",
+      "scope_name": "automation-thunderbird.scope", "unit_name": "automation-thunderbird",
+      "workload_enabled": true, "prediction_enabled": true,
+      "window_keywords": ["thunderbird", "PARP local message"],
+      "process_keywords": ["thunderbird"]
+    },
+    {
+      "app_key": "EVINCE", "app_id": 7, "vocab_name": "Evince",
+      "scope_name": "automation-evince.scope", "unit_name": "automation-evince",
+      "workload_enabled": true, "prediction_enabled": true,
+      "window_keywords": ["evince", "document viewer", "document-test", "文档查看器"],
+      "process_keywords": ["evince"]
+    },
+    {
+      "app_key": "FILES", "app_id": 8, "vocab_name": "Files",
+      "scope_name": "automation-files.scope", "unit_name": "automation-files",
+      "workload_enabled": true, "prediction_enabled": true,
+      "window_keywords": ["nautilus", "files", "文件", "lsapp-fixtures"],
+      "process_keywords": ["nautilus", "org.gnome.Nautilus"]
+    },
+    {
+      "app_key": "CALCULATOR", "app_id": 9, "vocab_name": "Calculator",
+      "scope_name": "automation-calculator.scope", "unit_name": "automation-calculator",
+      "workload_enabled": true, "prediction_enabled": true,
+      "window_keywords": ["gnome-calculator", "calculator", "计算器"],
+      "process_keywords": ["gnome-calculator"]
+    },
+    {
+      "app_key": "CALENDAR", "app_id": 10, "vocab_name": "Calendar",
+      "scope_name": "automation-calendar.scope", "unit_name": "automation-calendar",
+      "workload_enabled": true, "prediction_enabled": true,
+      "window_keywords": ["gnome-calendar", "calendar", "日历"],
+      "process_keywords": ["gnome-calendar"]
+    },
+    {
+      "app_key": "RHYTHMBOX", "app_id": 11, "vocab_name": "Rhythmbox",
+      "scope_name": "automation-rhythmbox.scope", "unit_name": "automation-rhythmbox",
+      "workload_enabled": true, "prediction_enabled": true,
+      "window_keywords": ["rhythmbox", "music", "音乐"],
+      "process_keywords": ["rhythmbox"]
+    },
+    {
+      "app_key": "IMAGE_VIEWER", "app_id": 12, "vocab_name": "ImageViewer",
+      "scope_name": "automation-image-viewer.scope", "unit_name": "automation-image-viewer",
+      "workload_enabled": true, "prediction_enabled": true,
+      "window_keywords": ["eog", "image viewer", "image-test", "图像查看器"],
+      "process_keywords": ["eog"]
+    },
+    {
+      "app_key": "SHOTWELL", "app_id": 13, "vocab_name": "Shotwell",
+      "scope_name": "automation-shotwell.scope", "unit_name": "automation-shotwell",
+      "workload_enabled": true, "prediction_enabled": true,
+      "window_keywords": ["shotwell", "photo", "照片"],
+      "process_keywords": ["shotwell"]
+    },
+    {
+      "app_key": "SYSTEM_MONITOR", "app_id": 14, "vocab_name": "SystemMonitor",
+      "scope_name": "automation-system-monitor.scope", "unit_name": "automation-system-monitor",
+      "workload_enabled": true, "prediction_enabled": true,
+      "window_keywords": ["gnome-system-monitor", "system monitor", "系统监视器"],
+      "process_keywords": ["gnome-system-monitor"]
+    },
+    {
+      "app_key": "SOLITAIRE", "app_id": 15, "vocab_name": "Solitaire",
+      "scope_name": "automation-solitaire.scope", "unit_name": "automation-solitaire",
+      "workload_enabled": true, "prediction_enabled": true,
+      "window_keywords": ["aisleriot", "solitaire", "klondike", "纸牌"],
+      "process_keywords": ["sol", "aisleriot"]
+    }
+  ]
+}

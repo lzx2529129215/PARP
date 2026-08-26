@@ -1,0 +1,43 @@
+#!/usr/bin/env bpftrace
+
+/*
+ * Linux reclaim/OOM event stream.
+ * This intentionally uses tracepoints only: no unstable kprobe symbol names.
+ * bpftrace transports printf records through its kernel/user event buffer.
+ * Collector lifecycle markers are emitted by run_bpf_collector.sh because
+ * some distro bpftrace 0.14 binaries strip the BEGIN/END trigger symbols.
+ */
+
+tracepoint:vmscan:mm_vmscan_direct_reclaim_begin
+{
+  @direct_start[tid] = nsecs;
+  printf("{\"type\":\"direct_reclaim_begin\",\"ts_ns\":%llu,\"pid\":%d,\"tid\":%d,\"comm\":\"%s\",\"cgroup_id\":%llu}\n",
+         nsecs, pid, tid, comm, cgroup);
+}
+
+tracepoint:vmscan:mm_vmscan_direct_reclaim_end
+/@direct_start[tid]/
+{
+  $duration = nsecs - @direct_start[tid];
+  printf("{\"type\":\"direct_reclaim_end\",\"ts_ns\":%llu,\"pid\":%d,\"tid\":%d,\"comm\":\"%s\",\"cgroup_id\":%llu,\"duration_ns\":%llu}\n",
+         nsecs, pid, tid, comm, cgroup, $duration);
+  delete(@direct_start[tid]);
+}
+
+tracepoint:vmscan:mm_vmscan_kswapd_wake
+{
+  printf("{\"type\":\"kswapd_wake\",\"ts_ns\":%llu,\"pid\":%d,\"tid\":%d,\"comm\":\"%s\"}\n",
+         nsecs, pid, tid, comm);
+}
+
+tracepoint:vmscan:mm_vmscan_kswapd_sleep
+{
+  printf("{\"type\":\"kswapd_sleep\",\"ts_ns\":%llu,\"pid\":%d,\"tid\":%d,\"comm\":\"%s\"}\n",
+         nsecs, pid, tid, comm);
+}
+
+tracepoint:oom:mark_victim
+{
+  printf("{\"type\":\"oom_mark_victim\",\"ts_ns\":%llu,\"pid\":%d,\"tid\":%d,\"comm\":\"%s\",\"cgroup_id\":%llu}\n",
+         nsecs, pid, tid, comm, cgroup);
+}

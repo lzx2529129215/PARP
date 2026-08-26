@@ -1,0 +1,344 @@
+diff --git a/Documentation/admin-guide/mm/parp-experiments.rst b/Documentation/admin-guide/mm/parp-experiments.rst
+index b86e0cffd..b0c2994b4 100644
+--- a/Documentation/admin-guide/mm/parp-experiments.rst
++++ b/Documentation/admin-guide/mm/parp-experiments.rst
+@@ -55,4 +55,10 @@ build otherwise matched APPLY images with
+ ``CONFIG_PARP_RECLAIM_BIN_SCORE=n/y``.  The ``n`` image preserves native
+ random memcg-bin placement and starting-bin selection.
+ 
++Before accepting a reclaim-bin APPLY round, capture
++``/sys/kernel/debug/parp/reclaim_bin_stats`` before and after the workload.
++The delta of ``scored`` must be positive.  When applications run in child
++systemd scopes below the enabled test slice, ``inherited_hits`` must also grow.
++This prevents a compiled but dormant scorer from being reported as APPLY.
++
+ .. lzx-note: pristine Native baseline and build/runtime switch contract.
+diff --git a/Documentation/admin-guide/mm/parp-tier2.rst b/Documentation/admin-guide/mm/parp-tier2.rst
+index 9989f4e9f..d5d32b126 100644
+--- a/Documentation/admin-guide/mm/parp-tier2.rst
++++ b/Documentation/admin-guide/mm/parp-tier2.rst
+@@ -23,6 +23,16 @@ only when PARP is in APPLY mode, ``vm.tier2_predict_enabled`` is one, and the
+ target cgroup's ``memory.tier2_enabled`` is one.  Otherwise MGLRU uses its
+ native random bin placement and random starting bin.
+ 
++For workloads launched as systemd scopes below an enabled experiment slice,
++the scorer uses the nearest enabled ancestor's Tier2 headroom policy while
++retaining the leaf cgroup for application-prior lookup.  This makes a policy
++set on the test slice cover its dynamically created children without silently
++changing unrelated sibling cgroups.  Runtime coverage is exported in
++``/sys/kernel/debug/parp/reclaim_bin_stats``; in particular, non-zero
++``inherited_hits`` and ``scored`` prove that descendant pages used the scorer.
++
++.. lzx-note: reclaim-bin hierarchy contract and auditable coverage counters.
++
+ Watermarks and EWMA
+ ===================
+ 
+diff --git a/include/linux/parp_tier2.h b/include/linux/parp_tier2.h
+index d767948ad..fafa7adea 100644
+--- a/include/linux/parp_tier2.h
++++ b/include/linux/parp_tier2.h
+@@ -10,6 +10,17 @@ struct kernfs_open_file;
+ struct mem_cgroup;
+ struct seq_file;
+ 
++/* Reclaim-bin counters make APPLY coverage auditable across cgroup children. */
++struct parp_reclaim_bin_stats { /* lzx-note */
++	u64 lookups;
++	u64 policy_hits;
++	u64 inherited_hits;
++	u64 context_hits;
++	u64 headroom_hits;
++	u64 scored;
++	u64 fallbacks;
++}; /* lzx-note */
++
+ #ifdef CONFIG_PARP_TIER2 /* lzx-note */
+ 
+ /*
+@@ -58,6 +69,14 @@ void parp_tier2_memcg_sample(struct mem_cgroup *memcg);
+ void parp_tier2_memcg_charge(struct mem_cgroup *memcg);
+ bool parp_tier2_runtime_enabled(void); /* lzx-note */
+ 
++#ifdef CONFIG_PARP_RECLAIM_BIN_SCORE /* lzx-note */
++bool parp_tier2_reclaim_bin_apply_enabled(void); /* lzx-note */
++bool parp_tier2_reclaim_bin_score(struct mem_cgroup *memcg,
++				  u32 *score_q15); /* lzx-note */
++void parp_tier2_reclaim_bin_stats_snapshot(
++		struct parp_reclaim_bin_stats *stats); /* lzx-note */
++#endif /* CONFIG_PARP_RECLAIM_BIN_SCORE */ /* lzx-note */
++
+ int parp_tier2_enabled_show(struct seq_file *m, void *v);
+ ssize_t parp_tier2_enabled_write(struct kernfs_open_file *of, char *buf,
+ 				 size_t nbytes, loff_t off);
+diff --git a/mm/parp/control/debugfs.c b/mm/parp/control/debugfs.c
+index c35a41ee8..ca38b86ca 100644
+--- a/mm/parp/control/debugfs.c
++++ b/mm/parp/control/debugfs.c
+@@ -3,6 +3,7 @@
+ #include <linux/fs.h>
+ #include <linux/init.h>
+ #include <linux/module.h>
++#include <linux/parp_tier2.h> /* lzx-note */
+ #include <linux/seq_file.h> /* #lzx */
+ #include <linux/uaccess.h>
+ #include "../internal.h"
+@@ -167,6 +168,25 @@ static const struct file_operations frontier_stats_fops = {
+ };
+ #endif
+ 
++#ifdef CONFIG_PARP_RECLAIM_BIN_SCORE /* lzx-note */
++static int reclaim_bin_stats_show(struct seq_file *m, void *v) /* lzx-note */
++{
++	struct parp_reclaim_bin_stats stats;
++
++	parp_tier2_reclaim_bin_stats_snapshot(&stats);
++	seq_printf(m,
++		   "lookups %llu\npolicy_hits %llu\ninherited_hits %llu\n"
++		   "context_hits %llu\nheadroom_hits %llu\nscored %llu\n"
++		   "fallbacks %llu\n",
++		   stats.lookups, stats.policy_hits, stats.inherited_hits,
++		   stats.context_hits, stats.headroom_hits, stats.scored,
++		   stats.fallbacks);
++	return 0;
++} /* lzx-note */
++
++DEFINE_SHOW_ATTRIBUTE(reclaim_bin_stats); /* lzx-note */
++#endif /* CONFIG_PARP_RECLAIM_BIN_SCORE */ /* lzx-note */
++
+ #ifdef CONFIG_PARP_EFFECTIVE_TIER
+ static ssize_t effective_tier_mode_read(struct file *file, char __user *buf,
+ 					size_t len, loff_t *ppos)
+@@ -709,6 +729,10 @@ static int __init parp_init(void)
+ 	debugfs_create_file("effective_tier_stats", 0400, parp_dir, NULL,
+ 			    &effective_tier_stats_fops);
+ #endif
++#ifdef CONFIG_PARP_RECLAIM_BIN_SCORE /* lzx-note */
++	debugfs_create_file("reclaim_bin_stats", 0400, parp_dir, NULL,
++			    &reclaim_bin_stats_fops); /* lzx-note */
++#endif /* CONFIG_PARP_RECLAIM_BIN_SCORE */ /* lzx-note */
+ 	debugfs_create_file("scan_budget_mode", 0600, parp_dir, NULL,
+ 			    &scan_budget_mode_fops);
+ 	debugfs_create_file("scan_budget_apply_domain", 0600, parp_dir, NULL,
+diff --git a/mm/parp/core/watermark.c b/mm/parp/core/watermark.c
+index 532517fad..478ef96ff 100644
+--- a/mm/parp/core/watermark.c
++++ b/mm/parp/core/watermark.c
+@@ -23,6 +23,9 @@
+ #include <linux/sysctl.h>
+ 
+ #include "../internal.h"
++#ifdef CONFIG_PARP_RECLAIM_BIN_SCORE /* lzx-note */
++#include "../adapter/adapter.h" /* lzx-note */
++#endif /* CONFIG_PARP_RECLAIM_BIN_SCORE */ /* lzx-note */
+ 
+ #define PARP_TIER2_SCALE_BASE		10000U
+ #define PARP_TIER2_DEFAULT_ALLOC_SCALE	100U
+@@ -36,6 +39,18 @@ static int parp_tier2_one = 1;
+ static int parp_tier2_thousand = 1000;
+ static int parp_tier2_hundred = 100;
+ 
++#ifdef CONFIG_PARP_RECLAIM_BIN_SCORE /* lzx-note */
++static struct { /* lzx-note */
++	atomic64_t lookups;
++	atomic64_t policy_hits;
++	atomic64_t inherited_hits;
++	atomic64_t context_hits;
++	atomic64_t headroom_hits;
++	atomic64_t scored;
++	atomic64_t fallbacks;
++} parp_reclaim_bin_stats; /* lzx-note */
++#endif /* CONFIG_PARP_RECLAIM_BIN_SCORE */ /* lzx-note */
++
+ static const struct ctl_table parp_tier2_sysctls[] = {
+ 	{
+ 		.procname = "tier2_predict_enabled",
+@@ -71,6 +86,111 @@ bool parp_tier2_runtime_enabled(void) /* lzx-note */
+ 	return READ_ONCE(sysctl_tier2_predict_enabled); /* lzx-note */
+ }
+ 
++#ifdef CONFIG_PARP_RECLAIM_BIN_SCORE /* lzx-note */
++/*
++ * A systemd scope created below an enabled experiment slice must use the
++ * nearest enabled ancestor's headroom policy.  Per-app context lookup still
++ * starts at the leaf memcg so application priors remain specific. lzx-note
++ */
++static struct mem_cgroup *parp_reclaim_bin_policy_memcg(
++		struct mem_cgroup *memcg) /* lzx-note */
++{
++	struct mem_cgroup *iter;
++
++	for (iter = memcg; iter && !mem_cgroup_is_root(iter);
++	     iter = parent_mem_cgroup(iter)) {
++		if (READ_ONCE(iter->parp_tier2.enabled))
++			return iter;
++	}
++
++	return NULL;
++} /* lzx-note */
++
++bool parp_tier2_reclaim_bin_apply_enabled(void) /* lzx-note */
++{
++	return parp_get_mode() == PARP_MODE_APPLY &&
++	       parp_tier2_runtime_enabled();
++} /* lzx-note */
++
++bool parp_tier2_reclaim_bin_score(struct mem_cgroup *memcg,
++				  u32 *score_q15) /* lzx-note */
++{
++	struct mem_cgroup *policy_memcg;
++	struct parp_tier2_memcg *state;
++	struct parp_app_context app;
++	u64 now = ktime_get_mono_fast_ns();
++	u64 domain_id;
++	u64 limit;
++	u64 headroom;
++	u32 score = 0;
++	bool have_signal = false;
++
++	if (!memcg || !score_q15 || mem_cgroup_is_root(memcg) ||
++	    !parp_tier2_reclaim_bin_apply_enabled())
++		return false;
++
++	atomic64_inc(&parp_reclaim_bin_stats.lookups);
++	policy_memcg = parp_reclaim_bin_policy_memcg(memcg);
++	if (!policy_memcg) {
++		atomic64_inc(&parp_reclaim_bin_stats.fallbacks);
++		return false;
++	}
++
++	atomic64_inc(&parp_reclaim_bin_stats.policy_hits);
++	if (policy_memcg != memcg)
++		atomic64_inc(&parp_reclaim_bin_stats.inherited_hits);
++
++	domain_id = parp_memcg_domain_id(memcg);
++	if (domain_id && parp_context_lookup(domain_id, now, &app)) {
++		score = app.app_prior_q15;
++		have_signal = true;
++		atomic64_inc(&parp_reclaim_bin_stats.context_hits);
++	}
++
++	state = &policy_memcg->parp_tier2;
++	limit = READ_ONCE(state->limit_bytes);
++	headroom = READ_ONCE(state->headroom_bytes);
++	if (limit && limit != U64_MAX) {
++		u32 headroom_q15;
++
++		if (headroom >= limit)
++			headroom_q15 = PARP_Q15_ONE;
++		else
++			/* Keep the 8 GiB cgroup divisor fully 64-bit. lzx-note */
++			headroom_q15 = mul_u64_u64_div_u64(headroom,
++							      PARP_Q15_ONE, limit);
++
++		score = have_signal ? min(score, headroom_q15) : headroom_q15;
++		have_signal = true;
++		atomic64_inc(&parp_reclaim_bin_stats.headroom_hits);
++	}
++
++	if (!have_signal) {
++		atomic64_inc(&parp_reclaim_bin_stats.fallbacks);
++		return false;
++	}
++
++	*score_q15 = score;
++	atomic64_inc(&parp_reclaim_bin_stats.scored);
++	return true;
++} /* lzx-note */
++
++void parp_tier2_reclaim_bin_stats_snapshot(
++		struct parp_reclaim_bin_stats *stats) /* lzx-note */
++{
++	if (!stats)
++		return;
++
++	stats->lookups = atomic64_read(&parp_reclaim_bin_stats.lookups);
++	stats->policy_hits = atomic64_read(&parp_reclaim_bin_stats.policy_hits);
++	stats->inherited_hits = atomic64_read(&parp_reclaim_bin_stats.inherited_hits);
++	stats->context_hits = atomic64_read(&parp_reclaim_bin_stats.context_hits);
++	stats->headroom_hits = atomic64_read(&parp_reclaim_bin_stats.headroom_hits);
++	stats->scored = atomic64_read(&parp_reclaim_bin_stats.scored);
++	stats->fallbacks = atomic64_read(&parp_reclaim_bin_stats.fallbacks);
++} /* lzx-note */
++#endif /* CONFIG_PARP_RECLAIM_BIN_SCORE */ /* lzx-note */
++
+ u64 parp_tier2_scaled_wmark(u64 limit_bytes, u32 scale, u64 floor)
+ {
+ 	u64 scaled;
+diff --git a/mm/vmscan.c b/mm/vmscan.c
+index c78adac5f..ef5d0a1e4 100644
+--- a/mm/vmscan.c
++++ b/mm/vmscan.c
+@@ -58,12 +58,8 @@
+ #include <linux/random.h>
+ #include <linux/mmu_notifier.h>
+ #include <linux/parser.h>
+-#include <linux/math64.h> /* lzx-note */
+ #include <linux/parp.h>
+ #include <linux/parp_tier2.h> /* lzx-note */
+-#ifdef CONFIG_PARP_RECLAIM_BIN_SCORE /* lzx-note */
+-#include "parp/adapter/adapter.h" /* lzx-note */
+-#endif /* CONFIG_PARP_RECLAIM_BIN_SCORE */ /* lzx-note */
+ 
+ #include <asm/tlbflush.h>
+ #include <asm/div64.h>
+@@ -4395,55 +4391,15 @@ enum {
+ #ifdef CONFIG_PARP_RECLAIM_BIN_SCORE /* lzx-note */
+ static bool parp_reclaim_bin_apply_enabled(void) /* lzx-note */
+ {
+-	return parp_get_mode() == PARP_MODE_APPLY &&
+-	       parp_tier2_runtime_enabled();
++	return parp_tier2_reclaim_bin_apply_enabled(); /* lzx-note */
+ } /* lzx-note */
+ 
+ static unsigned int parp_memcg_reclaim_bin(struct mem_cgroup *memcg) /* lzx-note */
+ {
+-	struct parp_app_context app;
+-	u64 now = ktime_get_mono_fast_ns();
+-	u64 domain_id;
+-	u32 score_q15 = 0;
+-	bool have_signal = false;
+-	u64 limit;
+-	u64 headroom;
+-
+-	if (!memcg || mem_cgroup_is_root(memcg) ||
+-	    !parp_reclaim_bin_apply_enabled() ||
+-	    !READ_ONCE(memcg->parp_tier2.enabled)) /* lzx-note */
+-		return get_random_u32_below(MEMCG_NR_BINS);
+-
+-	domain_id = parp_memcg_domain_id(memcg);
+-	if (domain_id && parp_context_lookup(domain_id, now, &app)) {
+-		score_q15 = app.app_prior_q15;
+-		have_signal = true;
+-	}
+-
+-	limit = READ_ONCE(memcg->parp_tier2.limit_bytes);
+-	headroom = READ_ONCE(memcg->parp_tier2.headroom_bytes);
+-	if (limit && limit != U64_MAX) {
+-		u32 headroom_q15;
+-
+-		if (headroom >= limit)
+-			headroom_q15 = PARP_Q15_ONE;
+-		else
+-			/* memory.max is 64-bit; mul_u64_u32_div() truncates its
+-			 * divisor to u32, turning limits such as 8 GiB into zero.
+-			 * Keep all three operands 64-bit during memcg offlining.
+-			 * lzx-note
+-			 */
+-			headroom_q15 = mul_u64_u64_div_u64(headroom,
+-							      PARP_Q15_ONE, limit);
+-
+-		if (have_signal)
+-			score_q15 = min(score_q15, headroom_q15);
+-		else
+-			score_q15 = headroom_q15;
+-		have_signal = true;
+-	}
++	u32 score_q15;
+ 
+-	if (!have_signal)
++	if (!parp_reclaim_bin_apply_enabled() ||
++	    !parp_tier2_reclaim_bin_score(memcg, &score_q15)) /* lzx-note */
+ 		return get_random_u32_below(MEMCG_NR_BINS);
+ 
+ 	return min_t(unsigned int, score_q15 * MEMCG_NR_BINS >> 15,

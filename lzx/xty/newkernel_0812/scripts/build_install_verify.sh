@@ -17,6 +17,12 @@ fi
   -e PARP \
   -e PARP_TIER2_WATERMARK \
   -e PARP_RECLAIM_BIN_SCORE
+if [[ "${PARP_EXPERIMENT_APPLY:-0}" == "1" ]]; then
+  "$SRC_ROOT/scripts/config" --file "$BUILD_DIR/.config" \
+    --enable PARP_EFFECTIVE_TIER_EXPERIMENTAL_APPLY \
+    --set-str LOCALVERSION "-myks-l03-apply"
+  echo "Experimental effective-tier Apply is compiled; runtime mode still defaults to OFF."
+fi
 make -C "$SRC_ROOT" O="$BUILD_DIR" olddefconfig
 grep -E '^CONFIG_(LOCALVERSION|PARP_TIER2_WATERMARK|PARP_RECLAIM_BIN_SCORE)=' "$BUILD_DIR/.config"
 make -C "$SRC_ROOT" O="$BUILD_DIR" -j"$JOBS" bzImage modules

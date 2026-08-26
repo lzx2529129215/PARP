@@ -14,6 +14,11 @@ for f in /proc/sys/vm/tier2_predict_enabled /proc/sys/vm/tier2_predict_latency_m
   if [[ -r "$f" ]]; then echo "$f=$(cat "$f")"; else echo "missing: $f"; fi
 done
 
+echo "--- independent experiment switches ---"
+for f in /sys/kernel/debug/parp/mode /sys/kernel/debug/parp/effective_tier_mode /sys/kernel/debug/parp/effective_tier_stats; do
+  if [[ -r "$f" ]]; then echo "[$f]"; cat "$f"; else echo "missing: $f"; fi
+done
+
 echo "--- cgroup tier2 files ---"
 find /sys/fs/cgroup -maxdepth 3 \( -name 'memory.tier2_enabled' -o -name 'memory.tier2_stats' \) 2>/dev/null | head -20 || true
 echo "--- expected tier2 files in a child cgroup ---"

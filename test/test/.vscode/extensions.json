@@ -1,0 +1,8 @@
+{
+  "recommendations": [
+    "ms-vscode-remote.remote-ssh",
+    "ms-python.python",
+    "ms-python.vscode-pylance",
+    "timonwong.shellcheck"
+  ]
+}

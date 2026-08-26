@@ -57,6 +57,7 @@ void parp_tier2_memcg_reset(struct mem_cgroup *memcg);
 void parp_tier2_memcg_destroy(struct mem_cgroup *memcg);
 void parp_tier2_memcg_sample(struct mem_cgroup *memcg);
 void parp_tier2_memcg_charge(struct mem_cgroup *memcg);
+bool parp_tier2_runtime_enabled(void);
 
 int parp_tier2_enabled_show(struct seq_file *m, void *v);
 ssize_t parp_tier2_enabled_write(struct kernfs_open_file *of, char *buf,
@@ -84,6 +85,7 @@ static inline void parp_tier2_memcg_reset(struct mem_cgroup *memcg) { }
 static inline void parp_tier2_memcg_destroy(struct mem_cgroup *memcg) { }
 static inline void parp_tier2_memcg_sample(struct mem_cgroup *memcg) { }
 static inline void parp_tier2_memcg_charge(struct mem_cgroup *memcg) { }
+static inline bool parp_tier2_runtime_enabled(void) { return false; }
 
 #endif /* CONFIG_PARP_TIER2_WATERMARK */
 

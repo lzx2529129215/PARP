@@ -58,7 +58,9 @@ Global sysctls
 ==============
 
 ``vm.tier2_predict_enabled``
-  Master switch, 0 or 1.  Default 0.
+  Master switch, 0 or 1.  Default 0.  It gates both proactive reclaim and
+  PARP's prediction/headroom-based MGLRU memcg-bin ordering, so an OFF versus
+  Tier2-only experiment has one explicit runtime treatment switch.
 
 ``vm.tier2_predict_latency_ms``
   Expected prediction/reclaim latency, 0 through 1000 ms.  Default 100.
@@ -104,3 +106,5 @@ For ``/sys/fs/cgroup/my-app``::
 
 Configure each application cgroup separately.  Changing one cgroup's scales
 or enabling state does not modify any sibling's watermarks or EWMA history.
+Both the global switch and the target cgroup switch must be one before Tier2
+can affect reclaim ordering or start proactive reclaim.

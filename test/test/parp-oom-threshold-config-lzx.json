@@ -1,0 +1,89 @@
+{
+  "output_root": "outputs/parp_oom_threshold",
+  "slice": "parp-oom-threshold.slice",
+  "safety": {
+    "memory_high_ratio": 0.65,
+    "memory_max_ratio": 0.75,
+    "min_memavailable_bytes": 8589934592,
+    "psi_full_avg10_abort": 0.20,
+    "psi_memavailable_guard_bytes": 8589934592,
+    "abort_consecutive_samples": 3,
+    "sample_interval_seconds": 0.5,
+    "trace_buffer_kb_per_cpu": 2048,
+    "min_inotify_watch_headroom": 1024,
+    "max_round_seconds": 600
+  },
+  "profiles": {
+    "smoke": {
+      "hotcold_logical_ratio": 0.04,
+      "hotcold_repeats": 1,
+      "hotcold_steps": 6,
+      "peak_logical_ratio": 0.08,
+      "peak_rounds": 1,
+      "peak_steps": 8,
+      "dwell_min_seconds": 0.2,
+      "dwell_max_seconds": 0.4,
+      "min_memavailable_bytes": 8589934592,
+      "psi_memavailable_guard_bytes": 8589934592
+    },
+    "full": {
+      "hotcold_logical_ratio": 0.16,
+      "hotcold_repeats": 3,
+      "hotcold_steps": 30,
+      "peak_logical_ratio": 0.16,
+      "peak_rounds": 3,
+      "peak_steps": 30,
+      "dwell_min_seconds": 0.4,
+      "dwell_max_seconds": 0.8
+    }
+  },
+  "hotcold": {
+    "apps": ["FIREFOX", "LIBREOFFICE", "VLC", "GIMP", "THUNDERBIRD", "FILES"],
+    "hot_fraction": 0.20,
+    "anon_fraction": 0.23,
+    "sample_fraction_per_step": 0.01,
+    "target_improvement_percent": 20,
+    "challenge_improvement_percent": 30
+  },
+  "peak": {
+    "apps": ["FIREFOX", "LIBREOFFICE", "VLC", "GIMP", "THUNDERBIRD", "FILES"],
+    "normal_ratio_by_app": {
+      "FIREFOX": 0.16,
+      "LIBREOFFICE": 0.14,
+      "VLC": 0.08,
+      "GIMP": 0.10,
+      "THUNDERBIRD": 0.08,
+      "FILES": 0.09
+    },
+    "peak_ratio_by_app": {
+      "FIREFOX": 0.30,
+      "LIBREOFFICE": 0.25,
+      "VLC": 0.15,
+      "GIMP": 0.20,
+      "THUNDERBIRD": 0.15,
+      "FILES": 0.15
+    },
+    "hot_fraction": 0.20,
+    "anon_fraction": 0.23,
+    "sample_fraction_per_step": 0.01,
+    "target_improvement_percent": 30,
+    "oom_threshold": {
+      "enabled": true,
+      "memory_max_bytes": 8589934592,
+      "memory_high": "infinity",
+      "memory_swap_max_bytes": 0,
+        "pressure_mib": 6656,
+      "chunk_mib": 64,
+      "ramp_interval_seconds": 0.25,
+        "ramp_wait_seconds": 30,
+      "hold_seconds": 600,
+      "oom_score_adj": 1000
+    }
+  },
+  "lstm_contract": {
+    "app_vocab": "configs/lsapp_aligned/app_vocab_duration.json",
+    "runtime_scope": "configs/lsapp_aligned/runtime_app_scope.json",
+    "excluded_login_apps": ["TELEGRAM"],
+    "minimum_online_switches": 180
+  }
+}

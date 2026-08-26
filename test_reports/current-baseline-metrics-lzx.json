@@ -1,0 +1,2522 @@
+{
+  "report_type": "PARP_CURRENT_SYSTEM_BASELINE",
+  "generated_at": "2026-08-14T21:28:17.786057",
+  "kernel_release": "6.17.13-parp-lzx-v4.2+",
+  "environment": {
+    "memory_total_bytes": 34130087936,
+    "swap_bytes": 4087345152,
+    "effective_tier_mode": "0",
+    "apply_compiled": "1",
+    "model_provenance": "ENGINEERING_FIXTURE_UNTRAINED",
+    "system_metadata": {
+      "captured_at": "2026-08-14T20:08:06.086396",
+      "hostname": "lzx-virtual-machine",
+      "kernel_release": "6.17.13-parp-lzx-v4.2+",
+      "kernel_version": "#4 SMP PREEMPT_DYNAMIC Fri Aug 14 18:02:18 CST 2026",
+      "kernel_cmdline": "BOOT_IMAGE=/boot/vmlinuz-6.17.13-parp-lzx-v4.2+ root=UUID=51e68485-f377-4ea6-bc24-d44fdffad6d3 ro find_preseed=/preseed.cfg auto noprompt priority=critical locale=en_US quiet splash",
+      "kernel_config": {
+        "path": "/boot/config-6.17.13-parp-lzx-v4.2+",
+        "sha256": "fc34269628abfdd943a5919816026706c931cbdaee16546ce36f16c5bd1e2313"
+      },
+      "machine": "x86_64",
+      "cpu_model": "13th Gen Intel(R) Core(TM) i5-13600K",
+      "cpu_count": 2,
+      "page_size": 4096,
+      "memtotal_bytes": 34130087936,
+      "vm_sysctls": {
+        "vm.swappiness": "60",
+        "vm.watermark_scale_factor": "10",
+        "vm.watermark_boost_factor": "15000",
+        "vm.overcommit_memory": "0",
+        "vm.overcommit_ratio": "50"
+      },
+      "swap": [
+        {
+          "path": "/swapfile",
+          "type": "file",
+          "size_kib": 3991548,
+          "used_kib": 941496,
+          "priority": -2
+        }
+      ],
+      "transparent_hugepage": {
+        "enabled": "always [madvise] never",
+        "defrag": "always defer defer+madvise [madvise] never"
+      },
+      "cpu_governors": [],
+      "session": {
+        "type": "x11",
+        "desktop": null,
+        "display": ":3",
+        "xauthority": "/dev/null",
+        "wayland_display": null
+      },
+      "result_storage": {
+        "mount_point": "/",
+        "filesystem": "ext4",
+        "source": "/dev/sda3"
+      }
+    }
+  },
+  "official_acceptance_baseline": {
+    "pagefault": {
+      "baseline_mean": 295966.2,
+      "target_20_percent_max": 236772.96000000002,
+      "challenge_30_percent_max": 207176.34,
+      "improvement_percent": null,
+      "verdict": "BASELINE_ONLY_WAITING_FOR_APPLY_PAIR"
+    },
+    "peak_failure_total": {
+      "baseline_mean": null,
+      "target_30_percent_max": null,
+      "improvement_percent": null,
+      "verdict": "NO_VALID_ROUNDS_PSI_ABORT"
+    }
+  },
+  "diagnostic_safety_baseline": {
+    "hotcold_workingset_refault_file_mean": 304138.8,
+    "hotcold_workingset_refault_anon_mean": 61935.3,
+    "peak_workingset_refault_file_mean": null,
+    "peak_workingset_refault_anon_mean": null,
+    "comparison_rule": "Apply不得显著增加真实workingset refault；必须在相同seed/场景下配对比较。"
+  },
+  "hotcold": {
+    "summary_path": "/home/lzx/Desktop/PARP/test/outputs/parp_acceptance_lsapp_aligned/hotcold-full-observe-20260814_200806-6.17.13-parp-lzx-v4.2+/summary.json",
+    "kernel_release": "6.17.13-parp-lzx-v4.2+",
+    "status": "DIAGNOSTIC_BASELINE_COMPLETE",
+    "rounds_requested": 10,
+    "rounds_valid": 10,
+    "case_done_total": 900,
+    "case_done_attempted_total": 900,
+    "attempts": [
+      {
+        "round": 1,
+        "status": "VALID_DIAGNOSTIC",
+        "abort_reason": "",
+        "case_start": 90,
+        "case_done": 90,
+        "expected_steps": 90,
+        "trace_page_fault_user": 277094,
+        "trace_loss_total": 0,
+        "cgroup_pgfault": 13581268,
+        "cgroup_pgmajfault": 36728,
+        "workingset_refault_file": 364453,
+        "workingset_refault_anon": 32283,
+        "pgscan": 8416533,
+        "pgsteal": 8254716,
+        "pswpin": 58596,
+        "pswpout": 98828,
+        "memory_high_events": 16340,
+        "cgroup_oom": 0,
+        "cgroup_oom_kill": 0,
+        "host_oom_kill": 0,
+        "failure_total": 0,
+        "launch_ready_latency_mean_ms": 1617.4655259333333,
+        "launch_ready_latency_p95_ms": 3120.331424,
+        "monitor_extrema": {
+          "min_memavailable_bytes": 21258797056.0,
+          "min_swapfree_bytes": 2670764032.0,
+          "max_psi_some_avg10": 29.74,
+          "max_psi_full_avg10": 20.97,
+          "max_test_cgroup_memory_current_bytes": 22186467328.0,
+          "host_oom_kill_delta": 0.0,
+          "pswpin_delta": 67712.0,
+          "pswpout_delta": 116454.0,
+          "test_cgroup_memory_high_delta": 16340.0,
+          "test_cgroup_memory_max_delta": 0.0,
+          "test_cgroup_oom_delta": 0.0,
+          "test_cgroup_oom_kill_delta": 0.0,
+          "max_low_memory_popup_count": 0.0
+        }
+      },
+      {
+        "round": 2,
+        "status": "VALID_DIAGNOSTIC",
+        "abort_reason": "",
+        "case_start": 90,
+        "case_done": 90,
+        "expected_steps": 90,
+        "trace_page_fault_user": 275001,
+        "trace_loss_total": 0,
+        "cgroup_pgfault": 13552523,
+        "cgroup_pgmajfault": 29731,
+        "workingset_refault_file": 206713,
+        "workingset_refault_anon": 50211,
+        "pgscan": 8196034,
+        "pgsteal": 8032287,
+        "pswpin": 49534,
+        "pswpout": 83494,
+        "memory_high_events": 16168,
+        "cgroup_oom": 0,
+        "cgroup_oom_kill": 0,
+        "host_oom_kill": 0,
+        "failure_total": 0,
+        "launch_ready_latency_mean_ms": 1391.8861547333336,
+        "launch_ready_latency_p95_ms": 2882.120091,
+        "monitor_extrema": {
+          "min_memavailable_bytes": 21460541440.0,
+          "min_swapfree_bytes": 2626162688.0,
+          "max_psi_some_avg10": 22.55,
+          "max_psi_full_avg10": 19.34,
+          "max_test_cgroup_memory_current_bytes": 22184730624.0,
+          "host_oom_kill_delta": 0.0,
+          "pswpin_delta": 53463.0,
+          "pswpout_delta": 114670.0,
+          "test_cgroup_memory_high_delta": 16168.0,
+          "test_cgroup_memory_max_delta": 0.0,
+          "test_cgroup_oom_delta": 0.0,
+          "test_cgroup_oom_kill_delta": 0.0,
+          "max_low_memory_popup_count": 0.0
+        }
+      },
+      {
+        "round": 3,
+        "status": "VALID_DIAGNOSTIC",
+        "abort_reason": "",
+        "case_start": 90,
+        "case_done": 90,
+        "expected_steps": 90,
+        "trace_page_fault_user": 301802,
+        "trace_loss_total": 0,
+        "cgroup_pgfault": 13599046,
+        "cgroup_pgmajfault": 35976,
+        "workingset_refault_file": 305050,
+        "workingset_refault_anon": 67400,
+        "pgscan": 8386700,
+        "pgsteal": 8167087,
+        "pswpin": 66322,
+        "pswpout": 121297,
+        "memory_high_events": 15710,
+        "cgroup_oom": 0,
+        "cgroup_oom_kill": 0,
+        "host_oom_kill": 0,
+        "failure_total": 0,
+        "launch_ready_latency_mean_ms": 1437.4067782666668,
+        "launch_ready_latency_p95_ms": 2848.435549,
+        "monitor_extrema": {
+          "min_memavailable_bytes": 21271031808.0,
+          "min_swapfree_bytes": 2380992512.0,
+          "max_psi_some_avg10": 13.27,
+          "max_psi_full_avg10": 11.6,
+          "max_test_cgroup_memory_current_bytes": 22184853504.0,
+          "host_oom_kill_delta": 0.0,
+          "pswpin_delta": 73177.0,
+          "pswpout_delta": 145920.0,
+          "test_cgroup_memory_high_delta": 15710.0,
+          "test_cgroup_memory_max_delta": 0.0,
+          "test_cgroup_oom_delta": 0.0,
+          "test_cgroup_oom_kill_delta": 0.0,
+          "max_low_memory_popup_count": 0.0
+        }
+      },
+      {
+        "round": 4,
+        "status": "VALID_DIAGNOSTIC",
+        "abort_reason": "",
+        "case_start": 90,
+        "case_done": 90,
+        "expected_steps": 90,
+        "trace_page_fault_user": 269567,
+        "trace_loss_total": 0,
+        "cgroup_pgfault": 13558267,
+        "cgroup_pgmajfault": 35876,
+        "workingset_refault_file": 259527,
+        "workingset_refault_anon": 57154,
+        "pgscan": 8250267,
+        "pgsteal": 8090746,
+        "pswpin": 56390,
+        "pswpout": 99584,
+        "memory_high_events": 13933,
+        "cgroup_oom": 0,
+        "cgroup_oom_kill": 0,
+        "host_oom_kill": 0,
+        "failure_total": 0,
+        "launch_ready_latency_mean_ms": 1312.770788,
+        "launch_ready_latency_p95_ms": 2978.668418,
+        "monitor_extrema": {
+          "min_memavailable_bytes": 21631500288.0,
+          "min_swapfree_bytes": 2433265664.0,
+          "max_psi_some_avg10": 15.6,
+          "max_psi_full_avg10": 13.87,
+          "max_test_cgroup_memory_current_bytes": 22185459712.0,
+          "host_oom_kill_delta": 0.0,
+          "pswpin_delta": 60533.0,
+          "pswpout_delta": 117025.0,
+          "test_cgroup_memory_high_delta": 13933.0,
+          "test_cgroup_memory_max_delta": 0.0,
+          "test_cgroup_oom_delta": 0.0,
+          "test_cgroup_oom_kill_delta": 0.0,
+          "max_low_memory_popup_count": 0.0
+        }
+      },
+      {
+        "round": 5,
+        "status": "VALID_DIAGNOSTIC",
+        "abort_reason": "",
+        "case_start": 90,
+        "case_done": 90,
+        "expected_steps": 90,
+        "trace_page_fault_user": 358470,
+        "trace_loss_total": 0,
+        "cgroup_pgfault": 13684477,
+        "cgroup_pgmajfault": 69415,
+        "workingset_refault_file": 289793,
+        "workingset_refault_anon": 63119,
+        "pgscan": 8642028,
+        "pgsteal": 8254219,
+        "pswpin": 186689,
+        "pswpout": 291251,
+        "memory_high_events": 2188,
+        "cgroup_oom": 0,
+        "cgroup_oom_kill": 0,
+        "host_oom_kill": 0,
+        "failure_total": 0,
+        "launch_ready_latency_mean_ms": 1411.6396968666666,
+        "launch_ready_latency_p95_ms": 3078.346833,
+        "monitor_extrema": {
+          "min_memavailable_bytes": 22015557632.0,
+          "min_swapfree_bytes": 1578442752.0,
+          "max_psi_some_avg10": 26.33,
+          "max_psi_full_avg10": 21.84,
+          "max_test_cgroup_memory_current_bytes": 22184435712.0,
+          "host_oom_kill_delta": 0.0,
+          "pswpin_delta": 216005.0,
+          "pswpout_delta": 327087.0,
+          "test_cgroup_memory_high_delta": 2188.0,
+          "test_cgroup_memory_max_delta": 0.0,
+          "test_cgroup_oom_delta": 0.0,
+          "test_cgroup_oom_kill_delta": 0.0,
+          "max_low_memory_popup_count": 0.0
+        }
+      },
+      {
+        "round": 6,
+        "status": "VALID_DIAGNOSTIC",
+        "abort_reason": "",
+        "case_start": 90,
+        "case_done": 90,
+        "expected_steps": 90,
+        "trace_page_fault_user": 278068,
+        "trace_loss_total": 0,
+        "cgroup_pgfault": 13602551,
+        "cgroup_pgmajfault": 56906,
+        "workingset_refault_file": 304658,
+        "workingset_refault_anon": 93760,
+        "pgscan": 8420063,
+        "pgsteal": 8158690,
+        "pswpin": 92749,
+        "pswpout": 172611,
+        "memory_high_events": 16600,
+        "cgroup_oom": 0,
+        "cgroup_oom_kill": 0,
+        "host_oom_kill": 0,
+        "failure_total": 0,
+        "launch_ready_latency_mean_ms": 1453.8798905333338,
+        "launch_ready_latency_p95_ms": 3426.863773,
+        "monitor_extrema": {
+          "min_memavailable_bytes": 21850103808.0,
+          "min_swapfree_bytes": 2142896128.0,
+          "max_psi_some_avg10": 20.62,
+          "max_psi_full_avg10": 15.97,
+          "max_test_cgroup_memory_current_bytes": 22184497152.0,
+          "host_oom_kill_delta": 0.0,
+          "pswpin_delta": 98202.0,
+          "pswpout_delta": 174587.0,
+          "test_cgroup_memory_high_delta": 16600.0,
+          "test_cgroup_memory_max_delta": 0.0,
+          "test_cgroup_oom_delta": 0.0,
+          "test_cgroup_oom_kill_delta": 0.0,
+          "max_low_memory_popup_count": 0.0
+        }
+      },
+      {
+        "round": 7,
+        "status": "VALID_DIAGNOSTIC",
+        "abort_reason": "",
+        "case_start": 90,
+        "case_done": 90,
+        "expected_steps": 90,
+        "trace_page_fault_user": 263448,
+        "trace_loss_total": 0,
+        "cgroup_pgfault": 13552473,
+        "cgroup_pgmajfault": 35004,
+        "workingset_refault_file": 302894,
+        "workingset_refault_anon": 52745,
+        "pgscan": 8316941,
+        "pgsteal": 8140417,
+        "pswpin": 52079,
+        "pswpout": 107221,
+        "memory_high_events": 16407,
+        "cgroup_oom": 0,
+        "cgroup_oom_kill": 0,
+        "host_oom_kill": 0,
+        "failure_total": 0,
+        "launch_ready_latency_mean_ms": 1474.533265066667,
+        "launch_ready_latency_p95_ms": 3006.534995,
+        "monitor_extrema": {
+          "min_memavailable_bytes": 21678436352.0,
+          "min_swapfree_bytes": 2404691968.0,
+          "max_psi_some_avg10": 13.52,
+          "max_psi_full_avg10": 10.99,
+          "max_test_cgroup_memory_current_bytes": 22184718336.0,
+          "host_oom_kill_delta": 0.0,
+          "pswpin_delta": 62321.0,
+          "pswpout_delta": 111616.0,
+          "test_cgroup_memory_high_delta": 16407.0,
+          "test_cgroup_memory_max_delta": 0.0,
+          "test_cgroup_oom_delta": 0.0,
+          "test_cgroup_oom_kill_delta": 0.0,
+          "max_low_memory_popup_count": 0.0
+        }
+      },
+      {
+        "round": 8,
+        "status": "VALID_DIAGNOSTIC",
+        "abort_reason": "",
+        "case_start": 90,
+        "case_done": 90,
+        "expected_steps": 90,
+        "trace_page_fault_user": 367383,
+        "trace_loss_total": 0,
+        "cgroup_pgfault": 13704575,
+        "cgroup_pgmajfault": 66091,
+        "workingset_refault_file": 331284,
+        "workingset_refault_anon": 47609,
+        "pgscan": 8848785,
+        "pgsteal": 8369130,
+        "pswpin": 195974,
+        "pswpout": 303513,
+        "memory_high_events": 2252,
+        "cgroup_oom": 0,
+        "cgroup_oom_kill": 0,
+        "host_oom_kill": 0,
+        "failure_total": 0,
+        "launch_ready_latency_mean_ms": 1373.385102733333,
+        "launch_ready_latency_p95_ms": 3256.088666,
+        "monitor_extrema": {
+          "min_memavailable_bytes": 22602080256.0,
+          "min_swapfree_bytes": 1229328384.0,
+          "max_psi_some_avg10": 28.85,
+          "max_psi_full_avg10": 21.73,
+          "max_test_cgroup_memory_current_bytes": 22184550400.0,
+          "host_oom_kill_delta": 0.0,
+          "pswpin_delta": 294955.0,
+          "pswpout_delta": 420657.0,
+          "test_cgroup_memory_high_delta": 2252.0,
+          "test_cgroup_memory_max_delta": 0.0,
+          "test_cgroup_oom_delta": 0.0,
+          "test_cgroup_oom_kill_delta": 0.0,
+          "max_low_memory_popup_count": 0.0
+        }
+      },
+      {
+        "round": 9,
+        "status": "VALID_DIAGNOSTIC",
+        "abort_reason": "",
+        "case_start": 90,
+        "case_done": 90,
+        "expected_steps": 90,
+        "trace_page_fault_user": 291677,
+        "trace_loss_total": 0,
+        "cgroup_pgfault": 13577407,
+        "cgroup_pgmajfault": 37529,
+        "workingset_refault_file": 245040,
+        "workingset_refault_anon": 52006,
+        "pgscan": 8308246,
+        "pgsteal": 8106734,
+        "pswpin": 63531,
+        "pswpout": 115939,
+        "memory_high_events": 15218,
+        "cgroup_oom": 0,
+        "cgroup_oom_kill": 0,
+        "host_oom_kill": 0,
+        "failure_total": 0,
+        "launch_ready_latency_mean_ms": 1455.6906320666665,
+        "launch_ready_latency_p95_ms": 3051.446425,
+        "monitor_extrema": {
+          "min_memavailable_bytes": 21844361216.0,
+          "min_swapfree_bytes": 2460520448.0,
+          "max_psi_some_avg10": 7.8,
+          "max_psi_full_avg10": 7.46,
+          "max_test_cgroup_memory_current_bytes": 22186053632.0,
+          "host_oom_kill_delta": 0.0,
+          "pswpin_delta": 69890.0,
+          "pswpout_delta": 116495.0,
+          "test_cgroup_memory_high_delta": 15218.0,
+          "test_cgroup_memory_max_delta": 0.0,
+          "test_cgroup_oom_delta": 0.0,
+          "test_cgroup_oom_kill_delta": 0.0,
+          "max_low_memory_popup_count": 0.0
+        }
+      },
+      {
+        "round": 10,
+        "status": "VALID_DIAGNOSTIC",
+        "abort_reason": "",
+        "case_start": 90,
+        "case_done": 90,
+        "expected_steps": 90,
+        "trace_page_fault_user": 277152,
+        "trace_loss_total": 0,
+        "cgroup_pgfault": 13613352,
+        "cgroup_pgmajfault": 66451,
+        "workingset_refault_file": 431976,
+        "workingset_refault_anon": 103066,
+        "pgscan": 8437203,
+        "pgsteal": 8136929,
+        "pswpin": 101928,
+        "pswpout": 204108,
+        "memory_high_events": 16508,
+        "cgroup_oom": 0,
+        "cgroup_oom_kill": 0,
+        "host_oom_kill": 0,
+        "failure_total": 0,
+        "launch_ready_latency_mean_ms": 1433.2858771333333,
+        "launch_ready_latency_p95_ms": 2969.930194,
+        "monitor_extrema": {
+          "min_memavailable_bytes": 21941624832.0,
+          "min_swapfree_bytes": 1927282688.0,
+          "max_psi_some_avg10": 26.18,
+          "max_psi_full_avg10": 19.38,
+          "max_test_cgroup_memory_current_bytes": 22186418176.0,
+          "host_oom_kill_delta": 0.0,
+          "pswpin_delta": 142516.0,
+          "pswpout_delta": 243317.0,
+          "test_cgroup_memory_high_delta": 16508.0,
+          "test_cgroup_memory_max_delta": 0.0,
+          "test_cgroup_oom_delta": 0.0,
+          "test_cgroup_oom_kill_delta": 0.0,
+          "max_low_memory_popup_count": 0.0
+        }
+      }
+    ],
+    "workload_contract": {
+      "logical_ratio": 1.5,
+      "logical_total_bytes": 51195131895,
+      "memtotal_bytes": 34130087936,
+      "required_ratio_min": 1.5,
+      "required_ratio_max": 2.0,
+      "ratio_requirement_met": true
+    },
+    "metrics": {
+      "trace_page_fault_user": {
+        "available": true,
+        "available_rounds": 10,
+        "mean": 295966.2,
+        "min": 263448.0,
+        "max": 367383.0,
+        "sample_stdev": 36944.265012162425,
+        "round_values": [
+          277094.0,
+          275001.0,
+          301802.0,
+          269567.0,
+          358470.0,
+          278068.0,
+          263448.0,
+          367383.0,
+          291677.0,
+          277152.0
+        ]
+      },
+      "cgroup_pgfault": {
+        "available": true,
+        "available_rounds": 10,
+        "mean": 13602593.9,
+        "min": 13552473.0,
+        "max": 13704575.0,
+        "sample_stdev": 53026.78633682331,
+        "round_values": [
+          13581268.0,
+          13552523.0,
+          13599046.0,
+          13558267.0,
+          13684477.0,
+          13602551.0,
+          13552473.0,
+          13704575.0,
+          13577407.0,
+          13613352.0
+        ]
+      },
+      "cgroup_pgmajfault": {
+        "available": true,
+        "available_rounds": 10,
+        "mean": 46970.7,
+        "min": 29731.0,
+        "max": 69415.0,
+        "sample_stdev": 15726.722877178054,
+        "round_values": [
+          36728.0,
+          29731.0,
+          35976.0,
+          35876.0,
+          69415.0,
+          56906.0,
+          35004.0,
+          66091.0,
+          37529.0,
+          66451.0
+        ]
+      },
+      "workingset_refault_file": {
+        "available": true,
+        "available_rounds": 10,
+        "mean": 304138.8,
+        "min": 206713.0,
+        "max": 431976.0,
+        "sample_stdev": 63157.76809229408,
+        "round_values": [
+          364453.0,
+          206713.0,
+          305050.0,
+          259527.0,
+          289793.0,
+          304658.0,
+          302894.0,
+          331284.0,
+          245040.0,
+          431976.0
+        ]
+      },
+      "workingset_refault_anon": {
+        "available": true,
+        "available_rounds": 10,
+        "mean": 61935.3,
+        "min": 32283.0,
+        "max": 103066.0,
+        "sample_stdev": 21508.872908381065,
+        "round_values": [
+          32283.0,
+          50211.0,
+          67400.0,
+          57154.0,
+          63119.0,
+          93760.0,
+          52745.0,
+          47609.0,
+          52006.0,
+          103066.0
+        ]
+      },
+      "workingset_activate_file": {
+        "available": true,
+        "available_rounds": 10,
+        "mean": 267599.5,
+        "min": 187248.0,
+        "max": 393569.0,
+        "sample_stdev": 63034.29458151244,
+        "round_values": [
+          328595.0,
+          187248.0,
+          251843.0,
+          257904.0,
+          204238.0,
+          296147.0,
+          301029.0,
+          238737.0,
+          216685.0,
+          393569.0
+        ]
+      },
+      "workingset_activate_anon": {
+        "available": true,
+        "available_rounds": 10,
+        "mean": 46898.9,
+        "min": 26423.0,
+        "max": 74900.0,
+        "sample_stdev": 16037.403866170693,
+        "round_values": [
+          26423.0,
+          34306.0,
+          52929.0,
+          49747.0,
+          46434.0,
+          70362.0,
+          41278.0,
+          29177.0,
+          43433.0,
+          74900.0
+        ]
+      },
+      "workingset_restore_file": {
+        "available": true,
+        "available_rounds": 10,
+        "mean": 5484.1,
+        "min": 91.0,
+        "max": 40432.0,
+        "sample_stdev": 12461.952321187702,
+        "round_values": [
+          40432.0,
+          342.0,
+          91.0,
+          1020.0,
+          805.0,
+          4054.0,
+          276.0,
+          115.0,
+          1053.0,
+          6653.0
+        ]
+      },
+      "workingset_restore_anon": {
+        "available": true,
+        "available_rounds": 10,
+        "mean": 1833.2,
+        "min": 0.0,
+        "max": 6536.0,
+        "sample_stdev": 2736.0451913096917,
+        "round_values": [
+          6.0,
+          0.0,
+          0.0,
+          0.0,
+          523.0,
+          6536.0,
+          825.0,
+          6417.0,
+          9.0,
+          4016.0
+        ]
+      },
+      "pgscan": {
+        "available": true,
+        "available_rounds": 10,
+        "mean": 8422280.0,
+        "min": 8196034.0,
+        "max": 8848785.0,
+        "sample_stdev": 193390.23780888677,
+        "round_values": [
+          8416533.0,
+          8196034.0,
+          8386700.0,
+          8250267.0,
+          8642028.0,
+          8420063.0,
+          8316941.0,
+          8848785.0,
+          8308246.0,
+          8437203.0
+        ]
+      },
+      "pgsteal": {
+        "available": true,
+        "available_rounds": 10,
+        "mean": 8171095.5,
+        "min": 8032287.0,
+        "max": 8369130.0,
+        "sample_stdev": 97333.50259945328,
+        "round_values": [
+          8254716.0,
+          8032287.0,
+          8167087.0,
+          8090746.0,
+          8254219.0,
+          8158690.0,
+          8140417.0,
+          8369130.0,
+          8106734.0,
+          8136929.0
+        ]
+      },
+      "scan_efficiency_percent": {
+        "available": true,
+        "available_rounds": 10,
+        "mean": 97.04083407560616,
+        "min": 94.57942531093252,
+        "max": 98.07739124886696,
+        "sample_stdev": 1.1984429467747033,
+        "round_values": [
+          98.07739124886696,
+          98.00211907368856,
+          97.3814134284045,
+          98.06647469712192,
+          95.51252321792987,
+          96.895830826919,
+          97.8775369453745,
+          94.57942531093252,
+          97.57455424406066,
+          96.44107176276309
+        ]
+      },
+      "page_refault_ratio_percent": {
+        "available": true,
+        "available_rounds": 10,
+        "mean": 4.4773938946830345,
+        "min": 3.198640686021304,
+        "max": 6.575478291625747,
+        "sample_stdev": 0.9037312012229924,
+        "round_values": [
+          4.806173828390946,
+          3.198640686021304,
+          4.560377525058812,
+          3.9141137294385464,
+          4.27553472957284,
+          4.883357499794697,
+          4.36880567666251,
+          4.527268664723812,
+          3.664188315541129,
+          6.575478291625747
+        ]
+      },
+      "direct_reclaim_scan_ratio_percent": {
+        "available": true,
+        "available_rounds": 10,
+        "mean": 79.07842066739741,
+        "min": 16.88788788927784,
+        "max": 98.80680094787309,
+        "sample_stdev": 33.04001396210036,
+        "round_values": [
+          97.23407488570413,
+          98.80680094787309,
+          93.95280622891006,
+          83.88042471837578,
+          16.88788788927784,
+          97.13693353600799,
+          97.80299030617147,
+          16.988965151712918,
+          91.39518738371493,
+          96.69813562622589
+        ]
+      },
+      "pgscan_direct": {
+        "available": true,
+        "available_rounds": 10,
+        "mean": 6610981.2,
+        "min": 1459456.0,
+        "max": 8183738.0,
+        "sample_stdev": 2731625.601721022,
+        "round_values": [
+          8183738.0,
+          8098239.0,
+          7879540.0,
+          6920359.0,
+          1459456.0,
+          8178991.0,
+          8134217.0,
+          1503317.0,
+          7593337.0,
+          8158618.0
+        ]
+      },
+      "pgsteal_direct": {
+        "available": true,
+        "available_rounds": 10,
+        "mean": 6467020.9,
+        "min": 1373841.0,
+        "max": 8065515.0,
+        "sample_stdev": 2699263.817429422,
+        "round_values": [
+          8065515.0,
+          7944214.0,
+          7669649.0,
+          6777606.0,
+          1373841.0,
+          8030810.0,
+          7990976.0,
+          1427689.0,
+          7398896.0,
+          7991013.0
+        ]
+      },
+      "pgscan_kswapd": {
+        "available": true,
+        "available_rounds": 10,
+        "mean": 1811298.8,
+        "min": 97795.0,
+        "max": 7345468.0,
+        "sample_stdev": 2896492.887448804,
+        "round_values": [
+          232795.0,
+          97795.0,
+          507160.0,
+          1329908.0,
+          7182572.0,
+          241072.0,
+          182724.0,
+          7345468.0,
+          714909.0,
+          278585.0
+        ]
+      },
+      "pgsteal_kswapd": {
+        "available": true,
+        "available_rounds": 10,
+        "mean": 1704074.6,
+        "min": 88073.0,
+        "max": 6941441.0,
+        "sample_stdev": 2770095.250489661,
+        "round_values": [
+          189201.0,
+          88073.0,
+          497438.0,
+          1313140.0,
+          6880378.0,
+          127880.0,
+          149441.0,
+          6941441.0,
+          707838.0,
+          145916.0
+        ]
+      },
+      "direct_reclaim_begin": {
+        "available": true,
+        "available_rounds": 10,
+        "mean": 0.0,
+        "min": 0.0,
+        "max": 0.0,
+        "sample_stdev": 0.0,
+        "round_values": [
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0
+        ]
+      },
+      "direct_reclaim_latency_p95_ms": {
+        "available": true,
+        "available_rounds": 10,
+        "mean": 0.0,
+        "min": 0.0,
+        "max": 0.0,
+        "sample_stdev": 0.0,
+        "round_values": [
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0
+        ]
+      },
+      "direct_reclaim_time_total_ms": {
+        "available": true,
+        "available_rounds": 10,
+        "mean": 0.0,
+        "min": 0.0,
+        "max": 0.0,
+        "sample_stdev": 0.0,
+        "round_values": [
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0
+        ]
+      },
+      "direct_reclaim_pages_reclaimed": {
+        "available": true,
+        "available_rounds": 10,
+        "mean": 0.0,
+        "min": 0.0,
+        "max": 0.0,
+        "sample_stdev": 0.0,
+        "round_values": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      },
+      "memcg_reclaim_latency_p95_ms": {
+        "available": true,
+        "available_rounds": 10,
+        "mean": 1.1791,
+        "min": 0.558,
+        "max": 2.514,
+        "sample_stdev": 0.5314814619950957,
+        "round_values": [
+          2.514,
+          0.558,
+          1.327,
+          0.915,
+          1.182,
+          0.899,
+          1.051,
+          1.366,
+          1.191,
+          0.788
+        ]
+      },
+      "kswapd_wake": {
+        "available": true,
+        "available_rounds": 10,
+        "mean": 0.0,
+        "min": 0.0,
+        "max": 0.0,
+        "sample_stdev": 0.0,
+        "round_values": [
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0
+        ]
+      },
+      "kswapd_active_time_total_ms": {
+        "available": true,
+        "available_rounds": 10,
+        "mean": 0.0,
+        "min": 0.0,
+        "max": 0.0,
+        "sample_stdev": 0.0,
+        "round_values": [
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0
+        ]
+      },
+      "kswapd_cpu_time_ms": {
+        "available": true,
+        "available_rounds": 10,
+        "mean": 2449.0,
+        "min": 450.0,
+        "max": 6710.0,
+        "sample_stdev": 2080.1199217566495,
+        "round_values": [
+          2780.0,
+          1270.0,
+          1040.0,
+          1120.0,
+          5470.0,
+          2080.0,
+          950.0,
+          6710.0,
+          450.0,
+          2620.0
+        ]
+      },
+      "cgroup_cpu_usage_ms": {
+        "available": true,
+        "available_rounds": 10,
+        "mean": 90655.8647,
+        "min": 70322.467,
+        "max": 203511.3,
+        "sample_stdev": 40164.454646557766,
+        "round_values": [
+          203511.3,
+          71595.685,
+          70322.467,
+          72606.123,
+          83008.907,
+          79530.416,
+          72656.199,
+          90430.067,
+          82851.958,
+          80045.525
+        ]
+      },
+      "cgroup_cpu_one_core_percent": {
+        "available": true,
+        "available_rounds": 10,
+        "mean": 24.016951082483953,
+        "min": 20.1882429937092,
+        "max": 41.487198828477005,
+        "sample_stdev": 6.268115838845659,
+        "round_values": [
+          41.487198828477005,
+          21.149695165886577,
+          20.1882429937092,
+          21.411031093877295,
+          22.470721495003936,
+          22.868303702437345,
+          20.290142892865443,
+          23.701187376916565,
+          23.310622107663086,
+          23.29236516800308
+        ]
+      },
+      "cgroup_cpu_machine_percent": {
+        "available": true,
+        "available_rounds": 10,
+        "mean": 12.008475541241976,
+        "min": 10.0941214968546,
+        "max": 20.743599414238503,
+        "sample_stdev": 3.1340579194228293,
+        "round_values": [
+          20.743599414238503,
+          10.574847582943288,
+          10.0941214968546,
+          10.705515546938647,
+          11.235360747501968,
+          11.434151851218672,
+          10.145071446432722,
+          11.850593688458282,
+          11.655311053831543,
+          11.64618258400154
+        ]
+      },
+      "cgroup_io_read_mib": {
+        "available": true,
+        "available_rounds": 10,
+        "mean": 1858.988671875,
+        "min": 1551.96484375,
+        "max": 2378.52734375,
+        "sample_stdev": 308.2113573707887,
+        "round_values": [
+          2189.8671875,
+          1551.96484375,
+          1593.18359375,
+          1585.6328125,
+          2266.40234375,
+          1855.0703125,
+          1639.1796875,
+          2378.52734375,
+          1720.6796875,
+          1809.37890625
+        ]
+      },
+      "cgroup_io_write_mib": {
+        "available": true,
+        "available_rounds": 10,
+        "mean": 658.5984375,
+        "min": 360.33984375,
+        "max": 1220.02734375,
+        "sample_stdev": 317.3266678588263,
+        "round_values": [
+          420.82421875,
+          360.33984375,
+          508.4609375,
+          423.3359375,
+          1172.2109375,
+          708.484375,
+          453.37109375,
+          1220.02734375,
+          487.3125,
+          831.6171875
+        ]
+      },
+      "cgroup_io_read_mib_per_second": {
+        "available": true,
+        "available_rounds": 10,
+        "mean": 5.068559021497223,
+        "min": 4.4641970944989415,
+        "max": 6.233979927863858,
+        "sample_stdev": 0.6579710480899525,
+        "round_values": [
+          4.4641970944989415,
+          4.584575642161297,
+          4.5737271310768834,
+          4.675918786065688,
+          6.135208582138111,
+          5.334099006300351,
+          4.577612171324503,
+          6.233979927863858,
+          4.841178764133047,
+          5.265093109409554
+        ]
+      },
+      "cgroup_io_write_mib_per_second": {
+        "available": true,
+        "available_rounds": 10,
+        "mean": 1.8095510281653848,
+        "min": 0.8578795396186724,
+        "max": 3.1976197340626262,
+        "sample_stdev": 0.8561154505001408,
+        "round_values": [
+          0.8578795396186724,
+          1.0644604980643315,
+          1.459694660464512,
+          1.2483876767484465,
+          3.1732047152433855,
+          2.037187364382893,
+          1.2660948965527627,
+          3.1976197340626262,
+          1.3710668776036128,
+          2.4199143189126047
+        ]
+      },
+      "launch_ready_latency_mean_ms": {
+        "available": true,
+        "available_rounds": 10,
+        "mean": 1436.1943711333333,
+        "min": 1312.770788,
+        "max": 1617.4655259333333,
+        "sample_stdev": 79.42603025953406,
+        "round_values": [
+          1617.4655259333333,
+          1391.8861547333336,
+          1437.4067782666668,
+          1312.770788,
+          1411.6396968666666,
+          1453.8798905333338,
+          1474.533265066667,
+          1373.385102733333,
+          1455.6906320666665,
+          1433.2858771333333
+        ]
+      },
+      "launch_ready_latency_p95_ms": {
+        "available": true,
+        "available_rounds": 10,
+        "mean": 3061.8766368,
+        "min": 2848.435549,
+        "max": 3426.863773,
+        "sample_stdev": 173.53863090930136,
+        "round_values": [
+          3120.331424,
+          2882.120091,
+          2848.435549,
+          2978.668418,
+          3078.346833,
+          3426.863773,
+          3006.534995,
+          3256.088666,
+          3051.446425,
+          2969.930194
+        ]
+      },
+      "parp_decision": {
+        "available": true,
+        "available_rounds": 10,
+        "mean": 0.0,
+        "min": 0.0,
+        "max": 0.0,
+        "sample_stdev": 0.0,
+        "round_values": [
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0
+        ]
+      },
+      "parp_access": {
+        "available": true,
+        "available_rounds": 10,
+        "mean": 0.0,
+        "min": 0.0,
+        "max": 0.0,
+        "sample_stdev": 0.0,
+        "round_values": [
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0
+        ]
+      },
+      "parp_outcome": {
+        "available": true,
+        "available_rounds": 10,
+        "mean": 0.0,
+        "min": 0.0,
+        "max": 0.0,
+        "sample_stdev": 0.0,
+        "round_values": [
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0
+        ]
+      },
+      "launch_failures": {
+        "available": true,
+        "available_rounds": 10,
+        "mean": 0.0,
+        "min": 0.0,
+        "max": 0.0,
+        "sample_stdev": 0.0,
+        "round_values": [
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0
+        ]
+      },
+      "low_memory_popups": {
+        "available": true,
+        "available_rounds": 10,
+        "mean": 0.0,
+        "min": 0.0,
+        "max": 0.0,
+        "sample_stdev": 0.0,
+        "round_values": [
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0
+        ]
+      },
+      "cgroup_oom_events": {
+        "available": true,
+        "available_rounds": 10,
+        "mean": 0.0,
+        "min": 0.0,
+        "max": 0.0,
+        "sample_stdev": 0.0,
+        "round_values": [
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0
+        ]
+      },
+      "app_oom_kills": {
+        "available": true,
+        "available_rounds": 10,
+        "mean": 0.0,
+        "min": 0.0,
+        "max": 0.0,
+        "sample_stdev": 0.0,
+        "round_values": [
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0
+        ]
+      },
+      "host_oom_kills": {
+        "available": true,
+        "available_rounds": 10,
+        "mean": 0.0,
+        "min": 0.0,
+        "max": 0.0,
+        "sample_stdev": 0.0,
+        "round_values": [
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0
+        ]
+      },
+      "failure_total": {
+        "available": true,
+        "available_rounds": 10,
+        "mean": 0.0,
+        "min": 0.0,
+        "max": 0.0,
+        "sample_stdev": 0.0,
+        "round_values": [
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0
+        ]
+      },
+      "trace_loss_total": {
+        "available": true,
+        "available_rounds": 10,
+        "mean": 0.0,
+        "min": 0.0,
+        "max": 0.0,
+        "sample_stdev": 0.0,
+        "round_values": [
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0
+        ]
+      }
+    },
+    "monitor_extrema": {
+      "min_memavailable_bytes": 21258797056.0,
+      "min_swapfree_bytes": 1229328384.0,
+      "max_psi_some_avg10": 29.74,
+      "max_psi_full_avg10": 21.84,
+      "max_test_cgroup_memory_current_bytes": 22186467328.0,
+      "host_oom_kill_delta": 0.0,
+      "pswpin_delta": 1138774.0,
+      "pswpout_delta": 1887828.0,
+      "test_cgroup_memory_high_delta": 131324.0,
+      "test_cgroup_memory_max_delta": 0.0,
+      "test_cgroup_oom_delta": 0.0,
+      "test_cgroup_oom_kill_delta": 0.0,
+      "max_low_memory_popup_count": 0.0
+    },
+    "attempt_monitor_extrema": {
+      "min_memavailable_bytes": 21258797056.0,
+      "min_swapfree_bytes": 1229328384.0,
+      "max_psi_some_avg10": 29.74,
+      "max_psi_full_avg10": 21.84,
+      "max_test_cgroup_memory_current_bytes": 22186467328.0,
+      "host_oom_kill_delta": 0.0,
+      "pswpin_delta": 1138774.0,
+      "pswpout_delta": 1887828.0,
+      "test_cgroup_memory_high_delta": 131324.0,
+      "test_cgroup_memory_max_delta": 0.0,
+      "test_cgroup_oom_delta": 0.0,
+      "test_cgroup_oom_kill_delta": 0.0,
+      "max_low_memory_popup_count": 0.0
+    },
+    "summary_sha256": "7f0f4fa39263f9e9c80eb291e32fde69d85432a40d4bafa0482bbb80d2d09a6a",
+    "scenario_plans": [
+      {
+        "round": 1,
+        "seed": 20260815,
+        "path": "/home/lzx/Desktop/PARP/test/outputs/parp_acceptance_lsapp_aligned/hotcold-full-observe-20260814_200806-6.17.13-parp-lzx-v4.2+/round-01/scenario-plan.json",
+        "sha256": "6bd3d43b48a354139b9fec347618cfeab2b0af1a7323263869930c0f53a79499"
+      },
+      {
+        "round": 2,
+        "seed": 20260816,
+        "path": "/home/lzx/Desktop/PARP/test/outputs/parp_acceptance_lsapp_aligned/hotcold-full-observe-20260814_200806-6.17.13-parp-lzx-v4.2+/round-02/scenario-plan.json",
+        "sha256": "db175842eb4810deb486ac43a6cec1eec325a57d4709cd3ad7b5376f420cb86c"
+      },
+      {
+        "round": 3,
+        "seed": 20260817,
+        "path": "/home/lzx/Desktop/PARP/test/outputs/parp_acceptance_lsapp_aligned/hotcold-full-observe-20260814_200806-6.17.13-parp-lzx-v4.2+/round-03/scenario-plan.json",
+        "sha256": "d4c6114b2555f4f5bc1fd22e07af6815464079d1e9660e4b2d5b5762da8340b8"
+      },
+      {
+        "round": 4,
+        "seed": 20260818,
+        "path": "/home/lzx/Desktop/PARP/test/outputs/parp_acceptance_lsapp_aligned/hotcold-full-observe-20260814_200806-6.17.13-parp-lzx-v4.2+/round-04/scenario-plan.json",
+        "sha256": "82c927008570ca90f3c0a391e684d04e035c2d5deadaa315e38aa83cf81e6bda"
+      },
+      {
+        "round": 5,
+        "seed": 20260819,
+        "path": "/home/lzx/Desktop/PARP/test/outputs/parp_acceptance_lsapp_aligned/hotcold-full-observe-20260814_200806-6.17.13-parp-lzx-v4.2+/round-05/scenario-plan.json",
+        "sha256": "4c575bff3935849530f51d0917faca24e666c6da66c6364ab8b691e50eb957a6"
+      },
+      {
+        "round": 6,
+        "seed": 20260820,
+        "path": "/home/lzx/Desktop/PARP/test/outputs/parp_acceptance_lsapp_aligned/hotcold-full-observe-20260814_200806-6.17.13-parp-lzx-v4.2+/round-06/scenario-plan.json",
+        "sha256": "ca3f4d20878fb375c839c26b3a2cd621baffc12f9e50ac7c2bbacc377f2f121f"
+      },
+      {
+        "round": 7,
+        "seed": 20260821,
+        "path": "/home/lzx/Desktop/PARP/test/outputs/parp_acceptance_lsapp_aligned/hotcold-full-observe-20260814_200806-6.17.13-parp-lzx-v4.2+/round-07/scenario-plan.json",
+        "sha256": "ba9b6824de81379ad1640470e69d9a273da459d6be6d38c172689431f91c7137"
+      },
+      {
+        "round": 8,
+        "seed": 20260822,
+        "path": "/home/lzx/Desktop/PARP/test/outputs/parp_acceptance_lsapp_aligned/hotcold-full-observe-20260814_200806-6.17.13-parp-lzx-v4.2+/round-08/scenario-plan.json",
+        "sha256": "f49c09246f784aca6786ce08bbebcee6d5ced26f257d2564d883dd4fed6e4d29"
+      },
+      {
+        "round": 9,
+        "seed": 20260823,
+        "path": "/home/lzx/Desktop/PARP/test/outputs/parp_acceptance_lsapp_aligned/hotcold-full-observe-20260814_200806-6.17.13-parp-lzx-v4.2+/round-09/scenario-plan.json",
+        "sha256": "bba2a7dfd288fc6e1ddfceef0387266254c6af0c7bacdce03de8a49704ad4e0e"
+      },
+      {
+        "round": 10,
+        "seed": 20260824,
+        "path": "/home/lzx/Desktop/PARP/test/outputs/parp_acceptance_lsapp_aligned/hotcold-full-observe-20260814_200806-6.17.13-parp-lzx-v4.2+/round-10/scenario-plan.json",
+        "sha256": "45a6cf32f7bb0586c7c89cc49f1e286021f2854c5b84352acf1fa4b544e205df"
+      }
+    ],
+    "preflight": {
+      "status": "READY",
+      "blocking_checks": [
+        "sudo_noninteractive",
+        "x11_display",
+        "cgroup_v2_memory",
+        "cgroup_v2_cpu",
+        "cgroup_v2_io",
+        "tracefs_page_fault_user",
+        "tracefs_parp_decision",
+        "swap_present",
+        "memory_16g_class",
+        "memavailable_floor",
+        "disk_for_sparse_fixture",
+        "automation_present",
+        "all_required_apps_installed",
+        "xdotool_present",
+        "wmctrl_present",
+        "inotify_watch_headroom"
+      ],
+      "metrics_schema_version": 3,
+      "diagnostic_only": true,
+      "diagnostic_reason": "SHADOW_APPLY_NOT_COMPILED_OR_MODEL_UNTRAINED",
+      "timestamp": "2026-08-14T20:08:06.093466",
+      "kernel_release": "6.17.13-parp-lzx-v4.2+",
+      "profile": "full",
+      "suite": "hotcold",
+      "variant": "observe",
+      "memory": {
+        "total_bytes": 34130087936,
+        "available_bytes": 31683698688
+      },
+      "swap_bytes": 4087345152,
+      "disk_free_bytes": 156747563008,
+      "inotify": {
+        "maximum": 65536,
+        "used": 15899,
+        "headroom": 49637
+      },
+      "gui": {
+        "DISPLAY": ":3",
+        "XAUTHORITY": "/dev/null",
+        "XDG_RUNTIME_DIR": "/run/user/1000",
+        "DBUS_SESSION_BUS_ADDRESS": "unix:path=/run/user/1000/bus",
+        "XDG_SESSION_TYPE": "x11"
+      },
+      "apps": {
+        "FIREFOX": {
+          "executable": "epiphany-browser",
+          "installed": true
+        },
+        "LIBREOFFICE": {
+          "executable": "libreoffice",
+          "installed": true
+        },
+        "VLC": {
+          "executable": "vlc",
+          "installed": true
+        },
+        "GIMP": {
+          "executable": "gimp",
+          "installed": true
+        },
+        "AUDACITY": {
+          "executable": "audacity",
+          "installed": true
+        },
+        "THUNDERBIRD": {
+          "executable": "thunderbird",
+          "installed": true
+        },
+        "EVINCE": {
+          "executable": "evince",
+          "installed": true
+        },
+        "FILES": {
+          "executable": "nautilus",
+          "installed": true
+        },
+        "CALCULATOR": {
+          "executable": "gnome-calculator",
+          "installed": true
+        },
+        "CALENDAR": {
+          "executable": "gnome-calendar",
+          "installed": true
+        },
+        "RHYTHMBOX": {
+          "executable": "rhythmbox",
+          "installed": true
+        },
+        "IMAGE_VIEWER": {
+          "executable": "eog",
+          "installed": true
+        },
+        "SHOTWELL": {
+          "executable": "shotwell",
+          "installed": true
+        },
+        "SYSTEM_MONITOR": {
+          "executable": "gnome-system-monitor",
+          "installed": true
+        },
+        "SOLITAIRE": {
+          "executable": "/usr/games/sol",
+          "installed": true
+        }
+      },
+      "system_metadata": {
+        "captured_at": "2026-08-14T20:08:06.086396",
+        "hostname": "lzx-virtual-machine",
+        "kernel_release": "6.17.13-parp-lzx-v4.2+",
+        "kernel_version": "#4 SMP PREEMPT_DYNAMIC Fri Aug 14 18:02:18 CST 2026",
+        "kernel_cmdline": "BOOT_IMAGE=/boot/vmlinuz-6.17.13-parp-lzx-v4.2+ root=UUID=51e68485-f377-4ea6-bc24-d44fdffad6d3 ro find_preseed=/preseed.cfg auto noprompt priority=critical locale=en_US quiet splash",
+        "kernel_config": {
+          "path": "/boot/config-6.17.13-parp-lzx-v4.2+",
+          "sha256": "fc34269628abfdd943a5919816026706c931cbdaee16546ce36f16c5bd1e2313"
+        },
+        "machine": "x86_64",
+        "cpu_model": "13th Gen Intel(R) Core(TM) i5-13600K",
+        "cpu_count": 2,
+        "page_size": 4096,
+        "memtotal_bytes": 34130087936,
+        "vm_sysctls": {
+          "vm.swappiness": "60",
+          "vm.watermark_scale_factor": "10",
+          "vm.watermark_boost_factor": "15000",
+          "vm.overcommit_memory": "0",
+          "vm.overcommit_ratio": "50"
+        },
+        "swap": [
+          {
+            "path": "/swapfile",
+            "type": "file",
+            "size_kib": 3991548,
+            "used_kib": 941496,
+            "priority": -2
+          }
+        ],
+        "transparent_hugepage": {
+          "enabled": "always [madvise] never",
+          "defrag": "always defer defer+madvise [madvise] never"
+        },
+        "cpu_governors": [],
+        "session": {
+          "type": "x11",
+          "desktop": null,
+          "display": ":3",
+          "xauthority": "/dev/null",
+          "wayland_display": null
+        },
+        "result_storage": {
+          "mount_point": "/",
+          "filesystem": "ext4",
+          "source": "/dev/sda3"
+        }
+      },
+      "checks": {
+        "sudo_noninteractive": true,
+        "x11_display": true,
+        "cgroup_v2_memory": true,
+        "cgroup_v2_cpu": true,
+        "cgroup_v2_io": true,
+        "tracefs_page_fault_user": true,
+        "tracefs_parp_decision": true,
+        "swap_present": true,
+        "memory_16g_class": true,
+        "memavailable_floor": true,
+        "disk_for_sparse_fixture": true,
+        "automation_present": true,
+        "all_required_apps_installed": true,
+        "xdotool_present": true,
+        "wmctrl_present": true,
+        "inotify_watch_headroom": true
+      },
+      "parp": {
+        "requested_policy": null,
+        "observed_policy": {
+          "parp_mode": "1",
+          "effective_tier_mode": "0",
+          "tier2_enabled": "0",
+          "cgroup_tier2_enabled": null,
+          "effective_tier_stats": "mode 0\napply_compiled 1\npage_ext_bytes 24\nstate_epoch 0\ncandidates 0\ntier_gate_decisions 0\ncandidate_pages 0\nstate_fault 0\nscores 0\nmetadata_missing 0\nstate_unstable 0\nmodel_invalid 0\nkeep_reclaim_pages 0\nupgrade_pages 0\nkeep_protect_pages 0\ndowngrade_pages 0\nspecial_protect_pages 0\npolicy_promotions 0\nnative_tier_promotions 0\nnative_generation_moves 0\nscore_time_ns_total 0\nscore_time_ns_max 0\ndecision_time_ns_total 0\ndecision_time_ns_max 0\nlock_time_ns_total 0\nlock_time_ns_max 0\ntrace_decisions 0\ntrace_accesses 0\ntrace_outcomes 0\ntrace_batches 0\ntrace_locks 0\nscore_hist_log2_ns 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0\ndecision_hist_log2_ns 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0\nlock_hist_log2_ns 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0",
+          "effective_tier_config": "model GLOBAL_REUSE_MODEL\nmodel_type pairwise_linear_ranker\nmodel_version 1\nmodel_checksum 1d5cc9918ae0e2caea316d36841fd61bef562e68f0820188c1cc0a6195f1fa5e\nmodel_provenance ENGINEERING_FIXTURE_UNTRAINED\nfeature_schema_version 1\nconfig_sequence 0\nmetadata_reservation_requested 0\nmetadata_ready 0\nmetadata_payload_bytes 24\ncold_threshold -48\nhot_threshold_1 48\nhot_threshold_2 96\nhot_threshold_3 144\nmax_upgrade_tiers 2\nmax_downgrade_tiers 1\nrequire_two_cold 1\nupgrade_batch_pages 2\nupgrade_epoch_pages 8\nupgrade_ratio_permyriad 100\ndowngrade_batch_pages 1\ndowngrade_epoch_pages 4\ndowngrade_ratio_permyriad 50\nexperiment_id 0\nsession_id 0"
+        },
+        "effective_tier_mode": "0",
+        "apply_compiled": "1",
+        "model_provenance": "ENGINEERING_FIXTURE_UNTRAINED",
+        "effective_tier_stats": "mode 0\napply_compiled 1\npage_ext_bytes 24\nstate_epoch 0\ncandidates 0\ntier_gate_decisions 0\ncandidate_pages 0\nstate_fault 0\nscores 0\nmetadata_missing 0\nstate_unstable 0\nmodel_invalid 0\nkeep_reclaim_pages 0\nupgrade_pages 0\nkeep_protect_pages 0\ndowngrade_pages 0\nspecial_protect_pages 0\npolicy_promotions 0\nnative_tier_promotions 0\nnative_generation_moves 0\nscore_time_ns_total 0\nscore_time_ns_max 0\ndecision_time_ns_total 0\ndecision_time_ns_max 0\nlock_time_ns_total 0\nlock_time_ns_max 0\ntrace_decisions 0\ntrace_accesses 0\ntrace_outcomes 0\ntrace_batches 0\ntrace_locks 0\nscore_hist_log2_ns 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0\ndecision_hist_log2_ns 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0\nlock_hist_log2_ns 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0",
+        "effective_tier_config": "model GLOBAL_REUSE_MODEL\nmodel_type pairwise_linear_ranker\nmodel_version 1\nmodel_checksum 1d5cc9918ae0e2caea316d36841fd61bef562e68f0820188c1cc0a6195f1fa5e\nmodel_provenance ENGINEERING_FIXTURE_UNTRAINED\nfeature_schema_version 1\nconfig_sequence 0\nmetadata_reservation_requested 0\nmetadata_ready 0\nmetadata_payload_bytes 24\ncold_threshold -48\nhot_threshold_1 48\nhot_threshold_2 96\nhot_threshold_3 144\nmax_upgrade_tiers 2\nmax_downgrade_tiers 1\nrequire_two_cold 1\nupgrade_batch_pages 2\nupgrade_epoch_pages 8\nupgrade_ratio_permyriad 100\ndowngrade_batch_pages 1\ndowngrade_epoch_pages 4\ndowngrade_ratio_permyriad 50\nexperiment_id 0\nsession_id 0"
+      }
+    }
+  },
+  "peak": {
+    "summary_path": "/home/lzx/Desktop/PARP/test/outputs/parp_acceptance_lsapp_aligned/peak-full-observe-20260814_210935-6.17.13-parp-lzx-v4.2+/summary.json",
+    "kernel_release": "6.17.13-parp-lzx-v4.2+",
+    "status": "DIAGNOSTIC_BASELINE_INCOMPLETE",
+    "rounds_requested": 3,
+    "rounds_valid": 0,
+    "case_done_total": 0,
+    "case_done_attempted_total": 142,
+    "attempts": [
+      {
+        "round": 1,
+        "status": "INVALID",
+        "abort_reason": "PSI_FULL_HARD_LIMIT",
+        "case_start": 29,
+        "case_done": 28,
+        "expected_steps": 100,
+        "trace_page_fault_user": 446282,
+        "trace_loss_total": 0,
+        "cgroup_pgfault": 16182369,
+        "cgroup_pgmajfault": 17989,
+        "workingset_refault_file": 152103,
+        "workingset_refault_anon": 70876,
+        "pgscan": 11304681,
+        "pgsteal": 10568593,
+        "pswpin": 91763,
+        "pswpout": 511106,
+        "memory_high_events": 13077,
+        "cgroup_oom": 0,
+        "cgroup_oom_kill": 0,
+        "host_oom_kill": 0,
+        "failure_total": 0,
+        "launch_ready_latency_mean_ms": 13440.885701133333,
+        "launch_ready_latency_p95_ms": 15906.448362,
+        "monitor_extrema": {
+          "min_memavailable_bytes": 4270530560.0,
+          "min_swapfree_bytes": 1178415104.0,
+          "max_psi_some_avg10": 30.56,
+          "max_psi_full_avg10": 26.95,
+          "max_test_cgroup_memory_current_bytes": 22184869888.0,
+          "host_oom_kill_delta": 0.0,
+          "pswpin_delta": 122440.0,
+          "pswpout_delta": 524856.0,
+          "test_cgroup_memory_high_delta": 13077.0,
+          "test_cgroup_memory_max_delta": 0.0,
+          "test_cgroup_oom_delta": 0.0,
+          "test_cgroup_oom_kill_delta": 0.0,
+          "max_low_memory_popup_count": 0.0
+        }
+      },
+      {
+        "round": 2,
+        "status": "INVALID",
+        "abort_reason": "PSI_FULL_HARD_LIMIT",
+        "case_start": 67,
+        "case_done": 66,
+        "expected_steps": 100,
+        "trace_page_fault_user": 925277,
+        "trace_loss_total": 0,
+        "cgroup_pgfault": 25817329,
+        "cgroup_pgmajfault": 45546,
+        "workingset_refault_file": 422984,
+        "workingset_refault_anon": 101336,
+        "pgscan": 13161478,
+        "pgsteal": 11639459,
+        "pswpin": 159572,
+        "pswpout": 1083914,
+        "memory_high_events": 18192,
+        "cgroup_oom": 0,
+        "cgroup_oom_kill": 0,
+        "host_oom_kill": 0,
+        "failure_total": 0,
+        "launch_ready_latency_mean_ms": 15210.737980000002,
+        "launch_ready_latency_p95_ms": 18026.055395,
+        "monitor_extrema": {
+          "min_memavailable_bytes": 3962159104.0,
+          "min_swapfree_bytes": 684879872.0,
+          "max_psi_some_avg10": 39.15,
+          "max_psi_full_avg10": 33.56,
+          "max_test_cgroup_memory_current_bytes": 22184861696.0,
+          "host_oom_kill_delta": 0.0,
+          "pswpin_delta": 282970.0,
+          "pswpout_delta": 1252831.0,
+          "test_cgroup_memory_high_delta": 18187.0,
+          "test_cgroup_memory_max_delta": 0.0,
+          "test_cgroup_oom_delta": 0.0,
+          "test_cgroup_oom_kill_delta": 0.0,
+          "max_low_memory_popup_count": 0.0
+        }
+      },
+      {
+        "round": 3,
+        "status": "INVALID",
+        "abort_reason": "PSI_FULL_HARD_LIMIT",
+        "case_start": 49,
+        "case_done": 48,
+        "expected_steps": 100,
+        "trace_page_fault_user": 682733,
+        "trace_loss_total": 0,
+        "cgroup_pgfault": 20970188,
+        "cgroup_pgmajfault": 34083,
+        "workingset_refault_file": 357229,
+        "workingset_refault_anon": 86397,
+        "pgscan": 12105156,
+        "pgsteal": 11210582,
+        "pswpin": 139005,
+        "pswpout": 791375,
+        "memory_high_events": 11989,
+        "cgroup_oom": 0,
+        "cgroup_oom_kill": 0,
+        "host_oom_kill": 0,
+        "failure_total": 0,
+        "launch_ready_latency_mean_ms": 42458.1922718,
+        "launch_ready_latency_p95_ms": 54278.574285,
+        "monitor_extrema": {
+          "min_memavailable_bytes": 4254158848.0,
+          "min_swapfree_bytes": 967598080.0,
+          "max_psi_some_avg10": 38.94,
+          "max_psi_full_avg10": 32.6,
+          "max_test_cgroup_memory_current_bytes": 22185013248.0,
+          "host_oom_kill_delta": 0.0,
+          "pswpin_delta": 229831.0,
+          "pswpout_delta": 871132.0,
+          "test_cgroup_memory_high_delta": 11989.0,
+          "test_cgroup_memory_max_delta": 0.0,
+          "test_cgroup_oom_delta": 0.0,
+          "test_cgroup_oom_kill_delta": 0.0,
+          "max_low_memory_popup_count": 0.0
+        }
+      }
+    ],
+    "workload_contract": {
+      "logical_ratio": 1.25,
+      "logical_total_bytes": 42662609914,
+      "memtotal_bytes": 34130087936,
+      "normal_ratio_by_app": {
+        "FIREFOX": 0.09,
+        "LIBREOFFICE": 0.075,
+        "VLC": 0.05,
+        "GIMP": 0.065,
+        "AUDACITY": 0.055,
+        "THUNDERBIRD": 0.05,
+        "EVINCE": 0.035,
+        "FILES": 0.04,
+        "CALCULATOR": 0.015,
+        "CALENDAR": 0.02,
+        "RHYTHMBOX": 0.04,
+        "IMAGE_VIEWER": 0.025,
+        "SHOTWELL": 0.04,
+        "SYSTEM_MONITOR": 0.03,
+        "SOLITAIRE": 0.02
+      },
+      "normal_ratio_sum": 0.65,
+      "peak_ratio_by_app": {
+        "FIREFOX": 0.195,
+        "LIBREOFFICE": 0.145,
+        "VLC": 0.09,
+        "GIMP": 0.13,
+        "AUDACITY": 0.09,
+        "THUNDERBIRD": 0.085,
+        "EVINCE": 0.065,
+        "FILES": 0.075,
+        "CALCULATOR": 0.03,
+        "CALENDAR": 0.045,
+        "RHYTHMBOX": 0.075,
+        "IMAGE_VIEWER": 0.045,
+        "SHOTWELL": 0.07,
+        "SYSTEM_MONITOR": 0.065,
+        "SOLITAIRE": 0.045
+      },
+      "peak_ratio_sum": 1.2499999999999998,
+      "normal_sum_le_physical": true,
+      "each_peak_le_physical": true,
+      "concurrent_peak_ge_120_percent": true,
+      "oom_probe": {
+        "enabled": false,
+        "memory_ratio": 0.55,
+        "ramp_seconds": 8,
+        "hold_seconds": 12,
+        "oom_score_adj": 1000,
+        "repeat_every_steps": 20
+      }
+    },
+    "metrics": {
+      "trace_page_fault_user": {
+        "available": false,
+        "available_rounds": 0,
+        "mean": null,
+        "min": null,
+        "max": null,
+        "sample_stdev": null,
+        "round_values": []
+      },
+      "cgroup_pgfault": {
+        "available": false,
+        "available_rounds": 0,
+        "mean": null,
+        "min": null,
+        "max": null,
+        "sample_stdev": null,
+        "round_values": []
+      },
+      "cgroup_pgmajfault": {
+        "available": false,
+        "available_rounds": 0,
+        "mean": null,
+        "min": null,
+        "max": null,
+        "sample_stdev": null,
+        "round_values": []
+      },
+      "workingset_refault_file": {
+        "available": false,
+        "available_rounds": 0,
+        "mean": null,
+        "min": null,
+        "max": null,
+        "sample_stdev": null,
+        "round_values": []
+      },
+      "workingset_refault_anon": {
+        "available": false,
+        "available_rounds": 0,
+        "mean": null,
+        "min": null,
+        "max": null,
+        "sample_stdev": null,
+        "round_values": []
+      },
+      "workingset_activate_file": {
+        "available": false,
+        "available_rounds": 0,
+        "mean": null,
+        "min": null,
+        "max": null,
+        "sample_stdev": null,
+        "round_values": []
+      },
+      "workingset_activate_anon": {
+        "available": false,
+        "available_rounds": 0,
+        "mean": null,
+        "min": null,
+        "max": null,
+        "sample_stdev": null,
+        "round_values": []
+      },
+      "workingset_restore_file": {
+        "available": false,
+        "available_rounds": 0,
+        "mean": null,
+        "min": null,
+        "max": null,
+        "sample_stdev": null,
+        "round_values": []
+      },
+      "workingset_restore_anon": {
+        "available": false,
+        "available_rounds": 0,
+        "mean": null,
+        "min": null,
+        "max": null,
+        "sample_stdev": null,
+        "round_values": []
+      },
+      "pgscan": {
+        "available": false,
+        "available_rounds": 0,
+        "mean": null,
+        "min": null,
+        "max": null,
+        "sample_stdev": null,
+        "round_values": []
+      },
+      "pgsteal": {
+        "available": false,
+        "available_rounds": 0,
+        "mean": null,
+        "min": null,
+        "max": null,
+        "sample_stdev": null,
+        "round_values": []
+      },
+      "scan_efficiency_percent": {
+        "available": false,
+        "available_rounds": 0,
+        "mean": null,
+        "min": null,
+        "max": null,
+        "sample_stdev": null,
+        "round_values": []
+      },
+      "page_refault_ratio_percent": {
+        "available": false,
+        "available_rounds": 0,
+        "mean": null,
+        "min": null,
+        "max": null,
+        "sample_stdev": null,
+        "round_values": []
+      },
+      "direct_reclaim_scan_ratio_percent": {
+        "available": false,
+        "available_rounds": 0,
+        "mean": null,
+        "min": null,
+        "max": null,
+        "sample_stdev": null,
+        "round_values": []
+      },
+      "pgscan_direct": {
+        "available": false,
+        "available_rounds": 0,
+        "mean": null,
+        "min": null,
+        "max": null,
+        "sample_stdev": null,
+        "round_values": []
+      },
+      "pgsteal_direct": {
+        "available": false,
+        "available_rounds": 0,
+        "mean": null,
+        "min": null,
+        "max": null,
+        "sample_stdev": null,
+        "round_values": []
+      },
+      "pgscan_kswapd": {
+        "available": false,
+        "available_rounds": 0,
+        "mean": null,
+        "min": null,
+        "max": null,
+        "sample_stdev": null,
+        "round_values": []
+      },
+      "pgsteal_kswapd": {
+        "available": false,
+        "available_rounds": 0,
+        "mean": null,
+        "min": null,
+        "max": null,
+        "sample_stdev": null,
+        "round_values": []
+      },
+      "direct_reclaim_begin": {
+        "available": false,
+        "available_rounds": 0,
+        "mean": null,
+        "min": null,
+        "max": null,
+        "sample_stdev": null,
+        "round_values": []
+      },
+      "direct_reclaim_latency_p95_ms": {
+        "available": false,
+        "available_rounds": 0,
+        "mean": null,
+        "min": null,
+        "max": null,
+        "sample_stdev": null,
+        "round_values": []
+      },
+      "direct_reclaim_time_total_ms": {
+        "available": false,
+        "available_rounds": 0,
+        "mean": null,
+        "min": null,
+        "max": null,
+        "sample_stdev": null,
+        "round_values": []
+      },
+      "direct_reclaim_pages_reclaimed": {
+        "available": false,
+        "available_rounds": 0,
+        "mean": null,
+        "min": null,
+        "max": null,
+        "sample_stdev": null,
+        "round_values": []
+      },
+      "memcg_reclaim_latency_p95_ms": {
+        "available": false,
+        "available_rounds": 0,
+        "mean": null,
+        "min": null,
+        "max": null,
+        "sample_stdev": null,
+        "round_values": []
+      },
+      "kswapd_wake": {
+        "available": false,
+        "available_rounds": 0,
+        "mean": null,
+        "min": null,
+        "max": null,
+        "sample_stdev": null,
+        "round_values": []
+      },
+      "kswapd_active_time_total_ms": {
+        "available": false,
+        "available_rounds": 0,
+        "mean": null,
+        "min": null,
+        "max": null,
+        "sample_stdev": null,
+        "round_values": []
+      },
+      "kswapd_cpu_time_ms": {
+        "available": false,
+        "available_rounds": 0,
+        "mean": null,
+        "min": null,
+        "max": null,
+        "sample_stdev": null,
+        "round_values": []
+      },
+      "cgroup_cpu_usage_ms": {
+        "available": false,
+        "available_rounds": 0,
+        "mean": null,
+        "min": null,
+        "max": null,
+        "sample_stdev": null,
+        "round_values": []
+      },
+      "cgroup_cpu_one_core_percent": {
+        "available": false,
+        "available_rounds": 0,
+        "mean": null,
+        "min": null,
+        "max": null,
+        "sample_stdev": null,
+        "round_values": []
+      },
+      "cgroup_cpu_machine_percent": {
+        "available": false,
+        "available_rounds": 0,
+        "mean": null,
+        "min": null,
+        "max": null,
+        "sample_stdev": null,
+        "round_values": []
+      },
+      "cgroup_io_read_mib": {
+        "available": false,
+        "available_rounds": 0,
+        "mean": null,
+        "min": null,
+        "max": null,
+        "sample_stdev": null,
+        "round_values": []
+      },
+      "cgroup_io_write_mib": {
+        "available": false,
+        "available_rounds": 0,
+        "mean": null,
+        "min": null,
+        "max": null,
+        "sample_stdev": null,
+        "round_values": []
+      },
+      "cgroup_io_read_mib_per_second": {
+        "available": false,
+        "available_rounds": 0,
+        "mean": null,
+        "min": null,
+        "max": null,
+        "sample_stdev": null,
+        "round_values": []
+      },
+      "cgroup_io_write_mib_per_second": {
+        "available": false,
+        "available_rounds": 0,
+        "mean": null,
+        "min": null,
+        "max": null,
+        "sample_stdev": null,
+        "round_values": []
+      },
+      "launch_ready_latency_mean_ms": {
+        "available": false,
+        "available_rounds": 0,
+        "mean": null,
+        "min": null,
+        "max": null,
+        "sample_stdev": null,
+        "round_values": []
+      },
+      "launch_ready_latency_p95_ms": {
+        "available": false,
+        "available_rounds": 0,
+        "mean": null,
+        "min": null,
+        "max": null,
+        "sample_stdev": null,
+        "round_values": []
+      },
+      "parp_decision": {
+        "available": false,
+        "available_rounds": 0,
+        "mean": null,
+        "min": null,
+        "max": null,
+        "sample_stdev": null,
+        "round_values": []
+      },
+      "parp_access": {
+        "available": false,
+        "available_rounds": 0,
+        "mean": null,
+        "min": null,
+        "max": null,
+        "sample_stdev": null,
+        "round_values": []
+      },
+      "parp_outcome": {
+        "available": false,
+        "available_rounds": 0,
+        "mean": null,
+        "min": null,
+        "max": null,
+        "sample_stdev": null,
+        "round_values": []
+      },
+      "launch_failures": {
+        "available": false,
+        "available_rounds": 0,
+        "mean": null,
+        "min": null,
+        "max": null,
+        "sample_stdev": null,
+        "round_values": []
+      },
+      "low_memory_popups": {
+        "available": false,
+        "available_rounds": 0,
+        "mean": null,
+        "min": null,
+        "max": null,
+        "sample_stdev": null,
+        "round_values": []
+      },
+      "cgroup_oom_events": {
+        "available": false,
+        "available_rounds": 0,
+        "mean": null,
+        "min": null,
+        "max": null,
+        "sample_stdev": null,
+        "round_values": []
+      },
+      "app_oom_kills": {
+        "available": false,
+        "available_rounds": 0,
+        "mean": null,
+        "min": null,
+        "max": null,
+        "sample_stdev": null,
+        "round_values": []
+      },
+      "host_oom_kills": {
+        "available": false,
+        "available_rounds": 0,
+        "mean": null,
+        "min": null,
+        "max": null,
+        "sample_stdev": null,
+        "round_values": []
+      },
+      "failure_total": {
+        "available": false,
+        "available_rounds": 0,
+        "mean": null,
+        "min": null,
+        "max": null,
+        "sample_stdev": null,
+        "round_values": []
+      },
+      "trace_loss_total": {
+        "available": false,
+        "available_rounds": 0,
+        "mean": null,
+        "min": null,
+        "max": null,
+        "sample_stdev": null,
+        "round_values": []
+      }
+    },
+    "monitor_extrema": {
+      "min_memavailable_bytes": 0.0,
+      "min_swapfree_bytes": 0.0,
+      "max_psi_some_avg10": 0.0,
+      "max_psi_full_avg10": 0.0,
+      "max_test_cgroup_memory_current_bytes": 0.0,
+      "host_oom_kill_delta": 0.0,
+      "pswpin_delta": 0.0,
+      "pswpout_delta": 0.0,
+      "test_cgroup_memory_high_delta": 0.0,
+      "test_cgroup_memory_max_delta": 0.0,
+      "test_cgroup_oom_delta": 0.0,
+      "test_cgroup_oom_kill_delta": 0.0,
+      "max_low_memory_popup_count": 0.0
+    },
+    "attempt_monitor_extrema": {
+      "min_memavailable_bytes": 3962159104.0,
+      "min_swapfree_bytes": 684879872.0,
+      "max_psi_some_avg10": 39.15,
+      "max_psi_full_avg10": 33.56,
+      "max_test_cgroup_memory_current_bytes": 22185013248.0,
+      "host_oom_kill_delta": 0.0,
+      "pswpin_delta": 635241.0,
+      "pswpout_delta": 2648819.0,
+      "test_cgroup_memory_high_delta": 43253.0,
+      "test_cgroup_memory_max_delta": 0.0,
+      "test_cgroup_oom_delta": 0.0,
+      "test_cgroup_oom_kill_delta": 0.0,
+      "max_low_memory_popup_count": 0.0
+    },
+    "summary_sha256": "d428bb82d837d0043e56d037e0cc9fd7130b4500d548a2add2ccce2d52d349b8",
+    "scenario_plans": [
+      {
+        "round": 1,
+        "seed": 20260815,
+        "path": "/home/lzx/Desktop/PARP/test/outputs/parp_acceptance_lsapp_aligned/peak-full-observe-20260814_210935-6.17.13-parp-lzx-v4.2+/round-01/scenario-plan.json",
+        "sha256": "d7019eef4a8e485b8d2e0d4195f9e8f4c70b713ce309e9ed81755647f56c681a"
+      },
+      {
+        "round": 2,
+        "seed": 20260816,
+        "path": "/home/lzx/Desktop/PARP/test/outputs/parp_acceptance_lsapp_aligned/peak-full-observe-20260814_210935-6.17.13-parp-lzx-v4.2+/round-02/scenario-plan.json",
+        "sha256": "eb6c28cde6474345c82812bc6af02975345fe7fded7a82c35a1593aadec06639"
+      },
+      {
+        "round": 3,
+        "seed": 20260817,
+        "path": "/home/lzx/Desktop/PARP/test/outputs/parp_acceptance_lsapp_aligned/peak-full-observe-20260814_210935-6.17.13-parp-lzx-v4.2+/round-03/scenario-plan.json",
+        "sha256": "927d1917d5fa372c40e359976930fbfdbba0c276a5db9636cb302924f8d32b55"
+      }
+    ],
+    "preflight": {
+      "status": "READY",
+      "blocking_checks": [
+        "sudo_noninteractive",
+        "x11_display",
+        "cgroup_v2_memory",
+        "cgroup_v2_cpu",
+        "cgroup_v2_io",
+        "tracefs_page_fault_user",
+        "tracefs_parp_decision",
+        "swap_present",
+        "memory_16g_class",
+        "memavailable_floor",
+        "disk_for_sparse_fixture",
+        "automation_present",
+        "all_required_apps_installed",
+        "xdotool_present",
+        "wmctrl_present",
+        "inotify_watch_headroom"
+      ],
+      "metrics_schema_version": 3,
+      "diagnostic_only": true,
+      "diagnostic_reason": "SHADOW_APPLY_NOT_COMPILED_OR_MODEL_UNTRAINED",
+      "timestamp": "2026-08-14T21:09:35.893317",
+      "kernel_release": "6.17.13-parp-lzx-v4.2+",
+      "profile": "full",
+      "suite": "peak",
+      "variant": "observe",
+      "memory": {
+        "total_bytes": 34130087936,
+        "available_bytes": 24410529792
+      },
+      "swap_bytes": 4087345152,
+      "disk_free_bytes": 155889385472,
+      "inotify": {
+        "maximum": 65536,
+        "used": 15908,
+        "headroom": 49628
+      },
+      "gui": {
+        "DISPLAY": ":3",
+        "XAUTHORITY": "/dev/null",
+        "XDG_RUNTIME_DIR": "/run/user/1000",
+        "DBUS_SESSION_BUS_ADDRESS": "unix:path=/run/user/1000/bus",
+        "XDG_SESSION_TYPE": "x11"
+      },
+      "apps": {
+        "FIREFOX": {
+          "executable": "epiphany-browser",
+          "installed": true
+        },
+        "LIBREOFFICE": {
+          "executable": "libreoffice",
+          "installed": true
+        },
+        "VLC": {
+          "executable": "vlc",
+          "installed": true
+        },
+        "GIMP": {
+          "executable": "gimp",
+          "installed": true
+        },
+        "AUDACITY": {
+          "executable": "audacity",
+          "installed": true
+        },
+        "THUNDERBIRD": {
+          "executable": "thunderbird",
+          "installed": true
+        },
+        "EVINCE": {
+          "executable": "evince",
+          "installed": true
+        },
+        "FILES": {
+          "executable": "nautilus",
+          "installed": true
+        },
+        "CALCULATOR": {
+          "executable": "gnome-calculator",
+          "installed": true
+        },
+        "CALENDAR": {
+          "executable": "gnome-calendar",
+          "installed": true
+        },
+        "RHYTHMBOX": {
+          "executable": "rhythmbox",
+          "installed": true
+        },
+        "IMAGE_VIEWER": {
+          "executable": "eog",
+          "installed": true
+        },
+        "SHOTWELL": {
+          "executable": "shotwell",
+          "installed": true
+        },
+        "SYSTEM_MONITOR": {
+          "executable": "gnome-system-monitor",
+          "installed": true
+        },
+        "SOLITAIRE": {
+          "executable": "/usr/games/sol",
+          "installed": true
+        }
+      },
+      "system_metadata": {
+        "captured_at": "2026-08-14T21:09:35.866842",
+        "hostname": "lzx-virtual-machine",
+        "kernel_release": "6.17.13-parp-lzx-v4.2+",
+        "kernel_version": "#4 SMP PREEMPT_DYNAMIC Fri Aug 14 18:02:18 CST 2026",
+        "kernel_cmdline": "BOOT_IMAGE=/boot/vmlinuz-6.17.13-parp-lzx-v4.2+ root=UUID=51e68485-f377-4ea6-bc24-d44fdffad6d3 ro find_preseed=/preseed.cfg auto noprompt priority=critical locale=en_US quiet splash",
+        "kernel_config": {
+          "path": "/boot/config-6.17.13-parp-lzx-v4.2+",
+          "sha256": "fc34269628abfdd943a5919816026706c931cbdaee16546ce36f16c5bd1e2313"
+        },
+        "machine": "x86_64",
+        "cpu_model": "13th Gen Intel(R) Core(TM) i5-13600K",
+        "cpu_count": 2,
+        "page_size": 4096,
+        "memtotal_bytes": 34130087936,
+        "vm_sysctls": {
+          "vm.swappiness": "60",
+          "vm.watermark_scale_factor": "10",
+          "vm.watermark_boost_factor": "15000",
+          "vm.overcommit_memory": "0",
+          "vm.overcommit_ratio": "50"
+        },
+        "swap": [
+          {
+            "path": "/swapfile",
+            "type": "file",
+            "size_kib": 3991548,
+            "used_kib": 1207860,
+            "priority": -2
+          }
+        ],
+        "transparent_hugepage": {
+          "enabled": "always [madvise] never",
+          "defrag": "always defer defer+madvise [madvise] never"
+        },
+        "cpu_governors": [],
+        "session": {
+          "type": "x11",
+          "desktop": null,
+          "display": ":3",
+          "xauthority": "/dev/null",
+          "wayland_display": null
+        },
+        "result_storage": {
+          "mount_point": "/",
+          "filesystem": "ext4",
+          "source": "/dev/sda3"
+        }
+      },
+      "checks": {
+        "sudo_noninteractive": true,
+        "x11_display": true,
+        "cgroup_v2_memory": true,
+        "cgroup_v2_cpu": true,
+        "cgroup_v2_io": true,
+        "tracefs_page_fault_user": true,
+        "tracefs_parp_decision": true,
+        "swap_present": true,
+        "memory_16g_class": true,
+        "memavailable_floor": true,
+        "disk_for_sparse_fixture": true,
+        "automation_present": true,
+        "all_required_apps_installed": true,
+        "xdotool_present": true,
+        "wmctrl_present": true,
+        "inotify_watch_headroom": true
+      },
+      "parp": {
+        "requested_policy": null,
+        "observed_policy": {
+          "parp_mode": "1",
+          "effective_tier_mode": "0",
+          "tier2_enabled": "0",
+          "cgroup_tier2_enabled": null,
+          "effective_tier_stats": "mode 0\napply_compiled 1\npage_ext_bytes 24\nstate_epoch 0\ncandidates 0\ntier_gate_decisions 0\ncandidate_pages 0\nstate_fault 0\nscores 0\nmetadata_missing 0\nstate_unstable 0\nmodel_invalid 0\nkeep_reclaim_pages 0\nupgrade_pages 0\nkeep_protect_pages 0\ndowngrade_pages 0\nspecial_protect_pages 0\npolicy_promotions 0\nnative_tier_promotions 0\nnative_generation_moves 0\nscore_time_ns_total 0\nscore_time_ns_max 0\ndecision_time_ns_total 0\ndecision_time_ns_max 0\nlock_time_ns_total 0\nlock_time_ns_max 0\ntrace_decisions 0\ntrace_accesses 0\ntrace_outcomes 0\ntrace_batches 0\ntrace_locks 0\nscore_hist_log2_ns 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0\ndecision_hist_log2_ns 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0\nlock_hist_log2_ns 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0",
+          "effective_tier_config": "model GLOBAL_REUSE_MODEL\nmodel_type pairwise_linear_ranker\nmodel_version 1\nmodel_checksum 1d5cc9918ae0e2caea316d36841fd61bef562e68f0820188c1cc0a6195f1fa5e\nmodel_provenance ENGINEERING_FIXTURE_UNTRAINED\nfeature_schema_version 1\nconfig_sequence 0\nmetadata_reservation_requested 0\nmetadata_ready 0\nmetadata_payload_bytes 24\ncold_threshold -48\nhot_threshold_1 48\nhot_threshold_2 96\nhot_threshold_3 144\nmax_upgrade_tiers 2\nmax_downgrade_tiers 1\nrequire_two_cold 1\nupgrade_batch_pages 2\nupgrade_epoch_pages 8\nupgrade_ratio_permyriad 100\ndowngrade_batch_pages 1\ndowngrade_epoch_pages 4\ndowngrade_ratio_permyriad 50\nexperiment_id 0\nsession_id 0"
+        },
+        "effective_tier_mode": "0",
+        "apply_compiled": "1",
+        "model_provenance": "ENGINEERING_FIXTURE_UNTRAINED",
+        "effective_tier_stats": "mode 0\napply_compiled 1\npage_ext_bytes 24\nstate_epoch 0\ncandidates 0\ntier_gate_decisions 0\ncandidate_pages 0\nstate_fault 0\nscores 0\nmetadata_missing 0\nstate_unstable 0\nmodel_invalid 0\nkeep_reclaim_pages 0\nupgrade_pages 0\nkeep_protect_pages 0\ndowngrade_pages 0\nspecial_protect_pages 0\npolicy_promotions 0\nnative_tier_promotions 0\nnative_generation_moves 0\nscore_time_ns_total 0\nscore_time_ns_max 0\ndecision_time_ns_total 0\ndecision_time_ns_max 0\nlock_time_ns_total 0\nlock_time_ns_max 0\ntrace_decisions 0\ntrace_accesses 0\ntrace_outcomes 0\ntrace_batches 0\ntrace_locks 0\nscore_hist_log2_ns 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0\ndecision_hist_log2_ns 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0\nlock_hist_log2_ns 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0",
+        "effective_tier_config": "model GLOBAL_REUSE_MODEL\nmodel_type pairwise_linear_ranker\nmodel_version 1\nmodel_checksum 1d5cc9918ae0e2caea316d36841fd61bef562e68f0820188c1cc0a6195f1fa5e\nmodel_provenance ENGINEERING_FIXTURE_UNTRAINED\nfeature_schema_version 1\nconfig_sequence 0\nmetadata_reservation_requested 0\nmetadata_ready 0\nmetadata_payload_bytes 24\ncold_threshold -48\nhot_threshold_1 48\nhot_threshold_2 96\nhot_threshold_3 144\nmax_upgrade_tiers 2\nmax_downgrade_tiers 1\nrequire_two_cold 1\nupgrade_batch_pages 2\nupgrade_epoch_pages 8\nupgrade_ratio_permyriad 100\ndowngrade_batch_pages 1\ndowngrade_epoch_pages 4\ndowngrade_ratio_permyriad 50\nexperiment_id 0\nsession_id 0"
+      }
+    }
+  }
+}

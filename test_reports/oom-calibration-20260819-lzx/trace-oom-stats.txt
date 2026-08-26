@@ -1,0 +1,1152 @@
+===/sys/kernel/tracing/instances/parp-accept-oomcal819/per_cpu/cpu0/stats
+entries: 0
+overrun: 0
+commit overrun: 0
+bytes: 0
+oldest event ts:   625.326060
+now ts:   625.358530
+dropped events: 0
+read events: 196539
+===/sys/kernel/tracing/instances/parp-accept-oomcal819/per_cpu/cpu1/stats
+entries: 0
+overrun: 0
+commit overrun: 0
+bytes: 0
+oldest event ts:   625.332587
+now ts:   625.359468
+dropped events: 0
+read events: 89224
+===/sys/kernel/tracing/instances/parp-accept-oomcal819/per_cpu/cpu10/stats
+entries: 0
+overrun: 0
+commit overrun: 0
+bytes: 0
+oldest event ts:     0.000000
+now ts:   625.360608
+dropped events: 0
+read events: 0
+===/sys/kernel/tracing/instances/parp-accept-oomcal819/per_cpu/cpu100/stats
+entries: 0
+overrun: 0
+commit overrun: 0
+bytes: 0
+oldest event ts:     0.000000
+now ts:   625.361479
+dropped events: 0
+read events: 0
+===/sys/kernel/tracing/instances/parp-accept-oomcal819/per_cpu/cpu101/stats
+entries: 0
+overrun: 0
+commit overrun: 0
+bytes: 0
+oldest event ts:     0.000000
+now ts:   625.362490
+dropped events: 0
+read events: 0
+===/sys/kernel/tracing/instances/parp-accept-oomcal819/per_cpu/cpu102/stats
+entries: 0
+overrun: 0
+commit overrun: 0
+bytes: 0
+oldest event ts:     0.000000
+now ts:   625.363942
+dropped events: 0
+read events: 0
+===/sys/kernel/tracing/instances/parp-accept-oomcal819/per_cpu/cpu103/stats
+entries: 0
+overrun: 0
+commit overrun: 0
+bytes: 0
+oldest event ts:     0.000000
+now ts:   625.364898
+dropped events: 0
+read events: 0
+===/sys/kernel/tracing/instances/parp-accept-oomcal819/per_cpu/cpu104/stats
+entries: 0
+overrun: 0
+commit overrun: 0
+bytes: 0
+oldest event ts:     0.000000
+now ts:   625.365722
+dropped events: 0
+read events: 0
+===/sys/kernel/tracing/instances/parp-accept-oomcal819/per_cpu/cpu105/stats
+entries: 0
+overrun: 0
+commit overrun: 0
+bytes: 0
+oldest event ts:     0.000000
+now ts:   625.366531
+dropped events: 0
+read events: 0
+===/sys/kernel/tracing/instances/parp-accept-oomcal819/per_cpu/cpu106/stats
+entries: 0
+overrun: 0
+commit overrun: 0
+bytes: 0
+oldest event ts:     0.000000
+now ts:   625.367344
+dropped events: 0
+read events: 0
+===/sys/kernel/tracing/instances/parp-accept-oomcal819/per_cpu/cpu107/stats
+entries: 0
+overrun: 0
+commit overrun: 0
+bytes: 0
+oldest event ts:     0.000000
+now ts:   625.368235
+dropped events: 0
+read events: 0
+===/sys/kernel/tracing/instances/parp-accept-oomcal819/per_cpu/cpu108/stats
+entries: 0
+overrun: 0
+commit overrun: 0
+bytes: 0
+oldest event ts:     0.000000
+now ts:   625.369102
+dropped events: 0
+read events: 0
+===/sys/kernel/tracing/instances/parp-accept-oomcal819/per_cpu/cpu109/stats
+entries: 0
+overrun: 0
+commit overrun: 0
+bytes: 0
+oldest event ts:     0.000000
+now ts:   625.370048
+dropped events: 0
+read events: 0
+===/sys/kernel/tracing/instances/parp-accept-oomcal819/per_cpu/cpu11/stats
+entries: 0
+overrun: 0
+commit overrun: 0
+bytes: 0
+oldest event ts:     0.000000
+now ts:   625.370957
+dropped events: 0
+read events: 0
+===/sys/kernel/tracing/instances/parp-accept-oomcal819/per_cpu/cpu110/stats
+entries: 0
+overrun: 0
+commit overrun: 0
+bytes: 0
+oldest event ts:     0.000000
+now ts:   625.371779
+dropped events: 0
+read events: 0
+===/sys/kernel/tracing/instances/parp-accept-oomcal819/per_cpu/cpu111/stats
+entries: 0
+overrun: 0
+commit overrun: 0
+bytes: 0
+oldest event ts:     0.000000
+now ts:   625.372589
+dropped events: 0
+read events: 0
+===/sys/kernel/tracing/instances/parp-accept-oomcal819/per_cpu/cpu112/stats
+entries: 0
+overrun: 0
+commit overrun: 0
+bytes: 0
+oldest event ts:     0.000000
+now ts:   625.373392
+dropped events: 0
+read events: 0
+===/sys/kernel/tracing/instances/parp-accept-oomcal819/per_cpu/cpu113/stats
+entries: 0
+overrun: 0
+commit overrun: 0
+bytes: 0
+oldest event ts:     0.000000
+now ts:   625.374184
+dropped events: 0
+read events: 0
+===/sys/kernel/tracing/instances/parp-accept-oomcal819/per_cpu/cpu114/stats
+entries: 0
+overrun: 0
+commit overrun: 0
+bytes: 0
+oldest event ts:     0.000000
+now ts:   625.375002
+dropped events: 0
+read events: 0
+===/sys/kernel/tracing/instances/parp-accept-oomcal819/per_cpu/cpu115/stats
+entries: 0
+overrun: 0
+commit overrun: 0
+bytes: 0
+oldest event ts:     0.000000
+now ts:   625.375835
+dropped events: 0
+read events: 0
+===/sys/kernel/tracing/instances/parp-accept-oomcal819/per_cpu/cpu116/stats
+entries: 0
+overrun: 0
+commit overrun: 0
+bytes: 0
+oldest event ts:     0.000000
+now ts:   625.376801
+dropped events: 0
+read events: 0
+===/sys/kernel/tracing/instances/parp-accept-oomcal819/per_cpu/cpu117/stats
+entries: 0
+overrun: 0
+commit overrun: 0
+bytes: 0
+oldest event ts:     0.000000
+now ts:   625.377833
+dropped events: 0
+read events: 0
+===/sys/kernel/tracing/instances/parp-accept-oomcal819/per_cpu/cpu118/stats
+entries: 0
+overrun: 0
+commit overrun: 0
+bytes: 0
+oldest event ts:     0.000000
+now ts:   625.378760
+dropped events: 0
+read events: 0
+===/sys/kernel/tracing/instances/parp-accept-oomcal819/per_cpu/cpu119/stats
+entries: 0
+overrun: 0
+commit overrun: 0
+bytes: 0
+oldest event ts:     0.000000
+now ts:   625.379984
+dropped events: 0
+read events: 0
+===/sys/kernel/tracing/instances/parp-accept-oomcal819/per_cpu/cpu12/stats
+entries: 0
+overrun: 0
+commit overrun: 0
+bytes: 0
+oldest event ts:     0.000000
+now ts:   625.380840
+dropped events: 0
+read events: 0
+===/sys/kernel/tracing/instances/parp-accept-oomcal819/per_cpu/cpu120/stats
+entries: 0
+overrun: 0
+commit overrun: 0
+bytes: 0
+oldest event ts:     0.000000
+now ts:   625.381711
+dropped events: 0
+read events: 0
+===/sys/kernel/tracing/instances/parp-accept-oomcal819/per_cpu/cpu121/stats
+entries: 0
+overrun: 0
+commit overrun: 0
+bytes: 0
+oldest event ts:     0.000000
+now ts:   625.382816
+dropped events: 0
+read events: 0
+===/sys/kernel/tracing/instances/parp-accept-oomcal819/per_cpu/cpu122/stats
+entries: 0
+overrun: 0
+commit overrun: 0
+bytes: 0
+oldest event ts:     0.000000
+now ts:   625.383677
+dropped events: 0
+read events: 0
+===/sys/kernel/tracing/instances/parp-accept-oomcal819/per_cpu/cpu123/stats
+entries: 0
+overrun: 0
+commit overrun: 0
+bytes: 0
+oldest event ts:     0.000000
+now ts:   625.384672
+dropped events: 0
+read events: 0
+===/sys/kernel/tracing/instances/parp-accept-oomcal819/per_cpu/cpu124/stats
+entries: 0
+overrun: 0
+commit overrun: 0
+bytes: 0
+oldest event ts:     0.000000
+now ts:   625.385472
+dropped events: 0
+read events: 0
+===/sys/kernel/tracing/instances/parp-accept-oomcal819/per_cpu/cpu125/stats
+entries: 0
+overrun: 0
+commit overrun: 0
+bytes: 0
+oldest event ts:     0.000000
+now ts:   625.386345
+dropped events: 0
+read events: 0
+===/sys/kernel/tracing/instances/parp-accept-oomcal819/per_cpu/cpu126/stats
+entries: 0
+overrun: 0
+commit overrun: 0
+bytes: 0
+oldest event ts:     0.000000
+now ts:   625.387145
+dropped events: 0
+read events: 0
+===/sys/kernel/tracing/instances/parp-accept-oomcal819/per_cpu/cpu127/stats
+entries: 0
+overrun: 0
+commit overrun: 0
+bytes: 0
+oldest event ts:     0.000000
+now ts:   625.387950
+dropped events: 0
+read events: 0
+===/sys/kernel/tracing/instances/parp-accept-oomcal819/per_cpu/cpu13/stats
+entries: 0
+overrun: 0
+commit overrun: 0
+bytes: 0
+oldest event ts:     0.000000
+now ts:   625.388746
+dropped events: 0
+read events: 0
+===/sys/kernel/tracing/instances/parp-accept-oomcal819/per_cpu/cpu14/stats
+entries: 0
+overrun: 0
+commit overrun: 0
+bytes: 0
+oldest event ts:     0.000000
+now ts:   625.389544
+dropped events: 0
+read events: 0
+===/sys/kernel/tracing/instances/parp-accept-oomcal819/per_cpu/cpu15/stats
+entries: 0
+overrun: 0
+commit overrun: 0
+bytes: 0
+oldest event ts:     0.000000
+now ts:   625.390322
+dropped events: 0
+read events: 0
+===/sys/kernel/tracing/instances/parp-accept-oomcal819/per_cpu/cpu16/stats
+entries: 0
+overrun: 0
+commit overrun: 0
+bytes: 0
+oldest event ts:     0.000000
+now ts:   625.391108
+dropped events: 0
+read events: 0
+===/sys/kernel/tracing/instances/parp-accept-oomcal819/per_cpu/cpu17/stats
+entries: 0
+overrun: 0
+commit overrun: 0
+bytes: 0
+oldest event ts:     0.000000
+now ts:   625.391898
+dropped events: 0
+read events: 0
+===/sys/kernel/tracing/instances/parp-accept-oomcal819/per_cpu/cpu18/stats
+entries: 0
+overrun: 0
+commit overrun: 0
+bytes: 0
+oldest event ts:     0.000000
+now ts:   625.392892
+dropped events: 0
+read events: 0
+===/sys/kernel/tracing/instances/parp-accept-oomcal819/per_cpu/cpu19/stats
+entries: 0
+overrun: 0
+commit overrun: 0
+bytes: 0
+oldest event ts:     0.000000
+now ts:   625.394054
+dropped events: 0
+read events: 0
+===/sys/kernel/tracing/instances/parp-accept-oomcal819/per_cpu/cpu2/stats
+entries: 0
+overrun: 0
+commit overrun: 0
+bytes: 0
+oldest event ts:     0.000000
+now ts:   625.395156
+dropped events: 0
+read events: 0
+===/sys/kernel/tracing/instances/parp-accept-oomcal819/per_cpu/cpu20/stats
+entries: 0
+overrun: 0
+commit overrun: 0
+bytes: 0
+oldest event ts:     0.000000
+now ts:   625.396040
+dropped events: 0
+read events: 0
+===/sys/kernel/tracing/instances/parp-accept-oomcal819/per_cpu/cpu21/stats
+entries: 0
+overrun: 0
+commit overrun: 0
+bytes: 0
+oldest event ts:     0.000000
+now ts:   625.396891
+dropped events: 0
+read events: 0
+===/sys/kernel/tracing/instances/parp-accept-oomcal819/per_cpu/cpu22/stats
+entries: 0
+overrun: 0
+commit overrun: 0
+bytes: 0
+oldest event ts:     0.000000
+now ts:   625.397733
+dropped events: 0
+read events: 0
+===/sys/kernel/tracing/instances/parp-accept-oomcal819/per_cpu/cpu23/stats
+entries: 0
+overrun: 0
+commit overrun: 0
+bytes: 0
+oldest event ts:     0.000000
+now ts:   625.398576
+dropped events: 0
+read events: 0
+===/sys/kernel/tracing/instances/parp-accept-oomcal819/per_cpu/cpu24/stats
+entries: 0
+overrun: 0
+commit overrun: 0
+bytes: 0
+oldest event ts:     0.000000
+now ts:   625.399809
+dropped events: 0
+read events: 0
+===/sys/kernel/tracing/instances/parp-accept-oomcal819/per_cpu/cpu25/stats
+entries: 0
+overrun: 0
+commit overrun: 0
+bytes: 0
+oldest event ts:     0.000000
+now ts:   625.400723
+dropped events: 0
+read events: 0
+===/sys/kernel/tracing/instances/parp-accept-oomcal819/per_cpu/cpu26/stats
+entries: 0
+overrun: 0
+commit overrun: 0
+bytes: 0
+oldest event ts:     0.000000
+now ts:   625.401702
+dropped events: 0
+read events: 0
+===/sys/kernel/tracing/instances/parp-accept-oomcal819/per_cpu/cpu27/stats
+entries: 0
+overrun: 0
+commit overrun: 0
+bytes: 0
+oldest event ts:     0.000000
+now ts:   625.402710
+dropped events: 0
+read events: 0
+===/sys/kernel/tracing/instances/parp-accept-oomcal819/per_cpu/cpu28/stats
+entries: 0
+overrun: 0
+commit overrun: 0
+bytes: 0
+oldest event ts:     0.000000
+now ts:   625.403963
+dropped events: 0
+read events: 0
+===/sys/kernel/tracing/instances/parp-accept-oomcal819/per_cpu/cpu29/stats
+entries: 0
+overrun: 0
+commit overrun: 0
+bytes: 0
+oldest event ts:     0.000000
+now ts:   625.405025
+dropped events: 0
+read events: 0
+===/sys/kernel/tracing/instances/parp-accept-oomcal819/per_cpu/cpu3/stats
+entries: 0
+overrun: 0
+commit overrun: 0
+bytes: 0
+oldest event ts:     0.000000
+now ts:   625.405974
+dropped events: 0
+read events: 0
+===/sys/kernel/tracing/instances/parp-accept-oomcal819/per_cpu/cpu30/stats
+entries: 0
+overrun: 0
+commit overrun: 0
+bytes: 0
+oldest event ts:     0.000000
+now ts:   625.406935
+dropped events: 0
+read events: 0
+===/sys/kernel/tracing/instances/parp-accept-oomcal819/per_cpu/cpu31/stats
+entries: 0
+overrun: 0
+commit overrun: 0
+bytes: 0
+oldest event ts:     0.000000
+now ts:   625.407770
+dropped events: 0
+read events: 0
+===/sys/kernel/tracing/instances/parp-accept-oomcal819/per_cpu/cpu32/stats
+entries: 0
+overrun: 0
+commit overrun: 0
+bytes: 0
+oldest event ts:     0.000000
+now ts:   625.408578
+dropped events: 0
+read events: 0
+===/sys/kernel/tracing/instances/parp-accept-oomcal819/per_cpu/cpu33/stats
+entries: 0
+overrun: 0
+commit overrun: 0
+bytes: 0
+oldest event ts:     0.000000
+now ts:   625.409722
+dropped events: 0
+read events: 0
+===/sys/kernel/tracing/instances/parp-accept-oomcal819/per_cpu/cpu34/stats
+entries: 0
+overrun: 0
+commit overrun: 0
+bytes: 0
+oldest event ts:     0.000000
+now ts:   625.410938
+dropped events: 0
+read events: 0
+===/sys/kernel/tracing/instances/parp-accept-oomcal819/per_cpu/cpu35/stats
+entries: 0
+overrun: 0
+commit overrun: 0
+bytes: 0
+oldest event ts:     0.000000
+now ts:   625.411857
+dropped events: 0
+read events: 0
+===/sys/kernel/tracing/instances/parp-accept-oomcal819/per_cpu/cpu36/stats
+entries: 0
+overrun: 0
+commit overrun: 0
+bytes: 0
+oldest event ts:     0.000000
+now ts:   625.412693
+dropped events: 0
+read events: 0
+===/sys/kernel/tracing/instances/parp-accept-oomcal819/per_cpu/cpu37/stats
+entries: 0
+overrun: 0
+commit overrun: 0
+bytes: 0
+oldest event ts:     0.000000
+now ts:   625.413641
+dropped events: 0
+read events: 0
+===/sys/kernel/tracing/instances/parp-accept-oomcal819/per_cpu/cpu38/stats
+entries: 0
+overrun: 0
+commit overrun: 0
+bytes: 0
+oldest event ts:     0.000000
+now ts:   625.414471
+dropped events: 0
+read events: 0
+===/sys/kernel/tracing/instances/parp-accept-oomcal819/per_cpu/cpu39/stats
+entries: 0
+overrun: 0
+commit overrun: 0
+bytes: 0
+oldest event ts:     0.000000
+now ts:   625.416225
+dropped events: 0
+read events: 0
+===/sys/kernel/tracing/instances/parp-accept-oomcal819/per_cpu/cpu4/stats
+entries: 0
+overrun: 0
+commit overrun: 0
+bytes: 0
+oldest event ts:     0.000000
+now ts:   625.417182
+dropped events: 0
+read events: 0
+===/sys/kernel/tracing/instances/parp-accept-oomcal819/per_cpu/cpu40/stats
+entries: 0
+overrun: 0
+commit overrun: 0
+bytes: 0
+oldest event ts:     0.000000
+now ts:   625.418100
+dropped events: 0
+read events: 0
+===/sys/kernel/tracing/instances/parp-accept-oomcal819/per_cpu/cpu41/stats
+entries: 0
+overrun: 0
+commit overrun: 0
+bytes: 0
+oldest event ts:     0.000000
+now ts:   625.418993
+dropped events: 0
+read events: 0
+===/sys/kernel/tracing/instances/parp-accept-oomcal819/per_cpu/cpu42/stats
+entries: 0
+overrun: 0
+commit overrun: 0
+bytes: 0
+oldest event ts:     0.000000
+now ts:   625.419904
+dropped events: 0
+read events: 0
+===/sys/kernel/tracing/instances/parp-accept-oomcal819/per_cpu/cpu43/stats
+entries: 0
+overrun: 0
+commit overrun: 0
+bytes: 0
+oldest event ts:     0.000000
+now ts:   625.420681
+dropped events: 0
+read events: 0
+===/sys/kernel/tracing/instances/parp-accept-oomcal819/per_cpu/cpu44/stats
+entries: 0
+overrun: 0
+commit overrun: 0
+bytes: 0
+oldest event ts:     0.000000
+now ts:   625.421516
+dropped events: 0
+read events: 0
+===/sys/kernel/tracing/instances/parp-accept-oomcal819/per_cpu/cpu45/stats
+entries: 0
+overrun: 0
+commit overrun: 0
+bytes: 0
+oldest event ts:     0.000000
+now ts:   625.422354
+dropped events: 0
+read events: 0
+===/sys/kernel/tracing/instances/parp-accept-oomcal819/per_cpu/cpu46/stats
+entries: 0
+overrun: 0
+commit overrun: 0
+bytes: 0
+oldest event ts:     0.000000
+now ts:   625.423226
+dropped events: 0
+read events: 0
+===/sys/kernel/tracing/instances/parp-accept-oomcal819/per_cpu/cpu47/stats
+entries: 0
+overrun: 0
+commit overrun: 0
+bytes: 0
+oldest event ts:     0.000000
+now ts:   625.424089
+dropped events: 0
+read events: 0
+===/sys/kernel/tracing/instances/parp-accept-oomcal819/per_cpu/cpu48/stats
+entries: 0
+overrun: 0
+commit overrun: 0
+bytes: 0
+oldest event ts:     0.000000
+now ts:   625.425029
+dropped events: 0
+read events: 0
+===/sys/kernel/tracing/instances/parp-accept-oomcal819/per_cpu/cpu49/stats
+entries: 0
+overrun: 0
+commit overrun: 0
+bytes: 0
+oldest event ts:     0.000000
+now ts:   625.425920
+dropped events: 0
+read events: 0
+===/sys/kernel/tracing/instances/parp-accept-oomcal819/per_cpu/cpu5/stats
+entries: 0
+overrun: 0
+commit overrun: 0
+bytes: 0
+oldest event ts:     0.000000
+now ts:   625.426893
+dropped events: 0
+read events: 0
+===/sys/kernel/tracing/instances/parp-accept-oomcal819/per_cpu/cpu50/stats
+entries: 0
+overrun: 0
+commit overrun: 0
+bytes: 0
+oldest event ts:     0.000000
+now ts:   625.427862
+dropped events: 0
+read events: 0
+===/sys/kernel/tracing/instances/parp-accept-oomcal819/per_cpu/cpu51/stats
+entries: 0
+overrun: 0
+commit overrun: 0
+bytes: 0
+oldest event ts:     0.000000
+now ts:   625.428714
+dropped events: 0
+read events: 0
+===/sys/kernel/tracing/instances/parp-accept-oomcal819/per_cpu/cpu52/stats
+entries: 0
+overrun: 0
+commit overrun: 0
+bytes: 0
+oldest event ts:     0.000000
+now ts:   625.429582
+dropped events: 0
+read events: 0
+===/sys/kernel/tracing/instances/parp-accept-oomcal819/per_cpu/cpu53/stats
+entries: 0
+overrun: 0
+commit overrun: 0
+bytes: 0
+oldest event ts:     0.000000
+now ts:   625.430487
+dropped events: 0
+read events: 0
+===/sys/kernel/tracing/instances/parp-accept-oomcal819/per_cpu/cpu54/stats
+entries: 0
+overrun: 0
+commit overrun: 0
+bytes: 0
+oldest event ts:     0.000000
+now ts:   625.431338
+dropped events: 0
+read events: 0
+===/sys/kernel/tracing/instances/parp-accept-oomcal819/per_cpu/cpu55/stats
+entries: 0
+overrun: 0
+commit overrun: 0
+bytes: 0
+oldest event ts:     0.000000
+now ts:   625.432185
+dropped events: 0
+read events: 0
+===/sys/kernel/tracing/instances/parp-accept-oomcal819/per_cpu/cpu56/stats
+entries: 0
+overrun: 0
+commit overrun: 0
+bytes: 0
+oldest event ts:     0.000000
+now ts:   625.433049
+dropped events: 0
+read events: 0
+===/sys/kernel/tracing/instances/parp-accept-oomcal819/per_cpu/cpu57/stats
+entries: 0
+overrun: 0
+commit overrun: 0
+bytes: 0
+oldest event ts:     0.000000
+now ts:   625.433994
+dropped events: 0
+read events: 0
+===/sys/kernel/tracing/instances/parp-accept-oomcal819/per_cpu/cpu58/stats
+entries: 0
+overrun: 0
+commit overrun: 0
+bytes: 0
+oldest event ts:     0.000000
+now ts:   625.434820
+dropped events: 0
+read events: 0
+===/sys/kernel/tracing/instances/parp-accept-oomcal819/per_cpu/cpu59/stats
+entries: 0
+overrun: 0
+commit overrun: 0
+bytes: 0
+oldest event ts:     0.000000
+now ts:   625.435610
+dropped events: 0
+read events: 0
+===/sys/kernel/tracing/instances/parp-accept-oomcal819/per_cpu/cpu6/stats
+entries: 0
+overrun: 0
+commit overrun: 0
+bytes: 0
+oldest event ts:     0.000000
+now ts:   625.436454
+dropped events: 0
+read events: 0
+===/sys/kernel/tracing/instances/parp-accept-oomcal819/per_cpu/cpu60/stats
+entries: 0
+overrun: 0
+commit overrun: 0
+bytes: 0
+oldest event ts:     0.000000
+now ts:   625.437292
+dropped events: 0
+read events: 0
+===/sys/kernel/tracing/instances/parp-accept-oomcal819/per_cpu/cpu61/stats
+entries: 0
+overrun: 0
+commit overrun: 0
+bytes: 0
+oldest event ts:     0.000000
+now ts:   625.438108
+dropped events: 0
+read events: 0
+===/sys/kernel/tracing/instances/parp-accept-oomcal819/per_cpu/cpu62/stats
+entries: 0
+overrun: 0
+commit overrun: 0
+bytes: 0
+oldest event ts:     0.000000
+now ts:   625.438934
+dropped events: 0
+read events: 0
+===/sys/kernel/tracing/instances/parp-accept-oomcal819/per_cpu/cpu63/stats
+entries: 0
+overrun: 0
+commit overrun: 0
+bytes: 0
+oldest event ts:     0.000000
+now ts:   625.439809
+dropped events: 0
+read events: 0
+===/sys/kernel/tracing/instances/parp-accept-oomcal819/per_cpu/cpu64/stats
+entries: 0
+overrun: 0
+commit overrun: 0
+bytes: 0
+oldest event ts:     0.000000
+now ts:   625.441617
+dropped events: 0
+read events: 0
+===/sys/kernel/tracing/instances/parp-accept-oomcal819/per_cpu/cpu65/stats
+entries: 0
+overrun: 0
+commit overrun: 0
+bytes: 0
+oldest event ts:     0.000000
+now ts:   625.442476
+dropped events: 0
+read events: 0
+===/sys/kernel/tracing/instances/parp-accept-oomcal819/per_cpu/cpu66/stats
+entries: 0
+overrun: 0
+commit overrun: 0
+bytes: 0
+oldest event ts:     0.000000
+now ts:   625.443751
+dropped events: 0
+read events: 0
+===/sys/kernel/tracing/instances/parp-accept-oomcal819/per_cpu/cpu67/stats
+entries: 0
+overrun: 0
+commit overrun: 0
+bytes: 0
+oldest event ts:     0.000000
+now ts:   625.444709
+dropped events: 0
+read events: 0
+===/sys/kernel/tracing/instances/parp-accept-oomcal819/per_cpu/cpu68/stats
+entries: 0
+overrun: 0
+commit overrun: 0
+bytes: 0
+oldest event ts:     0.000000
+now ts:   625.445628
+dropped events: 0
+read events: 0
+===/sys/kernel/tracing/instances/parp-accept-oomcal819/per_cpu/cpu69/stats
+entries: 0
+overrun: 0
+commit overrun: 0
+bytes: 0
+oldest event ts:     0.000000
+now ts:   625.446535
+dropped events: 0
+read events: 0
+===/sys/kernel/tracing/instances/parp-accept-oomcal819/per_cpu/cpu7/stats
+entries: 0
+overrun: 0
+commit overrun: 0
+bytes: 0
+oldest event ts:     0.000000
+now ts:   625.447360
+dropped events: 0
+read events: 0
+===/sys/kernel/tracing/instances/parp-accept-oomcal819/per_cpu/cpu70/stats
+entries: 0
+overrun: 0
+commit overrun: 0
+bytes: 0
+oldest event ts:     0.000000
+now ts:   625.448203
+dropped events: 0
+read events: 0
+===/sys/kernel/tracing/instances/parp-accept-oomcal819/per_cpu/cpu71/stats
+entries: 0
+overrun: 0
+commit overrun: 0
+bytes: 0
+oldest event ts:     0.000000
+now ts:   625.449128
+dropped events: 0
+read events: 0
+===/sys/kernel/tracing/instances/parp-accept-oomcal819/per_cpu/cpu72/stats
+entries: 0
+overrun: 0
+commit overrun: 0
+bytes: 0
+oldest event ts:     0.000000
+now ts:   625.450022
+dropped events: 0
+read events: 0
+===/sys/kernel/tracing/instances/parp-accept-oomcal819/per_cpu/cpu73/stats
+entries: 0
+overrun: 0
+commit overrun: 0
+bytes: 0
+oldest event ts:     0.000000
+now ts:   625.450856
+dropped events: 0
+read events: 0
+===/sys/kernel/tracing/instances/parp-accept-oomcal819/per_cpu/cpu74/stats
+entries: 0
+overrun: 0
+commit overrun: 0
+bytes: 0
+oldest event ts:     0.000000
+now ts:   625.451653
+dropped events: 0
+read events: 0
+===/sys/kernel/tracing/instances/parp-accept-oomcal819/per_cpu/cpu75/stats
+entries: 0
+overrun: 0
+commit overrun: 0
+bytes: 0
+oldest event ts:     0.000000
+now ts:   625.452456
+dropped events: 0
+read events: 0
+===/sys/kernel/tracing/instances/parp-accept-oomcal819/per_cpu/cpu76/stats
+entries: 0
+overrun: 0
+commit overrun: 0
+bytes: 0
+oldest event ts:     0.000000
+now ts:   625.456721
+dropped events: 0
+read events: 0
+===/sys/kernel/tracing/instances/parp-accept-oomcal819/per_cpu/cpu77/stats
+entries: 0
+overrun: 0
+commit overrun: 0
+bytes: 0
+oldest event ts:     0.000000
+now ts:   625.462307
+dropped events: 0
+read events: 0
+===/sys/kernel/tracing/instances/parp-accept-oomcal819/per_cpu/cpu78/stats
+entries: 0
+overrun: 0
+commit overrun: 0
+bytes: 0
+oldest event ts:     0.000000
+now ts:   625.464557
+dropped events: 0
+read events: 0
+===/sys/kernel/tracing/instances/parp-accept-oomcal819/per_cpu/cpu79/stats
+entries: 0
+overrun: 0
+commit overrun: 0
+bytes: 0
+oldest event ts:     0.000000
+now ts:   625.465616
+dropped events: 0
+read events: 0
+===/sys/kernel/tracing/instances/parp-accept-oomcal819/per_cpu/cpu8/stats
+entries: 0
+overrun: 0
+commit overrun: 0
+bytes: 0
+oldest event ts:     0.000000
+now ts:   625.466491
+dropped events: 0
+read events: 0
+===/sys/kernel/tracing/instances/parp-accept-oomcal819/per_cpu/cpu80/stats
+entries: 0
+overrun: 0
+commit overrun: 0
+bytes: 0
+oldest event ts:     0.000000
+now ts:   625.467362
+dropped events: 0
+read events: 0
+===/sys/kernel/tracing/instances/parp-accept-oomcal819/per_cpu/cpu81/stats
+entries: 0
+overrun: 0
+commit overrun: 0
+bytes: 0
+oldest event ts:     0.000000
+now ts:   625.468227
+dropped events: 0
+read events: 0
+===/sys/kernel/tracing/instances/parp-accept-oomcal819/per_cpu/cpu82/stats
+entries: 0
+overrun: 0
+commit overrun: 0
+bytes: 0
+oldest event ts:     0.000000
+now ts:   625.469100
+dropped events: 0
+read events: 0
+===/sys/kernel/tracing/instances/parp-accept-oomcal819/per_cpu/cpu83/stats
+entries: 0
+overrun: 0
+commit overrun: 0
+bytes: 0
+oldest event ts:     0.000000
+now ts:   625.470027
+dropped events: 0
+read events: 0
+===/sys/kernel/tracing/instances/parp-accept-oomcal819/per_cpu/cpu84/stats
+entries: 0
+overrun: 0
+commit overrun: 0
+bytes: 0
+oldest event ts:     0.000000
+now ts:   625.470905
+dropped events: 0
+read events: 0
+===/sys/kernel/tracing/instances/parp-accept-oomcal819/per_cpu/cpu85/stats
+entries: 0
+overrun: 0
+commit overrun: 0
+bytes: 0
+oldest event ts:     0.000000
+now ts:   625.471773
+dropped events: 0
+read events: 0
+===/sys/kernel/tracing/instances/parp-accept-oomcal819/per_cpu/cpu86/stats
+entries: 0
+overrun: 0
+commit overrun: 0
+bytes: 0
+oldest event ts:     0.000000
+now ts:   625.472674
+dropped events: 0
+read events: 0
+===/sys/kernel/tracing/instances/parp-accept-oomcal819/per_cpu/cpu87/stats
+entries: 0
+overrun: 0
+commit overrun: 0
+bytes: 0
+oldest event ts:     0.000000
+now ts:   625.473518
+dropped events: 0
+read events: 0
+===/sys/kernel/tracing/instances/parp-accept-oomcal819/per_cpu/cpu88/stats
+entries: 0
+overrun: 0
+commit overrun: 0
+bytes: 0
+oldest event ts:     0.000000
+now ts:   625.474426
+dropped events: 0
+read events: 0
+===/sys/kernel/tracing/instances/parp-accept-oomcal819/per_cpu/cpu89/stats
+entries: 0
+overrun: 0
+commit overrun: 0
+bytes: 0
+oldest event ts:     0.000000
+now ts:   625.475282
+dropped events: 0
+read events: 0
+===/sys/kernel/tracing/instances/parp-accept-oomcal819/per_cpu/cpu9/stats
+entries: 0
+overrun: 0
+commit overrun: 0
+bytes: 0
+oldest event ts:     0.000000
+now ts:   625.476229
+dropped events: 0
+read events: 0
+===/sys/kernel/tracing/instances/parp-accept-oomcal819/per_cpu/cpu90/stats
+entries: 0
+overrun: 0
+commit overrun: 0
+bytes: 0
+oldest event ts:     0.000000
+now ts:   625.477362
+dropped events: 0
+read events: 0
+===/sys/kernel/tracing/instances/parp-accept-oomcal819/per_cpu/cpu91/stats
+entries: 0
+overrun: 0
+commit overrun: 0
+bytes: 0
+oldest event ts:     0.000000
+now ts:   625.478376
+dropped events: 0
+read events: 0
+===/sys/kernel/tracing/instances/parp-accept-oomcal819/per_cpu/cpu92/stats
+entries: 0
+overrun: 0
+commit overrun: 0
+bytes: 0
+oldest event ts:     0.000000
+now ts:   625.479296
+dropped events: 0
+read events: 0
+===/sys/kernel/tracing/instances/parp-accept-oomcal819/per_cpu/cpu93/stats
+entries: 0
+overrun: 0
+commit overrun: 0
+bytes: 0
+oldest event ts:     0.000000
+now ts:   625.480180
+dropped events: 0
+read events: 0
+===/sys/kernel/tracing/instances/parp-accept-oomcal819/per_cpu/cpu94/stats
+entries: 0
+overrun: 0
+commit overrun: 0
+bytes: 0
+oldest event ts:     0.000000
+now ts:   625.481050
+dropped events: 0
+read events: 0
+===/sys/kernel/tracing/instances/parp-accept-oomcal819/per_cpu/cpu95/stats
+entries: 0
+overrun: 0
+commit overrun: 0
+bytes: 0
+oldest event ts:     0.000000
+now ts:   625.481910
+dropped events: 0
+read events: 0
+===/sys/kernel/tracing/instances/parp-accept-oomcal819/per_cpu/cpu96/stats
+entries: 0
+overrun: 0
+commit overrun: 0
+bytes: 0
+oldest event ts:     0.000000
+now ts:   625.482770
+dropped events: 0
+read events: 0
+===/sys/kernel/tracing/instances/parp-accept-oomcal819/per_cpu/cpu97/stats
+entries: 0
+overrun: 0
+commit overrun: 0
+bytes: 0
+oldest event ts:     0.000000
+now ts:   625.483695
+dropped events: 0
+read events: 0
+===/sys/kernel/tracing/instances/parp-accept-oomcal819/per_cpu/cpu98/stats
+entries: 0
+overrun: 0
+commit overrun: 0
+bytes: 0
+oldest event ts:     0.000000
+now ts:   625.484618
+dropped events: 0
+read events: 0
+===/sys/kernel/tracing/instances/parp-accept-oomcal819/per_cpu/cpu99/stats
+entries: 0
+overrun: 0
+commit overrun: 0
+bytes: 0
+oldest event ts:     0.000000
+now ts:   625.485478
+dropped events: 0
+read events: 0

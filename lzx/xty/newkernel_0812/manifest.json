@@ -32,7 +32,7 @@
     "overlay_files_listed": 1413,
     "diff_qr_lines": 1682,
     "overlay_files_actual": 1413,
-    "overlay_bytes": 59763196
+    "overlay_bytes": 57731150
   },
   "key_paths": [
     "Makefile",
@@ -61,6 +61,7 @@
   ],
   "notes": [
     "source/overlay is authoritative for reproduction",
+    "tier2_predict_enabled now gates both proactive reclaim and prediction-based memcg-bin ordering for isolated experiments",
     "patches/0001-key-parp-tier2-bin-review.patch is for key PARP review",
     "patches/0002-parp-kconfig-switches-0814.patch records the compile-time feature switches",
     "patches/0000-full-tree-diff.patch.gz is a text diff reference"

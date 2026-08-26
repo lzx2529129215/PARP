@@ -1,0 +1,1629 @@
+
+===== PAGE 1 =====
+More Apps, Faster Hot-Launch on Mobile Devices via
+Fore/Background-aware GC-Swap Co-design
+JiachengHuang YunmoZhang JunqiaoQiu
+jiacheng.huang@my.cityu.edu.hk yunmo.zhang@my.cityu.edu.hk junqiqiu@cityu.edu.hk
+CityUniversityofHongKong& CityUniversityofHongKong CityUniversityofHongKong
+WuhanUniversity HongKong,China HongKong,China
+HongKong,China
+YuLiang RachataAusavarungnirun QinganLi∗
+yulianglenny@gmail.com r.ausavarungnirun@gmail.com qingan@whu.edu.cn
+ETHZürich KingMongkut’sUniversityof WuhanUniversity
+Zürich,Switzerland TechnologyNorthBangkok Wuhan,China
+Bangkok,Thailand
+ChunJasonXue
+jason.xue@mbzuai.ac.ae
+MohamedbinZayedUniversityof
+ArtificialIntelligence
+AbuDhabi,UnitedArabEmirates
+Abstract usesruntimeinformationtoguidetheswapschemeinthe
+Fasterapplaunchingiscrucialfortheuserexperienceon OS.Inaddition,Fleetaggregatessmallobjectswithsimilar
+mobiledevices.Appslaunchedfromabackgroundcached accesspatternsintothesamepagestoimproveswapeffi-
+state,calledhot-launching,havemuchbetterperformance ciency. We implemented Fleet in AOSP and evaluated its
+thanappslaunchedfromscratch.Toincreasethenumber performancewithdifferenttypesofapps.Experimentalre-
+of hot-launches, leading mobile vendors now cache more
+sultsshowthatFleetachievesa1.59×fasterhot-launchtime
+appsinthebackgroundbyenablingswap.Recentworkalso
+andcaches1.21×moreappsthanAndroid.
+proposedreducingtheJavaheaptoincreasethenumberof
+CCSConcepts: •Softwareanditsengineering;•Com-
+cachedapps.However,thispaperfoundthatexistingmeth- putersystemsorganization→Embeddedsystems;
+odsdeteriorateapphot-launchperformancewhileincreas-
+ingthenumberofcachedapps.Tosimultaneouslyimprove Keywords: GarbageCollection,OperatingSystems,Memory
+the number of cached apps and hot-launch performance, Management,MobileSystems
+thispaperproposesFleet,aforeground/background-aware ACMReferenceFormat:
+GC-swapco-designframework.Toenhanceapp-cachingca- JiachengHuang,YunmoZhang,JunqiaoQiu,YuLiang,Rachata
+pacity,FleetlimitsthetracingrangeofGCtobackground Ausavarungnirun, Qingan Li, and Chun Jason Xue. 2024. More
+objectsonly,avoidingtouchinglong-lifetimeforegroundob- Apps,FasterHot-LaunchonMobileDevicesviaFore/Background-
+jects.Toimprovehot-launchperformance,Fleetidentifies awareGC-SwapCo-design.In29thACMInternationalConference
+objectsthatwillbeaccessedduringthenexthot-launchand onArchitecturalSupportforProgrammingLanguagesandOperating
+Systems,Volume3(ASPLOS’24),April27-May1,2024,LaJolla,CA,
+∗CorrespondingAuthor USA.ACM,NewYork,NY,USA,17pages.https://doi.org/10.1145/
+3620666.3651377
+Permission to make digital or hard copies of all or part of this work for
+personal or classroom use is granted without fee provided that copies 1 Introduction
+are not made or distributed for profit or commercial advantage and that
+Mobiledeviceshavebecomeanindispensablepartofdaily
+copies bear this notice and the full citation on the first page. Copyrights
+life for everyone today. Mobile device users often switch
+for components of this work owned by others than the author(s) must
+be honored. Abstracting with credit is permitted. To copy otherwise, or among apps. The app launch performance, therefore, is a
+republish, to post on servers or to redistribute to lists, requires prior specific crucialmetricoftheuserexperience[41].Toenhancethe
+permission and/or a fee. Request permissions from permissions@acm.org. applaunchperformance,Androidcachesappsintheback-
+ASPLOS ’24, April 27-May 1, 2024, La Jolla, CA, USA
+groundwheneverthereissufficientmemory[32,33],while
+© 2024 Copyright held by the owner/author(s). Publication rights licensed
+interacting with users with the app in the foreground, as
+to ACM.
+ACM ISBN 979-8-4007-0386-7/24/04 shown in Figure 1. When the user switches to an app al-
+https://doi.org/10.1145/3620666.3651377 ready cached in the background, Android directly moves
+654
+
+===== PAGE 2 =====
+Background 字少一些，例如用标
+识不同（实心空心）
+ASPLOS’24,April27-May1,2024,LaJolla,CA,USA Huang,Zhang,Qiu,Liang,Ausavarungnirun,Li,andXue
+Foreground hot Background the swap scheme using runtime information. It identifies
+User 𝐴𝑃𝑃 𝐴𝑃𝑃 … 𝐴𝑃𝑃 launch …
+Application 1 2 𝑛 APPs objectsthatwillbere-accessedduringthenexthot-launch
+andadjuststheswapschemetocachetheseidentifiedobjects
+Android Android Runtime Android Android Runtime (ART) Garbage Collection (GC) inmemory.
+System
+Linux Kernel System Linux Swapping WeimplementFleetonAndroid.Theexperimentalresults
+show that, on average, Fleet can increase the number of
+Hardware
+Resources DRAM CPU … R H e a s r o d u w r a c r e e s DRAM CPU Power … maximum cached apps by 21% compared to the original
+Android.ComparedtoMarvin,Fleetimprovesthetailhot-
+Figure1.ArchitectureofAndroidsystems.
+launchperformanceby4.45×onaverage.Additionally,Fleet
+Improvement: hasabetterabilitytocacheappsby2×forappswithsmall
+1.whatis“fore&back-groundapplication” objects.Thispapermakesthefollowingcontributions:
+itt2o.wthhaetifso“rehgotrolauunncdh,”calledhot-launch[41].Hot-launchis
+• We observe that when an app is in the background, its
+mu3.cwhhfyacsatcehrintghcaanpalcaituynischiminpogrtaanntafoprpanbdyrocidreatinganewpro-
+foregroundobjectsoccupyalargermemoryfootprintand
+cess,calledcold-launchbecausetheformerdoesnotrequire
+havealongerlifetimecomparedtoitsbackgroundobjects;
+additionalinitializationwork. 4
+• Weobservethatsomespecialobjectsoccupyalargepro-
+To benefit more from the hot-launch, there have been
+portionofobjectre-accessesduringthehot-launch,and
+two directions. First, enabling the swap provided by the
+thesespecialobjectscanbedetermined;
+Linuxkerneltocachemoreapps.Theswapextendstheavail-
+• Basedonthefirstobservation,weproposeaGCmethod
+ablememoryresourcesbyoffloadingtheleast-recently-used
+thatrestrictsthetracingrangetobackgroundobjectsonly
+(LRU)pagesfromthemainmemorytotheswappartition[4–
+tomitigatetheconflictbetweenGCandtheswapmecha-
+6,13,33,54].Second,recentworkMarvin[32]proposesto
+nism,tocachemoreappsinmemory;
+cache more apps by separating the reference information
+• Based on the second observation, we propose a swap
+fromtheobjectandkeepingitinmemoryaftertheobjecthas
+scheme that selectively keeps objects likely to be used
+beenswappedout.However,whilebothenablingswapand
+duringhot-launchinmemory,toimprovethehot-launch
+Marvinincreasethenumberofcachedapps,thispaperfound
+performance.
+thatthehot-launchtimedeterioratessignificantly,especially
+fortaillatency.Thisisbecause,existingworksessentially
+2 Background
+usethenativeLRU-basedswapmechanism,whichisagnos-
+ticofappre-launching.Itmayswapoutmemorypagesthat In this section, we introduce how Android launches
+areleastrecentlyusedbutrequiredduringthehot-launch apps(§2.1)andthememorymanagementinvolvedinapp
+stage.Thispaperaimstoimprovehot-launchperformance launching,includingGCandswap(§2.2).
+whilesimultaneouslycachingmoreapps.
+2.1 Hot-launchiscrucialformobileuserexperience
+Tomaximizeappcachingcapacityandimprovehot-launch
+performance,thispaperproposesFleet,afore/background- Androidtypicallyhasonelaunchedappintheforeground,
+awareGC-swapco-designframework.Theideaismotivated whichallowsinteractionwiththeuser[26,34,41].There
+by two key fore/background-related observations, as de- aretwowaystolaunchapps:hot-launchandcold-launch.As
+pictedin§4:(i)Thelifetimeofforegroundobjects(i.e.,ob- showninFigure1,hot-launchreferstotheappbeingdirectly
+jectsallocatedwhentheownerapprunsintheforeground) switchedfromthebackgroundtotheforeground,whilecold-
+is much longer than that of background objects (i.e., ob- launchreferstotheappstartingwithanewprocesscreation.
+jectsallocatedwhentheownerapprunsinthebackground). Hot-launchismoredesirableintermsofuserexperiencebe-
+HenceitwillbemoreefficienttoconductGConbackground causeitoffersshorterlaunchlatency.Usingtheexperimental
+objectsonlywhen anappis inthebackground;(ii)Upon setupdetailedin§6,wemeasurethedurationofhot-launch
+hot-launches,objectsallocatedintheimmediatelypreceding andcold-launchforourtestedapps.Thelaunchtimeisthe
+foregroundstateandobjectsclosetotheGCrootsaremore durationuntilthefirstframeisdisplayed,whichismeasured
+likelytobere-accessedandcanbeidentifiedthroughrun- bytheAndroidDebugBridge(ADB)tool[7,8].Thecold-
+timeinformation.Theseobjectscanbecachedinmemory launchtimeisobtainedbyexplicitlyterminatingappsbefore
+tofacilitatehot-launches. thelaunch.Werepeatthelaunch20timesforeachtestcase
+Based on these observations, Fleet is proposed, which andcalculatetheaverageandstandarddeviation.Figure2
+consistsoftwocomponents:(i)Background-objectGC(BGC), showsthathot-launchsignificantlyoutperformscold-launch.
+whichlimitsthetracingrangeofthegarbagecollectorto Forexample,theaveragehot-launchtimeforTwitteris273
+backgroundobjectsonly,avoidingtouchingtheforeground ms,whilethecold-launchtimeis2390ms,whichis8.75×
+objects.ThisapproachminimizestheconflictbetweenGC longerthanthehot-launch.
+and the swap, maximizing the caching capacity for apps; Thespeedupfromthehotlaunchiscrucialforthemobile
+(ii)Runtime-GuidedSwap(RGS),whichadaptivelyguides userexperience.Previousstudiesonuserexperienceinthe
+655
+
+===== PAGE 3 =====
+MoreApps,FasterHot-LaunchonMobileDevicesviaFore/Background-awareGC-SwapCo-design ASPLOS’24,April27-May1,2024,LaJolla,CA,USA
+5000
+4000
+3000
+2000
+1000
+0
+Tw F it a t I c e n e r s b ta o T g k e r l a e m gram L Yo in u e tub T e ikT S o p k oti T f w y itc A h R B m a ig v a o e z G L o o i n v o e S g h le o M p C a h p r s om Fi e r L e i A f n o n k x g C e r d a y I n n B d i y rd C s r A u v s e h rage
+)sm(
+emit
+hcnuaL
+Hot-launch Cold-launch 1500
+1200
+900
+600
+300
+0 Tw F it a t I e c n e r s b ta o g T k e ra le m gram L Yo in u e tu S b p e oti T f w y itch A R B m a ig v a o e z G L o i o v n o e S g h le o M p C a h p r s om Fi e r L e i f A n o n k x e g C d r a y I n n B d ir y d C s r A u v s e h rage
+Figure 2. The average hot-launch and cold-launch times.
+Thehot-launchissignificantlyfasterthanthecold-launch
+foralltestedapps.
+mobilecontext[1,2,22]reportthatdelaysintherangeof
+hundredsofmillisecondsareperceivablebyusers.Accord-
+ingtoaquantifiedstudyontheimpactofresponsetimeon
+user experience in the human-computer interaction com-
+munity[35,44],userproductivityremainsunaffectedonly
+when the response time is below 150 milliseconds. If the
+responsetimeexceeds150milliseconds,usersbecomeaware
+ofthedelay[44].Theissueofhundred-milliseconddelays
+hasalsobecomecentraltothememorymanagementand
+schedulingeffortsofmanymobiledevices[23,29,45].
+2.2 Two-layermemorymanagement
+AndroidusestheAndroidRuntime(ART)toexecuteapps
+andutilizesLinuxtomanagehardwareresources(Figure1).
+EachapprunsinanindependentARTinstance.ARTisan
+implementationofaJavavirtualmachinethatincorporates
+agarbagecollection(GC)mechanismtomanagetheapp’s
+dynamicmemory[20,52].Atthesametime,Linuxextends
+memorycapacitythroughtheswapmechanism,whichcan
+offloadcoldmemorytoaswappartition.Thissectionwill
+introducetheGCandswapseparately.
+Garbagecollection.ARTemploysatracing-basedconcur-
+rentcopyingGC[10].TheGCperformslivenessanalysisof
+objectsbytraversingtheobjectreferencegraphandcopies
+liveobjectstoanewmemorylocation.HereisalistofGC
+terminologiesusedinthepaper:
+• Region: A segment of continuous memory. The region
+fromwhichtheGCcopiesobjectsiscalledthefrom-region,
+whiletheregiontowhichtheGCcopiesobjectsiscalled
+theto-region;
+• Roots:Agroupofspecialobjectsthatdirectlyorindirectly
+referenceallobjectsusedbytheprogram;
+• Mutatorthread:Allappthreads,excludingtheGCthread;
+• Readbarrier:Apieceofcodeexecutedbymutatorthreads
+concurrentlywiththeGCthread.Itcouldcopyobjectsto
+theto-regionwheneveraccessinganobject;
+• Writebarrier:Apieceofcodethatisexecutedwhenevera
+mutatorthreadwritesanobject;
+• Card table: An array where each byte represents some
+objectscorrespondingtoarangeofcontinuousaddresses.
+)sm(
+hcnual-toh
+ht09
+w/o swap w/ swap Marvin
+7694 6131 1677 2513 716
+1
+8 1401 2111 2589 2682 2831
+Figure3.The90thpercentiletailhot-launchtimeofMarvin
+andLinuxswap.Bothofthesemethodsdeterioratethehot-
+launchperformancecomparedtothebaselinewithoutswap.
+Linuxswap.Asdescribedin§2.1,Androidaimstobenefit
+from hot-launches by caching apps in memory. However,
+cachingmoreappsischallengingduetothelimitedmem-
+orycapacityofmobiledevices.Therefore,Androidutilizes
+swaptoenablemorememorythanthephysicalDRAMca-
+pacityavailable.Whenmemorypressurebecomeshigh,the
+swapmechanismoffloadstheleast-recently-usedpagesto
+theswappartition[34,51].
+Nowadays,thenumberofappsisrapidlyincreasing,and
+eachappisoccupyingmorememory[39,41].Theincreas-
+ingspeedofDRAMcapacitycannotmatchthesignificantly
+growingmemoryrequirementsofmobileapps[53].Inor-
+dertocachemoreappsinthebackground,enablingswap
+hasbecomethedefaultandwidespreadsetupforAndroid
+devices. Mainstream mobile device vendors, such as Sam-
+sung,Huawei,andOPPO,haveenabledswapintheirsmart-
+phones[4,6,13].
+However,swapcannotefficientlyworkwithGCinAn-
+droid to achieve a desirable caching capacity because the
+pagesswappedoutwouldbeswappedbackduetothetrac-
+ingprocedureofGC.Toaddressthisissue,Marvin[32]pro-
+posestomitigatetheconflictbetweenGCandswapusing
+a bookmarking GC [27]. Marvin saves corresponding ref-
+erencesforeachswapped-outobject,allowingittolocate
+liveobjectsbasedonthereferenceswithouttouchingand
+swapping them back. Therefore, Marvin can improve the
+cachingcapacityofAndroid.
+3 Motivation
+Inthissection,westudythelimitationsofexistingworks
+(§3.1)andidentifytwoissuesoftheLinuxswapthatleadto
+theirinferiorperformanceonAndroid(§3.2).
+3.1 Theperformanceofhot-launchdeteriorates
+whenmorecachedappsareenabled
+TherearetwomethodstocachemoreappsinAndroid:(i)
+Linuxswapand(ii)Marvin[32].Whilethesemethodsenable
+moreappstobecachedinthebackground,theysacrificethe
+hot-launchperformance.Usingtheexperimentalsetupde-
+scribedin§7.2,wemeasurethetailhot-launchperformance
+ofthesetwomethods.
+656
+
+===== PAGE 4 =====
+ASPLOS’24,April27-May1,2024,LaJolla,CA,USA Huang,Zhang,Qiu,Liang,Ausavarungnirun,Li,andXue
+Tailhot-launchinLinuxswap.AsdepictedinFigure3,the
+hot-launchtimeisslowedbyseveralhundredmilliseconds
+due to the swapped pages. For example, Instagram takes
+1027mstocompleteahot-launchwithswapenabled,while
+itonlytakes147mswithoutswap.Thehot-launchbecomes
+7×slowerafterenablingswap.Inthefollowing§3.2,wewill
+(cid:45)(cid:41) (cid:40)(cid:71)(cid:73)(cid:81)(cid:3)(cid:90)(cid:85)(cid:3)(cid:76)(cid:85)(cid:88)(cid:75)
+conductadetailedanalysistoidentifytherootcausesofthe
+lowhot-launchperformancewhenAndroidenablesswap.
+Tailhot-launchinMarvin.Figure3alsodemonstratesthat (cid:44)(cid:85)(cid:88)(cid:75)(cid:3)(cid:90)(cid:85)(cid:3)(cid:72)(cid:71)(cid:73)(cid:81)
+Marvincouldexperienceseveralsecondsofdelayduringtail
+hot-launch.Despiteitsabilitytocachemoreapps,Marvin Figure4.Theaccessedobjectsovertime.Initially,westart
+fails to achieve the desired hot-launch performance. This theAmazonshopintheforeground.Then,weswitchittothe
+isduetothreedrawbacksofMarvin:(i)Itrequiresalong backgroundat20seconds.Duringitsruninthebackground,
+stop-the-world(STW)pausetimetomaintainconsistency aGCoccursat37seconds.Finally,weswitchitbacktothe
+betweentheseparatedreferenceinformationandobjects; foregroundat53seconds.
+(ii)Marvininducesswapamplificationduetoanalyzingat
+objectgranularitywhileswappingatpagegranularity;(iii)
+MarvinemploysanLRU-basedswapschemethatisagnostic
+mostofthememorycouldbesafelyswappedoutaccording
+towhetherornottheevictedpagewillbeusedduringthe
+to the LRU assumption. However, during the hot-launch
+hot-launchstage.
+stage(ataround53seconds),theappneedstoaccessmany
+Insummary,theultimatechallengeis:Howcanwemain-
+objectsthathaven’tbeenusedrecently.Then,thehot-launch
+tainorevenimprovethehot-launchperformancewhile
+processmaybeblockedduetoaccessingmultiplepagesthat
+cachingmoreapps? Thisistheaimofthispaper.
+havebeenswappedout.
+Theon-demandswap-infromtheswappartitionissig-
+3.2 AnalysisoftheLinuxswapinAndroid
+nificantlyslowerthanreadsfromtheDRAM.Wemeasure
+Android directly utilizes the existing LRU-based swap
+theperformanceofboththeDRAMandtheswappartition.
+scheme in Linux. However, the LRU-based scheme is de-
+Weutilizetinymembench[16]andFIO[17]totesttheread
+signed for general workloads from the Linux perspective
+bandwidthoftheDRAMandtheflash-basedswappartition.
+andneglectsthespecificcharacteristicsofAndroid.Inthis
+TheexperimentalresultsindicatethattheDRAMbandwidth
+section, we will analyze the challenges of enabling Linux
+is 9182.7 MB/s, whereas the read bandwidth of the swap
+swapinAndroid.
+partition is 20.3 MB/s. The performance of the DRAM is
+We conducted a motivational experiment, as shown in approximately452×fasterthanthatoftheswappartition.
+Figure4.First,westartedtheAmazonshopintheforeground.
+Insummary,theLRU-basedswapinLinuxdoesnotwork
+Then,weswitchittothebackgroundafter20seconds.Finally,
+wellforAndroidapps,neitherforcachingmoreappsnor
+weswitchitbacktotheforegroundat53seconds(througha
+for achieving fast hot-launch. The Marvin work partially
+hot-launch).Duringthisexperiment,weassignanincreasing
+addressesthefirstissuebutfailstoaddressthesecondone.
+objectIDtoeachobjectbasedontheirallocationorderand
+Asaresult,existingworkscannotsimultaneouslymaximize
+sampletheobjectaccessevery100accesses.Basedonthe
+appcachingcapacityandimprovehot-launchperformance.
+results,weuncoveredtwoissuesusingtheLRU-basedswap
+schemeforAndroidapps.
+4 Observations
+First, the GC may offset the effects of swapping in
+Asstatedintheanalysisin§3.2,appstateinmobiledevicesis
+termsofcachingmoreapps.Figure4illustratesthatwhen
+eitherforegroundorbackground,whichthepriorLinuxswap
+theappisinthebackground,onlyasmallportionofobjects
+isagnosticto.Inthissection,wepresentthreeobservations
+areaccessedinmemory,whilemostotherobjectsareleast
+ofAndroidappsrelatedtotheirforegroundandbackground
+recentlyused.However,whenaGCistriggered(ataround
+states.
+37seconds),thereisaspikeinaccessedobjectsduetothe
+tracingworkofGC,eventhoughtheyarenotnecessarily
+4.1 Fore/backgroundobjectcharacteristics
+usedbytheappmutatorthreads.DuetoGC,theLRUpages
+willbeswappedbackintomemory,leadingtohighmemory Duetothesignificantchangeinanapp’sbehaviorwhenit
+pressure,whichmayinduceterminationsofcachedapps. switchesfromtheforegroundtothebackground(asshown
+Second,thehot-launchprocessmaybedelayedasthe inFigure4),weexaminethedistinctstatesofobjectsbefore
+necessarypagescouldbeswappedoutbeforehandbythe andaftertheswitchtothebackgroundinthissection.We
+LRU-basedswapmechanism.Figure4showsthatwhen categorizeallobjectsintotwotypesaccordingtotheowner
+theappisinthebackground,therearemanyLRUobjects,and app’sstatewhentheyareallocated:
+657
+
+===== PAGE 5 =====
+MoreApps,FasterHot-LaunchonMobileDevicesviaFore/Background-awareGC-SwapCo-design ASPLOS’24,April27-May1,2024,LaJolla,CA,USA
+2 4 6 8 01 21 41 51>
+40 30 20
+10
+Lifetime (GC count)
+)%(
+egatnecreP Foreground objects
+(a)Foregroundobjectlifetime
+2 4 6 8 01 21 41 51>
+40
+30 20
+10
+Lifetime (GC count)
+)%(
+egatnecreP Background objects
+(b)Backgroundobjectlifetime
+120
+90
+60
+30
+0
+Tw F it a t I c e n e r s b ta o T g k e r l a e m gra m Y L o in u e tub T e ikT S o p k ot T if w y itc A h R B m a ig v a o e z G L o o i n v o S e g h le o M p C a h p r s o m Fir e L e i A f n o n k C x g e a r d n y I d n B y ir d C s A ru v s e h rage
+)BM(
+tnirptoof
+yromeM
+80 70 60 50
+40
+30
+20
+10
+0
+Twit F t a e c r I e n b s o ta k gr L a A i m m nk a e z d o I n n Sh A o v p erage
+Foreground objects Background objects
+(c)Memoryfootprint
+Figure5.Foregroundandbackgroundobjectshavedifferent
+lifetimeandmemoryfootprints.Foregroundobjectshave
+longerlifetimesandoccupythemajorityofmemory.In(a)
+and (b), the last bar indicates the percent of alive objects
+after15GCcycles.
+• Foregroundobjects(FGO): Theobjectsthatareallocated
+whentheownerappisintheforegroundstate;
+• Backgroundobjects(BGO):Theobjectsthatareallocated
+whentheownerappisinthebackgroundstate.
+Atthemomentthatanappswitchestothebackground,allex-
+istingobjectsareconsideredFGO,whileallnewlyallocated
+objectsaftertheswitchingareclassifiedasBGO.
+Wemeasurethelifetime(GCcount)ofthesetwotypesof
+objectswhiletheappisinthebackground.UsingTwitteras
+anexample,westartanduseitfor10minutesinthefore-
+ground.Then,weswitchittothebackgroundandperform
+anexplicitGCevery15seconds.AftereachGC,wecalculate
+thelifetimeofeachobjectasthenumberofGCcyclesthat
+itsurvived.Finally,wegeneratethelifetimedistributionof
+FGO(Figure5a)andBGO(Figure5b),respectively.These
+resultsshowasignificantdisparityinthelifetimeofFGOand
+BGO.MostBGOarereclaimedwithinthefirstseveralGCs,
+whilemorethan40%FGOstillsurviveafter15GCcycles.
+OnepossiblereasonisthatallBGOarenewlyallocatedin
+thebackground,whichareyoungerandthusmorelikelyto
+becomegarbage[42].Additionally,thenumberofFGOis
+farmorethanBGO,asshowninFigure5c.Thisisbecausea
+backgroundappismostlyinactiveandonlyallocatesafew
+objects.Therefore,wedrawthefirstkeyfore/background
+relatedobservation:Whenanappisinthebackground,
+itsFGOoccupyalargermemoryfootprintandhavea
+longerlifetimecomparedtoitsBGO.
+TheexistingARTusesaGCschemethattreatsFGOand
+BGOequally.However,basedonourobservation,theFGO
+)%( etar
+dessecca-eR
+NRO (D=2) FYO Both 100 80
+60
+40
+20
+0 0 2 4 6 8 101214 Depth from roots
+(a)Re-accessedobjects
+)%(
+egatnecreP
+Access during launch
+Memory footprint
+(b)DepthanalysisofNRO
+Figure6. There-access analysisofNROandFYOduring
+hot-launches.Thelargerthedepth,thehigherthere-access
+ratiocoveredbytheNRO,whilethememoryfootprintalso
+increases.Becausethere-accessratioincreasesfasterthan thememoryfootprintforsmalldepthvalues,wecanselect
+arelativelysmalldepthparametertocovermorere-access
+withminimalmemoryfootprint.
+shouldnotbevisitedbytheGCasoftenastheBGO,since
+mostofthemhavealonglifetime.
+4.2 Fore/backgroundobjectaccesspattern
+AsshowninFigure4,asubsetofFGO(accessedbefore20
+seconds)arere-accessedat53secondsduringthehot-launch
+procedure. In accordance with the nature of the Android
+launchprocedure,weidentifytwospecialtypesofFGOthat
+tendtobere-accessedduringthehot-launches:
+• Nearrootsobjects(NRO):Theobjectsforwhichtheshortest
+pathtotherootsissmallerthanadepthparameter(defined
+as𝐷)inthereferencegrapharedefinedasNROwiththe
+depth distance. NRO could be different when selecting
+differentdepthvalues;
+• Foregroundyoungobjects(FYO):Theobjectsallocatedjust
+beforeanappisswitchedtothebackground.
+We conducted an experiment to analyze the object re-
+accessedduringhot-launches.Westarteachtestedappand
+useitintheforegroundfor10minutes.Then,weswitchthe
+apptothebackground.WeobtaintheFYOandNROduring
+thefirstGCwhentheappisinthebackground(depicted
+in §5.3). After 30 seconds, we switch the app back to the
+foregroundandrecordallaccessedobjectsduringthehot-
+launchtime.Finally,wecalculatethere-accessratioofNRO
+andFYO,asshowninFigure6a.Forthesefivetestedapps,
+NROoccupiesaround50%re-accessobjectsonaverageand
+FYOisaround40%.NROandFYO,combined,accountfor
+68%ofthetotalre-accessobjectsonaverage.
+Wefurtheranalyzedthememoryfootprintsofthesetwo
+typesofobjectsforthefiveappsinFigure6a.Theaverage
+memorypercentagesofNROandFYOare10.4%and9.3%,
+respectively,withadepthof2.Together,theyoccupy15.5%
+of the heap memory because they share common objects.
+Therefore,thesetwotypesoflaunchobjects(NROandFYO)
+658
+
+===== PAGE 6 =====
+ASPLOS’24,April27-May1,2024,LaJolla,CA,USA Huang,Zhang,Qiu,Liang,Ausavarungnirun,Li,andXue
+Android Runtime Linux Kernel
+Background-
+Background objects
+ object GC
+ 
+Foreground Runtime Runtime- Swap
+objects information guided swap partition
+(cid:54)(cid:71)(cid:77)(cid:75)(cid:3)(cid:89)(cid:79)(cid:96)(cid:75) 
+Figure8.OverviewofFleet.
+Figure7.Theobjectsizedistribution.Duetothesignificant
+sizedifferencebetweenobjectsandpages,co-designingGC
+alltestedappsexhibitsimilarobjectsizedistributions.The
+andswapischallenging.
+swapmechanismoperatesatthegranularityofafixed-size
+page,commonly4KB[12].Themajorityofobjectsaresignif-
+can cover the majority of demanded objects with a small icantlysmallerthanthepagesize.Duetothesignificantsize
+memoryfootprint.Thesecondkeyfore/backgroundrelated differencebetweenobjectsandpages,co-designingGCand
+observationis:NROandFYOoccupyalargeproportion swapischallenging.Toaddressthischallenge,ourinsightis
+ofobjectre-accessesduringhot-launcheswithasmall togroupobjectswithsimilaraccesspatternsintothesame
+memoryfootprint. pagebasedonruntimeinformation.
+We also analyzed the effect of the depth parameter for
+NRO using Twitter, as shown in Figure 6b. With a larger
+5 FleetDesign
+depthparameter,there-accessratioofNROishigher,but
+its memory footprint also becomes larger. Regarding the 5.1 Overview
+depthparameter,onekeyinsightisthatthere-accessratio Fleetisacross-layermemorymanagementframeworkthat
+increasesfasterthanthememoryfootprintforsmalldepth aims to cache more apps and enable faster hot-launches
+values.Wecanselectarelativelysmalldepthparameterto simultaneously.Figure8illustratesthetwomaincomponents
+covermorere-accesswithasmallmemoryfootprint. inFleet’sdesign:(i)Background-objectGC,aGCmethod
+NROarelikelytobereaccessedduringthehot-launches thatcollaborateswithswap,and(ii)Runtime-guidedswap,a
+fortworeasons.First,NROisoftenaccessedintheinterme- swapschemethatleveragesruntimeinformationtooptimize
+diatepathofmanyotherobjects.Sincetherootsincludeall hot-launches.
+objectsanappcoulddirectlyaccess,objectsclosertotheroot Keyidea.Drivenbytheobservationspresentedin§4,Fleet
+aremorelikelytobeaccessedwhenaccessingotherobjects. isdesignedbasedontwokeyideas:(i)SinceBGOismore
+Second,GCusuallystartssimultaneouslywithahot-launch, likelytobecomegarbagethanFGO,FleetfocusesonBGO
+anditwillalsoaccessNRO.Androidusesadynamicmemory inbackgroundGC.Thelong-lifetimeFGO,whichoccupies
+thresholdtocontrolGC.Ifthecurrentmemoryusageisclose mostofthememory,canbesafelyswappedout.Therefore,
+tothethreshold,anewGCwillbetriggered.Whenanapp GCcanminimizeaccesstotheswappedpageswhilefreeing
+is in the background, the threshold is set to a value close garbageobjectsontime;(ii)FleetidentifiesNRO,FYO,and
+tothememoryusage.However,duringahot-launch,many currentlyusedobjectsbasedontheruntimeinformationin
+newobjectsarecreatedquickly,resultinginmemoryusage ART.Theunderlyingswapcanadjustitsschemetofacilitate
+largerthanthethresholdandtriggeringanewGC.ThisGC accesstotheseNROandFYO,optimizingtheperformance
+willalsoaccessNRO. ofhot-launches.
+FYOarealsolikelytobere-accessedbecauseoftheirasso- Background-object GC (§5.2). Background-object GC
+ciatedforegroundtasks.Thesetasksareapttobesuspended (BGC) is designed to free garbage objects while avoiding
+inthebackground.Whentheappswitchesbacktothefore- touchingtheswappageswhenanappisinthebackground.
+ground,thesesuspendedtasksresumeandcontinuetoaccess UnliketheexistingGCinART,whichtracesallobjects,BGC
+therecentlyallocatedyoungobjects.Furthermore,theyoung onlytracesBGO 1.
+objectswillbeaccessedmorefrequentlythantheothers[18] Runtime-guidedswap(§5.3).Runtime-guidedswap(RGS)
+ingeneral.Thus,FYOarealsohighlyprobabletobeaccessed isproposedtoswappagesinordertoextendmemorycapac-
+bytheresumedforegroundtasksduringthehot-launchtime. itywhileretaininghot-launchperformance.RGSconsistsof
+twosteps.First,itutilizesacopy-basedGCtoidentifythe
+4.3 ThesizemismatchbetweenGCandswap
+NROandFYOafteranappswitchestothebackground 2.
+AnotherfeatureofAndroidisthatmostobjectsaresmall.We DuringthisGC,objectsarealsogroupedintopages.Second,
+analyzedtheobjectsizedistributionforseveralpopularcom- RGSconveystheinformationofthegroupedpagestothe
+mercialappsintheappstoremarket.AsshowninFigure7, Linuxkernel.Guidedbytheruntimeinformation,Linuxcan
+659
+
+===== PAGE 7 =====
+MoreApps,FasterHot-LaunchonMobileDevicesviaFore/Background-awareGC-SwapCo-design ASPLOS’24,April27-May1,2024,LaJolla,CA,USA
+activelyswapoutthegroupedpages 3,whilecachingpages
+containingNROandFYOinthemainmemory 4.
+Workflow. Fleet starts working after an app is switched
+tothebackground.First,Fleetwaitsforaspecifictime(de-
+finedas𝑇 𝐵)toensuretheapprunsinastablebackground
+state.Then,FleetperformsafullGC,classifyingobjectsinto
+differenttypes,suchasNROandFYO,basedonruntimein-
+formation.Objectsarethengroupedintopagesaccordingto Card Foreground
+table objects
+theirclassifiedtypes.Afterward,FleetappliesRGStoguide
+theswapprocess.Whilerunninginthebackground,theapp
+employsBGCtofreegarbageobjects.NROandFYOobjects
+arecacheduntiltherearenootherpagestobeswappedout.
+Ifahot-launchoccursduringthisperiod,itwouldbefast
+becauseNROandFYOobjectsaregroupedandcachedinthe
+mainmemory.Oncetheappisswitchedtotheforeground,
+Fleetwaitsforaspecifictime(definedas𝑇 𝐹)toensurethat
+theapprunsinastableforegroundstate.Finally,Fleetstops,
+andtheforegroundappexecutesthesameasadefaultAn-
+droidapp.
+5.2 Background-objectGC
+ExistingARTmainlyutilizestwotypesofGC:(i)MinorGC,
+whichfreesgarbageobjectsfromnewlyallocatedregions
+afterthelastGC;(ii)MajorGC,whichfreesgarbageobjects
+from the entire Java heap. The existing major GC is not
+suitableforbackgroundappsbecauseittargetsallobjects
+andcalculatestheliveratioofregionsbyfullytracing.We
+propose BGC (Figure 9) to replace the existing major GC
+whenanappisinthebackground.BGCaimstofreegarbage
+objectsonlyfromBGOtominimizeaccesstotheFGO.Inthis
+section,wepresentthedesignofBGC.First,weexplainhow
+toseparateFGOandBGO.Then,weintroduceacarefully
+designed card table. Finally, we present BGC’s execution
+procedure.
+FGO&BGOseparation.FleetdividesallobjectsintoFGO
+andBGObyaddingaregion-typeflagtothemetadataof
+regions,indicatingwhethertheseregionscontainFGO.After
+anappisswitchedtothebackground,FleetusesafullGC
+tocompactallFGOintospecificregions(detailedin§5.3.1).
+Simultaneously,Fleetalsosetstheregion-typeflagofthe
+regionstowhichallFGOarecopied.Afterward,allobjects
+allocatedwhiletheappisinthebackgroundareclassified
+asBGO.Theseobjectswillbeallocatedinnewregionsthat
+aredifferentfromthosealreadycontainingFGO.Therefore,
+FGOandBGOcanbeorganizedinseparateregions.
+CardtablefortracingBGO.Toconductlivenessanalysis
+forBGO,weneedtotrackallreferencesfromFGOtoBGO.
+BGCcanidentifythesereferencesbyrecordingmodifications
+madetoFGO,asallBGOareallocatedafterFGO.
+Toachievethis,weproposetheuseofanadditionalcard
+tabletorecordallmodifiedFGO,asshowninFigure9.BGC
+usesashiftinstructionwiththeCARD_SHIFTvaluetotrans-
+late between the FGO address and the offset of the corre-
+spondingbyteinthecardtable.BGCrecordsthemodified
+… …
+1<<CARD_SHIFT
+Clearcard
+Dirtycard
+Write Cardtoaddress
+barrier Rootobject
+Normalobject
+Tracereference
+Background Notracereference
+objects
+Figure9.TheBGCFramework.Theapp’stotalobjectsare
+dividedintotwocategories:BGOandFGO.Byemployinga
+cardtable,theBGCrestrictstheGCrangetotheBGO.
+FGOusingadesignedwritebarrier.Wheneveranobjectis
+written,thewritebarrierfirstchecksiftheobjectbelongsto
+theFGO.IftheobjectbelongstotheFGO,thewritebarrier
+codewillfindthecorrespondingbyteinthecardtableby
+usingashiftinstructionontheobject’saddress.Then,the
+writebarriercodewillmarkthebyteasDIRTY.Finally,dur-
+ingBGCexecution,itcanobtainallreferencesfromFGO
+toBGObycheckingtheobjectscorrespondingtothebytes
+markedasDIRTYinthecardtable.
+GCexecution.AsshowninFigure9,theexecutionfollows
+thesesteps:OnceFGOandBGOareseparatedintodifferent
+regions,BGCinitializesitscardtabletoempty.Whilethe
+apprunsinthebackground,modifiedobjectsarerecorded
+inthecardtableusingthedesignedwritebarrier.Whena
+GCstarts,itscansalldirtybytesinthecardtabletoidentify
+theFGOthathavebeenmodifiedwhiletheappsareinthe
+background.TheGCthenaddsallthesemodifiedFGOto
+therootset.Next,theGCperformsatracingprocedureto
+findallobjectsthatcanbereachedfromtherootset.During
+the tracing procedure, if the BGC encounters a reference
+toanobjectbelongingtoFGO,itconsidersthisobjectasa
+liveobjectanddoesnotaccessit.Atthesametime,itcopies
+all live BGO to new to-regions. Finally, the BGC releases
+the memory of all from-regions containing the BGO. By
+followingthisprocess,theBGCcanfreegarbageobjectsin
+BGOwhileminimizingaccesstotheFGO.
+Discussion on memory leak. BGC can efficiently free
+garbageobjectsinbackgroundappsontimeduetothelong
+lifetimeandinactivenatureofFGO,asobservedinthelife-
+timedistributiondiscussedin§4.1.Insomecases,ifneces-
+sary,FleetcanresorttotheoriginalAndroidmethodofusing
+fulltracingtocleargarbageobjectsfromtheentireJavaheap.
+Nevertheless,eveninsuchworst-casescenarios,Fleetstill
+benefitsfromreducingthefrequencyoffullheaptracingfor
+backgroundapps.
+5.3 Runtime-guidedswap
+The existing Android system directly utilizes the native
+LRU-based swap scheme provided by Linux without con-
+sidering the mobile-specific characteristics of hot-launch
+660
+
+===== PAGE 8 =====
+Design overview
+ASPLOS’24,April27-May1,2024,LaJolla,CA,USA Huang,Zhang,Qiu,Liang,Ausavarungnirun,Li,andXue
+performance.Theruntime-guidedswap(RGS)isdesigned
+toproposeanewswapschemethataimstoachievefaster
+hot-launchperformancebytakingintoaccountruntimein-
+formation, including NRO and FYO. RGS consists of two
+steps:(i)Objectgrouping,afullGCprocessthatclassifies
+objectsbasedonruntimeinformationandgroupstheminto
+pages;(ii)Pageswapping,asystemcallthatconveysinfor-
+mationaboutthegroupedpagestotheLinuxkernel,thereby
+achievingahot-launch-friendlyswapscheme.
+5.3.1 Objectgrouping. RGSutilizesafullGCthatconsid-
+erstheaccesspatternofobjectstogroupthem.Theobject
+groupingoperationbeginsaftertheapphasbeenswitched
+tothebackgroundforaspecifiedwindowoftime(𝑇 𝐵).
+Classification.WewillidentifytheNROandFYOforthe
+nexthot-launch,basedonourobservationsin§4.2.Addition-
+ally,inthissection,wewillintroduceanewtypeofobject
+calledworkingset(WS)objects.TheseWSobjectsarethe
+objectscurrentlybeingusedbytheapp.TheWStypeen-
+suresthatthenecessaryobjectsrequiredfortheapptorun
+inthebackgroundarenotselectedtobeswappedout.
+7
+AsshowninFigure10,unliketheexistingGCinAndroid,
+whichusesadepth-firstsearch(DFS)algorithmtotracethe
+objectreferencegraph,weutilizeabreadth-firstsearch(BFS)
+algorithmwithafirst-in-first-outmarkqueue.Basedonthe
+BFSalgorithmstartingfromtheroots,weperformamark
+operationforeachtraversedobject.
+SimilartotheexistingconcurrentGC,weenabletheread
+barriermechanismduringtheBFS-basedtraversal.Concur-
+rentlywiththetracingandmarkprocedureoftheGCthread,
+mutatorthreadsalsoperformthemarkoperationthrough
+the read barrier whenever they access an object. The WS
+objectscanbedifferentiatedbythethreadthattriggersthe
+markoperation.Ifanobjectismarkedbymutatorthreads
+(intheirreadbarriers),itwillbeclassifiedasaWSobject.
+Insummary,duringthisGCprocedure,themarkoperation
+canclassifyobjectsintothefollowingcategories:
+• NRO:Weaddadepthdelimiter tothemarkqueueduring
+graphtraversal.Additionally,wemaintainadepthcounter
+throughout the traversal procedure. The depth counter
+keepstrackofthedepthofthecurrentlymarkedobject
+from the roots. If the depth counter is smaller than the
+NROthreshold,weclassifythemarkedobjectasanNRO;
+• FYO:BecausethegroupoperationofRGSisthefirstGC
+after the app is switched to the background, all objects
+newlyallocatedbetweenthegroupoperationandthelast
+GCareconsideredFYO.InART,thereisaflaginthemeta-
+dataofeachregionthatindicateswhethertheregionis
+newlyallocatedafterthelastGC.Byutilizingthisflag,we
+candeterminewhetheranobjectisanFYO;
+• WSobjects:WeobtainthethreadIDofthecurrentthread
+duringthemarkoperation.WecomparethethreadIDwith
+thatoftheGCthread.IfthesethreadIDsaredifferent,we
+identifythemarkedobjectasaWSobject;
+…
+Mark & Copy Breadth-first search (BFS)
+… Launch … Enqueue
+Region
+… flag … Inc Scan
+Others depth
+Depth
+… counter …
+WS Mark Dequeue
+To regions queue
+Mutatorthread GCthread Object reference Depthdelimiter
+Figure 10. The object grouping procedure of the RGS. It
+groupsobjectsintopagesthroughafullGC.
+• Coldobjects:Allotherobjectsareclassifiedascoldobjects.
+Group into regions. As shown in Figure 10, a copy op-
+erationisimposedoneveryobjectmarkedbythefullGC.
+Thecopyoperationcopiesallreachableobjectsfromfrom-
+regionstoto-regions.UnliketheexistingART,whichtreats
+allto-regionsequally,weproposethreetypesofto-regions
+correspondingtotheclassificationoftheobject:
+• Launchregion:Thisregioncontainsobjectsthatwillbe
+usedinthenexthotlaunch.WecopyallNROandFYO
+objectstothelaunchregion;
+• WSregion:Thisregioncontainsobjectsthatwillbeused
+whentheappisinthebackground.WecopyallWSobjects
+totheWSregion;
+• Coldregion:Thisregioncontainsobjectsthatwillnotbe
+usedduringthebackgroundandthehotlaunch.Wecopy
+allcoldobjectstothecoldregion.
+Basedontheobjectclassification,thecopyoperationselects
+thecorrespondingtypeofregionasthedestinationto-region
+foreverymarkedobject.TheARTusesthebump-pointer
+allocator[10,19]tocontinuouslyallocateobjectsinthese
+regions, resulting in objects with the same classification
+beingcompactlygroupedintheirrespectiveregions.Finally,
+we obtain the rearranged pages by utilizing the memory
+pagesoftheregions.
+5.3.2 Pageswapping. Basedonthethreetypesofregions
+intheobjectgroupingprocedure,allFGOaregroupedinto
+threetypesofpages:(i)Launchpages,(ii)WSpages,and
+(iii) Cold pages. To achieve the interaction between ART
+andLinux,wemodifiedtheexistingmadvisesystemcallin
+theLinuxkernelandaddedtwonewoptions:COLD_RUNTIME
+andHOT_RUNTIME.Therefore,wecanconveytheinformation
+of these different types of pages to the underlying Linux
+throughthemodifiedmadvisesystemcall.
+Activelyswap-out.Aftertheobjectgroupingprocedure
+finishes, RGS will make a madvise system call with the
+COLD_RUNTIME option and provide the memory address
+range of all cold regions as input values. The kernel part
+ofRGSwillthenidentifyallphysicalpagescorresponding
+tothesespecifiedmemoryaddressranges.Thesephysical
+pageswillbeactivelyswappedtotheswappartitiontopre-
+servememoryaheadofmemory-pressuresituations.Asa
+661
+
+===== PAGE 9 =====
+MoreApps,FasterHot-LaunchonMobileDevicesviaFore/Background-awareGC-SwapCo-design ASPLOS’24,April27-May1,2024,LaJolla,CA,USA
+Table1.Comparisonmethods. Table2.Fleet’sdefaultparameters.
+Methods GCapproach Swapapproach Parameterdescription Symbol Setting
+Granularity Scheme
+MaximumdepthtotherootsforNRO 𝐷 2
+Android[10] NativeGC Page LRU WaittimetostartFleetinthebackground 𝑇 𝐵 10seconds
+WaittimetostopFleetintheforeground 𝑇 𝐹 3seconds
+Marvin[32] BookmarkGC Object ObjectLRU
+CART_SHIFTforcardaddressconversion - 10
+Background- Grouped Runtime-guided RegionsizeoftheJavaheap - 256KB
+Fleet
+objectGC(§5.2) page(§5.3.1) swap(§5.3)
+Table3.Thecommercialappsforevaluation.
+Apptype AppDescription
+result,RGSoptimizestheswap-outmechanismbyactively
+CommunicationTwitter(X),Facebook,Instagram,Telegram,Line
+swapping out cold regions when an app switches to the
+Multi-media Youtube,Tiktok,Spotify,Twitch,Rave,BigoLive
+background. Tools&utilitiesAmazonShop,GoogleMaps,Chrome,Firefox,LinkedIn
+Cachethelaunchpages.Whileanappisinthebackground, Games Angrybirdsclassic,Candycrushsaga
+RGSwillperiodicallyexecutethemadvisesystemcallwith
+theHOT_RUNTIMEoptiononthememoryofthehotregions.
+processesobjectsthatexceedthethresholdsize.Foroureval-
+RGS will find the corresponding physical pages for these
+uation,wesetthethresholdparameterto1024bytes.The
+hotregionsandmovethesepagestoahighlyusedposition
+configurationsforFleetarelistedinTable2.
+in the LRU queue in the Linux kernel. As a result, these
+Experimentalplatform.WeuseaGooglePixel3smart-
+launchpagesareunlikelytobeswappedout,optimizingthe
+phonewith4GBofMicronLPDDR4XRAMandanOcta-
+hot-launchperformance.
+core Qualcomm Snapdragon 845 processor. For the swap
+partition,weemploya2GBflash-basedblockdevice.We
+6 EvaluationMethodology use the android-10.0.0_r1 branch of the Android Open
+SourceProject(AOSP)andtheandroid-msm-crosshatch-4.9-
+Comparison schemes. We compare Fleet to default An-
+android10branchoftheLinuxkernel.
+droid[10]andMarvin[32],assummarizedinTable1.The
+Workloads.Weutilizetwotypesofapps:(i)Themanually
+keydifferencesbetweenthesemethodsareasfollows:
+createdappsdownloadedfromtheMarvinproject[3].These
+DefaultAndroid:AndroidusesGCandswapastwoindepen-
+appshavetwoparameters:objectsizeandmemoryfootprint.
+dent mechanisms. As mentioned in §3.2, this method has
+Oncetheseappsstart,theyallocateobjectsofthesamesize,
+twoproblems:(i)Lowcachingcapacityduetoconflictsbe-
+determinedbytheobjectsizeparameter,tooccupythespec-
+tweenGCandswap,and(ii)Slowhot-launchduetosudden
+ifiedmemoryfootprint.Weconfiguretwotypesofobject
+swappingofmultiplepagesduringlaunch.
+sizes: small object apps (512 bytes) and large object apps
+Marvin:Thismethodalsoco-designsGCandswap.Marvin
+(2048bytes).Thememoryfootprintofeachappissetto180
+recordsthereferenceinformationofeachobjectbeforeswap-
+MB.(ii)ThemostpopularcommercialappsfromtheGoogle
+pingitout.Byutilizingtherecordedreferenceinformation,
+Playstore,whichcoverfourcategoriesasshowninTable3.
+itdoesnotneedtoaccesstheobjectsduringGC.However,
+Marvincouldnotachievedesirablehot-launchperformance
+7 EvaluationResults
+forthreereasons:(i)Marvinusesobject-granularityswap,
+TheevaluationofFleetanswersthefollowingquestions:
+whichisinefficientforswappingobjectssmallerthanthe
+pagesize,(ii)maintainingthereferenceinformationrequires Q1: HowmanycachedappsdoesFleetimprovebyreduc-
+longstop-the-worldpauses,and(iii)itdoesnotconsiderthe ingtheGCworkingsetwhenanappisintheback-
+suddenlyaccessedobjectsduringhot-launch. ground?(§7.1)
+Fleet:ThismethodisacollaborativedesignforGCandswap. Q2: HowmuchdoesFleetimprovethehot-launchperfor-
+Fleetgroupssmallobjectsintopagesaccordingtotherun- mancefordifferentcategoriesofapps?(§7.2)
+time information before swapping. Additionally, Fleet re- Q3: WhataretheeffectsofFleetonothercrucialsystemin-
+solvestheconflictbetweenGCandswapbyrestrictingthe dicatorssuchasuserexperience,CPUusage,memory
+GCrangeonlytothebackgroundobjects. overhead,andenergyconsumption?(§7.3)
+Parametersetting.BothFleetandMarvinusethedefault
+7.1 Appcachingcapacity
+parameters,whichareidenticaltothedefaultAndroidpa-
+rameters,inadditiontotheparametersproposedbytheir Totestthecachingcapacity,weevaluatemanuallycreated
+method.Marvinincludesalargeobjectthresholdparame- appstoavoidanybiascausedbydifferencesinappimplemen-
+ter.Basedonthisthresholdparametervalue,Marvinonly tations.Specifically,wecontinuouslylaunchoneadditional
+662
+
+===== PAGE 10 =====
+ASPLOS’24,April27-May1,2024,LaJolla,CA,USA Huang,Zhang,Qiu,Liang,Ausavarungnirun,Li,andXue
+18
+15 12
+9 6 3 0 0 4 8 12 16 20 24 28
+No. of lunched apps
+sppa
+evitca
+fo .oN
+18
+15 12 Android
+9 Marvin 6 Fleet 3 0 0 4 8 12 16 20 24 28
+No. of lunched apps
+(a)Largeobjectapps
+sppa
+evitca
+fo .oN
+Android
+Marvin Fleet
+(b)Smallobjectapps
+rettiwT kobecaF margatsnI margeleT eniL ebutuoY koTkiT yfitopS hctiwT evaR eviLogiB pohSnozamA spaMelgooG emorhC xoferiF nIdekniL sdriByrgnA hsurC
+ydnaC
+rettiwT kobecaF margatsnI margeleT eniL ebutuoY koTkiT yfitopS hctiwT evaR eviLogiB pohSnozamA spaMelgooG emorhC xoferiF nIdekniL sdriByrgnA hsurC
+ydnaC
+18
+15
+12
+9
+6
+3
+0
+Launched apps
+sppa
+evitca
+fo
+.oN
+1.8
+1.6 1.4
+1.2 1.0 0.8
+0.6 0.4
+0.2
+0.0
+Android w/o swap Tik F T a o c k ebook Twitch Li A n v e erage
+Android w/ swap
+Fleet
+(c)Commercialapps
+Figure11.Cachingcapacityfordifferenttypesofapps.(a)
+showsthatFleetandMarvinhavesimilarcachingcapacity
+formanuallycreatedappswithlarge-sizeobjects.(b)demon-
+stratesthatFleethasbettercachingcapacityformanually
+createdappswithsmall-sizeobjects.(c)illustratesthatFleet
+outperformsAndroidintermsofcachingcapacityforcom-
+mercialapps.
+appandcountthenumberofremainingactiveappsafter
+eachlaunch.
+SinceMarvinisonlyevaluatedonlargeobjectapps,we
+firstpresentthecachingcapacityresultsforthelargeobject
+apps,asshowninFigure11a.Fleetachievesacomparable
+cachingcapacitytoMarvin,asbothcancacheupto18apps,
+whichisapproximately1.3×thenumberofcachedappsin
+Android.ThisimprovementisbecauseMarvinandFleetcan
+overcome the drawback of Android, where GC traces the
+swappedobjects.Incomparison,Androidstartstokillapps
+whenthereare11cachedappsandcachesamaximumof14
+apps.Additionally,Figure11bshowsthecachingcapacityof
+smallobjectapps.Fortheseapps,FleetoutperformsMarvin
+by 2× in terms of maximum caching. Fleet can cache up
+to18smallobjectapps,whichisthesameascachinglarge
+objectapps.However,Marvincannothandlesmallobjects
+smallerthanitsconfiguredlargeobjectthresholdandcaches
+amaximumof9smallobjectapps.Thisresultshowsthat
+Fleetisnotsensitivetoobjectsizes,whichcanbeattributed
+toFleet’sdesignthatgroupssmallobjectsintopages.
+We also evaluate Fleet on commercial apps, as shown
+inTable3.Toensureafaircomparison,weonlycompare
+FleetagainstAndroid,asMarvin’sprototypedoesnotfully
+support commercial apps. According to our tests, Marvin
+CG
+yb dessecca
+stcejbo
+fo
+.oN
+1e6
+Android 60 Fleet w/o BGC 50
+Fleet w/ BGC 40 30 20 10 0
+(a)GCrangeinthebackground
+)diordnA( 1e4 Mutator GC
+60
+50 40 30
+20
+10
+0 0 100200300400500600 Time (second)
+)teelF(
+1e4
+stcejbo
+dessecca
+fo
+.oN
+(b)AccessesanalysisofTwitch
+Figure12.TheanalysisofGCworkingset.Fleetreduces
+theGCrangewhenanappisinthebackground.
+crashesafterlaunchingapproximatelyfourapps.Theorigi-
+nalpaper[32]alsoacknowledgesthatMarvineasilycrashes
+whenrunningcommercialapps.Inthistest,wesequentially
+launchtheseappsinaround-robinsequence(fromTwitter
+toCandyCrush,asindicatedonthex-axisofFigure11c).
+Weuseeachappfor30secondsandrecordthenumberof
+activeappscachedinthebackground.Wereporttheresults
+from two cycles of launches. The results show that Fleet
+can cache more apps than Android, both on average and
+atbest,regardlessofwhetherAndroidenablesswapornot.
+Fleetcancacheamaximumof17apps,whichis1.21×better
+thanAndroidwithswap.Thisimprovementvalidatesthe
+effectivenessofFleet’sstrategies.Additionally,commercial
+appsoftenconsistofmanysmallobjects,whichFleet’sobject
+groupingmechanismcanhandleefficiently.
+GC working set. To assess how Fleet improves caching
+capacitybyreducingtheworkingsetofbackgroundGC,we
+measuretheworkingsetsofGCthreadswhenanappisin
+thebackground.Wemeasurethenumberofobjectsaccessed
+bytheGCthreadduringasingleGCexecution.Figure12a
+illustratesthat,onaverage,theGCthreadaccessesapprox-
+imately 7×105 objects forAndroid. With BGC, Fleet can
+reducetheworkingsetofGCto105onaverage.Fleet’sre-
+ductionisapproximately7×ofAndroid.Figure12bpresents
+amoredetailedmeasurementofaccessedobjectsforTwitch.
+WeperformthesameusagepatternonbothAndroidand
+Fleet.Duringtheseexperiments,weswitchTwitchtothe
+backgroundataround180secondsandbringitbacktothe
+foregroundatabout480seconds.Thisfiguredemonstrates
+thatwhentheappisinthebackground(180to480seconds),
+Fleetcansignificantlyreducethenumberofobjectsaccessed
+bytheGCthreadcomparedtoAndroid.
+7.2 Hot-launchperformance
+ToassessFleet’shot-launchperformance,wetestthecom-
+mercialappsundermemorypressurewithabout10back-
+ground apps. We measure the hot-launch time as the du-
+rationfromthestarttothefirstframedisplay,whichcan
+663
+
+===== PAGE 11 =====
+MoreApps,FasterHot-LaunchonMobileDevicesviaFore/Background-awareGC-SwapCo-design ASPLOS’24,April27-May1,2024,LaJolla,CA,USA
+100
+50
+0
+0 5000
+Hot-launch time (ms)
+)%(
+FDC
+100
+Android
+Marvin 50
+Fleet
+0
+250 500 750
+Hot-launch time (ms)
+(a)Twitter
+)%(
+FDC
+100
+Android
+Marvin 50
+Fleet
+0
+0 2500 5000
+Hot-launch time (ms)
+(b)Facebook
+)%(
+FDC
+100
+Android
+Marvin 50
+Fleet
+0
+500 1000 1500
+Hot-launch time (ms)
+(c)Instagram
+)%(
+FDC
+100
+Android
+Marvin 50
+Fleet
+0
+1000 2000
+Hot-launch time (ms)
+(d)Line
+)%(
+FDC
+Android
+Marvin
+Fleet
+(e)Youtube
+100
+50
+0
+200 400 600
+Hot-launch time (ms)
+)%(
+FDC
+100
+Android
+Marvin 50
+Fleet
+0
+0 5000
+Hot-launch time (ms)
+(f)Spotify
+)%(
+FDC
+100
+Android
+Marvin 50
+Fleet
+0
+0 1000 2000
+Hot-launch time (ms)
+(g)Twitch
+)%(
+FDC
+100
+Android
+Marvin 50
+Fleet
+0
+1000 2000
+Hot-launch time (ms)
+(h)AmazonShop
+)%(
+FDC
+100
+Android
+Marvin 50
+Fleet
+0
+500 1000
+Hot-launch time (ms)
+(i)GoogleMaps
+)%(
+FDC
+Android
+Marvin
+Fleet
+(j)Chrome
+100
+50
+0 100 200 Hot-launch time (ms)
+)%(
+FDC
+100
+Android
+Marvin 50
+Fleet
+0 500 1000 1500 Hot-launch time (ms)
+(k)Firefox
+)%(
+FDC
+2 Android
+Marvin 1
+Fleet 0
+Tw F i a tt c e e r In b s o t o a k gram L Y in o e utub S e po A ti m f T y w az it G o c n o h S o h g o le p Ma C p h s rom F A e ir n e g f r o y x Bi A rd ve s rage
+(l)AngryBirds
+naidem
+fo
+pudeepS
+emit
+hcnual-toh
+3
+Marvin Fleet
+2
+1
+0 10 20 30 Java heap percentage of the app (%)
+(m)Median(50th)hot-launchtimeoverAndroid
+naidem
+fo
+pudeepS
+emit
+hcnual-toh AngryBirds
+Twitter
+(n)Fleetspeedup
+Figure13.Thehot-launchperformanceofcommercialappsunderhighmemorypressure.
+beobtainedusingtheADBtool[7,8].Weconduct20hot- 7.3 Runtimeperformance
+launchesforeachapp.Additionally,betweentwolaunches, Frame rendering. In this part, we present the impact of
+weuseotherappsfor30secondstosimulatetheintermittent Fleet on the user experience, as measured by the jank ra-
+usagepatternofusers.Wepresentthehot-launchtimesof tio[15]andframespersecond(FPS).Forthisexperiment,
+12representativecommercialappsinFigure13. These12 weusealltestedappsintheforegroundstateforoneminute.
+appsareselectedtocoverallapptypesinTable3.Wealso Whileusingtheapp,wesimulatehumaninteractionbycon-
+provideotherhot-launchdata,includingtheother6apps tinuouslyswipingthescreenusingtheADB[7]tool,follow-
+andadditionalstatisticalcharacteristicsinAppendixA. ingapredefinedscript.Weprofileperformanceinformation
+From these results, we make three observations. First, duringtheexperimentusingthesystemtrace[9]andanalyze
+Fleetachievesthebesthot-launchtimeamongthesethree thetracefileusingPerfetto[14].Todeterminethenumber
+approaches for almost all apps. As shown in Figure 13m, ofjanks,wecountoccurrenceswherethetimebetweentwo
+theaveragespeedupofthemedianhotlaunchtimeofFleet renderedframesexceeds16.7milliseconds(equivalentto60
+is1.59×comparedtoAndroidand2.62×comparedtoMar-
+framespersecond)[15].Thejankratioiscalculatedasthe
+vin.TakingFacebookasanexample,themedianhotlaunch proportionofjankstothetotalnumberofframes.Addition-
+timeforFleetis101ms,whichis1.72×fasterthanMarvin
+ally, we calculate the FPS results by dividing the number
+(174 ms) and 2.07× faster than Android (209 ms). Second, ofrenderedframesbytheduration.Figure14displaysthe
+Fleet displays significantly shorter tail launch times. The jank ratio and FPS results, respectively. Compared to An-
+90th percentile tail hot launch time of Fleet is 2.56× and droid,Fleetexhibitsanearlyidenticalaveragejankratioand
+4.45×comparedtoAndroidandMarvin,respectively(More FPS.ComparedtoMarvin,Fleetdemonstratesa19.9%im-
+detailsareshowninFigure15ainAppendixA).Forinstance, provementinthejankratioanda20.3%improvementinFPS
+Android’s90thpercentilehot-launchtimeonFacebookis onaverage.Therefore,Fleetcandeliverauserexperience
+622ms,whereasFleet’s90thpercentilelaunchtimeis121 comparabletotheoriginalAndroid.
+ms,whichis5.14×faster.Third,Figure13ndemonstratesa
+CPUusage.WealsomeasuretheCPUusageofeachapp.
+positivecorrelationbetweenthespeedupachievedbyFleet Todothis,welaunchanapp,useitfor30seconds,switchit
+andtheJavaheappercentageofapps.ThisimpliesthatFleet tothebackgroundfor30seconds,andrepeatthisprocedure.
+canprovidegreaterbenefitsforappswithahigherJavaheap Throughout this process, we utilize the system trace [9]
+ratio.Insummary,Fleet’sdesign,whichinvolvesswapping torecordtheCPUusage.IntermsoftotalCPUtimecost,
+withruntimeinformation,enablesittoachievefasterhot FleetperformsworsethanAndroidbyanaverageof0.18%,
+launchlatency. butitperformsbetterthanMarvinbyanaverageof3.21%.
+664
+
+===== PAGE 12 =====
+ASPLOS’24,April27-May1,2024,LaJolla,CA,USA Huang,Zhang,Qiu,Liang,Ausavarungnirun,Li,andXue
+25
+20
+15
+10
+5
+0
+)%(
+oitar
+knaJ
+Android Marvin Fleet
+60
+50
+40
+30
+20
+10
+0
+Tw F i a tt c e e r I b n o st o a k g T r e a l m egr Y a o m utub T e ikTo S k potif T y wi A t G c m o h o a g zo le n Ma C p h s rom F A e ir n e g f C o ry a x B n i d rd yC s rush
+SPF
+about31%fasterinAndroid.Therefore,Fleet’shotlaunch
+performanceismorerobustthanthatofAndroidwhencon-
+sideringdifferentheapsizeconfigurations.Thisisbecause
+Fleetaccuratelyidentifiesandswapsobjectsintheruntime
+layer,consideringthenexthotlaunch,whereastheoriginal
+Androidusesagenericswapapproach.
+8 RelatedWork
+GCintheruntime.Fleetaddressesfourchallengesinthe
+designofitsGCmethod:(i)AvoidpagingduringGC.There
+Figure14.Framerenderingperformanceanalysiswithjank
+areprimarilytwoapproachestocoordinatingGCandswap.
+ratioandframepersecond(FPS).
+First,onemethodinvolvesrecordingtheoutcomereferences
+ofswappedobjects[21,27,32,43].Thesemethodsrequire
+MostoftheCPUoverheadisattributedtotheGCthreads, recording the reference information before swapping ob-
+whereFleetincursanadditional0.16%CPUtimecompared jects.Duringthetracingprocedure,thesemethodsutilize
+toAndroidonaverage. the recorded reference information to traverse the object
+Memoryoverhead.Fleetintroducesanadditionalcardtable referencegraphwithoutaccessingtheobjects.Second,an-
+fixedat4MB,whichisproportionaltothe4GBheapsize. other approach is to control the range of GC [30, 46, 47].
+Thememoryoccupancyofthecardtablecanbereducedby FleetisamethodthatcontrolstherangeofGC.Tothebest
+reclaiming its empty pages. On the other hand, Fleet can ofauthors’knowledge,Fleetisthefirstmethodthatcontrols
+efficientlyoffloadcoldobjectsthatarelargerthanthecard therangeofGCbyemployingaschemethatdiffersbetween
+table. As a result, Fleet can decrease the overall memory foregroundandbackgroundstates;(ii)Identifyhotnessfor
+usagewithminimalmemoryoverhead. objects[21,28,43,50].ThekeydistinctionbetweenFleetand
+Power consumption. We use the Monsoon Power Mon- thesemethodsliesintheconsiderationofthedistincthot-
+itor [11] to measure the power consumption of Fleet and nesspatternsobservedinAndroid,suchasforegroundand
+Androidforourtestedapps.Eachappisusedforoneminute background usage; (iii) Reorganize objects through copy-
+intheforegroundandoneminuteinthebackground,and based GC [28, 50]. These works aim to consolidate small
+wemeasuretheaverageenergyconsumptionduringusage. objects with similar access patterns. Fleet groups the ob-
+TheaveragepowerconsumptionofFleetis1851±143mW. jects that need to be accessed during the hot-launch; (iv)
+ForAndroid,itis1817±197mW.Withinthestandarderror, Application-awareGC.Thistermreferstovariousefforts
+thepowerconsumptionofFleetandAndroidissimilar. thataimtoco-designtheGCschemewithspecificapplica-
+tions.Examplesofsuchworksincludethosefocusedonbig
+7.4 Sensitivitystudyonthebackgroundheapsize
+datasystems[37,38],disaggregatedmemory[24,36,46,47],
+ARTutilizesadynamicheapsizeschemethatadjuststhe and non-volatile memory [40, 49]. The objective of these
+heaplimitbasedonthecurrentlyallocatedmemorysizeafter methodsistodesignanimprovedGCtailoredtothespecific
+GC.Inthissection,weanalyzetheimpactoftheheapsize workloadandrequirementsofeachapplication.Fleetshares
+bysettingtheupdatedheapsizeto1.1×and2×theallocated asimilarobjectivebutfocusesspecificallyonmobileapps.
+memorysizeafterGCwhentheappisinthebackground.We Swap in mobile devices. Swap mechanisms are widely
+evaluatethecachingcapacityandhotlaunchperformance used in mobile devices. SEAL [33] introduces a two-level
+forthesetwoheapsizeschemesinFleetandAndroid. swapmechanismformobiledevices.Kwonetal.[31]pro-
+Regardingcachingcapacity,arelativelysmallerheapsize poseacompressedswapschemeformobileGPUmemoryto
+leads to higher app caching improvement in Fleet. When increasethecachingcapacityofapps.ASAP[41]improves
+theheapsizeschemeisconfiguredto1.1×,Fleet’scaching hot-launchperformancebyemployingaprefetchingmethod.
+capacityimprovesbyapproximately20%.However,whenthe However,thesemethodsconsiderGCthreadsasregularpro-
+schemeisconfiguredto2×,Fleet’scachingcapacitybecomes gramexecutionandfailtoaddresstheadverseeffectsofGC,
+similartothatofAndroid.Thisisbecausealargerheapsize whichisacrucialissueinAndroiddevices.SinceGCmoves
+limitallowsformoregarbagebackgroundobjects,resulting objects to different pages, estimating access patterns at a
+ininefficientBGCinFleet. pagelevelwillbeinterference.
+Asforthehotlaunchtime,Fleetdemonstratesconsistent Crosslayermemorymanagement.Severalworkspropose
+performanceacrossthesetwoheapsizeschemes.Incontrast, across-layerdesignformemorymanagement[25,32,34,48].
+Androidexhibitssignificantvariationinhotlaunchtimes Marvin[32]isthefirsttoco-designGCandswappingfor
+acrossthesetwoheapsizeschemes.Forinstance,compared mobile systems. Marvin utilizes a stub-based method to
+totheheapsizeconfiguredto2×,the1.1×configurationis recordreferencestoswapped-outobjects,whichimproves
+665
+
+===== PAGE 13 =====
+MoreApps,FasterHot-LaunchonMobileDevicesviaFore/Background-awareGC-SwapCo-design ASPLOS’24,April27-May1,2024,LaJolla,CA,USA
+thecachingcapacityforappswithlargeobjects.However,
+5
+itcausessignificantdegradationinhot-launchperformance 4
+3
+duetotwoproblems.First,itcannotefficientlyprocesssmall 2
+1
+objects,whichconstitutethemajorityofobjectsinAndroid 0
+apps.Second,itrequireslongstop-the-worldpausestomain- Tw F i a tt c e e r In b s o t o a k gram L Y in o e utub S e po A ti m f T y w az it G o c n o h S o h g o le p Ma C p h s rom F A e ir n e g f r o y x Bi A rd ve s rage
+tainthereferenceinformation.Acclaim[34]proposesacross-
+layer solution by passing the app state to the kernel and
+adjustingmemorymanagement.
+9 Conclusion
+The app launch time is critical to the user experience on mobiledevices.However,existingapproachesfallshortin
+optimizingthehot-launchperformancewhilemaximizing
+the number of cached apps. Based on the observation of
+foreground/background object characteristics, this paper
+presentsFleet,afore/background-awareGC-swapco-design
+frameworkthatguidestheswapwiththeforegroundobject
+accesspatternandrestrictstheGCtracingrangetotheback- groundobjects.Theevaluationrevealsthat,onaverage,Fleet
+achieves a 1.59× faster hot-launch time and caches 1.21×
+moreappsthanAndroid.
+Acknowledgments
+Wearegratefultoourshepherdandtheanonymousreview-
+ersfortheirconstructivecommentsandsuggestions.The
+workwassupportedinpartbytheResearchGrantsCouncil
+oftheHongKongSpecialAdministrativeRegion,China(No.
+CityU11209122),theThailandMHESIResearchGrantfor
+New Scholars (RGNS 64-091), the National Key Research
+andDevelopmentProgramofChina(No.2022YFB3104502),
+the State Key Laboratory of Computer Architecture (ICT,
+CAS)underGrantCARCHA20211,theWuhanScienceand
+TechnologyJointProjectforBuildingaStrongTransporta-
+tionCountry(No.2023-2-7),theCCF-PhytiumFund,andthe
+NationalScienceFoundation(NSF)Grant(No.2105006).
+A HotLaunchPerformanceAppendix
+Inthisappendix,wepresent3additionalcharacteristicsof
+thehotlaunchtime(Figure15)andhotlaunchdistributions
+fortheremaining6commercialapps(Figure16).
+Figure15supplements3statisticalcharacteristics:(a)the
+tailhot-launchtimeatthe90thpercentile,(b)theminimum
+hot-launchtimeatthe10thpercentile,and(c)themeanhot-
+launchtimeanditscorrespondingstandarddeviation.We
+calculatetheperformancespeeduprelativetoAndroid.The
+resultsindicatethatFleetimprovesthehot-launchperfor-
+manceforall3statisticalmeasures.Specifically,Fleetopti-
+mizesthetailhotlaunchtimemoreeffectively.Fleetshows
+anaverageimprovementofmorethan2.5×inoptimizing
+the90thpercentiletailhot-launchtime.
+Figure16showsthatFleetprovidesfasterhotlaunchtimes
+formostapps,exceptforCandyCrushSaga.Thisdiscrepancy
+isbecauseCandyCrushSagahasasmallpercentageofJava
+eht
+fo
+pudeepS
+elitnecrep
+ht09
+Marvin Fleet
+(a)The90thpercentilehot-launchtime
+2
+1
+0
+Tw F i a tt c e e r In b s o t o a k gram L Y in o e utub S e po A ti m f T y w az it G o c n o h S o h g o le p Ma C p h s rom F A e ir n e g f r o y x Bi A rd ve s rage
+eht
+fo
+pudeepS
+elitnecrep
+ht01
+Marvin Fleet
+(b)The10thpercentilehot-launchtime
+3
+2
+1
+0 Tw F i a tt c e e r In b s o t o a k gram L Y in o e utub S e po A ti m f T y w az it G o c n o h S o h g o le p Ma C p h s rom F A e ir n e g f r o y x Bi A rd ve s rage
+egareva
+fo
+pudeepS
+emit
+hcnual-toh
+Marvin Fleet
+(c)Averagehot-launchtimewithstandarddeviation
+Figure15.Thehot-launchspeedupoverAndroidunderhigh
+memorypressure.
+100
+50
+0
+200 400
+Hot-launch time (ms)
+)%(
+FDC
+100
+Android
+Marvin 50
+Fleet
+0
+500 1000
+Hot-launch time (ms)
+(a)Telegram
+)%(
+FDC
+Android
+Marvin
+Fleet
+(b)TikTok
+100
+50
+0
+0 5000 10000
+Hot-launch time (ms)
+)%(
+FDC
+100
+Android
+Marvin 50
+Fleet
+0
+0 5000
+Hot-launch time (ms)
+(c)Rave
+)%(
+FDC
+Android
+Marvin
+Fleet
+(d)BigoLive
+100
+50
+0
+0 1000 2000
+Hot-launch time (ms)
+)%(
+FDC
+100
+Android
+Marvin 50
+Fleet
+0
+500 750
+Hot-launch time (ms)
+(e)LinkedIn
+)%(
+FDC
+Android
+Marvin
+Fleet
+(f)Candycrushsoga
+Figure16.Thehot-launchperformancedistributionofthe
+6othercommercialappsunderhighmemorypressure.
+heap(only4%).Fleetisprimarilyoptimizedformemoryin
+theJavaheap,makingitmoresuitableforappswithalarger
+percentageofJavaheap.
+666
+
+===== PAGE 14 =====
+ASPLOS’24,April27-May1,2024,LaJolla,CA,USA Huang,Zhang,Qiu,Liang,Ausavarungnirun,Li,andXue
+B ArtifactAppendix alsohavesomedevelopmenttools,includingAndroidDebug
+B.1 Abstract Bridge(ADB)andfastboot.Additionally,thePixel3mobile
+deviceshouldbeconfiguredwithitsbootloaderunlocked.
+Fleetisaco-designofAndroidRuntime(ART)andLinux
+kernel, enabling more efficient memory management for B.3.4 Datasets. Theartifactprovidesinstallationpack-
+mobiledevices.Theartifactprovidesthesourcecodeofour ages for all the tested commercial apps listed in Table 3.
+modifiedARTandLinuxkernel.Additionally,thisartifact These apps can be found in the evaluation/APK folder.
+includestestingscriptsandJupyternotebooksforcollecting Additionally,thereareinstallationscriptsavailableinthe
+dataandreproducingthekeyexperimentalresultsreported evaluation/install-apkfoldertoassistusersininstalling
+inthepaper.Theseresultsencompassappcachingcapacity, theseappsontheirmobiledevices.
+hotlaunchperformance,andruntimeperformance.
+Fortheevaluation,itisnecessarytohaveaPixel3mobile B.4 Installation
+deviceandadevelopmentworkstationrunning64-bitLinux OurartifactincludesaREADME.mdfilethatprovidesamore
+distributionwithmorethan64GBDRAMand800GBfree detailedprocedureforbuildingandinstallingFleetandthe
+diskspace.Themobiledeviceshouldbeconnectedtothe otherbaselines.TheinstallationprocessforbuildingAndroid
+workstationusingaUSBdatacable. systemsisdividedintothreemainsteps.
+First, we need to obtain the source code of Android by
+B.2 Artifactcheck-list(meta-information)
+downloadingthebasicsourcecodeandmakingourmodifi-
+• Program: ModifiedARTandLinuxkernel,PythonandBashscripts, cations.Theartifactprovidesourmodifiedcodeinthesrc
+JupyterNotebooks. folder.ToincorporatethesefilesintotheoriginalAOSPand
+• Compilation: JavaDevelopmentKit8,Python3,GNUCLibrary.
+kernel,wecanruntheapply-modification.shscript.
+• Run-timeenvironment: Android10forthedeviceandUbuntu
+Second,afterupdatingthesourcecode,weneedtobuild
+22.04forthedevelopmentworkstation.
+• Hardware: Pixel3mobilephone. Androidsystemimagesfromit.Thisinvolvesbuildingthe
+• Metrics: Appcachingcapacity,GCworkingsetsize,hotlaunch kernel and the AOSP. We can utilize the scripts named
+performance,CPUusage,andframerenderingperformance. build_*.shprovidedintheartifact.
+• Output: Theconsoleandsystemtracetooloutputrawdata,and
+Third,oncewehavebuiltAndroidimages,userscanuse
+JupyterNotebookisusedtoanalyzeandgeneratevisualizedresults.
+• Experiments: PythonandBashscriptsareusedforcollectingdata, thescriptsprovidedintheartifacttoflashthecompiledim-
+andJupyterNotebooksareusedforanalysis. agestothePixel3deviceusingthefastboot*.shscripts.
+• Howmuchdiskspacerequired(approximately)?:About800 Additionally,wecanusecorrespondingscriptsprovidedby
+GB,mainlyforbuildingFleetandothercomparedAndroidsystems. theartifacttosetuptheconfigurationforoursystem,includ-
+• How much time is needed to prepare workflow (approxi-
+ingconfiguringtheswappartitionandinstallingtheGoogle
+mately)?: About12hours.
+• Howmuchtimeisneededtocompleteexperiments(approxi- servicesframeworkandapps.
+mately)?: About12hours. Moreover,theartifactalsoprovidespre-builtsystemim-
+• Publiclyavailable?: Yes. ages. Users can directly flash the corresponding pre-built
+• Archived(provideDOI)?:https://doi.org/10.5281/zenodo.10878114 imagestothedeviceusingthefastboot*.shscripts.
+B.3 Description
+B.5 Experimentworkflow
+B.3.1 Howtoaccess. Inadditiontothearchivedversion,
+The artifact includes all experiment-related files in the
+wemaintainapublicGitHubrepository:https://github.com/ evaluationfolder.Additionally,thereisaEXPERIMENTS.md
+jiachengh/Fleet
+documentthatprovidesamoredetaileddescriptionofthe
+evaluation.Toreproducethekeyresultsreportedinthepa-
+B.3.2 Hardwaredependencies. Toreproducetheresults
+per,thissectionwillincludethefollowingthreeexperiments.
+reportedinthepaper,werequireaGooglePixel3mobile
+device.Additionally,adevelopmentworkstationisnecessary B.5.1 AppcachingandGCworkingset. Alltherelevant
+forbuildingAndroidimagesandinteractingwiththedevice. filesarelocatedintheevaluation/exp-cache-appfolder.
+Itisrecommendedthatthedevelopmentworkstationhave Figure11c.Tobegin,runthefollowingcommandfromthe
+64GBofDRAMand800GBofstoragespace,primarilyfor evaluationfolder:
+building Android systems. The workstation should be an
+python ./exp-cache-app/run-cache-commercial.py
+AMD64architecturemachine.
+This Python script will continuously start the apps and
+B.3.3 Softwaredependencies. Werecommendthatthe count the number of active apps. The number of ac-
+developmentworkstationrunonUbuntu22.04,butothersim- tive apps can be observed in the console after the key-
+ilar64-bitLinuxdistributionsshouldalsowork.Thedevelop- word CachingNUM=. When the script finishes, it will
+mentenvironmentshouldincludeGNUCLibrary(glibc)2.17 print the summary of the cached app numbers in the
+orlater.Tointeractwiththedevice,theworkstationshould last line, which begins with cached_numbers=. Finally,
+667
+
+===== PAGE 15 =====
+MoreApps,FasterHot-LaunchonMobileDevicesviaFore/Background-awareGC-SwapCo-design ASPLOS’24,April27-May1,2024,LaJolla,CA,USA
+users need to paste these summary results into the trace and fetch the captured trace from the mobile de-
+exp-run-caching-commercial.ipynbnotebooktogener- vice to the development workstation. After obtaining the
+atetheresultfigure. tracefile,userscanupdatetheTRACE_PATHvariableinthe
+Figure12.Thisresultrequiresadditionalprofileinformation, exp-runtime-performance.ipynbnotebook.Finally,users
+which can be obtained by enabling the debug flag before canexecuteblocksofthenotebook,whichanalyzethetrace
+compiling Fleet. Therefore, users need to rebuild Fleet to fileusingPerfettoandoutputtheCPUusageresultinthe
+enableprofileinformation.Foreachcomparisonofconfig- lastcodeblock.
+uration,usersshouldcollecttheworkingsetalongsidethe Figure14. Similarly, users should start the system trace
+executiontimeusingtwoterminals.Oneterminalisusedto while initiating the run-once-foreground.py script. Af-
+savethelogsprintedbyadb logcat.Theotherisusedto ter the script finishes, users close the system trace and
+executetheapp-runningscriptsrun-gc-working-set.py. fetchthetracefilefromthedevice.Then,userscanusethe
+To produce Figure 12a, users should retrieve the back- exp-runtime-performance.ipynbnotebooktoanalyzethe
+ground GC working set logs from the log files saved tracebyupdatingtheTRACE_PATHtothetracefile.Afterrun-
+in the first terminal and calculate the statistical re- ningalltheblocksinthenotebook,itwillgeneratethejank
+sults. Finally, users could input these results to the ratioandFPSresults.Userscouldpastetheseresultsintothe
+exp-gc-working-set.ipynbnotebookandplotthefigure. exp-runtime-performance-plot.ipynb notebook which
+ToproduceFigure12b,theartifactprovidessomeanalysis incorporatesthescripttoplottheresultingfigure.
+codeblocksintheexp-gc-working-set.ipynbnotebook.
+Users need to update the log paths of enabling BGC and
+disablingBGCinthenotebook.Thenthenotebookcanau- B.6 Evaluationandexpectedresults
+tomaticallyanalyzethelogfilesandplottheresultfigure. Duringtheseexperiments,userscanobtainrawdatafrom
+theconsoleandtracescapturedbythesystemtracetool.Fur-
+B.5.2 Hotlaunchperformance. Userscouldusethefol-
+thermore,theartifactprovidesJupyternotebookstoanalyze
+lowingcommandtocontinuouslylaunchappsandobtain
+therawdataandgeneratefigures.
+thehotandcoldlaunchtimesintheconsole:
+Pleasenotethatduetodifferencesinappusage,suchas
+python ./exp-hot-launch/run-launch.py dailycontentandindividualaccounts,wedonotanticipate
+identicalresults,butweexpecttheresultstoexhibitsimilar
+Ifthereisnotenoughhotlaunchdataforsomeapps,users
+trendsasthosereportedinthepaper.
+canadjusttheappstartupsequenceandnumberofstartups
+inthescript.
+Once the script finishes, it will print a summary of the
+References
+hotlaunchtimesforeveryapp.Usersneedtocopythesum-
+[1] Milliseconds make millions: A study on how improvements
+maryhotlaunchtimefromtheconsoleandpasteitintothe
+in mobile site speed positively affect a brand’s bottom line.
+exp-hot-launch.ipynbJupyterNotebook.
+https://www2.deloitte.com/content/dam/Deloitte/ie/Documents/
+Figure13a-m. After all the hot launch records in Consulting/Milliseconds_Make_Millions_report.pdf.
+exp-hot-launch.ipynb have been updated, we can [2] Responsetimes:The3importantlimits.https://www.nngroup.com/
+articles/response-times-3-important-limits/.
+runtheallcodeblocksinthenotebook.Thenotebookwill
+[3] Marvincode,2019.https://github.com/UWSysLab/marvin-code/[Ac-
+generatetheCDFgraphofhotlaunchtimesforallappsand
+cessed:20-Nov-2023].
+thestatisticalgraph. [4] Oppo introduces new memory expansion technology for
+Figure13n.Userscanusethecheck-heap.shscripttoget its reno5 series, a94 and a74 series smartphones, 2021.
+theJavaheapsizeandthetotalmemoryfootprintofapps. https://www.oppo.com/sg/newsroom/press/oppo-introduces-
+new-memory-expansion-technology/[Accessed:20-Nov-2023].
+Then,theratiooftheJavaheapcanbecalculatedbydividing
+[5] How to use xiaomi virtual ram to speed up your device?,
+theJavaheapsizebythetotalmemoryoftheapp.
+2022.https://xiaomiui.net/how-to-use-xiaomi-virtual-ram-to-speed-
+Finally,userscouldwritetheratioofJavaheapandthe up-your-device-31416/[Accessed:20-Nov-2023].
+hot launch speedup in the corresponding code block in [6] Whatisramplusandhowtouseit?,2022.https://www.samsung.com/
+exp-hot-launch.ipynb,whichwillgenerateFigure13n. sg/support/mobile-devices/what-is-ram-plus-and-how-to-use-it/
+[Accessed:20-Nov-2023].
+[7] Androiddebugbridge(adb)tool,2023.https://developer.android.com/
+B.5.3 Runtimeperformance. Toobtaintheruntimein-
+studio/command-line/adb[Accessed:20-Nov-2023].
+formationofapps,theexperimentsmainlyconsistoftwo [8] App startup time | app quality | android developers, 2023. https:
+steps:(i)utilizethesystem tracetooltocapturetraces;(ii) //developer.android.com/topic/performance/vitals/launch-time[Ac-
+analyzethesecapturedtracesbythePerfettoPythonlibrary. cessed:20-Nov-2023].
+CPUusage. First, users should turn on the system trace [9] Captureasystemtraceonadevice,2023.https://developer.android.
+com/topic/performance/tracing/on-device/[Accessed:20-Nov-2023].
+whilesimultaneouslyexecutingrun-once-cpu.py.When
+[10] Debuggingartgarbagecollection,2023.https://source.android.com/
+the Python script finishes, users should close the system docs/core/runtime/gc-debug/[Accessed:20-Nov-2023].
+668
+
+===== PAGE 16 =====
+ASPLOS’24,April27-May1,2024,LaJolla,CA,USA Huang,Zhang,Qiu,Liang,Ausavarungnirun,Li,andXue
+[11] Highvoltagepowermonitor|monsoonsolutions|bellevue,2023. onProgramminglanguagedesignandimplementation,pages143–153,
+https://www.msoon.com/high-voltage-power-monitor/[Accessed:20- 2005.
+Nov-2023]. [28] Xianglong Huang, Stephen M. Blackburn, Kathryn S. McKinley,
+[12] Memoryallocationamongprocesses,2023.https://developer.android. J.EliotB.Moss,ZhenlinWang,andPerryCheng. Thegarbagecol-
+com/topic/performance/memory-management/[Accessed:20-Nov- lectionadvantage:improvingprogramlocality.InJohnM.Vlissides
+2023]. andDouglasC.Schmidt,editors,Proceedingsofthe19thAnnualACM
+[13] Memory swapping: What it is and how it works, 2023. SIGPLANConferenceonObject-OrientedProgramming,Systems,Lan-
+https://forum.huawei.com/enterprise/en/memory-swapping- guages,andApplications,OOPSLA2004,October24-28,2004,Vancouver,
+what-it-is-and-how-it-works/thread/696666286131658752- BC,Canada,pages69–80.ACM,2004.
+667213860488228864/[Accessed:20-Nov-2023]. [29] Sang-HoonKim,JinkyuJeong,andJin-SooKim.Application-aware
+[14] Perfetto-systemprofiling,apptracingandtraceanalysis,2023.https: swappingformobilesystems.ACMTransactionsonEmbeddedCom-
+//perfetto.dev/[Accessed:20-Nov-2023]. putingSystems(TECS),16(5s):1–19,2017.
+[15] Uijankdetection,2023.https://developer.android.com/studio/profile/ [30] IacovosGKolokasis,GiannosEvdorou,ShoaibAkram,ChristosKozani-
+jank-detection/[Accessed:20-Nov-2023]. tis,AnastasiosPapagiannis,FoivosSZakkak,PolyviosPratikakis,and
+[16] ssvb/tinymembench:Simplebenchmarkformemorythroughputand AngelosBilas. Teraheap:Reducingmemorypressureinmanaged
+latency,2024.https://github.com/ssvb/tinymembench[Accessed:10- bigdataframeworks. InProceedingsofthe28thACMInternational
+Mar-2024]. ConferenceonArchitecturalSupportforProgrammingLanguagesand
+[17] Welcometofio’sdocumentation!,2024.https://fio.readthedocs.io/en/ OperatingSystems,Volume3,pages694–709,2023.
+latest/index.html[Accessed:10-Mar-2024]. [31] SejunKwon,Sang-HoonKim,Jin-SooKim,andJinkyuJeong. Man-
+[18] ShoaibAkram,JenniferB.Sartor,KathrynS.McKinley,andLieven aginggpubuffersforcachingmoreappsinmobilesystems.In2015
+Eeckhout. Write-rationinggarbagecollectionforhybridmemories. InternationalConferenceonEmbeddedSoftware(EMSOFT),pages207–
+InJeffreyS.FosterandDanGrossman,editors,Proceedingsofthe 216.IEEE,2015.
+39thACMSIGPLANConferenceonProgrammingLanguageDesignand [32] NielLebeck,ArvindKrishnamurthy,HenryMLevy,andIreneZhang.
+Implementation,PLDI2018,Philadelphia,PA,USA,June18-22,2018, Endthesenselesskilling:Improvingmemorymanagementformobile
+pages62–77.ACM,2018. operatingsystems. In2020{USENIX}AnnualTechnicalConference
+[19] EmeryD.Berger,BenjaminG.Zorn,andKathrynS.McKinley.Recon- ({USENIX}{ATC}20),pages873–887,2020.
+sideringcustommemoryallocation.InMamdouhIbrahimandSatoshi [33] ChanglongLi,LiangShi,YuLiang,andChunJasonXue.SEAL:user
+Matsuoka,editors,Proceedingsofthe2002ACMSIGPLANConference experience-awaretwo-levelswapformobiledevices. IEEETrans.
+onObject-OrientedProgrammingSystems,LanguagesandApplications, Comput.AidedDes.Integr.CircuitsSyst.,39(11):4102–4114,2020.
+OOPSLA2002,Seattle,Washington,USA,November4-8,2002,pages [34] YuLiang,JinhengLi,RachataAusavarungnirun,RiweiPan,LiangShi,
+1–12.ACM,2002. Tei-WeiKuo,andChunJasonXue.Acclaim:Adaptivememoryreclaim
+[20] StephenM.BlackburnandKathrynS.McKinley.Immix:amark-region toimproveuserexperienceinandroidsystems. In2020{USENIX}
+garbagecollectorwithspaceefficiency,fastcollection,andmutator AnnualTechnicalConference({USENIX}{ATC} 20),pages897–910,
+performance. InRajivGuptaandSamanP.Amarasinghe,editors, 2020.
+ProceedingsoftheACMSIGPLAN2008ConferenceonProgramming [35] XinzeLiu,YuboZhang,ZiqianYan,andYanGe.Defining‘seamlessly
+LanguageDesignandImplementation,Tucson,AZ,USA,June7-13,2008, connected’:userperceptionsofoperationlatencyincross-deviceinter-
+pages22–32.ACM,2008. action.InternationalJournalofHuman-ComputerStudies,177:103068,
+[21] MichaelD.BondandKathrynS.McKinley.Toleratingmemoryleaks. 2023.
+InGailE.Harris,editor,Proceedingsofthe23rdAnnualACMSIGPLAN [36] MartinMaas,KrsteAsanovic,TimHarris,andJohnKubiatowicz.Tau-
+ConferenceonObject-OrientedProgramming,Systems,Languages,and rus:Aholisticlanguageruntimesystemforcoordinatingdistributed
+Applications,OOPSLA2008,October19-23,2008,Nashville,TN,USA, managed-languageapplications.InTomConteandYuanyuanZhou,
+pages109–126.ACM,2008. editors,ProceedingsoftheTwenty-FirstInternationalConferenceonAr-
+[22] StuartKCard,GeorgeGRobertson,andJockDMackinlay. The chitecturalSupportforProgrammingLanguagesandOperatingSystems,
+informationvisualizer,aninformationworkspace.InProceedingsof ASPLOS2016,Atlanta,GA,USA,April2-6,2016,pages457–471.ACM,
+theSIGCHIConferenceonHumanfactorsincomputingsystems,pages 2016.
+181–186,1991. [37] KhanhNguyen,LuFang,GuoqingXu,BrianDemsky,ShanLu,Sanazsa-
+[23] TaoDeng,ShaheenKanthawala,JingboMeng,WeiPeng,Anastasia datAlamian,andOnurMutlu. Yak:Ahigh-performancebig-data-
+Kononova,QiHao,QinhaoZhang,andPrabuDavid.Measuringsmart- friendlygarbagecollector.In12th{USENIX}SymposiumonOperating
+phoneusageandtaskswitchingwithlogtrackingandself-reports. SystemsDesignandImplementation({OSDI}16),pages349–365,2016.
+MobileMedia&Communication,7(1):3–23,2019. [38] KhanhNguyen,KaiWang,YingyiBu,LuFang,JianfeiHu,andGuoqing
+[24] PauloFerreiraandMarcShapiro. GarbagecollectionandDSMcon- Xu. FACADE:Acompilerandruntimefor(almost)object-bounded
+sistency.InProceedingsoftheFirstUSENIXSymposiumonOperating bigdataapplications. InÖzcanÖzturk,KemalEbcioglu,andSand-
+SystemsDesignandImplementation(OSDI),Monterey,California,USA, hyaDwarkadas,editors,ProceedingsoftheTwentiethInternational
+November14-17,1994,pages229–241.USENIXAssociation,1994. ConferenceonArchitecturalSupportforProgrammingLanguagesand
+[25] WeichaoGuo,KangChen,HuanFeng,YongweiWu,RuiZhang,and OperatingSystems,ASPLOS2015,Istanbul,Turkey,March14-18,2015,
+Weimin Zheng. MARS: Mobile application relaunching speed-up pages675–690.ACM,2015.
+throughflash-awarepageswapping.IEEETrans.Computers,65(3):916– [39] VijayJanapaReddi,HongilYoon,andAllanKnies.2billiondevices
+928,2016. andcounting:Anindustryperspectiveonthestateofmobilecomputer
+[26] SangwookShaneHahn,SungjinLee,InhyukYee,DongukRyu,and architecture.IEEEMicro,38:6–21,2018.
+JihongKim. {FastTrack}:Foreground{App-Aware}{I/O}manage- [40] ThomasShull,JianHuang,andJosepTorrellas.Autopersist:aneasy-
+mentforimprovinguserexperienceofandroidsmartphones.In2018 to-usejavaNVMframeworkbasedonreachability. InKathrynS.
+USENIXAnnualTechnicalConference(USENIXATC18),pages15–28, McKinleyandKathleenFisher,editors,Proceedingsofthe40thACM
+2018. SIGPLANConferenceonProgrammingLanguageDesignandImplemen-
+[27] MatthewHertz,YiFeng,andEmeryDBerger. Garbagecollection tation,PLDI2019,Phoenix,AZ,USA,June22-26,2019,pages316–332.
+withoutpaging.InProceedingsofthe2005ACMSIGPLANconference
+669
+
+===== PAGE 17 =====
+MoreApps,FasterHot-LaunchonMobileDevicesviaFore/Background-awareGC-SwapCo-design ASPLOS’24,April27-May1,2024,LaJolla,CA,USA
+ACM,2019. [48] JohannesWeiner,NiketAgarwal,DanSchatzberg,LeonYang,Hao
+[41] SamSon,SeungYulLee,YunhoJin,JonghyunBae,JinkyuJeong, Wang,BlaiseSanouillet,BikashSharma,TejunHeo,MayankJain,
+TaeJunHam,JaeWLee,andHongilYoon. {ASAP}:Fastmobile ChunqiangTang,andDimitriosSkarlatos.TMO:transparentmemory
+applicationswitchviaadaptiveprepaging. In2021USENIXAnnual offloadingindatacenters.InBabakFalsafi,MichaelFerdman,ShanLu,
+TechnicalConference(USENIXATC21),pages365–380,2021. andThomasF.Wenisch,editors,ASPLOS’22:27thACMInternational
+[42] DarkoStefanovic,KathrynS.McKinley,andJ.EliotB.Moss. Age- ConferenceonArchitecturalSupportforProgrammingLanguagesand
+basedgarbagecollection.InBrentHailpern,LindaM.Northrop,and OperatingSystems,Lausanne,Switzerland,28February2022-4March
+A.MichaelBerman,editors,Proceedingsofthe1999ACMSIGPLAN 2022,pages609–621.ACM,2022.
+ConferenceonObject-OrientedProgrammingSystems,Languages& [49] MingyuWu,ZimingZhao,HaoyuLi,HetingLi,HaiboChen,Binyu
+Applications,OOPSLA1999,Denver,Colorado,USA,November1-5,1999, Zang, and Haibing Guan. Espresso: Brewing java for more non-
+pages370–381.ACM,1999. volatilitywithnon-volatilememory.InProceedingsoftheTwenty-Third
+[43] YanTang,QiGao,andFengQin.Leaksurvivor:Towardssafelytolerat- InternationalConferenceonArchitecturalSupportforProgrammingLan-
+ingmemoryleaksforgarbage-collectedlanguages.InRebeccaIsaacs guagesandOperatingSystems,pages70–83,2018.
+andYuanyuanZhou,editors,2008USENIXAnnualTechnicalConfer- [50] AlbertMingkunYang,ErikÖsterlund,andTobiasWrigstad.Improving
+ence,Boston,MA,USA,June22-27,2008.Proceedings,pages307–320. programlocalityintheGCusinghotness. InAlastairF.Donaldson
+USENIXAssociation,2008. andEminaTorlak,editors,Proceedingsofthe41stACMSIGPLANInter-
+[44] NirajTolia,DavidGAndersen,andMahadevSatyanarayanan.Quanti- nationalConferenceonProgrammingLanguageDesignandImplemen-
+fyinginteractiveuserexperienceonthinclients.Computer,39(3):46–52, tation,PLDI2020,London,UK,June15-20,2020,pages301–313.ACM,
+2006. 2020.
+[45] Po-HsienTseng,Pi-ChengHsiu,Chin-ChiangPan,andTei-WeiKuo. [51] TingYang,EmeryDBerger,ScottFKaplan,andJEliotBMoss.Cramm:
+User-centricenergy-efficientschedulingonmulti-coremobiledevices. Virtualmemorysupportforgarbage-collectedapplications. InPro-
+InThe51stAnnualDesignAutomationConference2014,DAC’14,San ceedingsofthe7thsymposiumonOperatingsystemsdesignandimple-
+Francisco,CA,USA,June1-5,2014,pages85:1–85:6.ACM,2014. mentation,pages103–116,2006.
+[46] ChenxiWang,HaoranMa,ShiLiu,YuanqiLi,ZhenyuanRuan,Khanh [52] WenyuZhao,StephenM.Blackburn,andKathrynS.McKinley.Low-
+Nguyen,MichaelDBond,RaviNetravali,MiryungKim,andGuo- latency,high-throughputgarbagecollection.InRanjitJhalaandIsil
+qingHarryXu.Semeru:Amemory-disaggregatedmanagedruntime. Dillig,editors,PLDI’22:43rdACMSIGPLANInternationalConference
+In14th{USENIX}SymposiumonOperatingSystemsDesignandImple- onProgrammingLanguageDesignandImplementation,SanDiego,CA,
+mentation({OSDI}20),pages261–280,2020. USA,June13-17,2022,pages76–91.ACM,2022.
+[47] ChenxiWang,HaoranMa,ShiLiu,YifanQiao,JonathanEyolfson, [53] KanZhong,DuoLiu,LiangLiang,XiaoZhu,LinboLong,YiWang,
+ChristianNavasca,ShanLu,andGuoqingHarryXu.Memliner:Lining andEdwinHsing-MeanSha. Energy-efficientin-memorypaging
+uptracingandapplicationforafar-memory-friendlyruntime. In forsmartphones. IEEETransactionsonComputer-AidedDesignof
+MarcosK.AguileraandHakimWeatherspoon,editors,16thUSENIX IntegratedCircuitsandSystems,35(10):1577–1590,2015.
+SymposiumonOperatingSystemsDesignandImplementation,OSDI [54] XiaoZhu,DuoLiu,KanZhong,JintingRen,andTaoLi.Smartswap:
+2022,Carlsbad,CA,USA,July11-13,2022,pages35–53.USENIXAsso- High-performanceanduserexperiencefriendlyswappinginmobile
+ciation,2022. systems. InProceedingsofthe54thAnnualDesignAutomationCon-
+ference,DAC2017,Austin,TX,USA,June18-22,2017,pages22:1–22:6.
+ACM,2017.
+670

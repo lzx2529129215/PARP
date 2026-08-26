@@ -6,8 +6,10 @@ from __future__ import annotations
 import argparse
 import csv
 import json
+import math
 import random
 import sys
+from collections import Counter
 from pathlib import Path
 from typing import Any
 
@@ -94,9 +96,39 @@ def move_batch(batch: dict[str, torch.Tensor], device: torch.device) -> dict[str
     return {key: value.to(device) for key, value in batch.items()}
 
 
-def train_epoch(model: AppLSTMNextV3, loader: DataLoader, optimizer: torch.optim.Optimizer, device: torch.device) -> float:
+def mask_non_app_outputs(logits: torch.Tensor, invalid_ids: tuple[int, ...]) -> torch.Tensor:
+    if not invalid_ids:
+        return logits
+    logits = logits.clone()
+    logits[:, list(invalid_ids)] = torch.finfo(logits.dtype).min
+    return logits
+
+
+def class_weights(rows: list[dict[str, str]], app_vocab: dict[str, int], mode: str) -> tuple[torch.Tensor | None, dict[str, Any]]:
+    counts = Counter(int(row["next_app_id"]) for row in rows)
+    id_to_app = {app_id: app for app, app_id in app_vocab.items()}
+    eligible = [app_id for app, app_id in app_vocab.items() if not app.startswith("<")]
+    weights = torch.ones(len(app_vocab), dtype=torch.float32)
+    if mode == "inverse-sqrt":
+        total = sum(counts[app_id] for app_id in eligible)
+        classes = max(1, sum(counts[app_id] > 0 for app_id in eligible))
+        for app_id in eligible:
+            count = counts[app_id]
+            weights[app_id] = min(4.0, max(0.25, math.sqrt(total / max(1, classes * count)))) if count else 0.0
+    for app, app_id in app_vocab.items():
+        if app.startswith("<"):
+            weights[app_id] = 0.0
+    report = {
+        "mode": mode,
+        "target_counts": {id_to_app[app_id]: counts[app_id] for app_id in eligible},
+        "weights": {id_to_app[app_id]: float(weights[app_id]) for app_id in eligible},
+    }
+    return (weights if mode != "none" else None), report
+
+
+def train_epoch(model: AppLSTMNextV3, loader: DataLoader, optimizer: torch.optim.Optimizer, device: torch.device, weight: torch.Tensor | None, invalid_ids: tuple[int, ...]) -> float:
     model.train()
-    criterion = nn.CrossEntropyLoss()
+    criterion = nn.CrossEntropyLoss(weight=weight.to(device) if weight is not None else None)
     total = 0.0
     count = 0
     for batch in loader:
@@ -105,6 +137,7 @@ def train_epoch(model: AppLSTMNextV3, loader: DataLoader, optimizer: torch.optim
             batch["history_apps"], batch["history_durations"], batch["history_mask"],
             batch["opened_apps"], batch["time_feature"], batch["user_group"], batch["current_app"],
         )
+        logits = mask_non_app_outputs(logits, invalid_ids)
         loss = criterion(logits, batch["target"])
         optimizer.zero_grad()
         loss.backward()
@@ -115,24 +148,40 @@ def train_epoch(model: AppLSTMNextV3, loader: DataLoader, optimizer: torch.optim
 
 
 @torch.no_grad()
-def evaluate(model: AppLSTMNextV3, loader: DataLoader, device: torch.device, split: str) -> dict[str, Any]:
+def evaluate(model: AppLSTMNextV3, loader: DataLoader, device: torch.device, split: str, app_vocab: dict[str, int]) -> dict[str, Any]:
     model.eval()
     total = 0
     hits = {1: 0, 3: 0, 5: 0}
+    per_app_total: Counter[int] = Counter()
+    per_app_hits = {1: Counter(), 3: Counter(), 5: Counter()}
     reciprocal_rank = 0.0
+    invalid_ids = tuple(app_id for app, app_id in app_vocab.items() if app.startswith("<"))
     for batch in loader:
         batch = move_batch(batch, device)
         logits = model(
             batch["history_apps"], batch["history_durations"], batch["history_mask"],
             batch["opened_apps"], batch["time_feature"], batch["user_group"], batch["current_app"],
         )
+        logits = mask_non_app_outputs(logits, invalid_ids)
         ranked = torch.argsort(logits, dim=1, descending=True)
         targets = batch["target"].tolist()
         for prediction, target in zip(ranked.tolist(), targets):
             total += 1
+            per_app_total[target] += 1
             for k in hits:
-                hits[k] += int(target in prediction[:k])
+                matched = int(target in prediction[:k])
+                hits[k] += matched
+                per_app_hits[k][target] += matched
             reciprocal_rank += 1.0 / (prediction.index(target) + 1)
+    id_to_app = {app_id: app for app, app_id in app_vocab.items()}
+    per_app = {
+        id_to_app[app_id]: {
+            "num_samples": count,
+            **{f"hit_at_{k}": per_app_hits[k][app_id] / count for k in hits},
+        }
+        for app_id, count in sorted(per_app_total.items())
+        if count and not id_to_app[app_id].startswith("<")
+    }
     return {
         "version": "v3",
         "model": "app_lstm_switch",
@@ -141,7 +190,11 @@ def evaluate(model: AppLSTMNextV3, loader: DataLoader, device: torch.device, spl
         "hit_at_1": hits[1] / max(1, total),
         "hit_at_3": hits[3] / max(1, total),
         "hit_at_5": hits[5] / max(1, total),
+        "macro_hit_at_1": sum(item["hit_at_1"] for item in per_app.values()) / max(1, len(per_app)),
+        "macro_hit_at_3": sum(item["hit_at_3"] for item in per_app.values()) / max(1, len(per_app)),
+        "macro_hit_at_5": sum(item["hit_at_5"] for item in per_app.values()) / max(1, len(per_app)),
         "mrr": reciprocal_rank / max(1, total),
+        "per_app": per_app,
     }
 
 
@@ -164,6 +217,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--seed", type=int, default=42)
     parser.add_argument("--device", choices=["auto", "cpu", "cuda"], default="auto")
     parser.add_argument("--max-samples-per-split", type=int, default=0)
+    parser.add_argument("--class-weight-mode", choices=["none", "inverse-sqrt"], default="none")
     parser.add_argument("--output-dir", default=str(ROOT / "outputs/checkpoints/app_lstm_duration"))
     parser.add_argument("--checkpoint-name", default="lsapp_app_lstm_switch_v3.pt")
     parser.add_argument("--output", default=str(ROOT / "outputs/results/v3/lsapp_app_lstm_switch_results.json"))
@@ -191,10 +245,12 @@ def main() -> None:
         duration_cap_s=args.duration_cap_s, dropout=args.dropout,
     ).to(device)
     optimizer = torch.optim.Adam(model.parameters(), lr=args.lr)
+    weight, weight_report = class_weights(train_rows, app_vocab, args.class_weight_mode)
+    invalid_ids = tuple(app_id for app, app_id in app_vocab.items() if app.startswith("<"))
     for epoch in range(1, args.epochs + 1):
-        loss = train_epoch(model, train_loader, optimizer, device)
+        loss = train_epoch(model, train_loader, optimizer, device, weight, invalid_ids)
         print(f"epoch {epoch}/{args.epochs} train_loss={loss:.6f}")
-    results = [evaluate(model, val_loader, device, "val"), evaluate(model, test_loader, device, "test")]
+    results = [evaluate(model, val_loader, device, "val", app_vocab), evaluate(model, test_loader, device, "test", app_vocab)]
     output_dir = Path(args.output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
     checkpoint = {
@@ -206,6 +262,7 @@ def main() -> None:
         "pad_id": app_vocab["<PAD>"],
         "unknown_id": app_vocab["<UNKNOWN>"],
         "output_format": "app_probability",
+        "class_weighting": weight_report,
     }
     checkpoint_path = output_dir / args.checkpoint_name
     torch.save(checkpoint, checkpoint_path)

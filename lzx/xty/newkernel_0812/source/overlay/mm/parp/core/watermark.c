@@ -67,6 +67,11 @@ static const struct ctl_table parp_tier2_sysctls[] = {
 	},
 }; /* #lzx */
 
+bool parp_tier2_runtime_enabled(void)
+{
+	return READ_ONCE(sysctl_tier2_predict_enabled);
+}
+
 u64 parp_tier2_scaled_wmark(u64 limit_bytes, u32 scale, u64 floor)
 {
 	u64 scaled;
@@ -170,7 +175,7 @@ static void parp_tier2_predict_work(struct work_struct *work)
 	spin_lock_irqsave(&state->lock, flags);
 	state->scheduled_for_ns = 0;
 	active = state->online && state->enabled &&
-		 READ_ONCE(sysctl_tier2_predict_enabled);
+		 parp_tier2_runtime_enabled();
 	demote = state->demote_wmark_bytes;
 	predicted = state->predicted_ms;
 	spin_unlock_irqrestore(&state->lock, flags);
@@ -281,7 +286,7 @@ void parp_tier2_memcg_sample(struct mem_cgroup *memcg)
 	bool enabled, online, schedule = false, cancel = false;
 
 	if (!memcg || mem_cgroup_is_root(memcg) ||
-	    !READ_ONCE(sysctl_tier2_predict_enabled))
+	    !parp_tier2_runtime_enabled())
 		return;
 
 	state = &memcg->parp_tier2;
@@ -393,7 +398,7 @@ void parp_tier2_memcg_charge(struct mem_cgroup *memcg)
 {
 	struct mem_cgroup *iter;
 
-	if (!READ_ONCE(sysctl_tier2_predict_enabled))
+	if (!parp_tier2_runtime_enabled())
 		return;
 
 	/* Hierarchical charging changes every non-root ancestor's headroom. */

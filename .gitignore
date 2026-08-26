@@ -1,1 +1,14 @@
 Linux6.17/
+
+# Python/test caches are local generated artifacts.  # lzx-note
+__pycache__/
+*.py[cod]
+.pytest_cache/
+
+# Experiment captures can contain multi-gigabyte traces.  Keep the runners,
+# configurations, and curated Markdown reports in Git, not raw output.  # lzx-note
+/test/outputs/
+
+# The boot-time monitor continuously writes bounded/rotated runtime captures;
+# those captures remain machine-local.  # lzx-note
+/lzx/service/outputs/

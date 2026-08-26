@@ -54,4 +54,15 @@ sudo reboot
 bash scripts/verify_runtime.sh
 ```
 
+## 构建可切换的实验内核
+
+正式基线继续使用运行时 OFF。需要验证 effective-tier 时，在同一源码和配置上只额外编译实验 Apply 能力：
+
+```bash
+PARP_EXPERIMENT_APPLY=1 bash scripts/build_install_verify.sh \
+  /path/to/linux-hwe-6.17-parp /path/to/build-linux-6.17.13-parp-apply
+```
+
+该构建使用 `-myks-l03-apply` 后缀，但 effective-tier 和 Tier2 的运行时默认值仍为 OFF。验收工具负责逐轮设置、核对、记录并恢复开关，不能用“是否编译”代替运行时 treatment 记录。
+
 注意：`apply_overlay.sh` 会按 `source/delete_paths.txt` 删除初始 HWE 树中最新树不再保留的文件/目录。建议先复制一份初始源码树再执行。

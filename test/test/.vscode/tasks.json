@@ -1,0 +1,63 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "Test: Python unit tests",
+      "type": "shell",
+      "command": "${workspaceFolder}/.venv/bin/python",
+      "args": ["-m", "unittest", "discover", "-s", "tests", "-v"],
+      "options": {"cwd": "${workspaceFolder}"},
+      "problemMatcher": [],
+      "group": {"kind": "test", "isDefault": true}
+    },
+    {
+      "label": "Linux: Preflight",
+      "type": "shell",
+      "command": "bash",
+      "args": ["scripts/with_gui_session.sh", "bash", "scripts/preflight.sh"],
+      "options": {"cwd": "${workspaceFolder}"},
+      "problemMatcher": []
+    },
+    {
+      "label": "Experiment: QQ + WPS first cold round",
+      "type": "shell",
+      "command": "bash",
+      "args": ["scripts/with_gui_session.sh", "bash", "scripts/run_qq_wps_round.sh"],
+      "options": {"cwd": "${workspaceFolder}"},
+      "problemMatcher": [],
+      "presentation": {"reveal": "always", "panel": "dedicated", "focus": true}
+    },
+    {
+      "label": "Experiment: Acclaim 8 background apps",
+      "type": "shell",
+      "command": "bash",
+      "args": ["scripts/with_project_env.sh", "bash", "scripts/scenarios/run_acclaim.sh", "8"],
+      "options": {"cwd": "${workspaceFolder}"},
+      "problemMatcher": []
+    },
+    {
+      "label": "Experiment: AppFlow medium",
+      "type": "shell",
+      "command": "bash",
+      "args": ["scripts/with_project_env.sh", "bash", "scripts/scenarios/run_appflow.sh", "medium"],
+      "options": {"cwd": "${workspaceFolder}"},
+      "problemMatcher": []
+    },
+    {
+      "label": "Experiment: Fleet 512-byte objects",
+      "type": "shell",
+      "command": "bash",
+      "args": ["scripts/with_project_env.sh", "bash", "scripts/scenarios/run_fleet.sh", "512", "18"],
+      "options": {"cwd": "${workspaceFolder}"},
+      "problemMatcher": []
+    },
+    {
+      "label": "Report: Build summary.csv",
+      "type": "shell",
+      "command": "${workspaceFolder}/.venv/bin/python",
+      "args": ["-m", "memsched_exp.report", "--root", "results", "--output", "results/summary.csv"],
+      "options": {"cwd": "${workspaceFolder}"},
+      "problemMatcher": []
+    }
+  ]
+}

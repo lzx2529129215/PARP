@@ -1,0 +1,19 @@
+{
+  "Firefox": 0,
+  "LibreOffice": 1,
+  "VLC": 2,
+  "GIMP": 3,
+  "Audacity": 4,
+  "Thunderbird": 5,
+  "Evince": 6,
+  "Files": 7,
+  "Calculator": 8,
+  "Calendar": 9,
+  "Rhythmbox": 10,
+  "ImageViewer": 11,
+  "Shotwell": 12,
+  "SystemMonitor": 13,
+  "Solitaire": 14,
+  "<PAD>": 15,
+  "<UNKNOWN>": 16
+}

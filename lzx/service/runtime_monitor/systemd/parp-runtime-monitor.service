@@ -1,0 +1,18 @@
+[Unit]
+Description=PARP Runtime Monitor resident observation service
+Documentation=file://%h/Desktop/PARP/lzx/service/runtime_monitor/README_SERVICE.md
+After=default.target
+
+[Service]
+Type=simple
+WorkingDirectory=%h/Desktop/PARP/lzx/service
+Environment=PYTHONUNBUFFERED=1
+EnvironmentFile=-%h/.config/parp/runtime-monitor.env
+ExecStart=%h/Desktop/PARP/lzx/service/runtime_monitor/scripts/run_service_daemon.sh
+Restart=always
+RestartSec=5
+KillSignal=SIGINT
+TimeoutStopSec=30
+
+[Install]
+WantedBy=default.target

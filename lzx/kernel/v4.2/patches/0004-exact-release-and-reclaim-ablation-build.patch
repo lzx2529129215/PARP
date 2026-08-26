@@ -1,0 +1,66 @@
+diff --git a/tools/parp/build_lzx_kernel.sh b/tools/parp/build_lzx_kernel.sh
+index b2bae3c0d..e1e038c39 100755
+--- a/tools/parp/build_lzx_kernel.sh
++++ b/tools/parp/build_lzx_kernel.sh
+@@ -9,6 +9,7 @@ PROFILE="${1:-all}"
+ BASE_CONFIG="${2:-/boot/config-$(uname -r)}"
+ BUILD_DIR="${3:-$KERNEL_WORK_ROOT/build/linux-6.17.13-parp-lzx-$PROFILE}"
+ JOBS="${JOBS:-$(nproc)}"
++RECLAIM_BIN_SCORE="${LZX_RECLAIM_BIN_SCORE:-1}"
+ NATIVE_SRC_ROOT="${NATIVE_SRC_ROOT:-$KERNEL_WORK_ROOT/src/linux-6.17.13-native}"
+ NATIVE_BASELINE_COMMIT="${NATIVE_BASELINE_COMMIT:-6609c4d49ebe220a5c40d3105c3f0e68f569ba1a}"
+ SRC_ROOT="$PARP_SRC_ROOT"
+@@ -49,7 +50,6 @@ case "$PROFILE" in
+ 		"$CONFIG_TOOL" --file "$BUILD_DIR/.config" \
+ 			--enable PARP \
+ 			--enable PARP_TIER2 \
+-			--enable PARP_RECLAIM_BIN_SCORE \
+ 			--disable PARP_EFFECTIVE_TIER \
+ 			--disable PARP_EFFECTIVE_TIER_EXPERIMENTAL_APPLY \
+ 			--disable PARP_FRONTIER_SCORE
+@@ -60,9 +60,7 @@ case "$PROFILE" in
+ 			--enable PARP_EFFECTIVE_TIER \
+ 			--disable PARP_FRONTIER_SCORE
+ 		if [[ "$PROFILE" == all ]]; then
+-			"$CONFIG_TOOL" --file "$BUILD_DIR/.config" \
+-				--enable PARP_TIER2 \
+-				--enable PARP_RECLAIM_BIN_SCORE
++			"$CONFIG_TOOL" --file "$BUILD_DIR/.config" --enable PARP_TIER2
+ 		else
+ 			"$CONFIG_TOOL" --file "$BUILD_DIR/.config" \
+ 				--disable PARP_TIER2 \
+@@ -82,14 +80,28 @@ case "$PROFILE" in
+ 		;;
+ esac
+ 
+-if [[ "$PROFILE" == native ]]; then
+-	LOCALVERSION="-native-6.17.13"
++if [[ "$PROFILE" == tier2 || "$PROFILE" == all ]]; then
++	if [[ "$RECLAIM_BIN_SCORE" == 1 ]]; then
++		"$CONFIG_TOOL" --file "$BUILD_DIR/.config" --enable PARP_RECLAIM_BIN_SCORE
++	elif [[ "$RECLAIM_BIN_SCORE" == 0 ]]; then
++		"$CONFIG_TOOL" --file "$BUILD_DIR/.config" --disable PARP_RECLAIM_BIN_SCORE
++	else
++		echo "LZX_RECLAIM_BIN_SCORE must be 0 or 1" >&2
++		exit 2
++	fi
++fi
++
++if [[ -n "${LZX_LOCALVERSION:-}" ]]; then
++	CONFIG_LOCALVERSION_VALUE="$LZX_LOCALVERSION" # lzx-note
++elif [[ "$PROFILE" == native ]]; then
++	CONFIG_LOCALVERSION_VALUE="-native-6.17.13"
+ else
+-	LOCALVERSION="-parp-lzx-$PROFILE"
++	CONFIG_LOCALVERSION_VALUE="-parp-lzx-$PROFILE"
+ fi
+-"$CONFIG_TOOL" --file "$BUILD_DIR/.config" --set-str LOCALVERSION "$LOCALVERSION"
+-make -C "$SRC_ROOT" O="$BUILD_DIR" olddefconfig
+-make -C "$SRC_ROOT" O="$BUILD_DIR" -j"$JOBS" ${MAKE_TARGETS:-bzImage modules}
++"$CONFIG_TOOL" --file "$BUILD_DIR/.config" --set-str LOCALVERSION "$CONFIG_LOCALVERSION_VALUE"
++# Suppress SCM '+' and keep CONFIG_LOCALVERSION from being appended twice. # lzx-note
++make -C "$SRC_ROOT" O="$BUILD_DIR" LOCALVERSION= olddefconfig
++make -C "$SRC_ROOT" O="$BUILD_DIR" LOCALVERSION= -j"$JOBS" ${MAKE_TARGETS:-bzImage modules}
+ 
+ echo "build complete: $BUILD_DIR"
+ # lzx-note

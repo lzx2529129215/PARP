@@ -1,0 +1,7 @@
+{
+  "status": "RAMPING",
+  "pid": 4110,
+  "target_bytes": 1344649297,
+  "allocated_bytes": 0,
+  "started_ns": 1787102351672179023
+}

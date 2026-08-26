@@ -1,0 +1,297 @@
+diff --git a/Documentation/admin-guide/mm/parp-experiments.rst b/Documentation/admin-guide/mm/parp-experiments.rst
+index b7c162443aa81334e28258da8abd716e2941b6c7..b86e0cffdf35883b3b03f76b0a5ac5d4d78dc24c 100644
+--- a/Documentation/admin-guide/mm/parp-experiments.rst
++++ b/Documentation/admin-guide/mm/parp-experiments.rst
+@@ -12,7 +12,12 @@ silently enable an optimization.
+ 
+ ``CONFIG_PARP_TIER2``
+   Builds the per-cgroup secondary-watermark predictor, bounded proactive
+-  reclaim and prediction/headroom-based MGLRU memcg-bin ordering.
++  reclaim and its cgroup controls.
++
++``CONFIG_PARP_RECLAIM_BIN_SCORE``
++  Builds prediction/headroom-based MGLRU memcg-bin placement and ordered
++  scanning. It depends on ``CONFIG_PARP_TIER2`` and affects reclaim only in
++  PARP APPLY mode with Tier2 enabled globally and for the target cgroup.
+ 
+ ``CONFIG_PARP_EFFECTIVE_TIER``
+   Builds effective-tier scoring. Its runtime mode is OFF by default.
+@@ -25,22 +30,29 @@ silently enable an optimization.
+   Build the older frontier observation experiment and DAMON alignment
+   evidence path respectively.
+ 
+-For the primary paired experiment, compile ``PARP``, ``PARP_TIER2`` and
+-``PARP_EFFECTIVE_TIER`` into one kernel. Keep both runtime treatments OFF for
+-the Native/OFF round, then change only the requested runtime switch while
+-replaying the same scenario and random seed:
++The delivery baseline is a separate, pristine Linux 6.17.13 source worktree
++at tag ``v6.17.13`` (commit ``6609c4d49ebe``).  Do not call the PARP image
++"Native" merely because its runtime switches are zero.  The build helper's
++``native`` profile refuses to build unless that pinned source is clean.
++
++Compare the pristine Native image with the APPLY image using the same machine,
++kernel config apart from PARP/local-version symbols, scenario, random seed and
++collection procedure.  Runtime-OFF remains a useful additional ablation for
++measuring the APPLY binary's dormant instrumentation overhead:
+ 
+ ================  ===============================================
+ Treatment         Runtime state
+ ================  ===============================================
+-Native/OFF        ``tier2_predict_enabled=0`` and effective tier 0
+-Tier2 only        global Tier2 1, target cgroup Tier2 1, effective tier 0
+-Effective only    Tier2 0, effective tier Apply mode
+-Combined          Tier2 1 and effective tier Apply mode
++Native baseline   pristine Linux 6.17.13 image; no PARP code or symbols
++Runtime-OFF       PARP disabled; Tier2 0; effective tier 0
++Tier2 APPLY       PARP APPLY; global and target Tier2 1; effective tier 0
++Effective APPLY   PARP APPLY; Tier2 0; effective tier Apply mode
++Combined APPLY    PARP APPLY; Tier2 1; effective tier Apply mode
+ ================  ===============================================
+ 
+-The compile-time Native profile with ``CONFIG_PARP=n`` remains useful for
+-measuring instrumentation overhead, but it is a different kernel binary and
+-must not replace the same-image paired experiment.
++For a compile-time reclaim-bin ablation, keep ``CONFIG_PARP_TIER2=y`` and
++build otherwise matched APPLY images with
++``CONFIG_PARP_RECLAIM_BIN_SCORE=n/y``.  The ``n`` image preserves native
++random memcg-bin placement and starting-bin selection.
+ 
+-.. lzx-note: build/runtime switch contract for reproducible comparisons.
++.. lzx-note: pristine Native baseline and build/runtime switch contract.
+diff --git a/Documentation/admin-guide/mm/parp-tier2.rst b/Documentation/admin-guide/mm/parp-tier2.rst
+index 2f015fba6c2860db14f1c8a72e5812912cca648f..9989f4e9f94cb406f2c6fbfa70c1ef7ae6a9951a 100644
+--- a/Documentation/admin-guide/mm/parp-tier2.rst
++++ b/Documentation/admin-guide/mm/parp-tier2.rst
+@@ -16,6 +16,13 @@ facility does not change reclaim until explicitly enabled.
+ This feature is compiled only when ``CONFIG_PARP_TIER2=y``. The option is in
+ the centralized LZX PARP experiment menu and defaults to ``n``.
+ 
++The MGLRU memcg-bin scorer has a second, independent build switch,
++``CONFIG_PARP_RECLAIM_BIN_SCORE``.  It defaults to ``n`` and depends on
++``CONFIG_PARP_TIER2``.  Even when compiled in, reclaim-bin scoring is active
++only when PARP is in APPLY mode, ``vm.tier2_predict_enabled`` is one, and the
++target cgroup's ``memory.tier2_enabled`` is one.  Otherwise MGLRU uses its
++native random bin placement and random starting bin.
++
+ Watermarks and EWMA
+ ===================
+ 
+@@ -112,4 +119,4 @@ or enabling state does not modify any sibling's watermarks or EWMA history.
+ Both the global switch and the target cgroup switch must be one before Tier2
+ can score that cgroup or start proactive reclaim.
+ 
+-.. lzx-note: independent build and runtime gating.
++.. lzx-note: independent build and APPLY-only runtime gating.
+diff --git a/mm/parp/Kconfig b/mm/parp/Kconfig
+index e3d8337f5c55a6fe71aa14b98046afef9451ad4e..fc46cbe1c7876fb25ee3b5fa6e1df43e051d270d 100644
+--- a/mm/parp/Kconfig
++++ b/mm/parp/Kconfig
+@@ -24,11 +24,23 @@ config PARP_TIER2 # lzx-note
+ 	depends on PARP
+ 	default n
+ 	help
+-	  Build the per-cgroup secondary-watermark predictor, bounded proactive
+-	  reclaim, and prediction/headroom-based MGLRU memcg-bin ordering. The
+-	  runtime master switch vm.tier2_predict_enabled defaults to 0, and each
+-	  target cgroup must also set memory.tier2_enabled to 1. This permits an
+-	  exact OFF versus Tier2-only comparison with the same kernel image.
++	  Build the per-cgroup secondary-watermark predictor and bounded proactive
++	  reclaim. The runtime master switch vm.tier2_predict_enabled defaults to
++	  0, and each target cgroup must also set memory.tier2_enabled to 1. This
++	  permits an exact OFF versus Tier2-only comparison with the same kernel
++	  image.
++
++config PARP_RECLAIM_BIN_SCORE # lzx-note
++	bool "Enable PARP MGLRU memcg reclaim-bin scoring"
++	depends on PARP_TIER2
++	default n
++	help
++	  Build the app-prior and Tier2-headroom scorer that maps a memcg into
++	  the existing MGLRU reclaim bins. The scorer changes bin placement and
++	  ordered bin scanning only while PARP is in APPLY mode, the global Tier2
++	  switch is one, and the target cgroup has memory.tier2_enabled set to
++	  one. When this option is disabled, MGLRU keeps its native random bin
++	  placement and starting-bin behavior.
+ 
+ config PARP_DAMON_ALIGNMENT
+ 	bool "Collect DAMON VADDR aggregation evidence for PARP"
+diff --git a/mm/vmscan.c b/mm/vmscan.c
+index e60e9bf0d899a18f12520aeba026502d29d795b0..c78adac5fa6090c8825dc8461c8e1d523b67b878 100644
+--- a/mm/vmscan.c
++++ b/mm/vmscan.c
+@@ -58,11 +58,12 @@
+ #include <linux/random.h>
+ #include <linux/mmu_notifier.h>
+ #include <linux/parser.h>
++#include <linux/math64.h> /* lzx-note */
+ #include <linux/parp.h>
+ #include <linux/parp_tier2.h> /* lzx-note */
+-#ifdef CONFIG_PARP_TIER2 /* lzx-note */
++#ifdef CONFIG_PARP_RECLAIM_BIN_SCORE /* lzx-note */
+ #include "parp/adapter/adapter.h" /* lzx-note */
+-#endif /* CONFIG_PARP_TIER2 */ /* lzx-note */
++#endif /* CONFIG_PARP_RECLAIM_BIN_SCORE */ /* lzx-note */
+ 
+ #include <asm/tlbflush.h>
+ #include <asm/div64.h>
+@@ -4391,7 +4392,13 @@ enum {
+ 	MEMCG_LRU_YOUNG,
+ };
+ 
+-#ifdef CONFIG_PARP_TIER2 /* lzx-note */
++#ifdef CONFIG_PARP_RECLAIM_BIN_SCORE /* lzx-note */
++static bool parp_reclaim_bin_apply_enabled(void) /* lzx-note */
++{
++	return parp_get_mode() == PARP_MODE_APPLY &&
++	       parp_tier2_runtime_enabled();
++} /* lzx-note */
++
+ static unsigned int parp_memcg_reclaim_bin(struct mem_cgroup *memcg) /* lzx-note */
+ {
+ 	struct parp_app_context app;
+@@ -4403,7 +4410,7 @@ static unsigned int parp_memcg_reclaim_bin(struct mem_cgroup *memcg) /* lzx-note
+ 	u64 headroom;
+ 
+ 	if (!memcg || mem_cgroup_is_root(memcg) ||
+-	    !parp_tier2_runtime_enabled() ||
++	    !parp_reclaim_bin_apply_enabled() ||
+ 	    !READ_ONCE(memcg->parp_tier2.enabled)) /* lzx-note */
+ 		return get_random_u32_below(MEMCG_NR_BINS);
+ 
+@@ -4421,8 +4428,13 @@ static unsigned int parp_memcg_reclaim_bin(struct mem_cgroup *memcg) /* lzx-note
+ 		if (headroom >= limit)
+ 			headroom_q15 = PARP_Q15_ONE;
+ 		else
+-			headroom_q15 = mul_u64_u32_div(headroom, PARP_Q15_ONE,
+-						       limit);
++			/* memory.max is 64-bit; mul_u64_u32_div() truncates its
++			 * divisor to u32, turning limits such as 8 GiB into zero.
++			 * Keep all three operands 64-bit during memcg offlining.
++			 * lzx-note
++			 */
++			headroom_q15 = mul_u64_u64_div_u64(headroom,
++							      PARP_Q15_ONE, limit);
+ 
+ 		if (have_signal)
+ 			score_q15 = min(score_q15, headroom_q15);
+@@ -4437,12 +4449,17 @@ static unsigned int parp_memcg_reclaim_bin(struct mem_cgroup *memcg) /* lzx-note
+ 	return min_t(unsigned int, score_q15 * MEMCG_NR_BINS >> 15,
+ 		     MEMCG_NR_BINS - 1);
+ } /* lzx-note */
+-#else /* !CONFIG_PARP_TIER2 */ /* lzx-note */
++#else /* !CONFIG_PARP_RECLAIM_BIN_SCORE */ /* lzx-note */
++static bool parp_reclaim_bin_apply_enabled(void) /* lzx-note */
++{
++	return false;
++} /* lzx-note */
++
+ static unsigned int parp_memcg_reclaim_bin(struct mem_cgroup *memcg) /* lzx-note */
+ {
+ 	return get_random_u32_below(MEMCG_NR_BINS);
+ } /* lzx-note */
+-#endif /* CONFIG_PARP_TIER2 */ /* lzx-note */
++#endif /* CONFIG_PARP_RECLAIM_BIN_SCORE */ /* lzx-note */
+ 
+ static void lru_gen_rotate_memcg(struct lruvec *lruvec, int op)
+ {
+@@ -5500,7 +5517,7 @@ static void shrink_many(struct pglist_data *pgdat, struct scan_control *sc)
+ 	struct hlist_nulls_node *pos;
+ 
+ 	gen = get_memcg_gen(READ_ONCE(pgdat->memcg_lru.seq));
+-	bin = first_bin = parp_tier2_runtime_enabled() ? 0 :
++	bin = first_bin = parp_reclaim_bin_apply_enabled() ? 0 :
+ 		get_random_u32_below(MEMCG_NR_BINS); /* lzx-note */
+ restart:
+ 	op = 0;
+diff --git a/tools/parp/build_lzx_kernel.sh b/tools/parp/build_lzx_kernel.sh
+index c66952a5d154964a0984041b184041727760508b..b2bae3c0d46b17d10f43b2ec6d9159eb2d00fb53 100755
+--- a/tools/parp/build_lzx_kernel.sh
++++ b/tools/parp/build_lzx_kernel.sh
+@@ -3,12 +3,33 @@
+ set -euo pipefail
+ 
+ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+-SRC_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
+-KERNEL_WORK_ROOT="$(cd "$SRC_ROOT/../.." && pwd)"
++PARP_SRC_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
++KERNEL_WORK_ROOT="$(cd "$PARP_SRC_ROOT/../.." && pwd)"
+ PROFILE="${1:-all}"
+ BASE_CONFIG="${2:-/boot/config-$(uname -r)}"
+ BUILD_DIR="${3:-$KERNEL_WORK_ROOT/build/linux-6.17.13-parp-lzx-$PROFILE}"
+ JOBS="${JOBS:-$(nproc)}"
++NATIVE_SRC_ROOT="${NATIVE_SRC_ROOT:-$KERNEL_WORK_ROOT/src/linux-6.17.13-native}"
++NATIVE_BASELINE_COMMIT="${NATIVE_BASELINE_COMMIT:-6609c4d49ebe220a5c40d3105c3f0e68f569ba1a}"
++SRC_ROOT="$PARP_SRC_ROOT"
++
++if [[ "$PROFILE" == native ]]; then
++	SRC_ROOT="$NATIVE_SRC_ROOT"
++	if [[ ! -x "$SRC_ROOT/scripts/config" ]]; then
++		echo "native source is missing: $SRC_ROOT" >&2
++		echo "create it from upstream-v6.17.13-baseline before building" >&2
++		exit 2
++	fi
++	if [[ "$(git -C "$SRC_ROOT" rev-parse HEAD)" != "$NATIVE_BASELINE_COMMIT" ]]; then
++		echo "native source is not the pinned Linux 6.17.13 baseline" >&2
++		exit 2
++	fi
++	if [[ -n "$(git -C "$SRC_ROOT" status --porcelain --untracked-files=no)" ]]; then
++		echo "native source has tracked modifications; refusing mixed baseline" >&2
++		exit 2
++	fi
++fi
++
+ CONFIG_TOOL="$SRC_ROOT/scripts/config"
+ 
+ if [[ ! -r "$BASE_CONFIG" ]]; then
+@@ -21,17 +42,14 @@ cp -- "$BASE_CONFIG" "$BUILD_DIR/.config"
+ 
+ case "$PROFILE" in
+ 	native)
+-		"$CONFIG_TOOL" --file "$BUILD_DIR/.config" \
+-			--disable PARP \
+-			--disable PARP_TIER2 \
+-			--disable PARP_EFFECTIVE_TIER \
+-			--disable PARP_EFFECTIVE_TIER_EXPERIMENTAL_APPLY \
+-			--disable PARP_FRONTIER_SCORE
++		# This profile is built from the pristine pinned worktree, not from
++		# PARP sources with runtime switches set to zero. # lzx-note
+ 		;;
+ 	tier2)
+ 		"$CONFIG_TOOL" --file "$BUILD_DIR/.config" \
+ 			--enable PARP \
+ 			--enable PARP_TIER2 \
++			--enable PARP_RECLAIM_BIN_SCORE \
+ 			--disable PARP_EFFECTIVE_TIER \
+ 			--disable PARP_EFFECTIVE_TIER_EXPERIMENTAL_APPLY \
+ 			--disable PARP_FRONTIER_SCORE
+@@ -42,9 +60,13 @@ case "$PROFILE" in
+ 			--enable PARP_EFFECTIVE_TIER \
+ 			--disable PARP_FRONTIER_SCORE
+ 		if [[ "$PROFILE" == all ]]; then
+-			"$CONFIG_TOOL" --file "$BUILD_DIR/.config" --enable PARP_TIER2
++			"$CONFIG_TOOL" --file "$BUILD_DIR/.config" \
++				--enable PARP_TIER2 \
++				--enable PARP_RECLAIM_BIN_SCORE
+ 		else
+-			"$CONFIG_TOOL" --file "$BUILD_DIR/.config" --disable PARP_TIER2
++			"$CONFIG_TOOL" --file "$BUILD_DIR/.config" \
++				--disable PARP_TIER2 \
++				--disable PARP_RECLAIM_BIN_SCORE
+ 		fi
+ 		if [[ "${LZX_EXPERIMENTAL_APPLY:-0}" == 1 ]]; then
+ 			"$CONFIG_TOOL" --file "$BUILD_DIR/.config" \
+@@ -60,8 +82,12 @@ case "$PROFILE" in
+ 		;;
+ esac
+ 
+-"$CONFIG_TOOL" --file "$BUILD_DIR/.config" \
+-	--set-str LOCALVERSION "-parp-lzx-$PROFILE"
++if [[ "$PROFILE" == native ]]; then
++	LOCALVERSION="-native-6.17.13"
++else
++	LOCALVERSION="-parp-lzx-$PROFILE"
++fi
++"$CONFIG_TOOL" --file "$BUILD_DIR/.config" --set-str LOCALVERSION "$LOCALVERSION"
+ make -C "$SRC_ROOT" O="$BUILD_DIR" olddefconfig
+ make -C "$SRC_ROOT" O="$BUILD_DIR" -j"$JOBS" ${MAKE_TARGETS:-bzImage modules}
+ 

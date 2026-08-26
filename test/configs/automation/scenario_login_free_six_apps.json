@@ -1,0 +1,68 @@
+{
+  "description": "六个免登录 Linux 应用的启动、内容操作、两轮切换、前台验证和安全关闭。",
+  "implementation_note": "lzx-note",
+  "validation_mode": true,
+  "variables": {
+    "ASSET_DIR": "${PROJECT_ROOT}/outputs/automation_login_free/assets",
+    "IMAGE_FILE": "${ASSET_DIR}/automation-image.png",
+    "AUDIO_FILE": "${ASSET_DIR}/automation-audio.wav"
+  },
+  "actions": [
+    {"type": "shell", "command": "python3 \"${PROJECT_ROOT}/automation/scripts/create_login_free_assets.py\" --output \"${ASSET_DIR}\"", "label": "LOGIN_FREE_PREPARE_ASSETS"},
+    {"type": "assert_file", "path": "${IMAGE_FILE}", "label": "LOGIN_FREE_ASSERT_IMAGE"},
+    {"type": "assert_file", "path": "${AUDIO_FILE}", "label": "LOGIN_FREE_ASSERT_AUDIO"},
+
+    {"type": "launch", "name": "calendar", "app_key": "CALENDAR", "command": "env GDK_BACKEND=x11 gnome-calendar", "label": "LOGIN_FREE_LAUNCH_CALENDAR"},
+    {"type": "wait_window", "name": "calendar", "app_key": "CALENDAR", "title": "Calendar|日历", "timeout": 45, "label": "LOGIN_FREE_WAIT_CALENDAR"},
+    {"type": "launch", "name": "rhythmbox", "app_key": "RHYTHMBOX", "command": "env GDK_BACKEND=x11 rhythmbox --no-registration --rhythmdb-file=\"${ASSET_DIR}/rhythmdb.xml\"", "label": "LOGIN_FREE_LAUNCH_RHYTHMBOX"},
+    {"type": "wait_window", "name": "rhythmbox", "app_key": "RHYTHMBOX", "title": "Rhythmbox|Music|音乐", "timeout": 45, "label": "LOGIN_FREE_WAIT_RHYTHMBOX"},
+    {"type": "launch", "name": "image-viewer", "app_key": "IMAGE_VIEWER", "command": "env GDK_BACKEND=x11 eog --new-instance \"${IMAGE_FILE}\"", "label": "LOGIN_FREE_LAUNCH_IMAGE_VIEWER"},
+    {"type": "wait_window", "name": "image-viewer", "app_key": "IMAGE_VIEWER", "title": "automation-image|Image Viewer|图像查看器", "timeout": 45, "label": "LOGIN_FREE_WAIT_IMAGE_VIEWER"},
+    {"type": "launch", "name": "shotwell", "app_key": "SHOTWELL", "command": "env GDK_BACKEND=x11 shotwell --datadir=\"${ASSET_DIR}/shotwell\" --no-runtime-monitoring --no-startup-progress \"${IMAGE_FILE}\"", "label": "LOGIN_FREE_LAUNCH_SHOTWELL"},
+    {"type": "wait_window", "name": "shotwell", "app_key": "SHOTWELL", "title": "automation-image|Shotwell|Photo", "timeout": 45, "label": "LOGIN_FREE_WAIT_SHOTWELL"},
+    {"type": "launch", "name": "system-monitor", "app_key": "SYSTEM_MONITOR", "command": "env GDK_BACKEND=x11 gnome-system-monitor --show-resources-tab", "label": "LOGIN_FREE_LAUNCH_SYSTEM_MONITOR"},
+    {"type": "wait_window", "name": "system-monitor", "app_key": "SYSTEM_MONITOR", "title": "System Monitor|系统监视器", "timeout": 45, "label": "LOGIN_FREE_WAIT_SYSTEM_MONITOR"},
+    {"type": "launch", "name": "solitaire", "app_key": "SOLITAIRE", "command": "/usr/games/sol --variation=klondike", "label": "LOGIN_FREE_LAUNCH_SOLITAIRE"},
+    {"type": "wait_window", "name": "solitaire", "app_key": "SOLITAIRE", "title": "Klondike|AisleRiot|Solitaire|纸牌", "timeout": 45, "label": "LOGIN_FREE_WAIT_SOLITAIRE"},
+
+    {"type": "repeat", "times": 2, "actions": [
+      {"type": "switch", "name": "calendar", "app_key": "CALENDAR", "title": "Calendar|日历", "label": "LOGIN_FREE_SWITCH_CALENDAR"},
+      {"type": "verify_foreground", "name": "calendar", "app_key": "CALENDAR", "label": "LOGIN_FREE_VERIFY_CALENDAR"},
+      {"type": "key", "name": "calendar", "app_key": "CALENDAR", "key": "Right", "repeat": 2, "label": "LOGIN_FREE_CALENDAR_NEXT"},
+      {"type": "key", "name": "calendar", "app_key": "CALENDAR", "key": "Left", "repeat": 2, "label": "LOGIN_FREE_CALENDAR_PREVIOUS"},
+
+      {"type": "switch", "name": "rhythmbox", "app_key": "RHYTHMBOX", "title": "Rhythmbox|Music|音乐", "label": "LOGIN_FREE_SWITCH_RHYTHMBOX"},
+      {"type": "verify_foreground", "name": "rhythmbox", "app_key": "RHYTHMBOX", "label": "LOGIN_FREE_VERIFY_RHYTHMBOX"},
+      {"type": "key", "name": "rhythmbox", "app_key": "RHYTHMBOX", "key": "space", "label": "LOGIN_FREE_RHYTHMBOX_PAUSE"},
+      {"type": "key", "name": "rhythmbox", "app_key": "RHYTHMBOX", "key": "space", "label": "LOGIN_FREE_RHYTHMBOX_PLAY"},
+
+      {"type": "switch", "name": "image-viewer", "app_key": "IMAGE_VIEWER", "title": "automation-image|Image Viewer|图像查看器", "label": "LOGIN_FREE_SWITCH_IMAGE_VIEWER"},
+      {"type": "verify_foreground", "name": "image-viewer", "app_key": "IMAGE_VIEWER", "label": "LOGIN_FREE_VERIFY_IMAGE_VIEWER"},
+      {"type": "key", "name": "image-viewer", "app_key": "IMAGE_VIEWER", "key": "plus", "label": "LOGIN_FREE_IMAGE_VIEWER_ZOOM_IN"},
+      {"type": "key", "name": "image-viewer", "app_key": "IMAGE_VIEWER", "key": "minus", "label": "LOGIN_FREE_IMAGE_VIEWER_ZOOM_OUT"},
+
+      {"type": "switch", "name": "shotwell", "app_key": "SHOTWELL", "title": "automation-image|Shotwell|Photo", "label": "LOGIN_FREE_SWITCH_SHOTWELL"},
+      {"type": "verify_foreground", "name": "shotwell", "app_key": "SHOTWELL", "label": "LOGIN_FREE_VERIFY_SHOTWELL"},
+      {"type": "key", "name": "shotwell", "app_key": "SHOTWELL", "key": "plus", "label": "LOGIN_FREE_SHOTWELL_ZOOM_IN"},
+      {"type": "key", "name": "shotwell", "app_key": "SHOTWELL", "key": "minus", "label": "LOGIN_FREE_SHOTWELL_ZOOM_OUT"},
+
+      {"type": "switch", "name": "system-monitor", "app_key": "SYSTEM_MONITOR", "title": "System Monitor|系统监视器", "label": "LOGIN_FREE_SWITCH_SYSTEM_MONITOR"},
+      {"type": "verify_foreground", "name": "system-monitor", "app_key": "SYSTEM_MONITOR", "label": "LOGIN_FREE_VERIFY_SYSTEM_MONITOR"},
+      {"type": "hotkey", "name": "system-monitor", "app_key": "SYSTEM_MONITOR", "key": "ctrl+Page_Down", "label": "LOGIN_FREE_SYSTEM_MONITOR_NEXT_TAB"},
+      {"type": "hotkey", "name": "system-monitor", "app_key": "SYSTEM_MONITOR", "key": "ctrl+Page_Up", "label": "LOGIN_FREE_SYSTEM_MONITOR_PREVIOUS_TAB"},
+
+      {"type": "switch", "name": "solitaire", "app_key": "SOLITAIRE", "title": "Klondike|AisleRiot|Solitaire|纸牌", "label": "LOGIN_FREE_SWITCH_SOLITAIRE"},
+      {"type": "verify_foreground", "name": "solitaire", "app_key": "SOLITAIRE", "label": "LOGIN_FREE_VERIFY_SOLITAIRE"},
+      {"type": "hotkey", "name": "solitaire", "app_key": "SOLITAIRE", "key": "ctrl+n", "label": "LOGIN_FREE_SOLITAIRE_NEW_GAME"},
+      {"type": "key", "name": "solitaire", "app_key": "SOLITAIRE", "key": "F2", "label": "LOGIN_FREE_SOLITAIRE_SELECT_GAME"},
+      {"type": "key", "name": "solitaire", "app_key": "SOLITAIRE", "key": "Escape", "label": "LOGIN_FREE_SOLITAIRE_CLOSE_DIALOG"}
+    ]},
+
+    {"type": "close", "name": "solitaire", "app_key": "SOLITAIRE", "class": "aisleriot|Aisleriot|sol", "process_names": ["sol"], "force_after_seconds": 2, "label": "LOGIN_FREE_CLOSE_SOLITAIRE"},
+    {"type": "close", "name": "system-monitor", "app_key": "SYSTEM_MONITOR", "class": "gnome-system-monitor|Gnome-system-monitor", "process_names": ["gnome-system-monitor"], "force_after_seconds": 2, "label": "LOGIN_FREE_CLOSE_SYSTEM_MONITOR"},
+    {"type": "close", "name": "shotwell", "app_key": "SHOTWELL", "class": "shotwell|Shotwell", "process_names": ["shotwell"], "force_after_seconds": 2, "label": "LOGIN_FREE_CLOSE_SHOTWELL"},
+    {"type": "close", "name": "image-viewer", "app_key": "IMAGE_VIEWER", "class": "eog|Eog", "process_names": ["eog"], "force_after_seconds": 2, "label": "LOGIN_FREE_CLOSE_IMAGE_VIEWER"},
+    {"type": "close", "name": "rhythmbox", "app_key": "RHYTHMBOX", "class": "rhythmbox|Rhythmbox", "process_names": ["rhythmbox"], "force_after_seconds": 2, "label": "LOGIN_FREE_CLOSE_RHYTHMBOX"},
+    {"type": "close", "name": "calendar", "app_key": "CALENDAR", "class": "org.gnome.Calendar|Gnome-calendar|gnome-calendar", "process_names": ["gnome-calendar"], "force_after_seconds": 2, "label": "LOGIN_FREE_CLOSE_CALENDAR"}
+  ]
+}

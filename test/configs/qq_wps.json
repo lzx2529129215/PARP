@@ -1,0 +1,20 @@
+{
+  "apps": [
+    {
+      "name": "qq",
+      "command": ["qq"],
+      "process_names": ["qq", "QQ"],
+      "window_regex": "QQ"
+    },
+    {
+      "name": "wps-writer",
+      "command": ["wps"],
+      "process_names": ["wps", "wpsoffice"],
+      "window_regex": "WPS|Writer|文字"
+    }
+  ],
+  "collection_duration_s": 60,
+  "sample_interval_s": 1,
+  "cold_start_repetitions": 1,
+  "hot_start_repetitions": 0
+}

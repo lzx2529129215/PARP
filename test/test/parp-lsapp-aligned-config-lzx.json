@@ -1,0 +1,104 @@
+{
+  "output_root": "outputs/parp_acceptance_lsapp_aligned",
+  "slice": "parp-acceptance.slice",
+  "safety": {
+    "memory_high_ratio": 0.65,
+    "memory_max_ratio": 0.75,
+    "min_memavailable_bytes": 2147483648,
+    "psi_full_avg10_abort": 0.20,
+    "psi_memavailable_guard_bytes": 4294967296,
+    "abort_consecutive_samples": 3,
+    "sample_interval_seconds": 1.0,
+    "trace_buffer_kb_per_cpu": 1024,
+    "min_inotify_watch_headroom": 1024,
+    "max_round_seconds": 2400
+  },
+  "profiles": {
+    "smoke": {
+      "hotcold_logical_ratio": 0.05,
+      "hotcold_repeats": 1,
+      "hotcold_steps": 18,
+      "peak_logical_ratio": 0.08,
+      "peak_rounds": 1,
+      "peak_steps": 18,
+      "dwell_min_seconds": 0.2,
+      "dwell_max_seconds": 0.4,
+      "min_memavailable_bytes": 536870912,
+      "psi_memavailable_guard_bytes": 805306368,
+      "implementation_note": "lzx-note: small-VM smoke only; full acceptance keeps global safety floors"
+    },
+    "full": {
+      "hotcold_logical_ratio": 1.50,
+      "hotcold_repeats": 10,
+      "hotcold_steps": 90,
+      "peak_logical_ratio": 1.25,
+      "peak_rounds": 3,
+      "peak_steps": 100,
+      "dwell_min_seconds": 0.8,
+      "dwell_max_seconds": 3.0
+    }
+  },
+  "hotcold": {
+    "apps": ["FIREFOX", "LIBREOFFICE", "VLC", "GIMP", "AUDACITY", "THUNDERBIRD", "EVINCE", "FILES", "CALCULATOR", "CALENDAR", "RHYTHMBOX", "IMAGE_VIEWER", "SHOTWELL", "SYSTEM_MONITOR", "SOLITAIRE"],
+    "hot_fraction": 0.01,
+    "anon_fraction": 0.02,
+    "sample_fraction_per_step": 0.005,
+    "target_improvement_percent": 20,
+    "challenge_improvement_percent": 30
+  },
+  "peak": {
+    "apps": ["FIREFOX", "LIBREOFFICE", "VLC", "GIMP", "AUDACITY", "THUNDERBIRD", "EVINCE", "FILES", "CALCULATOR", "CALENDAR", "RHYTHMBOX", "IMAGE_VIEWER", "SHOTWELL", "SYSTEM_MONITOR", "SOLITAIRE"],
+    "normal_ratio_by_app": {
+      "FIREFOX": 0.09,
+      "LIBREOFFICE": 0.075,
+      "VLC": 0.05,
+      "GIMP": 0.065,
+      "AUDACITY": 0.055,
+      "THUNDERBIRD": 0.05,
+      "EVINCE": 0.035,
+      "FILES": 0.04,
+      "CALCULATOR": 0.015,
+      "CALENDAR": 0.02,
+      "RHYTHMBOX": 0.04,
+      "IMAGE_VIEWER": 0.025,
+      "SHOTWELL": 0.04,
+      "SYSTEM_MONITOR": 0.03,
+      "SOLITAIRE": 0.02
+    },
+    "peak_ratio_by_app": {
+      "FIREFOX": 0.195,
+      "LIBREOFFICE": 0.145,
+      "VLC": 0.09,
+      "GIMP": 0.13,
+      "AUDACITY": 0.09,
+      "THUNDERBIRD": 0.085,
+      "EVINCE": 0.065,
+      "FILES": 0.075,
+      "CALCULATOR": 0.03,
+      "CALENDAR": 0.045,
+      "RHYTHMBOX": 0.075,
+      "IMAGE_VIEWER": 0.045,
+      "SHOTWELL": 0.07,
+      "SYSTEM_MONITOR": 0.065,
+      "SOLITAIRE": 0.045
+    },
+    "hot_fraction": 0.02,
+    "anon_fraction": 0.02,
+    "sample_fraction_per_step": 0.004,
+    "target_improvement_percent": 30,
+    "oom_probe": {
+      "enabled": false,
+      "memory_ratio": 0.55,
+      "ramp_seconds": 8,
+      "hold_seconds": 12,
+      "oom_score_adj": 1000,
+      "repeat_every_steps": 20
+    }
+  },
+  "lstm_contract": {
+    "app_vocab": "configs/lsapp_aligned/app_vocab_duration.json",
+    "runtime_scope": "configs/lsapp_aligned/runtime_app_scope.json",
+    "excluded_login_apps": ["TELEGRAM"],
+    "minimum_online_switches": 900
+  }
+}

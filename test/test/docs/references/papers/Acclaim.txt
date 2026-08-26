@@ -1,0 +1,1332 @@
+
+===== PAGE 1 =====
+Acclaim: Adaptive Memory Reclaim to
+Improve User Experience in Android Systems
+Yu Liang and Jinheng Li, City University of Hong Kong; Rachata Ausavarungnirun,
+King Mongkut’s University of Technology North Bangkok; Riwei Pan, City University
+of Hong Kong; Liang Shi, East China Normal University; Tei-Wei Kuo, City University
+of Hong Kong and National Taiwan University; Chun Jason Xue, City University
+of Hong Kong
+https://www.usenix.org/conference/atc20/presentation/liang-yu
+This paper is included in the Proceedings of the
+2020 USENIX Annual Technical Conference.
+July 15–17, 2020
+978-1-939133-14-4
+Open access to the Proceedings of the
+2020 USENIX Annual Technical Conference
+is sponsored by USENIX.
+
+===== PAGE 2 =====
+Acclaim: Adaptive Memory Reclaim to Improve User Experience
+in Android Systems
+YuLiang1,JinhengLi1,RachataAusavarungnirun2,RiweiPan1,LiangShi3,Tei-WeiKuo14,ChunJasonXue1
+1
+DepartmentofComputerScience,CityUniversityofHongKong
+2
+TGGS,KingMongkut’sUniversityofTechnologyNorthBangkok
+3
+SchoolofComputerScienceandTechnology,EastChinaNormalUniversity
+4
+DepartmentofComputerScienceandInformationEngineering,NationalTaiwanUniversity
+Abstract servers fail to deliversimilarefficiency on mobile devices.
+Specifically,weobservethataslowpagereclaimprocedure
+WhiletheLinuxmemoryreclaimschemeisdesignedto
+andsevere page thrashing can severely degrade the perfor-
+deliverhighthroughputinserverworkloads,theschemebe-
+manceofAndroidapplications.Oneofthekeyreasonbehind
+comesinefficientonmobiledeviceworkloads.Throughcare-
+thisperformancedegradationispagere-fault,whichisapage
+fullydesignedexperiments,thispapershowsthatthecurrent
+faultthathappens on a previously evictedpage. This page
+memory reclaim scheme cannot deliver its desired perfor-
+re-faultcanbecomeabottleneckandlowerworkloads’read
+manceduetotwokeyreasons:pagere-fault,whichoccurs
+performancebecausethesystemnowneedstoreadthepage
+whenanevictedpageisdemandedagainsoonafter,anddi-
+from the storage instead of the much faster main memory,
+rectreclaim,whichoccurswhenthesystemneedstofreeup
+leadingto100xormoreincreaseinpagereadlatency. An-
+pagesuponrequesttime.Unliketheserverworkloadwhere
+otherkey reason behindperformance degradation is direct
+the direct reclaim happens infrequently,multiple direct re-
+reclaim.Directreclaimcannegativelyimpactperformance
+claimscanhappeninmanycommonAndroidusecases.We
+becauseanypageallocationsmustwaitforthedirectreclaim
+providefurtheranalysisthatidentifiesthemajorsourcesof
+process to finish. During a direct reclaim operation,many
+thehighnumberofpagere-faultsanddirectreclaimsandpro-
+dirtypagesmayneedtobeflushedandthusgreatlyprolong
+poseAcclaim,aforegroundawareandsize-sensitivereclaim
+theallocationprocedure.Toavoidcostlydirectreclaimop-
+scheme.Acclaimconsistsoftwoparts:foregroundawareevic-
+eration,analternativereclaimschemeusingthelightweight
+tion(FAE)andlightweightprediction-basedreclaimscheme
+backgroundreclaim(kswapd),isusedbytheLinuxsystem.
+(LWP).FAEisusedtorelocatefreepagesfrombackground
+Kswapd is a kernel thread that is wakened up periodically
+applicationstoforegroundapplications.WhileLWPdynami-
+orbypageallocationtoreclaimfreepages.However,inthe
+callytunesthesizeandtheamountofbackgroundreclaims
+current Android kernel,we observe that kswapd takes too
+accordingtothepredictedallocationworkloads.Experimen-
+longtofreeupthenecessarynumberofpagesandthusdirect
+talresultsshowAcclaimcansignificantlyreducethenumber
+reclaimhastobetriggered.
+ofpagere-faultsanddirectreclaimswithlowoverheadsand
+deliversbetteruserexperiencesformobiledevices. Throughexperimentsusingpopularmobileapplications,
+weshowthatthecurrentAndroidmemoryreclaimscheme
+doesnotadapttothecharacteristicsofAndroidapplications.
+1 Introduction
+Experimentsshowthatevenwhenlaunchingonesmall-size
+WithmanyoptimizationstoLinux’smemoryreclaimscheme, application,pagere-faultscouldhappenregularly.Undera
+the existing Linux memory reclaim scheme can efficiently setofcommon use cases,31% ofallthe evictedpages are
+manage pages inside the main memory in desktops and pagere-faults.Thishighratioofpagere-faultstonormalpage
+servers[6,11,14,17].Androidmobiledevices,whichhave evictionsmeansthatpagethrashingisverysevereinmodern
+seen remarkable growth,inherit the same Linux kernel de- Androidmobiledevices.Asidefromthehighrateofpagere-
+signed for desktops and servers. As a result,these mobile faults,ourexperimentsalsoshowthatthepercentageofdirect
+devicesutilizethesamememoryreclaimschemeinherited reclaimsinallreclaimsis0.8%onaverageundercommonuse
+fromLinuxdesktopandserverdistributions. cases.Oncedirectreclaimhappens,upto1024dirtypages
+In this work,we show thatthe nature ofmobile devices willbeflushedtoflashstorage,whichdramaticallyextends
+workloadsisfundamentallydifferentfromthoseofdesktop thelatencyofthepageallocation.Thus,directreclaimshould
+andserverworkloads.Hence,policiesdesignedtoimprove beavoided.
+theefficiencyofthememoryreclaimschemeindesktopsand Priorresearchesfocusedonreducingthenumberofpage
+USENIX Association 2020 USENIX Annual Technical Conference 897
+
+===== PAGE 3 =====
+faultsbyoptimizingpageevictionalgorithmsonmobilede- upto31%)andfrequencyofdirectreclaims(ofupto96
+vices[32,40].Thesepreviously-proposedevictionalgorithms timeswhenusingonlyoneforegroundapplicationfor
+treat the pages of backgroundand foreground applications fiveminutes)onAndroidmobiledevices.
+withthesamepriorityandchoosevictimpagesaccordingto
+• We analyze the root causes of the inefficient memory
+theiraccesstimeandthefrequencyofaccesses.Theoptimized
+reclaimschemeonmobiledevicesandproposeAcclaim,
+LRUisknownasagoodevictionalgorithmandisappliedin
+aforegroundawareandsize-sensitivereclaimscheme,
+Android[2].Toavoiddirectreclaim,theAndroidoperating
+toimprovetheperformance.
+systemreservessomefreepagesbysettingwatermarksfor
+• We conduct a survey to collect the usage information
+freememory. Thisadditionalfreepagescanpreventdirect
+of applications through deploying our monitoring ap-
+reclaimfrombeingtriggeredifthereisasuddenandurgent
+plicationonfifty-tworealmobiledevices.Weevaluate
+heavyallocation.However,ourexperimentalresultsshowthat
+Acclaimaccordingtooursurvey.Theexperimentalre-
+thenumberofdirectreclaimsisstillsurprisinglyhigh(could
+sultsonarealmobiledeviceshowthattheperformance
+be triggered 96 times in five minutes in one common use
+improvesinmostusecases.
+case)onAndroidmobiledevices.Toreducethelonglatency
+ofmemoryallocationcausedbypoorinsightofmobileOSes,
+Marvin[28]implementsmostmemorymanagementsinthe 2 Background
+languageruntime,whichhasmoreinsightintoanapp’smem-
+oryusage. However,Marvinmissestheopportunitiesatthe ToanalyzethelatencybottleneckofAndroidmobiledevices,
+OSlevel,e.g.takingintoaccounttheforeground/background wefirstlookathowAndroidreadapageofdata.
+statesofapplicationstopredictapplications’allocation.
+Inthispaper,weobservethatundercertainuserbehaviors, 2.1 AndroidI/OLatency
+page re-fault depends on the amount of available memory,
+whilethedirectreclaimdependsonboththeamountofavail- AndroidisaLinux-basedlightweightoperatingsystemde-
+ablememoryandthelatencyofbackgroundreclaims.Based signedformobiledevices. Figure1showsthearchitecture
+ofAndroidI/Ostackthatincludingtheuserspace,theLinux
+ontheseobservations,weuncovertwomaincausesthatlead
+toahighrateofpagere-faultsanddirectreclaimsonmobile kernel,andtheI/Odevices.
+devices.First,backgroundapplicationsarenottrulyinactive
+U
+buttheirreducedactivities andunevictedpages stillcreate Applications es
+r
+highmemorypressure,penalizingtheforegroundapplication VFS Layer
+inanunfairway.Furthermore,lowmemorykiller(LMK)[1] Page Cache K
+e
+does not help much. Second, we found that the large-size File Systems e
+nr
+l
+reclaim,whichissuitablefordesktopandserversasthelarge- Generic Block Layer
+sizereclaimamortizesthelonglatencyofeachdirectreclaim I/O Scheduler Layer D
+e
+process,isoverlyaggressiveandcoarse-grainedforAndroid Flash Storage e ci v
+because1)itprolongsthelatencyofthebackgroundreclaim
+andnegativelyimpactstheuserexperienceand2)Android Figure1:AnoverviewoftheAndroidI/Ostack.
+workloads typically issue page allocation requests that are
+We use a read operation as an example to show the la-
+muchsmallercomparedtodesktopandserverrequests.
+tency bottleneck. When an application reads a page in the
+Basedonthesetwomaincauses,weproposeAcclaim,a
+I/Ostack,theapplicationsendsareadrequesttothekernel.
+foregroundawareandsize-sensitivereclaimscheme.Acclaim
+Thekernelthensearchesthepagecachetoseewhetherthe
+consistsoftwomajorruntimecomponents:foregroundaware
+requestedpageisinthepagecacheornot.Iftherequested
+eviction(FAE)andalightweight,prediction-basedreclaim
+page is in the page cache,the page cache returns the page
+scheme(LWP).FAErelocatesfreepagesfrombackground
+to the application. Because the page cache resides in the
+applicationstoforegroundapplications;itdoessobylowering
+mainmemory,theaccesslatencyofaccessingthepagecache
+theprioritiesofthepagesbelongingtobackgroundapplica-
+takes about one hundred nanoseconds to complete [39]. If
+tionsduringpageeviction.LWPtunesthesizesandamounts
+the requestedpage is notin the page cache,a page faultis
+ofbackgroundreclaimsbasedonitspredictionofallocation
+generated.Inthiscase,thepageallocationoperationwillbe
+workloads.EvaluationresultsshowthatAcclaimbenefitsI/O-
+triggeredtoallocateanewpage.Whenthememoryisfull,
+intensivephasesinapplicationexecution,notablyapplication
+theLinux’sreclaimschemeistriggeredtofreepageswithin
+launchandapplicationinstallation,whichareknowncrucial
+the main memory. There are mainly two reclaim schemes:
+tomobileuserexperience[8].
+asynchronous background reclaim and synchronous direct
+Thecontributionofthispaperislistedasfollows.
+reclaim. Background reclaim frees unmapped pages while
+• This work reveals that the current memory reclaim directreclaim frees mappedpages ordirtypages,andthus
+scheme fails to deliver a good page re-fault ratio (of directreclaimhasaheavycost,especiallywhenwritingback
+898 2020 USENIX Annual Technical Conference USENIX Association
+
+===== PAGE 4 =====
+dirtypages.Afterpageallocation,therequestisdeliveredto 2.2 KeyFactorsthatAffectPerformance
+thefilesystemlayer,whichfindsthelogicaladdressofthe
+PageRe-fault.Pagefaultcanhappeninthreescenarios.First,
+requested page. Then,a read request goes through generic
+apagefaultoccursbecausephysicalmemoryhasnotyetbeen
+blockandI/Oschedulertoaccesstherequestedpagefrom
+allocatedforthe requestedpage. This occurs,forexample,
+flashstoragethroughI/Ooperations.Goingthrougheachof
+whenthepageisreadforthefirsttime.Second,apagefaultoc-
+theselayerscontributestoadditionalmicrosecondscalelaten-
+cursbecausetheapplicationwantstoreadanalreadyevicted
+ciestothisreadrequest,whichcanincludeaddressinglatency
+page. We define this case as a page re-fault. Third,a page
+ofthefilesystem,queuinglatencyoftheI/Ooperation,and
+faultoccursbecauseaprocesswantstoillegallyaccessinvalid
+readinglatencyoftheflashstorage.Aftertheseoperations,
+memory.Inthiscase,theoperatingsystemwillkillthepro-
+the fetched page is finally stored in the main memory and
+cess.Outofthesethreecases,thesystemcanbedesignedto
+futureaccessescanbefetcheddirectlyfromthepagecache.
+minimizepagere-faultbecausetherequestedpagehadbeen
+Duetothesereasons,apagefaultcantakemicrosecondsto
+inmemorybutwasevictedbysystem’spagereclaimscheme.
+finish,leadingtomuchlongerreadlatencyespeciallywhena
+Pagere-faultcanbeusedtomeasurethepagethrashingand
+directreclaimistriggered.
+thusevaluatetheefficiencyofthememoryreclaimscheme.
+ToquantitativelyshowtheinfluenceofpagefaultonAn-
+Direct Reclaim. Direct reclaim is a heavy-weight syn-
+droidmobiledevices,Yuetal.[21]measurethelatencyof
+chronous reclaim scheme that is triggered during the page
+launchingTwitterandFacebookapplicationsinthreediffer-
+allocationprocedurewhenthereisnotenoughfreespacefor
+entsituations.Figure2showsthethreescenariosacrosstwo
+thesystem’sdemands.Oncedirectreclaimistriggered,An-
+setupsbasedonF2FS[19]andEXT4[23]filesystems,which
+droidsystemneedstopausetheallocationprocess,resulting
+arecommonlyusedinAndroid.“Cached”referstothecase
+inadditionalperformancedegradation.Analternativesolution
+wheremostrequestedpagescanbefoundinthepagecache.
+istousebackgroundreclaim.Whenthenumberoffreepages
+This case is implemented by re-launching the application
+islowerthanathreshold(watermark ),backgroundreclaim
+right after it is closed,and thus its data is still in memory. low
+threads are woken upto reclaim andfree unmappedpages
+“Read”isacasewhentherearesomepagefaultsbutthere
+asynchronously.Duringthebackgroundreclaim,theAndroid
+areenoughfreepages,1andthusthereclaimprocedurewill
+systemdoesnotpausetheallocationprocess.Hence,back-
+notbetriggered.Thiscaseisimplementedbylaunchingthe
+groundreclaimislightweight.However,ifthebackground
+applicationaftercleaningthepagecache.“Reclaim-first”is
+reclaimisunabletoreclaimenoughfreepagesintimeand
+thecasewheretherearesomepagefaultsandtherearenot
+therearenotenoughfreepagesforthecurrentpageallocation,
+enoughfreepages,triggeringthereclaimprocedure.Thiscase
+direct reclaim is triggered to reclaim the mapped pages or
+isimplementedbylaunchingtheapplicationsaftersequen-
+dirty pages. When the memory is extremely scarce,direct
+tiallylaunchingtwentyotherapplications(toensurethatthe
+reclaimcannothelpandsomebackgroundapplicationswill
+pagecacheisfullpriortothelaunchofTwitterorFacebook.)
+be killed by the Android low memory killer (LMK) [1] to
+Cached (no page fault) reclaim memory. Because the overhead of LMK is larger
+3000 Read (page fault)
+)sm2500 Reclaim_first (page fault) thandirectreclaim[28],LMKcannotbeusedtoreplacedi-
+( y rectreclaim.Thus,LMKcomplementsdirectclaimandonly
+cn2000
+e handlesextremecases.
+ta
+l
+g
+1500
+n
+ih1000
+cn
+u 500
+3 AnalysisofAndroidMemoryReclaim
+a
+L
+sp
+p
+0
+Twitter Facebook Twitter Facebook In this section, we measure the Android memory reclaim
+A
+F2FS Ext4 schemebycountingpagere-faultsanddirectreclaimswhile
+runningpopularapplications.
+Figure2:Influenceofpagefaultandreclaimonapplication
+launchlatencyonAndroidmobiledevices.
+3.1 SurveyofApplicationUsagePatterns
+TheresultsinFigure2showthatthelatencyoflaunchingan
+applicationistheshortestinthe“Cached”case.Comparedto
+We survey the distribution of the numbers of background
+the“Cached”case,the“Read”andthe“Reclaim_first”cases
+applications from real phones,then using that numbers to
+take longer to launch for both applications. The extended
+conductcontrolledexperimentsandstudylaunchlatencies.
+latency is causedby page faults. The launchlatency is the Wedevelopamonitoringapplication2 anddeployitonthe
+longestin“Reclaim_first”casebecausethereclaimprocedure
+phonesofsixtyAndroidusers.Outofthe60users,weveri-
+istriggered.Especially,whendirectreclaimistriggered,the
+fiedthedatainvalidationandselected52users(90%18-35
+latencyincreasessignificantly.
+years old and 10% 35-50 years old) for our analysis. Our
+1Cachestatusischeckedbythecommanddumpsysmeminfo. 2https://github.com/MIoTLab/Accliam.
+USENIX Association 2020 USENIX Annual Technical Conference 899
+
+===== PAGE 5 =====
+monitoringapplicationcollecteddataonmorethantwenty tentimeswiththesamesubsetofbackgroundapplications
+mobiledevicemodelsoveratwo-monthperiod.Duringthis andtheaverageisshown.InSections3.2and3.3,weshow
+time,themonitoringapplicationgeneratesanhourlyreporton thatpagere-faultanddirectreclaimhappenonAndroidmo-
+otherapplications’activity,RAMusage,anddeviceinforma- biledevicesunexpectedlyfrequentlyevenwhenasmall-size
+tion.Ourmonitoringapplicationrunswithoutrootpermission. foregroundapplicationrunning.
+Hence,theapplicationonlycheckstheapplications’activity
+conductedbyusersbutnotbysystems.Withthisdata,wecan
+3.2 PageRe-faultonMobileDevices
+estimatethedistributionofbackgroundapplications’usage
+informationasshowninTable1. Theratioandthenumberofpagere-faultswhenlaunching
+Table1:Collecteddatafrom52realphones. andrunningpopularapplicationsareshowninFigure3.We
+definethepagere-faultratioastheproportionofre-faulted
+#ofphones #ofbackgroundapplications Workloads
+pages on allevictedpages. Itcan be usedto evaluate page
+0 N<2 light
+thrashing.Theresultsshowthatthepagere-faultratiocould
+8 2≤N<5 light
+beupto31%whenrunningpopularapplications.Thismeans
+39 5≤N<10 moderate
+theAndroidmemoryreclaimschemeoftenreclaimspages
+5 N≥10 heavy
+that will be used soon. Although the ratio of page re-fault
+Basedon the survey,we reproduce differentrealisticus- dependsonusers’behaviors,whenusingonlyoneapplication
+age scenarios by running several popular Android applica- inasystemwith3GBofmemory,pagere-faultsshouldnot
+tions. These applications include Facebook,Twitter,Insta- occurbecause the working set of one application does not
+gram,WhatsApp,Pinterest,Wish,Chrome,Firefox,Google exceed 3GB 3. The existence of page re-faults in Figure 3
+Earth, Google Map, Uber, Angrybird, CnadyCrush, News- indicatesthatthepre-loadeddataandprocesses’dataoccupy
+BreakYoutube,andSpotity.Weevaluatebothlaunchingand thememoryspacecausingmanypagere-faults.
+execution of applications with a different number of back-
+T g r
+g
+e r
+r
+a p o
+o
+b r u
+u
+l e e n
+n
+s d
+d
+e 2 n : a
+a
+t p A s
+p
+p
+p
+a p l
+l
+i p
+i
+f c
+c
+o l a i
+a
+r c t e
+t
+i a
+i
+o g
+o
+t n r i
+n
+o o s
+.
+n u a n
+3
+s c d
+B
+o sh
++
+a m o p
+A
+b w p i l n n
+m
+ic a i
+e
+a t n i
+a
+t o i
+n
+T o n
+s
+a n s b
+l
+a u l
+a
+n e
+u
+s d e 2
+n
+d .
+c
+B
+h
+in r
+in
+ep
+g
+ex re
+a
+p s e e
+f
+r n
+o
+im t
+r
+s
+e
+e
+g
+a n
+r
+b
+o
+ts a
+u
+. c
+n
+A k
+d
+- )s e g a p ( re b
+m
+u n3
+4
+5 6 7 8
+0
+0 0 0
+0
+0
+0
+0 0 0
+0
+0
+0
+0 0 0
+0
+0
+0
+0 0 0
+0
+0 o f r o e t f h r a e e u g r l r s t o r u a n t d io
+2
+2
+3 3 4 4 5
+0
+0 5 5 0
+5
+0 )% ( o ita
+r
+tlu
+applicationwhentherearethreebackgroundapplications. tlu20000 15 a fe
+a 10 R
+fe10000
+5
+Applications Operations Memory Workloads r e 0 0
+g
+A Launchanduse Avail. Light a P A 3B+A 8B+A15B+A A 3B+A 8B+A15B+A
+anapplicationfor5minutes 3G memory 2.5G memory
+3B+A 3backgroundapplications Avail. Moderate Figure3:Ratioandnumberofpagere-faultswhenusingone
+8B+A 8backgroundapplications Full Moderate foregroundapplicationforfiveminutes.Foreachcase,there
+15B+A 15backgroundapplications Full Heavy are different number of background applications. “Others”
+includesbackgroundapplicationsandsystemservices.
+AllourfollowingexperimentsareperformedonaHuawei
+P9smartphonewithanARM’sCortex-A72CPU,32GBinter-
+Moreover,wefindthattheincreaseinthenumberofback-
+nalmemoryand3GBRAM,runningAndroid7.0onLinux
+groundapplicationshasagreatimpactonthenumberofpage
+kernelversion4.1.18.Wealsoconductexperimentson2.5GB
+re-faults.Theratioofpagere-faultsisupto31%whenthere
+RAMbyusingmemtester[34]tooccupymemory.Thereis
+areeightbackgroundapplicationswith3GBmemory.This
+noexternalSDcardinordertoforcealltheI/Orequeststo
+meansalmostone-thirdoftheevictedpageswillbereused.
+theinternaleMMCflashstorage(/datapartition)ofAndroid.
+Wefurtherfindthatamajorfraction(37%onaverage)ofpage
+WeinstrumenttheAndroidkernelsourcecodeandusethe
+re-faultshappensontheforegroundapp.Becauseforeground
+adb(AndroidDebugBridge)tool[37]toobtaininformation
+applicationsdirectlyinteractwithusers,itisimportanttomin-
+onmemoryallocationsandthereclaimprocessofoureval-
+imizethenumberofpagere-faultsofforegroundapplications.
+uatedsmartphone.Ourinstrumentationframeworkincludes
+informationonthenumberofre-faultpages,thenumberof
+3.3 DirectReclaimonMobileDevices
+evicted pages,the size of each allocation,the size of each
+reclaim,the number of direct reclaims,and the number of
+Compared to page re-fault,direct reclaim can cause more
+allreclaimoperations.Toreproducetherealusagescenarios,
+severeperformancedegradationandfluctuationsbecauseit
+aftersystemstart,backgroundapplicationswillbelaunched
+couldflushmanydirtypagesduringapageallocationroutine.
+andwaitforawhile.Andthenwestarttocollecttheinfor-
+Weshowtheratioandnumberofdirectreclaimswhenrunning
+mationwhilewelaunchandusetheforegroundapplication
+forfiveminutes.Toavoidbias,eachexperimentisconducted 3Itischeckedbythecommanddumpsysmeminfo.
+900 2020 USENIX Annual Technical Conference USENIX Association
+
+===== PAGE 6 =====
+popularapplicationsinFigure4.Wedefinethedirectreclaim weuseddifferentusagescenariosfromthatinFigure3.“A”
+ratioas theproportion ofthenumberofdirectreclaimson meanstolaunchoneforegroundapp.“A4A”meanstolaunch
+totalofreclaims.Evenifthedirectreclaimratioissmall(upto oneforegroundapplicationandthenlaunchfourbackground
+2%),itcouldinducealargelatencybecausepageallocations applications,andfinallyre-launchtheforegroundapplication.
+needtowaitforthedirectreclaimtofinish.Thelatencytaken Relaunchingaforegroundapplicationisatypicalscenarioto
+bythedirectreclaimcanbethousandsoftimesthelatencyof producepagere-faults.
+thebackgroundreclaim.Thus,thedirectreclaimissupposed
+1000000
+tobetriggeredinmemoryofemergencycases. 900000 evict refault
+120 number 2.5
+)se
+g a p6 7
+8
+0 0
+0
+0 0
+0
+0 0
+0
+0 0
+0
+0 0
+0
+tn u o c m ia
+lc
+e r
+tc e riD
+10
+2
+4
+6 8 0 0
+0
+0
+0
+0 ratio
+0
+0
+1
+1 2 .
+.5
+5 )% ( o ita r m
+ia
+lc a
+r tc e riD
+( re b m u n 1 2 3 4 5 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0
+0
+eerf_G
+1 .1
+eerf_
+M 0 02
+e erf_M
+09
+eerf_G
+1 .1
+eerf_
+M 0 05
+eerf_
+M 0 02
+eerf_G
+1 .1
+eerf_
+M 0 05
+A 3B+A 8B+A 15B+A A 3B+A 8B+A 15B+A A A4A A8A
+3G memory 2.5G memory Figure5:Numberofpagere-faultsandevictedpagesunder
+Figure4:Ratioandnumberofdirectreclaimswhenusingone differentavailablememory.
+foregroundapplicationforfiveminutes.Foreachcase,there
+Theresultsshowthatthenumberofbackgroundapplica-
+isdifferentnumberofbackgroundapplications.
+tionshasamajorimpactonthenumberofre-faultandevict
+Wefindthattheincreaseinthenumberofbackgroundap- pages. Moreover, reducing physical memory can increase
+plicationsandthereductionofphysicalmemoryhavemajor numberofbothre-faultandevictpages.Inaword,thenum-
+effectonthenumberofdirectreclaims.However,thedirectre- berofpagere-faultsdependsontheavailablememory.
+claimratiotrendisdifferentbetweenon3GB(default)andon Observation 2: Direct reclaim depends on both avail-
+2.5GB(usingmemtestertooccupymemory).Whenmemory ablememoryandthelatencyofthebackgroundreclaim.
+isrelativelylarge(3GB),directreclaimtriggersonlywhen Thefactorswhichaffectthefrequencyofthedirectreclaim
+therearesomebackgroundapplicationsandincreasesasthe canbefoundinitsflowchartwhichisshowninFigure6.
+numberofbackgroundapplicationsincreases.However,when
+Page allocation
+memoryis extremelyscarce anddirectreclaim become in-
+effective,OSwillkillsomeapplicationstoreclaimmemory
+Lower than N Get free
+space.Thus,directreclaimratioisdecreasingwithalarger
+threshold? pages
+numberofbackgroundapplications on 2.5 GB ofmemory.
+Y
+Thenumberofdirectreclaimscouldbeupto96infivemin-
+Weakup background reclaim Reclaim free pages in background
+uteswhentherearefifteenbackgroundapplicationswiththe
+default3GBmemory.Anefficientmemoryreclaimscheme
+Get free Y Enough free
+shouldminimizethenumberofdirectreclaims.
+pages pages?
+N
+4 The Cause of Page Re-fault and Direct Re-
+Direct reclaim
+claimonMobileDevices
+Figure6:Theflowchartofreclaimscheme.
+Substantialre-faultrates were also seen on servers,e.g. as During page allocation, if the number of free pages is
+highas14%reportedbyGoogleengineers[9].Comparedto lowerthanathreshold,thebackgroundreclaimstartsasyn-
+servers,mobiledeviceshavevastlydifferentcharacteristics: chronously. If there are not enough free pages for this al-
+muchsmallerpageallocationrequestsize,limitedmemory, location or the launched background reclaim does not re-
+andhighly-interactiveforegroundapplications[10,13]. Ac- claimenoughpagesintime,directreclaimwillkickinsyn-
+cording to these characteristics,we conduct another set of chronously. Theflowchartshowsthatdirectreclaimdepends
+experimentstoanalyzetheAndroidmemoryreclaimscheme notonlyonavailablememorybutalsoonthelatencyofthe
+tofindthemaincausesofahighnumberofpagere-faultsand backgroundreclaim.Notably,alargerreclaimsizealsosig-
+directreclaims. nificantlyincreasesthelatencyofthebackgroundreclaim.
+Observation1:Pagere-faultdependsontheavailable Basedontheabovetwoobservationsandthespecificchar-
+memory. Figure 5 shows that the number of page re-fault acteristics of mobile devices, we found that there are two
+andevictpagesunderdifferentavailablememory.Tofurther additional factors that can increase the number of page re-
+eliminate the impact of user behavior, in this experiment, faultsanddirectreclaims.
+USENIX Association 2020 USENIX Annual Technical Conference 901
+
+===== PAGE 7 =====
+Observation3:Backgroundapplicationskeepconsum- memory block has an order,where the order is an integer
+ing free pages even though they do not have the same ranging from 0 to 11. The size of a block of order n is 2n.
+impact on user experience compared to the foreground The distribution of allocation order when running popular
+applications.Formobiledevicesorotherhighly-interactive applicationsisshowninFigure7.Theseresultsarecollected
+systems,foregroundapplicationshavesignificantimpacton fromtheallocationfunction_alloc_pages_nodemask().The
+userexperience.However,wefoundthatbackgroundapplica- resultsshowthatontheAndroidmobiledevice,99%ofallo-
+tionskeepconsumingfreespaceunderthecurrentmemory cationordersare0(1page),andmorethan99.9%oforders
+reclaimschemeduetotwomainreasons. aresmallerthan4(16pages).Thisisbecausetherequestson
+First,wefindthatanonymouspagesfrombackgroundap- Androidmobiledevicesaremostlyinsmallsize.Oneofthe
+plicationsthrashpagesfromtheforegroundapplication.In mainreasonsisthatmostAndroidapplicationsuseSQLite
+the android system, all the pages are in one of five LRU as the database. SQLite and its temporary files are mostly
+lists:Active_anonymous,inactive_anonymous,active_file,in- accessedin4KB(1page)units [20,29].
+active_file, and unevictable. The pages in the unevictable
+100% order=11
+listwillnotbeevicted.Sinceanonymouspagescontainthe order=10
+heapinformationassociatedwithaprocess,theseanonymous order=9
+99% order=8
+pagesareconsideredtobemoreimportantthanfilepagesto order=7
+theprocess. Inmostcases,thepagesinactive_anonymous order=6
+order=5
+listwillnotbeevicted,eveniftheybelongtoabackground 98% order=4
+order=3
+app. Thus,manyanonymouspagesofbackgroundapplica-
+order=2
+tionsstayinmemory,whilethefilepagesfromtheforeground 97% order=1
+applicationareevicted.Theseevictedfilepagesfromfore- YE F A E F C E F A YF C Y F TM F TA F C T F A YE C YE T M E T A E C TE T M Y T A Y C TY CA M C TA order=0
+groundapplicationsmaybeaccessedagainsoon,leadingto Figure 7: The distribution of allocation orders. The corre-
+ahighnumberofpagere-faults.Moreover,theanonymous spondingallocationsizeequalsto2order [21].
+pagesofbackgroundapplicationsoccupyfreespaceandthus
+ThedistributionofreclaimsizesisshowninFigure8.The
+affectthefrequencyofthedirectreclaim.
+resultsshow80%ofreclaimsizesarelargerthan32pages(or-
+Second,we found that background applications are still
+der=5).Androidinheritsmuchofthereclaimschemefromits
+activeevenaftertheyareinthebackgroundforthirtyminutes.
+servercounterpart.Thelatteroftenreclaimsmemoryasmuch
+Thedetailsareshown in Table3. Theresultsarecollected
+aspossibletofulfilllargeallocationsandavoidexpensivedi-
+whentherearesevenuserbackgroundapplicationsandone
+rectreclaimorkillingprocessesundermemorypressure.As
+foregroundapplication.Noticethatsystemservicesaretreated
+Androidapplicationstendtoallocatemultiplesmallblocksof
+asapplicationshere.
+data(showninFigure7),thereclaimprocessbecomesoverly
+Table3:Applicationsarestillactiveinthebackground.
+aggressiveandendsupreclaimingexcessivepagesforeach
+Time Evictapps Refaultapps Foreground Background System ofthesesmallallocations.
+5mins 53 31 6.2% 34.4% 59.4% 100%
+order>10
+30mins 52 19 18.3% 33.3% 48.4%
+80% order<=10
+“Evict apps” represents the number of applications that order<=9
+60%
+have pages being evicted while “Refault apps” represents order<=8
+thenumberofapplicationsthathavepagere-faults.“System” 40% order<=7
+includessystemservicesandprivateapplicationsthatarein- 20% order<=6
+order<=5
+stalledonthemobiledeviceatthefactory.Thepercentages
+0%
+i s n ho th w e t T ha a t b b le ac 3 k m gr e o a u n n s d t a h p e p p li e c r a c t e io n n ta s g s e til o l f re re q - u f e a s u t lt f s r . ee T p h a e g r e e s su an lt d s YE F A E F C E F A Y F C Y F TM F TA F C T F A YE C YE T M E T A E C TE T M Y T A Y C TY C A M C TA
+Figure 8: The distribution of reclaim sizes. These results
+thus induce page re-faults. Moreover,background applica-
+showthereclaimsfromLRUlists,andtheyarecollectedin
+tionsstillconsumefreespaceandthusaffectdirectreclaim
+thefunctionsshrik_lruvec()[21].
+frequency.
+Insummary,thereclaimschemekeepsthepagesofback- Largereclaimsizeprolongsthelatencyofthebackground
+groundapplicationsinmemoryandcouldinduceahighnum- reclaim.Accordingtoobservation2,thelatencyoftheback-
+berofpagere-faultsanddirectreclaims.Forservers,thefore- groundreclaimwillaffectthefrequencyofthedirectreclaim.
+groundandbackgroundapplicationsusuallyhavethesame Moreover,a large-size reclaim scheme could induce more
+priority. However,formobile devices,onlythe foreground pagere-faultsthannecessary[21].
+applicationhasamajorimpactontheuserexperience. BasedonourdatainSection3,Androiddoesnotefficiently
+Observation4:Large-sizereclaimprolongsthelatency manageitsmemory.Thisobservationisin-linewithmultiple
+of the background reclaim. In the buddy system, every technical news: Google Pixel 3 has memory management
+902 2020 USENIX Annual Technical Conference USENIX Association
+
+===== PAGE 8 =====
+issues,suchaskillingbackgroundapplications[35]andisun- isinstalled,itsUIDisfixed.TheUIDsofuserapplications
+abletoshufflebetweenafewapplicationsatatime[33].More- areaddedtoPageTableEntry(PTE).PTEisonlyaccessible
+over,its memory management issue seemingly gets worse duringthepagewalkprocessthroughthepagewalker.User
+whenusersusethecamera[16].Hardwarevendorstendto applicationswillnotbeabletoaccesstheseUIDbitsasthis
+addresstheissuebyputtingalarge-capacityDRAMonde- is handled by OS orhardware. The page’s UID is used by
+vices,whichalleviatestheprobleminashorttermbutleaves FAEduringtheevictionprocedure.Currently,only8unused
+theissueinthefuture.Moreover,thebrute-forcesolutionhas bitsofeachPTE(the56thtothe63rd)canbeusedtostore
+manyproblems,suchascostefficiency,powerconsumption, UIDs. Thus,Acclaim only supports 256 unique UIDs at a
+thegrowingtrendofapplicationsize,etc.andtheseproblems time,whichisanimplementationlimitation.
+cannotbeaddressedsolelybydroppinginmoreDRAM.In-
+stead,ourworkaimstoimprovetheefficiencyofAndroid’s Applications
+memorymanagement. ① ③
+①install or update apps
+Android Framework
+②update the config file
+③switch apps
+5 OurSolution:Acclaim ② ④ ④deliver the foreground uid
+Memory ⑤kernel gets the uidsof all apps
+Fore management ⑥kernel gets the uidof foreground app
+ground
+Withthe understanding ofthe fourobservations leading to Foreground
+Config ⑥ aware
+ahighnumberofpagere-faultsanddirectreclaims,wepro- files eviction
+⑤
+posedAcclaim,foregroundawareandsize-sensitivereclaim
+Kernel
+scheme,whichincludestwoparts.Thefirstpart,foreground
+aware eviction (FAE), is used to solve the problem that Figure9:Frameworkofforegroundawareevictscheme.
+background applications keep consuming free pages. FAE Thereisonlyoneforegroundapplicationatamomentbut
+takesspacefrombackgroundapplicationsandallocatesitto therecouldbeseveralbackgroundapplications.Thislistof
+the foreground application. The second part,a lightweight allbackgroundapplicationscanbeobtainedbysubtracting
+prediction-basedreclaim scheme (LWP),is usedto reduce theforegroundapplicationfromanapplicationlist.Themain
+thereclaimsizeofthebackgroundreclaimandthusminimize taskofFAEistocreatealistofbackgroundapplicationsand
+itslatency.LWPtunesthesizeandamountofthebackground lowertheirprioritycomparetotheforegroundtask.Todothis,
+reclaimsaccordingtothepredictedallocationworkloads.In FAEstorestheUIDsofapplicationsintheapplicationlistin
+summary,FAEdecidesfromwheretoreclaim,whileLWP aconfigurationfile.Thisfilewillbeupdatedwheninstalling
+decideshowmuchtoreclaim. ordeletingapplications.Toidentifythecurrentforeground
+application.FAEnotifiestheUIDoftheforegroundapplica-
+5.1 ForegroundAwareEviction(FAE) tiontothekernelwhenusersswitchapplications.Basedon
+theUIDsofapplicationsintheapplicationlistandtheUID
+Thememoryisalwaysnotlargeenoughtoeliminateallpage oftheforegroundapplication,thesystemcanthenlowerthe
+re-faults and direct reclaims. Both the number and size of prioritiesofallotherapplications’pagesinLRUlists.
+applicationsincreasewithmemorycapacity[38].Moreover, Bydefault,Acclaimdeprioritizesallbackgrounduserap-
+whenthememorycapacityincreases,mobiledevicemanufac- plicationsbyassigningthemlowerprioritiesinpageeviction.
+turersoftenmakeoptimizations,suchaslockingcommonly- To accommodate a smallnumberofapplications thatkeep
+usedfiles[3]andpre-loadingpredictedapplications[31]in servingtheusersinthebackground,e.g.musicorvideoplay-
+thememory.Alltheseoptimizationsconsumefreememory. ers,Acclaimcantreatthemasexceptionswithoutdegrading
+Sincethememorysizeislimited,thetotalpagere-faults theirprioritiesbyexcludingthemintheapplicationlist.
+can be hardly reduced. The reduction of page re-faults of
+theforegroundapplicationcanhaveamajorimpactonthe
+5.1.2 LowerPriorityofBackgroundApplications
+userexperienceofmobiledevicesorotherhighly-interactive
+systems. Thus,we propose to reduce the page re-faults of Initially,wetriedtoraisetheprioritiesofforegroundapplica-
+foregroundapplicationsbysacrificingspacefrombackground tions’pagesorsystem’spages.However,thismethodmain-
+applications.Foregroundawareeviction(FAE)isproposedto tainstoomanyuselesspagesofforegroundapplicationsand
+lowerthepriorityofbackgroundpagesinLRUlists,causing thesysteminmemorybecauseoftheirhigherpriorities.These
+themtobeevictedfasterandthusfreeingmorememoryspace. uselesspagesmayleadtoOScrasheswhenfreememoryis
+usedup.Thus,FAEchoosestolowerthepriorityofpagesof
+backgroundapplications.Underthisscheme,thepriorityof
+5.1.1 FrameworkofFAE
+foregroundapplications’pagesandthesystem’spageswill
+TheframeworkofFAEisshowninFigure9.FAEneedsto not be changed. Their useless pages will be evicted from
+know whether a page belongs to background applications. memoryandthusfreememorywillnotbeuseduptocrush
+EachapplicationhasauniqueID(UID).Onceanapplication OS.ThedetailsareshowninFigure10.
+USENIX Association 2020 USENIX Annual Technical Conference 903
+
+===== PAGE 9 =====
+asforegroundapplicationsandoptimizesthemaccordingly.
+If (uid==background)
+Go into inactive list referenced
+5.2 Lightweight Prediction-Based Reclaim
+d e Tail Active List Head Scheme(LWP)
+cn
+e
+re If (uid==background)
+fe stay in inactive list Theoriginalreclaimsizeofeachbackgroundreclaimisthe
+rn clean
+u Head Inactive List Tail maximumnumberofrequestedpagesuntilthetimeofthere-
+ytri d claim.FromSection4,wefindthatthecurrentreclaimsizeis
+toolargefortheallocationrequestsofmobiledevices.Large-
+write back
+Figure10:ForegroundawareevictschemeofLRUlists. sizereclaiminducesahighnumberofpagere-faultsanddirect
+Page movement between the “active” and the “inactive” reclaims.However,thereisatrade-offbetweenthereclaim
+LRUlistsisdrivenbymemorypressure.Unusedpagesinthe sizeandperformance.Ifthereclaimsizeofthebackgroundre-
+activelistgototheinactivelist.Pagesaretakenfromthetail claimistoosmallwhiletheapplicationworkloadsareheavy,
+oftheinactivelisttobefreed.Ifthepagehasthereferencebit thefreepageswillbeconsumedquicklyandtheheavy-weight
+set,itismovedtotheheadoftheactivelistandthereference directreclaimwillbetriggered,loweringperformance.On
+bitiscleared.Ifthepageisdirty,writebackiscommencedand theotherhand,ifthereclaimsizeofthebackgroundreclaim
+thepageismovedtotheheadoftheinactivelist.FAElowers commandsistoolarge,pagere-faultsanddirectreclaimwill
+theprioritiesofbackgroundpages(SeeFigure10)andmoves happenfrequentlyand,again,degradesoverallperformance.
+themoutofLRUlistsquickly.ThusFAEcanextractspace Thus,we incorporate a workload-prediction based reclaim
+frombackgroundapplicationsforforegroundapplicationsand schemeintoourdesignbyincorporatingthehistoricalinfor-
+thustoreducetheforegroundpagere-faults. mation obtained through a lightweight predictor (See Sec-
+tion 5.2.1). Based on the predicted results,the system can
+Sharingpageshavethesamepriorityastheircreators.To
+tune the reclaim size of the background reclaim. Another
+reducedynamic-conversionoverhead,asharingpagemain-
+challengecanoccurifwereducethereclaimsizeaccording
+tains the UID of the application that created it. Thus, the
+to each workload. In this case, the number of reclaim op-
+sharing page gets the priorityaccording to the status ofits
+erationscanincreasewhiletheamountofreclaimedpages
+creator.Forexample,letusassumepageAissharedbyappli-
+remainunchanged,andthusreducingreclaimsizewillwaste
+cationDandE.DcreatespageAfirstandDisinbackground
+CPUtime.Tosolvethisproblem,weincorporatetheamount
+while E is in foreground. If page A is not used for a long
+ofreclaimingpagestodynamicallytunethesizeaccordingto
+time,itwillbelikelytobeevictedbecauseitsownerisinthe
+thepredictedworkloads.
+backgroundlistandthushaslowpriority.However,ifpage
+Aisusedfrequently,Awillremainsinthememory.Acclaim
+does not move the application’s pages when it is changed 5.2.1 FrameworkofLWP
+frombackgroundtoforegroundandviceversa.Acclaimonly
+LWPconsistsoftwoparts,alightweightpredictorandamod-
+checks page’s UID and moves a page when it needs to be
+erator.ItsframeworkisshowninFigure11.Thelightweight
+movedunderthedefaultevictionscheme(SeeFigure10).
+predictorisrunduringthepageallocationprocedure.Tore-
+WithFAE,there-launchtimeofbackgroundapplications
+ducememoryoverhead,thesampledallocationrequestsas
+canincreasebecausetheirpagesareoutofLRUlists.How-
+inputsarestoredinthelightweightpredictor.Theoutputsof
+ever,thispenaltyismuchsmallercomparedtothebaseline
+thelightweightpredictorarethepredictedreclaimsizeandthe
+scenariowherethesebackgroundapplicationsarekilledby
+trendofreclaimamount.Themoderatormodifiesthereclaim
+the Android low memory killer (LMK) [1, 28]. Moreover,
+sizeandtheamountofthebackgroundreclaimaccordingto
+thepenaltyofFAEcanbeminimizedbycombiningitwith
+thepredictedreclaimsizeandtheamounttrend.
+application prediction [8, 27, 31]. If the system predicts a
+backgroundapplicationwillbeusedsoon,FAEremovesthese
+applicationsfromthebackgroundlist,andthusdoesnotde-
+creasetheprioritiesofitspagesintheLRUlists.
+Additionally,FAEiscompatiblewithLMK.Forexample,
+FAEcanfurthercategorizebackgroundapplications.Back-
+groundapplicationsthatmaybeusedinthenearfuturecan
+Figure11:TheframeworkofLWPreclaimscheme.
+donatesomeoftheirmemoryspacewithAcclaimwhileback-
+groundapplicationsmaynotbeusedagaincanbekilledby
+5.2.2 LightweightPredictors(LWP)
+LMKwhenmemoryisgettingfull.
+We expectFAE to benefitimpromptu,shortinteractions Usingrecentinformationprocessedbyaslidingwindowto
+(checkingandreplyinginstantmessages,orswitchingamong predict the future workloads is commonly applied for pre-
+applicationswithinashorttimespan).FAErecognizesthem diction[24][8][25]. Thechallengeishowtoimplementa
+904 2020 USENIX Annual Technical Conference USENIX Association
+
+===== PAGE 10 =====
+lightweightpredictor.Recentinformation-basedprediction
+shouldmakesurethecorrectnessofstoredinformation.Page
+allocationproceduresupportsconcurrency,thusthesliding
+windowneedstoguaranteecorrectnessbyusinglockswhich
+willgreatlydegradetheperformance.Topredictallocation
+workloadsincludingsizeandfrequency,thesystemneedsto
+storethesizeandtimeofhistoricalallocationrequests.How-
+ever,storingallhistoricalinformationpreciselywilloccupy
+significantspaceandCPUtimeandthusdegradetheoverall
+performance.Toreducetheoverhead,theproposedpredictor
+isdesignedasalock-freeslidingwindow,anditonlystores
+limitedhistoricalinformation.
+Limitedhistoricalinformation.Toreducethestoredinfor-
+mation,theslidingwindowiscarefullydesignedintwoas-
+pects. First,the sliding window is designed based on time
+slotstoavoidstoringthetimeinformation.Second,theslid-
+ingwindowstoressampledhistoricalinformationtoreduce
+theamountofstoredinformation.Eachelementofthesliding
+windowistheallocationsizeofasamplingallocationrequest.
+Figure12:Predictedsumtrendofreclaimsizesinthelock-
+For example,when the sampling period equals 10 ms,the
+freeandsamplingslidingwindow.
+predictorwillpickoneofallocationrequeststhathappenedin
+this10msandadditsallocationsizetotheslidingwindow. Thereclaimamountofthebackgroundreclaimcouldbetuned
+Lock-free sliding window. We first analyze the impact of bymodifyingitsstopsetting(watermark ).Theoriginal
+high
+beinglock-freeontheslidingwindow.Whenthewindowis backgroundreclaimwillstopwhenthenumberoffreepages
+lock-free,thefollowingthreethingscouldhappen.(1)Data is above the watermark , which is a fixed value (a pro-
+high
+disorderanddatamissingcouldoccur;(2)Whenthepredictor portionofthetotalnumberofpages).Theoriginalreclaim
+samplesthehistoricalinformation,thepenaltyofbeinglock- size of each background reclaim is the maximum number
+free reduces as there are fewer access to locks; (3) Being ofrequestedpagesuntilthetimeofthereclaim.Toexploit
+lock-freedoesnotaffectthesystemconsistencyasweonly thetrade-offbetweenreclaimsizeandperformance,theLWP
+useittostorethememoryhistoricalinformation.Wefurther basemoderatortriestomakethebackgroundreclaimreclaims
+evaluatetheaccuracyofthelock-freeandsamplingpredictor. justenoughfreepagesjustintime.Themainideaistotune
+Letsampling=10ms,sliding=10ms,andwindow=1000ms, the reclaim size of each background reclaim according to
+togetthesumofthereclaimsizesinawindow.Tocompare thepredictedallocationsizeandtunethewatermark ac-
+high
+three cases,the log ofsum value is shown in Figure 12 as cordingtothepredictedsumtrend.“sumtrend”isdefinedas
+thesuminthesamplingandlock-freecasesaremuchsmaller sum/lastsum,where“sum”isthesumofthereclaimsizesin
+thanthatinthelock-freeonlycaseandoriginalcases.Three thecurrentwindowand“lastsum”isthesumofthereclaim
+usagebehaviors,launchingChrome,launchingYouTube,and sizesinthelastwindow.Forthereclaimsize,ifthetrendis
+launchingandusingfiveapplications,areevaluated.Thex- largerthanathresholdT ,thatmeanstheamountofallocation
+1
+axisistheindexoftheslidingwindow.They-axisisthelog inthefuturewillbemuchincreased.Thus,thereclaimsize
+ofthesumofthereclaimsizesinawindow.Weusevertical shouldbeincreased.
+red lines to show the trend changes in the first figure. The • Reclaimsize=P ∗predicted sizewhentrend≥T
+1 1
+results show that the lock-free and sampling case captures
+• Reclaimsize=P ∗predicted sizeinothercases,(P <
+2 2
+thesametrendastheoriginalcase. (ForusingtheACFYT
+P )
+1
+case,too much data makes the trend of the sampling case
+Forthereclaimamount,themoderatortunestheamountof
+notobvious.It’strendalsosameastheoriginalcase.)Thus,
+reclaimbasedonthedefaultvaluethatissetbythemobile
+thelightweightpredictorcanpredictthetrendoftheamount
+devicemanufacture.
+ofallocation requestsin thenextwindowcorrectly. In this
+• Reclaim amount = min(watermark ∗ (1 +
+way,predictioncanbeachievedwithalowoverheadinboth high
+trend),watermark +T )whentrend>1
+storageandlatency. high 2
+• Reclaim amount = max(watermark ∗ (1 −
+high
+trend),watermark )inothercases
+low
+5.2.3 LWP-BasedModerator
+Reclaimamountislimited.Ifitissmallerthanthedefault
+Themoderatorisusedtotunethereclaimsizeandamount watermark ,theperformancewillbedegradedbecausedi-
+low
+ofthebackgroundreclaimaccordingtothepredictedresults. rectreclaimwillbetriggeredoften.
+USENIX Association 2020 USENIX Annual Technical Conference 905
+
+===== PAGE 11 =====
+Table4:SummaryofparametersusedinLWP.
+Symbols Semantics Defaultvalues
+P1 AmplificationfactorofreclaimsizewhenI/Oisintensive. 4
+P2 AmplificationfactorofreclaimsizewhenI/Oissparse. 2
+T1 Defines“suddenchange”andthusdecidesthereclaimsize. 2
+T2 Athresholdtostopbackgroundreclaim. watermarkhigh−watermarklow
+6 Evaluation 16.3%–60.2%;itreducesdirectreclaimsofthewholeOSby
+from23.9%–70%.Intheexperiments,theproposedtwotech-
+ToevaluateAcclaim,wesetsamplingdurationto10ms,win- niquesplayvital,complementaryroles. FAEshowshigher
+dowdurationto100ms,slidingdurationto100msforsliding benefitsasthenumberofbackgroundapplicationsincreases,
+windowofLWP.Bothmemoryoverheadandthepredictac- asitseizesfreepagesfrombackgroundapplicationstorelieve
+curacyofLWParesensitivetothesethreeparameters. memory pressure. LPW’s benefit depends on the accuracy
+Moreover,wesettheparametersforLWP-basedmoderator of its prediction, based on which it dynamically tunes the
+inTable4.Reclaimsizeshouldbelargerthanthepredicted backgroundreclaims.Notably,incaseofsuddenchangesin
+allocationsizetoavoidmemoryonceheavyworkloadsare applicationworkloads,LPWmaysufferfromaccuracyloss
+arriving. However, according to the analysis in Section 4, andthusunderperforms.
+reclaimschemeshouldnotbeoveraggressiveonmobilede- Benefit to read/write performance. Reduction in page re-
+vices.Thus,wechoosesmallvalues(4and2)asamplification faultsanddirectreclaimscouldimprovereadandwriteperfor-
+factors(P 1 andP 2 )underdifferentworkloads. mance.Toquantifytheimpactonreadandwriteoperations,
+Furthermore, T 1 determines the sensitivity to the incre- weshowthereadandwriteperformancebyusingreadand
+mentinworkloads.WeconfigureAcclaimtobesensitiveto writemicrobenchmarks,4andtheresultsareshowninFig-
+changesinworkloadsandrespondsintime,thuswechoose ure14.Sincemostpageallocationrequestsizesonmobile
+arelativelysmallvalue(2).T 2 isthethresholdthatensures devicesareinthesizeof4KB[10],wewriteorread512MB
+that the reclaim amount is not too large. Like the default or1GBofdatainsizeof4KB.
+watermark high ,itisanempiricalvalue.WeevaluateAcclaim This may not be a typical write access pattern, it could
+onthreeaspects:impactonforegroundapplications,impact happeninsomecases.Forexample,wheninstallinggames
+onbackgroundapplications,andoverhead. andapplications,morethan1GBofanapkfilecouldbedown-
+loaded and written back to flash storage. Moreover,this is
+6.1 ImpactonForegroundApplications a stress test to show Acclaim’s benefit underintensive I/O
+requests.Thus,theseevaluationresultsshowtheperformance
+Reduction in page re-fault for foreground applications impactunderintensiveI/Orequests.
+anddirectreclaimofOS. Pagere-faultanddirectreclaim
+arecloselyrelatedtouserbehaviors.Tocomparethesolution 20000
+18000
+and baseline, we need to choose an application with little 16000
+14000 changeinuserbehaviors. Thus,asinglegame,AngryBird, 12000
+is usedas a foregroundapplication forfive minutes in this 10000
+8000
+evaluation.Thepagere-faultanddirectreclaimresultsunder 6000
+4000
+the kernelwiththe originalreclaim scheme andthe kernel 2000
+withoursolutionareshowninFigure13. 0
+10000 120
+tluafer
+egap
+dnuorgeroF
+)segap(
+1
+2
+3
+4 5
+6 7
+8 9
+0
+0
+0
+0
+0
+0 0
+0
+0
+0
+0
+0
+0
+0
+0 0
+0
+0
+0
+0
+0
+0
+0
+0 0
+0
+0 b F
+F
+LP
+A
+A
+a
+W
+E
+E
+se + l L in P e W tnuoc
+m
+ialcer
+tceriD
+10
+2
+4
+6
+8
+0
+0
+0
+0
+0 b F
+F
+LP
+A
+A
+a
+W
+E
+E
+se + l L in P e W
+0 0
+A 3B+A 8B+A 15B+A A 3B+A 8B+A 15B+A
+(a)Pagere-fault. (b)Directreclaim.
+Figure 13: The page re-faults in a foreground application
+(AngryBird)anddirectreclaimsinthewholeOS,showing
+thebenefitofeachsolutionisdifferentinvariousscenarios.
+TheresultsdemonstratetheefficacyofAcclaim.Forthe
+benchmark(AngryBird),Acclaimreducespagere-faultsby
+etirw etirw+3B etirw+8B etirw+51B daer daer+3B daer+8B daer+51B etirw etirw+3B etirw+8B etirw+51B daer daer+3B daer+8B daer+51B
+512MB write 512MB read 1GB write 1GB read
+)sm(
+ycnetaL
+Baseline Acclaim
+Figure14:Readandwriteperformance.
+TheresultsshowthatAcclaimimproveswriteperformance
+byupto49.3%(whenwriting1GBofdata).Thisisbecause
+pageallocation,whichAcclaimoptimizes,constitutesasignif-
+icantportionofthedelayinwritesbecauseofthewrite-back
+operationsofdirtypages.Thereadperformanceisonlyim-
+proved slightly as the latency of page allocation is only a
+smallpartofreadlatencyinthissetoftestcasesasnodirty
+pagesaregeneratedandwrittenbackduringreads.
+4https://github.com/MIoTLab/Accliam
+906 2020 USENIX Annual Technical Conference USENIX Association
+
+===== PAGE 12 =====
+4000
+3500
+3000
+2500
+2000
+1500
+1000
+500
+0
+A A+B3 A+B8 A+B51 A A+B3 A+B8 A+B51 A A+B3 A+B8 A+B51 A A+B3 A+B8 A+B51 A A+B3 A+B8 A+B51 A A+B3 A+B8 A+B51
+CandyCrush Twitter Facebook Firefox Chrome Angrybirds
+)sm(
+ycnetal
+hcnuaL
+pagecache.Thus,wemeasurethepossiblelossinuserexperi-
+enceasFPSinKFMARK,apopulargamingbenchmark.[12].
+Baseline Acclaim TheaverageFPSandthestandarddeviationofFPSoffore-
+groundapplicationsareshowninFigure16.Fortheaverage
+FPS,the largerthe value,the better. While the smallerthe
+value,thebetterforthestandarddeviationofFPS.Theresults
+in Figure 16 suggest no noticeable impact: the difference
+betweenthemeanvaluesofthebaselinesandAcclaimare
+smallerthantheirstandarddeviations.
+6.2 ImpactonBackgroundApplications
+Figure15:Thelaunchlatencyofforegroundapplications.
+BecauseAcclaimevictsmorepagesfrombackgroundappli-
+Benefittouserexperienceinapplicationlaunch.Toquan-
+cations,itcannegativetheseapplications’re-launchtime.We
+tifytheimpactonuserexperience,thelaunchtimeofvarious
+evaluatethere-launchtimeforthefirst-launchedbackground
+foregroundapplicationsareevaluated.Theevaluationresults
+applicationtoshowtheupperboundofthepenalty. Inthis
+are shown in Figure 15. The results show that the launch
+evaluation,weuseFacebookasthefirstlaunchedbackground
+latency improvement varies for different applications. The
+application is evaluated when it is launched forone orten
+benefitofAcclaimismorepronouncedwhenanapplicationis
+minutes,andtheresultsareshowninFigure17.
+launchedwithmultiplememory-hungryapplicationsinback-
+ground. For example, the launch latencies of CandyCrush
+andFacebookarereducedbyupto58.8%and28.8%,respec- Baseline Acclaim
+tively.Acclaimcanhavenegativeimpactwhenforeground
+andbackgroundapplicationssharecommonfiles.Forexam-
+ple, the launch latency of Chrome could be prolonged up
+to12.3%byAcclaimwhentherearemanybackgroundap-
+plications.ThismaybecauseAcclaimevictscommonfiles
+betweenbackgroundapplicationsandChrome[3].However,
+this penalty can be eliminated by combining with mlock-
+ingcommonfiles[3].Insummary,Acclaimoutperformsthe
+baselineinmosttestcases.Ofallthe24testcases,itreduces
+Figure17:Re-launchtimeofthefirst-launchedbackground
+latenciesinmostofthem(20,withmedianreductionof19.1%
+application(Facebook).
+andmaxreductionof58.8%)whileincurringadditionalla-
+tenciesin4(withmedianincreaseof3.1%andmaxincrease
+BasedonFigure17,weobservethatre-launchpenaltyonly
+of12.3%).
+occurswhenthereareafewbackgroundapplicationsafterten
+minutes.Inmostcases,thebenefitislargerthanthepenalty.
+Whentherearemanybackgroundapplications,Acclaimeffec-
+tivelyseizesfreepagesfrombackgroundapplications,which
+canbeusedtoaidbackgroundapplications’re-launchpro-
+cess.Moreover,Acclaimalsoreducesthenumberofdirect
+reclaims,benefitingallapplications.Whenthetimeduring
+whichtheapplicationisusedafteritislaunchedistooshort
+(oneminute),Acclaimmaynothaveenoughtimetomoveout
+oftheevaluatedbackgroundapplication’spages.Aftersystem
+starts,manyapplicationsarepartiallyruninthebackground
+eveniftheuserdoesnotusethem.Tothisend,theirpages
+Figure16:AverageFPSandthestandarddeviationofFPSof willbefirstlyevictedfromLRUlistsbyAcclaim.
+foregroundapplications. Additionally, notice that the penalty of Acclaim can be
+eliminatedbyusingitincombinationwithapplicationpre-
+Impact on FPS during active user interactions. Acclaim diction[8,27,31].Ifabackgroundapplicationispredicted
+reduces the launch latency by employing policies on how as the next used application,Acclaim removes it from the
+applicationusesthememorytocachefiles.Thispolicymight backgroundapplicationlistinFAE,andthusthepriorityof
+impactuserexperiencenegativelyafterapplicationlaunch,as its pages will not be degraded in LRU lists when it is in
+launchedapplicationswillhaveadifferentamountofdatain background.Thus,thepenaltywillbeeliminated.
+USENIX Association 2020 USENIX Annual Technical Conference 907
+
+===== PAGE 13 =====
+6.3 OverheadAnalysis lartothebinarybuddysystem.ShenandPeterson[36]pro-
+posedtheweightedbuddysystem.PageandHagins[30]pro-
+Additionalmemoryoverhead.FAEaddsauidtoPTE,in-
+posedthedualbuddysystem,animprovementtotheweighted
+curringaspaceoverheadofanintegerspace(4Bytes).Fora
+buddysystem,toreducetheamountoffragmentationtothat
+devicewith3GBofmemory,themaximummemoryoverhead
+of the binary buddy system. A buddy system designed for
+is3MB.Moreover,FAEneedstostoretheuidsofapplications
+disk-filelayoutwithhighstorageutilizationwasproposedby
+intheapplicationlist.Ifauserinstalls100applications,the
+Koch[18].Brodaletal.[5]improvedthememorymanage-
+totalmemorycostisonly0.4KB.
+mentforacceleratingallocationanddeallocation.Marottaet
+LWPneedstostorethesamplinghistoricalallocationsize
+al.[22]proposedanon-blockingbuddysystemforscalable
+(4Bytesperentry).Whenthesamplingdurationis10msand
+memoryallocation on multi-core machines. Yu etal. [21]
+thewindowis100ms,only10valuesneedtobestored.Even
+showthattheexistingreclaimschemeisnotworkingwellfor
+ifthere are 100 values in the window,the LWP only takes
+Androidmobiledevices.Consequently,thispaperproposesa
+up 400B storage overhead. In summary,the total memory
+newsmartreclaimschemeforAndroidmobiledevices.
+overheadisabout3MB(0.1%ofmemorycapacity).
+Mobiledevice-specificmemorymanagement.Duetomo-
+Performance overhead. FAE’s performance overhead can
+bileOSeshavepoorinsightintoapplicationmemoryusage,
+bebrokendownintothreeparts.First,aftersystemstarts,it
+thememoryallocationmaytakealonglatency,especiallyun-
+needstochecktheconfigurefiletogettheUIDsoftheappli-
+dermemorypressure.Marvin[28]implementsmostmemory
+cations.Itonlyhappenswhenthesystemstarts.Second,when
+managementsinthelanguageruntime,whichhasmoreinsight
+theuserswitchesapplications,thenewforegroundUIDneeds
+intoanapp’smemoryusage.Theytargetthesameproblemat
+tobedeliveredtoFAEfromtheframeworklayer.Third,FAE
+adifferentlayer.Bypredictingallocationworkloadsandwith
+needstocheckiftheUIDequalstooneofthebackgroundap-
+foregroundandbackgroundinformation,Acclaimimproves
+plicationsduringeachpageeviction.Onlyafewcomparisons
+memorymanagementefficiencyatthesystemlevel.
+areconducted,thustheperformanceoverheadisnegligible.
+The performance overhead of LWP includes two parts.
+8 Conclusion
+First, prediction has a small cost because of the lock-free
+slidingwindow.Second,reducingthereclaimsizecouldpro-
+Existing Linux memory reclaim scheme is designed for
+longthewakeuptimeofthebackgroundreclaim.However,
+serversandPCs.AndroidinheritsLinuxkernelandthusthe
+LWPdynamicallytunestheamountofbackgroundreclaim
+memory reclaim scheme is transplantedto mobile devices.
+according to the allocation workloads to reduce the CPU
+Theexperimentalresultsshowthatthesealgorithmsbecome
+timeconsumption.Insummary,theperformanceoverheadof
+lesseffectiveforthecharacteristicsofapplicationsrunningon
+Acclaimistrivial.
+Androidmobiledevicesduetotwomainreasons.First,back-
+groundapplicationshaslessimpactontheuserexperience
+7 RelatedWork thanforegroundapplications.However,theycontinuallycon-
+sumefreepagesthatincreasethefrequencyofpagere-fault
+Applicationlaunch.Existingstudiesoncontext-awareness anddirectreclaim.Second,thelarge-sizereclaimaggravates
+led to the development of application pre-loading algo- thisproblemonmobiledeviceswhichinvolvewithalmost
+rithms[8,27,31].Thesealgorithmsgreatlyreducetheappli- exclusivelysmallallocationrequests.Inthiswork,wepro-
+cationlaunchlatencybypreparingrequiredresourcesbefore pose Acclaim. Acclaim consists of the Foreground aware
+theyarerequested. eviction(FAE),whichisdesignedtorelocatefreepagesfrom
+Applicationforeground/backgroundbehaviors.Manymo- backgroundapplicationsforforegroundapplications,andthe
+bileapplicationsaredesignedtoruninbackgroundtoenable lightweightprediction-basedreclaimscheme(LWP),which
+a model of always-on connectivity and to provide fast re- isusedtodynamicallytunethesizeandamountoftheback-
+sponsetime.Thismeansthatonceinstalledandinitiatedby groundreclaimaccordingtothepredictedallocationwork-
+theuser,applicationscanregisterthemselveswiththeservices loads. Evaluation results show that Acclaim improves the
+providedbytheOSframeworkforbackgroundactivities,re- performanceingeneralwithatrivialoverhead.
+gardlessoftheuser’sactualusageoftheapp.Thisistrueof
+bothiOSandAndroidOS[4,7,26].
+Acknowledgment
+Memorymanagement.Manypreviousworkswerefocusing
+on the design of the buddy system for managing memory.
+We would like to thank the anonymous reviewers and our
+Burton[6]proposedageneralizedbuddysystem.Byusing
+shepherd Prof. Felix Xiaozhu Lin for their feedbacks and
+the Fibonacci numbers as blocksize,Knuth [17] proposed
+guidance.Thispaperwaspartiallysupportedbyagrantfrom
+theFibonaccibuddysystem.Moreover,thisideawascomple-
+theResearchGrantsCounciloftheHongKongSpecialAd-
+mentedbyHirschberg[15],andwasoptimizedbyHinds[14],
+ministrativeRegion,China(11204718)andNationalNatural
+Cranston and Thomas [11] to locate buddies in time simi-
+ScienceFoundationofChinaunderGrantNo.61772092.
+908 2020 USENIX Annual Technical Conference USENIX Association
+
+===== PAGE 14 =====
+References /common-google-pixel-3-xl-problems-and-how-to-fix-
+them/,2019.
+[1] Android open source project. low memory killer.
+[17] KNUTH,D. Dynamicstorageallocation. In:Theartof
+computerprogramming1,435–455.
+https://source.android.com/devices/tech/perf/lmkd,
+2017. [18] KOCH,P.D.L. Diskfileallocationbasedonthebuddy
+system. ACM Trans. Comput. Syst. 5,4 (Oct. 1987),
+[2] Linux kernel code. lru scheme in the kernel.
+352–370.
+https://www.kernel.org/,2019.
+[3] Android open source project. mlock commonly-used
+[19] LEE,C.,SIM,D.,HWANG,J.Y.,ANDCHO,S. F2fs:
+A new file system for flash storage. In Proceedings
+files. https://source.android.com/devices/tech/debug/
+of the 13th USENIX Conference on File and Storage
+jank_jitter,2020.
+Technologies(FAST)(2015),pp.273–286.
+[4] AMALFITANO,D.,AMATUCCI,N.,TRAMONTANA,P.,
+FASOLINO,A.,ANDMEMON,A. Ageneralframework
+[20] LEE,K.,ANDWON,Y. Smartlayersanddumbresult:
+Iocharacterizationofanandroid-basedsmartphone. In
+forcomparingautomatictestingtechniquesofandroid
+Proceedingsofthe10thACMInternationalConference
+mobileapps. JournalofSystemsandSoftware125(12
+onEmbeddedSoftware(EMSOFT)(2012),ACM,pp.23–
+2016).
+32.
+[5] BRODAL,G.S.,DEMAINE,E.D.,ANDMUNRO,J.I.
+Fastallocationanddeallocationwithanimprovedbuddy [21] LIANG, Y., LI, Q., AND XUE, C. J. Mismatched
+memorymanagementofandroidsmartphones. In11th
+system. ActaInformatica41,4(Mar2005),273–291.
+USENIXWorkshoponHotTopicsinStorageandFile
+[6] BURTON,W. Abuddysystemvariationfordiskstorage
+Systems(HotStorage19)(2019),USENIXAssociation.
+allocation. Commun.ACM19,7(July1976),416–417.
+[22] MAROTTA, R., IANNI, M., SCARSELLI, A., PELLE-
+[7] CHEN,X.,JINDAL,A.,DING,N.,HU,Y.C.,GUPTA,
+GRINI,A.,ANDQUAGLIA,F. Anon-blockingbuddy
+M.,ANDVANNITHAMBY,R. Smartphonebackground
+system for scalable memory allocation on multi-core
+activitiesinthewild:Origin,energydrain,andoptimiza-
+machines. In2018IEEEInternationalConferenceon
+tion. InMobiCom’15(2015).
+ClusterComputing(CLUSTER)(2018),pp.164–165.
+[8] CHU,D.,KANSAL,A.,ANDLIU,J.Fastapplaunching
+[23] MATHUR, A., CAO, M., BHATTACHARYA, S., AND
+formobiledevicesusingpredictiveusercontext.InACM
+DILGER, A. Thenewext4filesystem:currentstatus
+MobiSys(June2012),ACM.
+andfutureplans. InInProceedingsofLinuxSymposium
+[9] CORBET, J. Proactively reclaiming idle memory.
+(2007),pp.21–33.
+https://lwn.net/Articles/787611/,2019.
+[24] MEI,L.,HU,R.,CAO,H.,LIU,Y.,HAN,Z.,LI,F.,
+[10] COURVILLE,J.,ANDCHEN,F. Understandingstorage
+ANDLI,J. Realtimemobilebandwidthpredictionusing
+i/o behaviors of mobile applications. In 2016 32nd lstm neuralnetwork. In Passive andActive Measure-
+SymposiumonMassStorageSystemsandTechnologies
+ment(Cham,2019),D.ChoffnesandM.Barcellos,Eds.,
+(MSST)(May2016),pp.1–11.
+SpringerInternationalPublishing,pp.34–47.
+[11] CRANSTON, B., AND THOMAS, R. A simplified re- [25] MITTAL, G., YAGNIK, K. B., GARG, M., AND KR-
+combination scheme for the fibonacci buddy system.
+ISHNAN,N.C. Spotgarbage:smartphoneapptodetect
+Commun.ACM18,6(June1975),331–332.
+garbageusingdeeplearning. Proceedingsofthe2016
+[12] FVIEW. Fps test tool kfmark. https://kfmark.com/, ACMInternationalJointConferenceonPervasiveand
+2017. UbiquitousComputing(2016).
+[13] GAO,C.,SHI,L.,XUE,C. J.,JI,C.,YANG,J.,AND [26] MUCCINI, H., FRANCESCO, A., AND ESPOSITO, P.
+ZHANG,Y. Parallelallthetime:Planelevelparallelism Softwaretestingofmobileapplications:Challengesand
+exploration forhigh performance ssds. In 2019 35th futureresearchdirections. 20127thInternationalWork-
+SymposiumonMassStorageSystemsandTechnologies shoponAutomationofSoftwareTest,AST2012-Pro-
+(MSST)(May2019),pp.172–184. ceedings(062012).
+[14] HINDS,J.A. Analgorithmforlocatingadjacentstorage [27] NATARAJAN, N., SHIN, D., AND S. DHILLON, I.
+blocksinthebuddysystem. Commun.ACM18,4(Apr. Which app will you use next? collaborative filtering
+1975),221–222. withinteractionalcontext. pp.201–208.
+[15] HIRSCHBERG,D.S. Aclassofdynamicmemoryallo- [28] NIELLEBECK,ARVINDKRISHNAMURTHY,H.M.L.,
+cationalgorithms. Commun.ACM16,10(Oct.1973), AND ZHANG, I. Endthesenselesskilling:Improving
+615–618. memorymanagementformobileoperatingsystems. In
+[16] JANSEN, M. Common google Pixel3 problems,and USENIXAnnualTechnicalConference(USENIXATC
+howtofixthem. https://www.digitaltrends.com/mobile ’20)(2020),USENIXAssociation.
+USENIX Association 2020 USENIX Annual Technical Conference 909
+
+===== PAGE 15 =====
+[29] OH,G.,KIM,S.,LEE,S.-W.,ANDMOON,B. Sqlite [34] PYROPUSTECHNOLOGY. Memorytesttoolmemtester.
+optimizationwithphasechangememoryformobileap- http://pyropus.ca/software/memtester/,2017.
+plications. ProceedingsoftheVLDBEndowment8,12 [35] SCHOON, B. Google Pixel 3 kills background
+(2015),1454–1465. apps. https://9to5google.com/2018/10/22/pixel-3-
+[30] PAGE, AND HAGINS. Improving the performance of memory-management-issue-background-apps/,2018.
+buddysystems. IEEETransactionsonComputersC-35, [36] SHEN,K.K.,ANDPETERSON,J.L. Aweightedbuddy
+5(May1986),441–447. methodfordynamicstorageallocation. Commun.ACM
+[31] PARATE,A.,BÖHMER,M.,CHU,D.,GANESAN,D., 17,10(Oct.1974),558–562.
+ANDMARLIN,B.M. Practicalpredictionandprefetch [37] SHIMP208. Android debug bridge (adb) tool.
+forfasteraccesstoapplicationsonmobilephones. In https://androidmtk.com/download-minimal-adb-and-
+Proceedingsofthe2013ACMInternationalJointCon- fastboot-tool,2019.
+ferenceonPervasiveandUbiquitousComputing(2013),
+[38] SIMS,G. Howmuchramdoesyourphonereallyneed
+UbiComp’13,ACM,pp.275–284.
+in2019? https://www.androidauthority.com/how-much-
+[32] PARK,S.-Y.,JUNG,D.,KANG,J.-U.,KIM,J.-S.,AND ram-do-you-need-in-smartphone-2019-944920/,2019.
+LEE, J. CFLRU: A replacement algorithm for flash
+[39] SISOFTWARE. Memoryperfromance. https://www.
+memory. InProceedingsofthe2006InternationalCon-
+sisoftware.co.uk/author/cas-admin/page/5/,2017.
+ference on Compilers,Architecture and Synthesis for
+[40] YOO,Y.-S.,LEE,H.,RYU,Y.,ANDBAHN,H. Page
+EmbeddedSystems(2006),CASES’06,ACM,pp.234–
+replacementalgorithmsfornandflashmemorystorages.
+241.
+InProceedingsofthe2007InternationalConferenceon
+[33] PELEGRIN, W. Google Pixel 3 is unable
+ComputationalScienceandItsApplications-Volume
+to shuffle between a few apps at a time.
+PartI(Berlin,Heidelberg,2007),ICCSA’07,Springer-
+https://www.androidauthority.com/google-pixel-3-
+Verlag,pp.201–212.
+memory-issues-917255/,2018.
+910 2020 USENIX Annual Technical Conference USENIX Association

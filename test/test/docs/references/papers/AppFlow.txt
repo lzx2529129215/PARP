@@ -1,0 +1,1580 @@
+
+===== PAGE 1 =====
+AppFlow: Memory Scheduling for Cold Launch of
+Large Apps on Mobile and Vehicle Systems
+Xiaochen Li Sicong Liu∗ Bin Guo
+NorthwesternPolytechnical NorthwesternPolytechnical NorthwesternPolytechnical
+University University University
+xiaochenli@mail.nwpu.edu.cn scliu@nwpu.edu.cn guob@nwpu.edu.cn
+Yu Ouyang Fengmin Wu Yuan Xu
+NorthwestUniversity,China NorthwesternPolytechnical NorthwesternPolytechnical
+ouyangyu@stumail.nwu.edu.cn University University
+fenny@mail.nwpu.edu.cn npuyuan@mail.nwpu.edu.cn
+Zhiwen Yu
+HarbinEngineeringUniversity,
+NorthwesternPolytechnical
+University
+zhiwenyu@nwpu.edu.cn
+Abstract introduceAppFlow,aprediction-basedsystem-widesched-
+GB-scalelargeappslikeon-deviceLLMsandrichmediaedi- ulerthatintegratesaSelectiveFilePreloader,anAdaptive
+torsarebecomingthenext-generationtrend,buttheirheavy MemoryReclaimer,andaContext-AwareProcessKiller.Im-
+memoryandI/Odemands,especiallyduringmultitasking, plementedacrosstheAndroidframeworkandLinuxkernel
+causedevicestoreclaimorkillprocesses,turningwarmapps withoutappchanges,AppFlowcutsGB-scalecold-launchla-
+intocoldlaunches.Thechallengeliesnotinstoringthem, tencyby66.5%(e.g.,2s→690ms)andsustains95%oflaunches
+but in fast, accurate launching. For users, 1s is the usabil- within1sovera100-daytest,significantlyimprovingrespon-
+itycliff,yetourmeasurementsshow86.6%ofGB-scalecold sivenessandmultitaskingexperience.
+launchesexceedit.Also,AndroidVitalsflagsonly≥5sas
+slow,exposingalargesatisfactiongap.Existingoptimiza- CCSConcepts
+tions are designed in isolation and conflict. For example, •Human-centeredcomputing→Ubiquitousandmo-
+preloadingreducesI/Ostallsbutconsumesscarcememory bilecomputing;•Computersystemsorganization→
+andisundonebyreclamation,whilereclamationandkilling Embeddedsystems;Availability;Embeddedsoftware.
+freememorybutsacrificebackgroundsurvivability,leading
+torepeatedcoldrelaunches.Ourkeyinsightisthat,although Keywords
+multitaskingmakesruntimebehaviorcomplex,eachapp’s GB-scalelargeappcoldlaunch,mobilememoryscheduler
+fileaccesspatternremainspredictable.Thechallengelies
+inexploitingthispredictability,i.e.,preloadingwithoutex- ACMReferenceFormat:
+XiaochenLi,SicongLiu,BinGuo,YuOuyang,FengminWu,Yuan
+haustingmemory,reclaimingwithoutundoinggains,and
+Xu,andZhiwenYu.2026.AppFlow:MemorySchedulingforCold
+killingselectivelytopreservebackgroundsurvivability.We
+LaunchofLargeAppsonMobileandVehicleSystems.InThe32nd
+AnnualInternationalConferenceonMobileComputingandNetwork-
+∗Correspondingauthor:scliu@nwpu.edu.cn ing(MobiCom’26),October26–30,2026,Austin,TX,USA.ACM,New
+York,NY,USA,15pages.https://doi.org/10.1145/3795866.3796690
+1 Introduction
+ThisworkislicensedunderaCreativeCommonsAttribution4.0Interna- GB-scalelargeappshavebecomethenext-generationtrend
+tionalLicense.
+onmobiledevices,placinghighpressureonmemoryandI/O
+MobiCom’26,Austin,TX,USA
+resources.Today’spopularappssuchasLLM-poweredassis-
+©2026Copyrightheldbytheowner/author(s).
+tants[7],image-to-textgenerators[45],rich-mediaeditors
+ACMISBN979-8-4007-2505-0/2026/10
+https://doi.org/10.1145/3795866.3796690 likeCapCut[4],streamingplatformssuchasTikTok[42],and
+6202
+raM
+81
+]SO.sc[
+1v95271.3062:viXra
+
+===== PAGE 2 =====
+MobiCom’26,October26–30,2026,Austin,TX,USA XiaochenLi,SicongLiu,BinGuo,YuOuyang,FengminWu,YuanXu,andZhiwenYu
+3DmobilegameslikePUBGMobile[32],allshipwithGB- exhaustsmemoryandcausesreclamationorkilling,orload
+scalefootprints.Notably,eightofthetenmost-downloaded ondemand [6,16,33],whichsavesmemorybutoftenlags
+appsonGooglePlaynowexceed1GB[2,39].Despitelim- behindCPUexecution,turningfileI/Ointothebottleneck
+ited mobile resources, users typically keep multiple tasks andmakingGB-scalecoldlaunchesevenslower.Moreover,
+openatonce.Forexample,LucymayutilizeTikTokandRed- preloading competes with reclamation for I/O bandwidth
+Notefortripplanning,simultaneouslyleavinganon-device anditsextrafootprintsacrificesbackgroundsurvivability.
+LLM active in the background. This repetitive switching •Challenge#2: Itisintractabletopromptlyreclaimmem-
+leadstofrequentcoldlaunchesthatbreakheroperational oryforGB-scalecoldlauncheswithoutbreakingbackground
+flow.Compoundingtheissue,theLLM’sintensive,instanta- survivability orundoingpreloadinggains.Inpractice,cold
+neousmemoryfootprintscancausethesystemtoterminate launches stall allocations and even block preloading, yet
+backgroundapps,resultinginafragmentedandfrustrating existingsolutionssuchasAndroid’sLMK[1]orfollow-up
+multitaskingexperience.Inin-vehiclesystems,driverscold studies [24, 26, 29] explore to address this by reclaiming
+launchappslikeGoogleMapsfornavigationorpedestrian- pages[24,26]orkillingprocesses[1].However,bothofthese
+detectionappsfordriverassistance,whereeverysecondof approachesfallshortastheytreatfile-backedandanonymous
+delaydegradesexperienceandcanevenaffectdrivingsafety. pagesuniformly despiteasymmetriccosts[26].Also,they
+Thiscommonmultitaskingscenariostretchesmemoryand inherentlytradeoffnewappresponsivenessforbackground
+I/Ototheirlimits. survivability,leavingtheproblemunresolved.
+TolaunchaGB-scalelargeappundersuchpressure,theOS To address these, we present AppFlow, a system-wide
+mustreclaimmemorybyeitherswappingcachedpages[28, schedulerthatjointlymanagespreloading,pagereclaim,and
+29]orkillingbackgroundprocesses[1].Bothsacrificeback- processkillingoncommoditymobileandvehicledevices.
+groundappresponsiveness:previouslywarmappsdegrade •First.WeprofileGB-scalelaunchesandidentifyastruc-
+intocoldlaunches.WhenLucyswitchesbacktoInstagram, turalI/Oimbalance,i.e.,althoughsmallfilesareonly3%of
+thesystemmustreloadmorethan1GBofassetsfromstorage, totalsize,theydominatelaunchlatencybyinterruptinglarge-
+oftenstallingforover2s,twicethe1susabilitycliff [30]at filetransfersandfragmentingsequentialreads(seeSec.2.2.1).
+whichusersperceiveappsasfrozenorcrashed. Leveragingthis,wedesignaSelectiveFilePreloader thatde-
+Crucially,thisisnotacornercasebutadailyinevitability. cideswhen,what,andhowtopreload.Itpreloadssmallfiles
+Modernsmartphoneskeeponly20appsresident[14](even beforelaunchtominimizememoryuseandavoidearlystalls,
+feweronotherdeviceslikevehicles),whileusersinstall80+ whilestreaminglargefilesduringlaunchwithlargeblocks
+onaverage[3],making 3 launchescoldbydesign.Forexam- tomaximizethroughput.Ams-levelknapsacksolverfurther
+4
+ple,withjust15GB-scaleappsalwaysrunning(e.g.,TikTok, selectsper-appcutoffs(seeSec.4.1).
+RedNote,andPUBG)onamobiledevice,e.g.,GooglePixel • Second. We decouple file-backed and anonymous page
+8,86.6%ofrelaunchesexceedthe1susabilitycliff.Inshort, reclamation to exploit their asymmetric costs: file-backed
+usersinevitablyfacethese“frozen-appmoments”multiple pagescanbereclaimedquicklyinlargecontiguousblocks,
+timesaday(e.g.,upto7timesperdayinour100-daytests), whileanonymouspagesrequireslowwrite-back(Sec.2.2.2).
+breakingtheseamlesslaunchinmultitaskingexperience. Harnessingthis,AppFlowintegratesanAdaptiveMemory
+Despite extensive efforts, reducing cold launch latency Reclaimer thatprioritizesfile-backedpagesunderpressure,
+withoutsacrificingbackgroundsurvivabilityremainsfunda- switchestoanonymouspagesotherwise,andtagspreloaded
+mentallyhard.Priorworktacklesonlyonesideofthebot- datatopreventprematureeviction(seeSec.4.2).Itfurther
+tleneck:I/Opreloading[6,33]reducesstallsbutconsumes includesaContext-AwareAppKiller thatremovesonlythe
+scarceRAMandisquicklyundonebyaggressivereclama- long-runningbackgroundapps(seeSec.4.3).
+tion,whilememoryreclamation[24,29]freesspacebutoften WeimplementAppFlowspanningtheAndroidframework
+evictspreloadedpages,nullifyingI/Ogains.Thecorediffi- andLinuxkernellayers,requiringnomodificationstoappli-
+cultyisthatpreloadingandreclamation/killingaredesigned cationlayer.Weconductextensiveevaluationsonthreeplat-
+inisolationandinherentlyconflict.Toourknowledge,there forms,includingcommercialsmartphonesandin-vehiclesys-
+is no prior work that jointly optimizes them. To address tems,using60+popularappswithdiverseworkloads.Com-
+these,wefacetwochallenges: paredwithAndroidOSandthreestate-of-the-artbaselines,
+•Challenge#1: Decidingwhen,what,andhowtopreload AppFlowcutsGB-scalecold-launchlatencybyupto66.5%
+forbalancingcold-launchlatencywithmultitaskingisnon- (e.g.,2s→690ms).Unlikepriorsystemsthatsacrificeback-
+trivial.GB-scalelaunchesinvolvethousandsofsmall,scat- groundresponsiveness,AppFlowsustains95%oflaunches
+tered readsthatfragmentI/OandkeepI/Othroughputfar within1sovera100-daytest,evenunder1.29×higherconcur-
+belowpeak(seeSec.2.2.1).Prioreffortseitherpreloadall rency.Thesegainscomefrom2.35×higherI/Othroughput
+files[20,21,31],whichisprohibitiveforGB-scaleappsasit
+
+===== PAGE 3 =====
+AppFlow:MemorySchedulingforColdLaunchofLargeAppsonMobileandVehicleSystems MobiCom’26,October26–30,2026,Austin,TX,USA
+50
+0 2018 2019 2020 2021 2022 2023 2024 2025
+elacs-BG
+)%(
+tnecrep
+ppa
+10
+5
+)$( BG/ecirp
+MARD
+Top10 app memory usage (GB) DRAM price/GB ($) GB-scale Flash libUE4.so PUBG.apk … Flash libUE4.so PUBG.apk … apps DRAM DRAM libUE4.so PUBG.apk …
+Cold launch: 1679ms Hot launch: 66ms Warm launch: 650ms
+Create app Stop app Create app
+Figure1:Overthepastfewyears,theshareofGB-scale process process process
+appsintheGooglePlaytop10hasgrownmarkedly,
+Figure2:IllustrationofGB-scaleapplaunchprogress.
+alongsidearapidsurgeinDRAMprices.
+and67.9%lowermemorypressure(measuredbythenum-
+berofkerneldirectreclaims).Ourmaincontributionsare
+summarizedasfollows. 2000
+• Toourknowledge,thisisthefirsttojointlyoptimize 1000
+G a 95 c B h % - i s e l c a v a u e l n s e c s c h u o e b l s d - a s l e n a c d u o n r n e c d l h a l u a a n t n e c d n h c e m y s. u ( l t t h it e as u k sa s b u i r l v it i y va c b li i ff lit ) y f . o I r t LL M( Q w VL e M n2 ( . G 5 e ) m ma) G T o e o m g u le Earth T witter Ube B r ooki R ng ed Note TikTok Capcut Ti P nd h e o r toshop Sno w Roblox P U B G
+• WedesignAppFlow,asystem-wideschedulingframe-
+workthatleveragesthepredictableappaccesspatterns
+to unify selective file preloading, adaptive memory
+reclamation,andcontext-awareprocesskilling.
+• ExperimentsshowthatAppFlowsignificantlyreduces
+GB-scalecoldlaunchlatencyandimprovesbackground
+survivabilitywithhigherI/Othroughputandmoreef-
+ficientreclamation,comparedtostate-of-the-arts.
+2 BackgroundandMotivation
+2.1 PrimerofAppLaunchProcesses
+Fastapplaunchisessentialforuserexperience[23,36,38,
+40],especiallyforGB-scale,memory-hungryapps(e.g.,mo-
+bilegames,LLM-poweredapps)thatsuffersignificantcold
+launchlatencyfromhardwareI/Oandmemoryconstraints.
+Wenotethatpriorstudies[30]showthatapplaunchdelays
+over1sisausabilitycliff,leadinguserstosuspectnetwork
+orsystemfailures.Tosystematicallyanalyzeapplaunchbot-
+tlenecks,wefirstsummarizeitsfundamentalmechanisms,
+costs,andtheunderlyinghardwareandOSlimitations.
+2.1.1 TheTrendofGB-ScaleLargeMobileApps. Overthe
+pasttenyears,appsontheGooglePlayStorehavegrown
+markedly in size [39, 44, 46]. Eight of the top-10 popular
+appsexceed1GB[2,39],andabout30%ofthetop100apps
+areover1GB.TheseGB-scaleappsincludethreemaintypes.
+i) On-device AI apps, such as LLM-powered assistants [7]
+andimage-to-textgenerators[45],runAImodelslocallyfor
+privateandlow-latencyinference,drivingupRAMusage.ii)
+Richmediaapps,e.g.,videoeditorsCapCut[4]andstreaming
+platforms TikTok [42], embed high-resolution and multi-
+modalinputsthatpushmemoryfootprints.iii)Mobilegames,
+e.g.,graphicallyintensivetitleslikePUBGMobilethatload
+large3Dassets,tendtoincursubstantialmemoryfootprints.
+2.1.2 GB-scale Large App Cold-Launch Problems. Mobile
+appstypicallylaunchinthreemodes,i.e.,cold,warm,andhot
+)sm(emit
+hcnuaL
+Cold launch Warm launch Hot launch
+User-acceptable latency threshold
+39 41 74 30 164 52 55 103 50 31 150 90 81
+Figure 3: Illustration of launch latency across cold,
+warm,andhotmodesfor15popularGB-scaleapps.
+launch,andeachmodefeelsdifferenttotheuser.Asshown
+in Fig. 2, in a hot launch, the app is already in RAM with
+allitsdataready,soitlaunchesalmostinstantly.Awarm
+launch happens when the app process has been stopped
+butitscacheremains;itlaunchesmoreslowlythanahot
+launchbutstillfairlyquickly[6].Inacoldlaunch,nothing
+is in memory, so the system must load the APK file ( e.g.,
+PUBG.apk)andsharedlibraries(e.g.,libUE4,etc.)fromFlash
+into DRAM, making it the slowest [29]. We run tests on
+aPixel8smartphoneusing15GB-scaleappsacrossthree
+modesandfindthat33%coldlaunchesoftentakemorethan
+1s(seeFig.3).
+Twomainfactorsdrivethisdelay.First,coldlaunchissues
+dozensofI/OrequeststhatcontendforlimitedmobileDRAM
+bandwidth,slowingeachread.Second,mobileusersoften
+runmultipleGB-scaleapps(e.g.,videoplayersTikTok[42],
+or LLM-based assistants Google AI Edge Gallery [7]) un-
+tilRAMisfullorthebatteryrunsout.Toensurememory
+foranewapp,Android/Linuxeitherkillsbackgroundpro-
+cesses [1] or reclaims cached pages [11], turning potential
+hotlaunchesintowarmorcoldones.Thepersistentrisein
+DRAM prices [5, 15, 43] poses a significant constraint on
+memoryexpansion(seeFig.1),makingitdifficulttoincrease
+thenumberofappsthatcanbekeptintheactivestatefor
+hotlaunches.Existingstudy[14]showsmobiledevicescan
+keepabout20appsactive,yetthetypicaluserhasaround
+80appsinstalled[3],resultinginacoldlaunchfor75%apps,
+highlightinghowoftencoldlaunchesoccurandtheirimpact.
+Moreover,frequentmultitaskswitchmakescoldlaunch
+delaysmoreproblematic.Forexample,ifauserswitchfrom
+TikToktoLineandback,bothappsloadinstantlyonlyifthey
+remaininRAM,otherwiseeachloadisaslowcoldlaunch.
+
+===== PAGE 4 =====
+MobiCom’26,October26–30,2026,Austin,TX,USA XiaochenLi,SicongLiu,BinGuo,YuOuyang,FengminWu,YuanXu,andZhiwenYu
+4000
+1000
+0
+LL M( Q w V e L n M 2 ( . G 5) e m ma) G T o e o m g u le Earth T witter Ube B r ooki R ng ed Note TikTok Capcut Tin P d h e o r toshop Sno w Roblox P U B G
+)sm(emit
+hcnuaL
+w/o memory pressure w/ memory pressure
+1000
+User-acceptable latency threshold
+0
+Figure4:Impactofmemoryavailabilityonapplaunch
+time:comparingcold-launchlatencieswith10back- groundapps(<1GBfreememory)vs.nobackground
+apps(>2GBfree).
+Severalsystems[14,19,28]useaggressivememorymanage-
+mentstrategiestomaximizethenumberofhot-launchapps.
+However,typicalmobileDRAMholdsjustthreeGB-scale
+appsatonce.Keepingstateandcachesfortoomanylarge
+appsandbackgroundservicesexceedsthislimit.
+2.1.3 MobileMemoryManagement. Efficientmemoryman-
+agement is critical to securing memory space (i.e., DRAM)
+fornewlaunchesandreducingcold-startdelaysofGB-scale
+apps on constrained mobile devices. Mobile OS typically
+employ two memory management strategies: i) memory
+reclamation[26](discardingfile-backedpagesandswapping
+anonymouspagestofreeRAM)andii)processkilling [29]
+(terminatingbackgroundapps).
+Specifically, when free RAM drops below a threshold,
+thekernel’sreclamationprocess(kswapd)runsatwo-phase
+cleanup:i)discardfile-backedpages(code/resources)thatcan
+bereloadedlater[40].ii)swapanonymouspagestotheFlash
+beforefreeingRAM[18,25,27].However,writingtoflash
+is slow. Limited I/O bandwidth on mobile devices always
+causesreclamationtolagbehindallocation,especiallyunder
+highmemorypressure.Inourtest(Fig.4),launchinganew
+appwithtenappsinthebackgroundtakesupto2.2×longer
+thanwithnobackgroundapps,causing86.6%oflaunchesto
+exceed1s.Ifreclamationandswapcan’tfreeenoughRAM,
+duetolimitedswapspaceorheavymemorypressure,theOS
+willkillbackgroundprocessestoreclaimtheirentirework-
+ingsets.Whilethisensuresmemoryspaceforthenewapp,
+itforceskilledrunningappsintocoldlaunchesonnextuse,
+degradinguserexperience.Tofurtherreducecold-launch
+delays,filepreloading[31,33,47]isanorthogonaltechnique.
+Byloadingcriticalbinariesanddataintomemorybefore[31]
+orduringlaunch[33],thesystemcanoverlapI/Owithother
+tasks and shorten launch time. However, it is non-trivial
+to speed up memory reclaim for fast cold launches while
+keepingbackgroundappshot.
+2.2 Observation
+Thissubsectionpresentsourkeyobservation,revealingop-
+portunitiesforoptimization.
+rebmun
+eliF
+(a) Counts of lar1g18e9 vs. small files
+1002
+62 466 58 372 108 478 59100 2769 48130 118 304 135 476 103 570 108 390 134 147 133 482 74195 61148
+2000
+0
+LL M( V Q L W M E ( G N) E M MA) G Te o m og u leEart B h ooking Tin P d h e o r tosho R p ed Note Twitter Sno w TikTok Capcut Uber Roblox P UB G
+)BM( ezis
+eliF
+Large files Small files
+(b) Sizes of large vs. small files 2302 1807
+23 20 16919 1575 2241 315 1 358 18 445 19 472 18 524 7 549 23 572 20 682 19 22115 341 2
+Figure 5: During GB-scale large app launch, small-
+file(≤128KB)accessesoutnumberlarge-file(>128KB)
+accessesby4.7×yetoccupyjust2.2%oftheirmemory.
+1000
+500
+0 4 8 16 32 64 128 256 512 1024 2048 4096 8192 I/O block size(KB)
+)s/BM(htdiwdnaB
+Figure6:I/ObandwidthvarieswithI/Oblocksizes.
+1000
+0
+C1 C2 C3 C4 C5 C6 C7 C8 C9C10C11C12C13C14C15C16
+User workloads
+segap
+eliF
+)BM(
+ezis
+Figure7:Diversefilepagesizesacross16representa-
+tive user workloads [41]. For example, C1 is a meal
+bookingscenario,typicallyoccurringintheafternoon,
+whereuserslaunchbothsocialappslikeWhatsApp
+andmediaappslikeTikTok.
+2.2.1 IdleI/OandHot-setFile. Asmentionedabove,efficient
+preloadingcanhidecoldlaunchI/Olatency.Towardsit,we
+havethreefindings.First,weempiricallyfindthat97.2%of
+cold-launchI/Owaitsacross24appsinvolvepredictablestatic
+data(e.g.,UE4[34]engineassetsorLLMweights).Crucially,
+weobservethat79%ofDRAMI/Obandwidthremainsunused
+during app switches. This indicates the existence of idle
+windowsthatareidealforpreloading.Second,wealsoprofile
+fifteenGB-scaleappsovertenlauncheseach,theresultsshow
+that GB-scale apps actually depend on many small hot-set
+fileswhosetotalsizeissmall.Forexample,asshowninFig.5,
+1,002smallfilesareaccessedduringtheTikTok[42]launch,
+whichis7.47×thenumberoflargefiles.Whiletheyoccupy
+only23MBofmemory,whichisjust4%ofthememoryused
+bylargefiles.Third,scalingupI/Oblocksboostthroughput
+forbigfilesbutwastebandwidthonsmallones,whilescaling
+down blocks suit tiny files yet limit throughput and add
+latency.TuningI/Oblocksizeinastructuredmannercan
+boostI/Othroughputsignificantly(seeFig.6).
+
+===== PAGE 5 =====
+AppFlow:MemorySchedulingforColdLaunchofLargeAppsonMobileandVehicleSystems MobiCom’26,October26–30,2026,Austin,TX,USA
+750
+500
+250
+0
+tuphguorht
+O/I
+)s/BM(
+• I/Ocontention:Whenreclaiminganonymouspages,
+thereclamationincreasesI/Owritetrafficthatcom-
+6.4 × peteswithpreloadreads.
+• Page eviction: When reclaiming file-backed pages,
+the reclamation may evict preloaded pages, forcing
+Ample memory, no reclamation Low memory, active reclamation
+Ample memory, active reclamation Low memory, no reclamation appstore-readthemduringlaunch.
+(a)PreloadI/Othroughput. (b)I/Olatency.
+Toquantifytheirinterference,wefirst testI/Othrough-
+Figure 8: Analysis of preload-reclaim interference.
+put under four memory conditions: i) ample memory, no
+(a) memory reclamation reduces the throughput of
+reclamation;ii)amplememory,activereclamation;iii)low
+preloading;(b)reclaimingpreloadedfilesresultsina
+memory,activereclamation;andiv)lowmemory,noreclama-
+6.4×longerI/OlatencyduringGB-scaleapplaunch.
+tion(Fig.8a).I/Othroughputisworstincase(iv)because
+stalledallocationsleavethestorageunder-utilised.Evenwith
+ample memory, turning on reclamation (case ii) still cuts
+2.2.2 Page-varyingReclamationCost. Reclamationcostvaries
+throughputaswritetrafficfromanonymous-pagereclaim
+bypagetype.Anonymouspagesareexpensivetoreclaim,as
+competeswithpre-loadreads.Wenext measuretheextra
+theyrequireI/OwritestoFlash(e.g.,swap_writepage()),
+I/Olatencyafterpre-loadingtoquantifytheirinterferencein
+whilefile-backedpagesarecheaptoreclaim,astheycanbe
+termsofpageeviction,underbothample-andlow-memory
+droppedwithoutwrites.Existingreclamationstrategiesal-
+conditions(Fig.8b).Withlowmemory,launch-timeI/Ola-
+ternate evenly between them, but this interleaving forces
+tencyjumpsby6.4×,showingthatmanypreloadedpages
+thesystemtowaitforexpensivewritesbeforefreeingcheap
+areevictedduringreclaimandhadtobere-read.
+pages.Moreover,ouranalysisof16typicaluserworkloads[41]
+Observation:Withoutpropercoordination,memoryre-
+(seeFig.7)reclaimablefile-backedpagesoftenexceed1000
+claimandpre-loadingcannegateeachother’sbenefits.This
+MB,regardlessofnonlineargrowthinsocialappsorlinear
+observation suggests that predictable launch-time depen-
+growthinmediaapps.
+denciesarenecessarybutinsufficient.Preloadingmustbe
+Observation:Differentpagetypesrequiredistinctrecla-
+coordinatedwithreclamationtoreducecontentionandavoid
+mation strategies. Dropping file-backed pages first under
+immediateeviction,motivatingasystem-wideschedulerthat
+highmemorypressurefreesmemoryinstantly,avoidingI/O
+(i)exploitsidleI/Owindows,(ii)prioritizeshot-setfilesunder
+delays. Anonymous page writebacks can then be handled
+memorylimits,and(iii)reclaimswithoutnegatingpreload-
+afterpeakdemand,ensuringfastermemoryreclamation.
+inggains.
+2.2.3 TemporalKillingImpact. Whenmemoryreclamation
+alonecannotfreeenoughRAM,theOS’slow-memorykiller 3 Overview
+(LMK)mayterminatebackgroundprocessestosecuremem-
+3.1 ProblemFormulation
+oryspace.However,thisbluntapproachcausesproblems.
+Ourgoalistominimizethecold-launchlatencyforGB-scale
+First,killingappsthatusersmayre-openquicklydisrupts
+workflow.Existinguserbehaviorstudiesreportthat92.5%
+appswhileensuringrelaunchofbackgroundappssharing
+thesameI/Oandmemoryresourcescompleteswithin1𝑠 (a
+ofappsarere-accessedwithin30minutes[41],yetLMKstill
+kills62%ofthesehigh-probabilityapps,causingduplicate
+knownresponsivenessthreshold[30]),i.e.,every𝑇
+𝑖
+<1,to
+maintainasmoothuserexperience.Thecoldlaunchlatency
+I/Oandexpensivecoldrelaunches.Second,mobileuserstend
+𝑇𝑐𝑜𝑙𝑑 isdecomposedas:
+tofocusoncertainappcategoriesatdiversetime(e.g.,pro- 𝑖
+ductivitytoolsinthemorning,mediaappsintheevening).
+Observation:Integratingthetemporallocality intokill 𝑇𝑐𝑜𝑙𝑑 =𝑇𝐼/𝑂 +𝑇𝑐𝑝𝑢 +𝑇𝑎𝑙𝑙𝑜𝑐 (1)
+decisionscansignificantlycutunnecessarykills,savingI/O 𝑖 𝑖 𝑖 𝑖
+andreducinguserdiscomfort.
+where 𝑇𝐼/𝑂 represents the data load time from Flash to
+𝑖
+2.2.4 Preload–ReclaimInterference. Coldlaunchdelaysfor DRAM, the primary component of launch time for each
+GB-scale apps arise from two tightly coupled bottlenecks, app.𝑇𝑐𝑝𝑢 istheappinitializationtime,and𝑇𝑎𝑙𝑙𝑜𝑐 represents
+𝑖 𝑖
+i.e.,limitedI/Obandwidthslowscriticalfilereads,andlow thememoryallocationtime,whichdependsonthesystem’s
+free memory blocks both new allocations and preloading. available memory during app launch. Since𝑇𝑐𝑝𝑢 depends
+𝑖
+Speeding up cold launch means loading files and freeing oneachapp’sinternalinitializationlogic,whichwecannot
+RAMatthesametime,yetthesetwoactionsoftencompete modifyatthesystemlevel,thuswetargetthereductionof
+andcuteachother’sgains.Itmainlycomesfromtwoareas: the I/O and memory delays. On mobile devices, the total
+
+===== PAGE 6 =====
+MobiCom’26,October26–30,2026,Austin,TX,USA XiaochenLi,SicongLiu,BinGuo,YuOuyang,FengminWu,YuanXu,andZhiwenYu
+3.2 SolutionOverview
+Flash
+GB-scale app files
+Toaddressaboveintractableproblems,weproposeAppFlow,
+File-backed page Protect preloaded files
+reclaimer ①Selective Fine-Grained asystem-widememoryschedulingframeworktailoredfor
+DRAM File Preloader mobiledevices.AsshowninFig.9,AppFlowcomprisesthree
+Maximize reclaim efficiency
+② During-launch Before-launch tightly-coupledcomponentsoperatingatdifferentgranulari-
+Adaptive Memory Page-level
+Reclaimer tiesandoptimizationdimensions,i.e.,preloading,reclama-
+tion,andkilling,formingacomprehensivesolution.Inpar-
+Re-balance memory pages App-level Launched apps
+Anonymous page
+… ticular,theSelectiveFilePreloader (file-level)proactively
+reclaimer ③ utilizes available free memory and I/O to preload critical
+Context-Aware App Killer
+file pages, reducing cold-start latency by up to 55.2% (see
+Figure9:WorkflowofAppFlow. Sec.4.1).Whenfreememoryrunslow,theAdaptiveMem-
+ory Reclaimer (page-level) keeps preloader efficiency by
+reclaimingcleanpagesfrombackgroundappsataratetuned
+memoryusagecanbeexpressedas:
+toreal-timeI/Oload,whiletaggingandskippingthepages
+𝑀 =𝑀𝑠𝑦𝑠 +𝑀𝑎𝑣𝑎𝑙 + ∑︁ 𝑝 𝑖 + ∑︁ 𝑚 𝑗 (2) justfetchedtoavoidwastefulreloads(seeSec.4.2).Also,the
+proposedReclaimerispreloader-aware,whichdeliberately
+𝑖 𝑗∈J
+skipspagesthePreloaderhasjustloaded,preventingcostly
+where𝑀𝑠𝑦𝑠 issystemusage(e.g.,theUIrenderingengine),
+reloads.Whenproactivetrimmingstillfallsshort,AppFlow
+and𝑀𝑎𝑣𝑎𝑙 istheavailableRAMforallocation.𝑝 isthemem-
+𝑖 activatestheContext-AwareAppKiller(process-level),that
+orypreloadedforapp𝑖 tobelaunched.J isthebackground
+goes beyond Android’s LRU list. It targets long-running,
+apps,and𝑚 𝑗 isthememoryoccupiedbyeachapp𝑗 ∈ J.As- memory-bloatedappswhoserelaunchfootprintreturnsto
+sumeapp𝑖 mustread𝑀𝑓𝑖𝑙𝑒 bytesoffilesandallocate𝑀𝑠𝑢𝑚 baseline,avoidingrepeatkillsandcuttingcold-launchtime
+𝑖 𝑖
+bytesofRAMduringlaunch.Let𝑣𝐼/𝑂 betheI/Othroughput by29.8%inlong-termtests(seeSec.6.6).Together,theyen-
+and𝑣𝑟𝑒𝑐 thememory-reclamationthroughput,whichdepend ableAppFlowtomaintainfastlaunchofGB-scalelargeapps
+onI/Oblocksizeandavailablememory,respectively(refer evenundertightmemorypressureandhighconcurrency.As
+toSec.2.2).Thenthetwokeysub-latenciesbecome: wewillshowinSec.6,AppFlowreducescoldlaunchlatency
+byupto66.5%acrossthreecategoriesofGB-scalelargeapps
+𝑇𝐼/𝑂 = 𝑀 𝑖 𝑓𝑖𝑙𝑒 −𝑝 𝑖 (3) whileimprovingbackgroundconcurrencyby2.6×.Moreover,
+𝑖 𝑣𝐼/𝑂 AppFlowsustains95%oflauncheswithin1sovera100-day
+test,demonstratingthatasystem-widememoryscheduler
+𝑀𝑎𝑥{(𝑀𝑠𝑢𝑚−𝑀𝑎𝑣𝑎𝑙),0} thatjointlyorchestratespreloading,pagereclamation,and
+𝑇 𝑖 𝑎𝑙𝑙𝑜𝑐 = 𝑖 𝑣𝑟𝑒𝑐 (4) processkillingiscriticalformobileresponsiveness.
+Here,𝑝 ,𝑀𝑎𝑣𝑎𝑙,𝑣𝐼/𝑂,and𝑣𝑟𝑒𝑐 arethedesignvariableswecan
+𝑖 4 SystemDesign
+tunetoimprovelaunchperformance.Wedefinethefeasible
+designspaceF by: 4.1 SelectiveFilePreloader
+ModernGB-scaleappsonDRAM-constrainedmobiledevices
+F ={(𝑝 𝑖 ,𝑀𝑎𝑣𝑎𝑙,𝑣𝐼/𝑂,𝑣𝑟𝑒𝑐) | C1,C2} (5) frequentlystallonblockingI/Oduringcoldlaunches,such
+C1: 𝑀𝑠𝑦𝑠 +𝑀𝑎𝑣𝑎𝑙 + ∑︁ 𝑝 𝑖 + ∑︁ 𝑚 𝑗 ≤ 𝑀, (6) as CPU tasks wait for file reads from flash to DRAM. As
+mentionedinSec.2.2.1,preloadingcanfillthesegaps,but
+𝑖∈I 𝑗∈J
+to avoid excessive memory use, we must carefully decide
+C2: 𝑇 𝑖 cpu + 𝑇 𝑖(𝑝 𝑖 ,𝑀𝑎𝑣𝑎𝑙) ≤1𝑠, ∀𝑖 ∈ 𝑎𝑝𝑝𝑠𝑒𝑡J. (7) when(timing),what(whichfiles),andhow(scalingI/Oblock
+ThecombinedI/Oandallocationlatencyis: size)topreload.Bytuningthesethreedimensions,wecan
+overlapI/Owithidleperiods.
+𝑇 𝑖(𝑝 𝑖 ,𝑀𝑎𝑣𝑎𝑙) =
+𝑀
+𝑖
+𝑓
+𝑣
+𝑖𝑙𝑒 −𝑝
+𝑖 +
+𝑀𝑎𝑥{(𝑀
+𝑖
+𝑠𝑢
+𝑣
+𝑚−𝑀𝑎𝑣𝑎𝑙),0}
+(8) tob
+L
+a
+im
+lan
+it
+c
+a
+e
+t
+l
+i
+a
+o
+u
+n
+n
+s
+ch
+of
+sp
+E
+e
+x
+e
+i
+d
+st
+a
+i
+n
+n
+d
+g
+m
+M
+e
+e
+m
+t
+o
+h
+r
+o
+y
+d
+e
+s
+ffi
+.P
+c
+r
+ie
+io
+n
+r
+c
+e
+y
+ff
+.F
+o
+i
+r
+r
+t
+s
+s
+t,
+s
+p
+t
+r
+r
+e
+u
+l
+g
+o
+g
+ad
+le
+-
+𝐼/𝑂 𝑟𝑒𝑐
+ingbeforelaunchloadsallrequiredfilesinadvance[13,31,
+WiththetrendofGB-scaleappsonmemory-limiteddevices 47],eliminatingI/Odelaysbutincurringhighmemoryusage,
+(see Sec. 2.1.1),𝐶1 tightly bounds 𝑝 and 𝑀𝑎𝑣𝑎𝑙. Ensuring whichisoftenunacceptableonmobiledevices.Forexample,
+𝑖
+every running app in J meets the sub-1s launch bound as shown in Fig. 10a, preloading just three popular apps,
+underthesetightmemorylimits(𝐶2)makestheinteractive e.g.,PUBG(0.5GB),Genshin(0.43GB),andGemini(1.8GB),
+tuningof𝑀𝑎𝑣𝑎𝑙,𝑣𝐼/𝑂,and𝑣𝑟𝑒𝑐 extremelychallenging. requiresapproximately3GBofmemory,whilePixel8phone
+
+===== PAGE 7 =====
+AppFlow:MemorySchedulingforColdLaunchofLargeAppsonMobileandVehicleSystems MobiCom’26,October26–30,2026,Austin,TX,USA
+constrainedmemorybudget.Itpreloadsallsmallfiles(<𝑠 ,
+𝑖
+R Flash reading C Computation
+decidedbyeachapp𝑖)andfrequentlyaccessedhotsegments
+oflargefiles.Thesefilesaddminimalmemoryoverheadbut
+Large memory
+eliminatehigh-frequencyI/Ostalls.
+consumption C1 C2 C3 C4 Time
+Application •Duringlaunch,throughput-first.Oncetheappstarts,this
+App launch
+R1 R2 R3 Time
+stageaggressivelyloadslargefilesusinglargeblocksize(≥𝑠
+𝑖
+)
+Preloading tomaximizeI/Othroughputoflargefiles.However,over-
+(a)Before-launchpreloading lappingwithforegroundI/Oposesanewchallenge,i.e.,I/O
+contentionbetweenthepreloaderandtheappitself.Toad-
+C1 C2 C3 C4 Long launch time Time
+dressthis,werunthepreloaderasaseparatelow-priority,
+Application
+App launch
+separateprocess,ensuringthatitneverblocksordelaysfore-
+groundI/Orequests.
+R1 R2-1 R3 R2-2 Time
+Preloading
+Selectingtheoptimalapp-specificcut-offsize𝑠
+𝑖
+thatsepa-
+(b)During-launchpreloading
+ratessmall(<𝑠 )fromlargefilesisnecessaryyetchallenging.
+𝑖
+Alarge𝑠 raisesprelaunchmemoryuse,whileasmaller𝑠
+𝑖 𝑖
+C1 C2 C3 C4 Time leavestoomanysmallfilesunpreloaded,throttlingI/Odur-
+Application
+App launch inglaunch.Wepose𝑠 selectionasadiscreteoptimization:
+𝑖
+Preloading R1
+(c)
+R
+O
+3
+urselective
+R2
+filepreloader
+Time
+arg min𝑇 𝑖 𝐼/𝑂 =
+𝑀
+𝑖
+𝑓
+𝑣
+𝑖𝑙
+𝐼
+𝑒
+/𝑂
+−𝑝
+𝑖 , 𝑝 𝑖 =𝑃(𝑠 𝑖), 𝑣 𝑖 𝐼/𝑂 =𝑉(𝑠 𝑖)
+𝑖
+Figure10:Illustrationofdiversepreloadingmethods. 𝑠.𝑡. ∑︁ 𝑝
+𝑖
+≤𝑀
+𝑝
+𝑖
+typically allocates only less than 1GB for preloading [29].
+Second,preloadingduringlaunchconservesmemorybyload- where𝑃(𝑠 𝑖)isthesizeoffilesbelow𝑠 𝑖 (preloaded),and𝑉(𝑠 𝑖)
+istheachievedI/Obandwidthwhenstreamingtheremaining
+ing files on demand at runtime, but still suffers from I/O
+files.Both𝑃 and𝑉 increasewith𝑠 .SinceI/Oblocksizesare
+bottleneckswhenfileaccesslagsbehindCPUexecution.As 𝑖
+powersoftwo(i.e.,4KB,8KB,etc.),weprofile𝑃 and𝑉 only
+shown in Fig. 10b, the computation steps C3 and C4 are
+atthesediscretesizes.Wecasttheselectionasamultiple-
+significantlydelayedduetothelongI/OtimeofR2andR3.
+choiceknapsack:eachapppicksoneprecomputed𝑠 under
+These limitations call for a fine-grained approach that 𝑖
+thepreloadbudget𝑀 (setas100MB,seeinSec.6.5.1).The
+alignspreloadtimingwithfilecharacteristics.Actually,GB- 𝑝
+instanceissmall,solvedin<0.1ms(seeSec.6.5.3);wereop-
+scaleapps’launch-criticalfilesincludetwotypes:i)Smallbut
+frequentfiles(e.g.,<128KB)contributeminimalmemoryover-
+timize𝑠
+𝑖
+onlywhenanapp’slaunchprofilechanges(e.g.,a
+GB-scalelargeapplaunched),soruntimeoverheadisnegli-
+headbutcausefrequentrandomI/Oifnotpreloadedearly.ii)
+gibleandconfigurationsremainnearoptimal.
+LargeandI/Obandwidth-intensivefiles(e.g.,≥128KB),whose
+loadingtimedependsonI/Obandwidth.Preloadingthemim-
+4.2 AdaptiveMemoryReclaimer
+provesperformance,butconsumessignificantmemory.As
+discussedinSec.2.2.1,small,frequentfilesdominatelaunch
+Evenwithpreloadoptimization,insufficientmemoryavail-
+I/O (91%) in GB-scale apps, and their footprint is modest
+abilitycanstillblocklaunch,particularlywhenthesystem
+must reclaim memory before fulfilling new allocation re-
+(≈3%ofthetotal;seeFig.5).Moreover,wefindthattheI/O
+bandwidthoflargefileswithlargeblocksize(i.e.,≥128KB)
+quests.Toaddressthis,thismoduleshiftsfocustoreducing
+canbeupto22.8×fasterthanwithsmallblocksize.(Fig.6). theapplication’smemoryallocationtime𝑇𝑎𝑙𝑙𝑜𝑐 whileavoid-
+Basedonthese,toreducelaunchlatencywithoutexceed- ingthedegradationofpreloadingefficiencyundermobile
+ingmemorylimits,weintroduceatime-split,file-and-app- memoryconstraints.
+type-aware preloading strategy with two phases. The key
+AsdiscussedinSec.2.1.2,whenavailablememory𝑀𝑎𝑣𝑎𝑙
+ideaistopreloadI/Ofrequency-intensivefilesbeforelaunch issufficient,𝑇𝑎𝑙𝑙𝑜𝑐 isnegligible.When𝑀𝑎𝑣𝑎𝑙 islow,memory
+withsmallI/Oblocksize,toreducelatency-criticalblocking allocationrequestsduringlaunchmaybeblocked untilthe
+with minimal memory overhead, and preload the remain- systemreclaimsenoughmemory.Thus,𝑇𝑎𝑙𝑙𝑜𝑐 isprimarily
+ing large files during launch with large I/O block size, to
+determinedbythememoryreclamationspeed𝑣𝑟𝑒𝑐.Formally,
+maximizeI/Oefficiencyundertimeconstraints.Specifically, this can be approximated as𝑇𝑎𝑙𝑙𝑜𝑐 = 𝑀𝑎𝑥{(𝑀𝑠𝑢𝑚−𝑀𝑎𝑣𝑎𝑙),0}.
+𝑣𝑟𝑒𝑐
+AppFlowemploystwocomplementarystrategies: Here,𝑀𝑠𝑢𝑚istheapp’stotalmemorydemandduringlaunch.
+•Beforelaunch,frequency-first.Thisstagefocusesonloading Preliminary of Prior Arts. Android/Linux-based mo-
+asmanyfrequency-intensivesmallfilesaspossiblewithina bilesystems(e.g.,smartphones,wearables,robotics)relyon
+
+===== PAGE 8 =====
+MobiCom’26,October26–30,2026,Austin,TX,USA XiaochenLi,SicongLiu,BinGuo,YuOuyang,FengminWu,YuanXu,andZhiwenYu
+_alloc_pages_nodemask() with a simple counter polled
+DRAM
+F A … A 3 r S e t c a l n a d im ar e d r Flash p al e l r o i c o a d t i e c d al i l n y t (e h . e g. l , a e s v t e i r n y te 1 r 0 v 0 a m l. s),wecompute𝑛 alloc ,thepages
+Weclassifyaphaseasmemory-sensitiveif
+…
+F F F Efficiency-first Preload-aware
+mode page retention 𝑀𝑎𝑣𝑎𝑙 <𝑀𝐹 & 𝑛𝑎𝑙𝑙𝑜𝑐 > 𝑁𝑎𝑙𝑙𝑜𝑐
+A A … A 1 File-backed page 2 Anonymous page Here,𝑀𝐹 issystem-specificthreshold,𝑁allocissetas12800
+reclaimer reclaimer (Sec. 6.5.1), and 𝑀𝑎𝑣𝑎𝑙 is the current free RAM. Upon de-
+Rebalancing mode tectingamemory-intensivecondition,AppFlowswitchesto
+A Anonymous page F File-backed page theefficiency-firstmodethatreclaimsonlyfile-backedpages
+(①inFig.11).Whenthepressuresubsides,itshiftstoare-
+balancingmodethatrestoresthenormalfile-to-anonymous
+Figure11:Adaptivememorypagereclaimer.
+reclamationratio(②inFig.11).Finally,AppFlowfallsback
+tothestandardreclamationmethod(③inFig.11).Thisfully
+Table 1: Anonymous (Anon.) and file-backed (File.)
+automated,multi-phasecontrollerrunswithnegligibleover-
+memorysizes(MB)acrossdiverseGB-scalelargeapps.
+headandrequiresnoappchanges,makingitpracticalfor
+Types Apps Anon. File. Types Apps Anon. File. deployment.
+Photoshop 636 379 On-device Qwen2.5 307 1637
+Multi Snow 679 370 V/LLM Gemma 710 1925
+media R T e i d k N to o k te 7 6 7 1 8 6 4 4 0 3 3 4 Game R P o U b B lo G x 6 8 3 5 6 6 3 2 9 8 2 1 4.2.2 Preload-awarePageRetention. Reclaimingonlyfile-
+backedpagesduringlaunchcanevictpreloadeddatabefore
+the kernel’s background reclaimer thread kswapd, to free itisused.TokeepthosepagesinRAMuntiltheappactually
+memorywhen𝑀𝑎𝑣𝑎𝑙 islow,duringwhichtheapplaunchis usesthem,weintroduceapreload-awareretentionstrategy
+blocked.kswapdtargetstwomaintypesofmemorypages,i.e., thattreatsthetwopreloadphasesdifferently.Thekeyidea
+file-backedpages,whicharemappedfromFlash,andanony- isthateachpreloadphasehasdifferentretentionneeds.The
+mouspages,whicharedynamicallygeneratedduringruntime. files fetched before launch are few and need only a short
+kswapdevenlyalternatesbetweenthesetwotypes,attempt- residency;wekeepthemalivebylightlytouchingtheirpages
+ing to free roughly balanced file-backed and anonymous everytenseconds,ascanthattakesabout10msandadds
+pages. However, we observe that this is inefficient under just0.1%overhead.OncetheGB-scalelargeappbecomes
+highmemorypressureduetotheirfundamentalheterogene- active,thosepagesaredroppedfromfuturescansandcan
+ity andasymmetry inreclamationcost(seeSec.2.2.2).As be reclaimed. By contrast, the files fetched during launch
+shownin③oftheFig.11,evenlyalternatingreclaimblocks are far more numerous, making periodic scans too costly.
+fastfile-backedpagesreclamationbehindslowanonymous Instead,werunapreload-filecheckinthememory-reclaim
+pagehandling. pathshrink_page_list.Ifapagemapstoapreloadedfile,
+thereclaimerskipsitandmarksitactivetoavoidrescanning.
+4.2.1 Page-type-awareMemoryReclamation. Toboostmem-
+TheSelectiveFilePreloaderpublishesthepreloaded-filelist
+oryreclaimefficiency,wedecouplefile-backedandanony-
+via/procandclearsitaftertheapplaunchcompletes.As
+mouspagereclamation.Duringcoldlaunches,wefirstre-
+aresult,preloadedpagesremaininDRAMuntilthelaunch
+claimonlyfile-backedpages,freeingRAMinstantlywith-
+finishesandarenotevictedprematurely.
+out extra I/O or CPU overhead, to boost𝑣rec and cut allo-
+cationlatency𝑇alloc.However,weobservethatsincemost
+Algorithm1showsthepipeline.Every100ms,AppFlow
+reads𝑛 and𝑀𝑎𝑣𝑎𝑙,thenchoosesthefile-onlyorfullrecla-
+GB-scalelargeappsproduceonaverage1.92×moreanony- alloc
+mationpolicy(lines4).Duringthefile-backedpagesreclama-
+mous pages than file-backed pages (see Tab. 1), favoring
+tion,AppFlowavoidsreclaimingthepreloadedpages(lines5).
+filepagesaloneleadstoreclamationstarvation,whereonly
+Oncethefile-backedpagereclamationcompletes,theanony-
+anonymouspagesremainandallocationsstall.
+mouspagereclaimerisinvokedtorebalancethepagetype
+Wethereforeintroduceanadaptive,page-type-awarestrat-
+ratio(lines6).AswewilldemonstrateinSec.6.4.2,thisadap-
+egy that switches modes based on runtime pressure: i) in
+tiveschemeenablesbothrapidmemoryrecoveryandbal-
+high-pressurephases(e.g.,coldlaunch),AppFlowreclaims
+ancedlong-termreclamation,preventinganonymous-page
+only file-backed pages for maximum speed; ii) otherwise,
+buildupandavoidingstarvation,therebyreducinglaunch
+reclaimsanonymouspagestoclearcostlyregionsaheadof
+latencyandthefrequencyofcoldlaunches.
+futurebursts.Thekeychallengeisdetectinghigh-pressure
+windowswithoutappchangesordeveloperinput. 4.3 Context-AwareProcessKiller
+Weleveragekernel’spage-allocationrateasaneffective, Even with adaptive page reclamation (Sec. 4.2), systems
+low-overhead, and app-agnostic signal. By instrumenting sometimesresorttoprocesskillingwhenonlyanonymous
+
+===== PAGE 9 =====
+AppFlow:MemorySchedulingforColdLaunchofLargeAppsonMobileandVehicleSystems MobiCom’26,October26–30,2026,Austin,TX,USA
+Algorithm1AdaptiveMemoryReclaimer We introduce a novel, context-aware app killing mech-
+1: Init: thresholds 𝑀𝐹, 𝑁𝑎𝑙𝑙𝑜𝑐; every 100ms update anism that leverages two runtime patterns, i.e., long-term
+backgroundbloatandshort-termrecency.Specifically,we
+𝑛𝑎𝑙𝑙𝑜𝑐 ←AllocRate().
+find that long-running apps (e.g., social media apps) grow
+2: foreachallocationeventdo
+3: 𝑀𝑎𝑣𝑎𝑙 ←FreeMem()
+theirmemoryfootprintby30∼50%overbaselinestate(i.e.,
+theminimalmemoryusedimmediatelyafterlaunchbefore
+4: if𝑀𝑎𝑣𝑎𝑙 <𝑀𝐹 ∧ 𝑛𝑎𝑙𝑙𝑜𝑐 > 𝑁𝑎𝑙𝑙𝑜𝑐 then
+anyruntimecache)yetreverttobaselinestateonrelaunch
+5: ReclaimFilePages(excludeprotectedfiles)
+becausetheprocessclearsallaccumulatedcachesandtem-
+6: ReclaimAnonPages()
+poraryallocations.Byharnessingthisbloat-and-resetphe-
+7: endif
+nomenon,AppFlowprioritizesreclaimingfromtheseapps
+8: endfor
+to secure large and reliable memory. Conversely, recently
+used apps pair high reuse probability with elevated mem-
+oryfootprints.Ratherthankillthemfollowingheuristics,
+wedeferterminationtoavoidthelargememoryallocation
+n o ita p u cco
+yro m e M R
+W
+e
+o
+la
+r
+u
+s
+n
+e
+c
+c
+h
+ase
+Low
+C u
+m
+r
+e
+re
+m
+n A
+o
+t v
+r
+a
+y
+il
+k
+a
+il
+b
+l
+le memory n o ita p u cco
+yro m e M
+B
+R
+e
+e
+t
+l
+A
+a
+te v
+u
+r a
+n
+c i
+c
+la a
+h
+b s l e e memory
+Low mem
+C
+o
+u
+ry
+rr e
+ki
+n
+ll
+t
+𝑀
+b d
+co
+r e
+r
+o
+v
+r
+e
+s u
+e la r
+g
+u
+k
+y n
+h i
+c
+l t
+h w
+ls
+,
+b
+i e t
+y b
+n h
+y
+s o
+r
+u
+e
+u
+n l
+r t
+a e
+in
+u t
+p g
+n
+e
+fr
+n
+c
+e
+e h
+a a
+e .
+l c
+d
+i h z
+A
+i
+m
+n
+s
+k g i
+e s
+l
+m
+l
+h
+s m
+o
+t
+o
+a
+w r
+a b
+y
+x
+n
+le im
+m i
+a
+n
+i p
+e
+z
+t
+p
+F
+e
+r i
+s s
+i g
+.
+c
+l
+.
+F a
+Δ 1
+o s
+2 𝑀
+t r i
+b
+n r
+,
+e g
+= A
+c m e
+p
+n
+𝑀 p
+e t m
+F c
+a
+l u
+o
+o
+p
+rr
+r
+w
+p
+e
+y
+n
+s
+t
+,
+o
+r
+−
+e i
+r
+t -
+-
+Application running time Application running time
+switchestorecency-awaredeferment,overlappingpreloading
+withreclamationidlephases.AswewillshowinSec.6.4.2,
+(a)Killrecently-usedapp (b)Killlong-runningapp
+thistwo-phasestrategyreduces30%killevents,balancing
+Figure12:Illustrationofdiversekillingmethods. aggressivememoryrecoverywithseamlessinteraction.
+pages remain. Two common scenarios cause problematic 5 Implementation
+anonymous-pagedominance,forcinginefficientfallback. WeimplementAppFlowonAndroid,oneofthemostwidely
+•Burstallocations.Duringlarge,repeatedallocations,e.g., usedmobileoperatingsystems.TheAndroidOSistypically
+LLMinference,systemsdeferanonymouspagewrites(5× organized into three layers: the application layer, the An-
+slowerthandroppingfilepages),soanonymouspagesac- droidframework,andtheLinuxkernel.AppFlowisamemory
+cumulate. In our analysis of three categories app traces managementmechanismthatspansboththeAndroidframe-
+(Sec.4.2),peakanonymous-to-fileratiosare1.92:1,exhaust- workandtheLinuxkernel.Itmakesnomodificationstothe
+ingfilepagesandleavingonlyanonymouspagestoreclaim. application layer, allowing GB-scale apps to benefit from
+•Reclaimcapacitylimits.Anonymous-pagereclamationit- itsaccelerationwithoutanycodechanges.Specifically,the
+selfisbounded,eitherbyswappartitionsize(e.g.,2GBon SelectiveFilePreloader andtheContext-AwareProcessKiller
+Pixel8)orbyzRAMcapacity(25∼30%ofDRAM).Oncethis modify 1,672 lines of the Android Framework to control
+bound is reached, anonymous reclamation stalls, and the preloading and process killing, while the Adaptive Mem-
+system falls back to dropping file pages to run out of file ory Reclaimer modifies 1,107 lines of the Linux kernel to
+pagesandtriggerprocesskills. managememoryreclamation.SincetheAdaptiveMemory
+These scenarios are unavoidable as anonymous pages ReclaimermustavoidreclaimingfilespreloadedbytheSe-
+growwithappactivity.Acleverkillermustthereforefactor lectiveFilePreloader,thetwomodulescommunicateviathe
+inboththecurrentpage-typeimbalanceandreclaimcapac- /procfilesystem.
+itylimitstoavoidunnecessaryterminationsandpreserve
+bothperformanceandstability. 6 Experiment
+LimitationsoftheKernelLMK.Whenonlyanonymous
+6.1 ExperimentSetup
+pagesremain,Android/Linuxinvokesthelow-memorykiller
+(LMK),terminatingappsinbackground-to-foregroundorder. Platforms.WeprototypeAppFlowontwocommercialsmart-
+AsmentionedinSec.2.2.3,eachkillforcesafullcoldrelaunch, phones(GooglePixel7andPixel8)andanin-vehiclesystem
+oftenover2secondsforappslikePUBG[32],thenimmedi- poweredbythevehiclewithaRaspberryPi4Bhandlingcom-
+atelyrecreatesmemorypressure(e.g.,freeing1200MBbut putation,allrunningthelatestAndroid15operatingsystem
+needing1100MBonrelaunch,asshowninFig.12a),trapping (OS)[9].Toemulatememory-constrainedlow-endmobile
+thesysteminakill–restartloop.ThisisbecauseLMK’sblind devices,wescalethevisibleDRAMofbothsmartphonesto
+selectionignoresanapp’srestartcost,reaccesslikelihood, 6GBand8GBbymodifyingarm64_memblock_init().And
+andnetmemorybenefit. thevehicleDRAMis4GBbydefault.
+
+===== PAGE 10 =====
+MobiCom’26,October26–30,2026,Austin,TX,USA XiaochenLi,SicongLiu,BinGuo,YuOuyang,FengminWu,YuanXu,andZhiwenYu
+Tasksandworkloads.WeevaluateAppFlowusingboth
+a real-world 100-day trace and simulation workloads. The
+real-world100-daydataset,AppFlow-100D,spansweekdays,
+2500 Low workload
+weekends, and holidays, covering over 60 apps (e.g., Tik-
+Tok,WhatsApp,Camera)and10,000+multitaskswitches, 0
+thereby capturing representative user workloads. To col- 2500
+lect AppFlow-100D, we developed a headless Android ap-
+0
+plicationthatrunscontinuouslyinthebackground.Ituti-
+lizes UsageStatsManager to log app-usage sequences for
+100days,afterwhichitautomaticallyterminatesandpro-
+vides a user-facing dashboard allowing participants to re-
+viewtracesbeforeuploading.Strictprivacysafeguardsare
+enforced:dataislocallyminimized,retainingonlymetadata
+(packagenames,timestamps,memorystates)whilestrictly
+excluding all personally identifiable information and app
+content.Afterdatacollection,wereplayedtheappswitching
+tracesonthesamedevicetoevaluateAppFlow.Simulation
+workloadscompriseseveralGB-scaleapps(e.g.,Gemma,Tik-
+Tok,Roblox,etc.)and15low-memoryapps(e.g.,ChatGPT,
+Instagram, Zoom, etc.). In each test, one GB-scale app is
+selectedforcold-launchunderthreescenarios:(i)fivelow-
+memoryapps(lowworkload),(ii)fifteenlow-memoryapps
+(mediumworkload),and(iii)fifteenlow-memoryappsplus
+twoGB-scaleapps(highworkload).Toensureconsistencyin
+thebackgroundworkload,wefirstterminateallbackground
+appsandclearthefilecache.Next,weemployanautomated
+script to launch the load-generating apps and place them
+inthebackground.Oncetheloadisestablished,weexecute
+the am start -W command to launch the target app and
+measureitslaunchtime.
+Baselines.Toensureacomprehensiveandfairevaluation,
+weselectfourrepresentativebaselinesthatspanthedesign
+spaceofpreloadingandreclamationstrategies:
+• AndroidOS[9]performsmemoryreclamationwith-
+out any preloading. This provides the fundamental
+systembaseline.
+• Paralfetch[33]isastate-of-the-artpreloadingmethod
+thatimproveslaunchspeedbyschedulingI/Osequences
+tomergesmallblocksintolargerones.
+• Acclaim[26]isastate-of-the-artreclamationmethod
+thatacceleratesmemoryreclaimbyenlargingbatch
+sizes,therebyreducingboththefrequencyandlatency
+ofcoldlaunchesunderhigh-loadconditions.
+• Acclaim+ParalfetchcombinestheaboveSOTAtech-
+niques.Since,tothebestofourknowledge,nojoint
+optimizationexists,thisbaselinedemonstratesthelim-
+itationofnaïvecombination.
+Metrics.WeevaluateAppFlowwith(i)user-perceived met-
+rics,i.e.,cold-launchlatencyandfrequencyofGB-scaleapps,
+capturedviaadbcommand[8];and(ii)intermediatemetrics,
+)sm(
+emit
+hcnuaL
+Android OS Acclaim Paralfetch Acclaim+Paralfetch AppFlow
+Medium workload
+2500 High workload
+0
+Qw
+L
+e
+L
+n
+M 2.5
+G
+V
+e
+L
+m
+M ma TikTok RedNote Photoshop Snow PUBG Roblox Average
+(a)onPixel8-8GB:withlow,medium,highworkloads
+Low workload
+2000
+0
+2000
+0
+)sm(
+emit
+hcnuaL
+Medium workload
+High workload
+2000
+0
+Qw
+L
+e
+L
+n
+M 2.5
+G
+V
+e
+L
+m
+M ma TikTok RedNote Photoshop Snow PUBG Roblox Average
+(b)onPixel8-6GB:withlow,medium,highworkloads
+Figure13:GB-scalecoldlaunchlatencycomparison.
+i.e.,I/Othroughputandmemory-pressureevents(directre-
+claims,LMK),obtainedthroughlogcat[10]orkernelhooks,
+tocapturebothuserexperienceandsystembehavior.
+6.2 GB-scaleAppColdlaunchperformance
+Wetestthecold-launchtimeofeightGB-scaleapps(i.e.,LLM-
+basedQwen2.5-2.0GB,VLM-basedGemma-2.6GB,TikTok-
+1.1GB,Snow-1.1GB,PUBG-1.2GB,etc.)acrossfourbaselines
+andAppFlowontwoconfigurations(i.e.,GooglePixel8de-
+viceswith6GBand8GBlimits),eachunderthreeworkloads
+(i.e., low, medium, high workloads as in Sec. 6.1). Fig. 13
+shows the results. First, across all device configurations,
+workloads,andGB-scaleapps,AppFlowachievesonaverage
+33.7∼43.6%shortercold-launchlatencythannativeAndroid.
+Second,AppFlowoutperformsthestate-of-the-artpreload-
+ingbaselineParalfetchevenunderlowworkload,reducing
+cold-launchlatencyby29.2%onaveragethroughsustain-
+inghigherI/OthroughputforGB-scalelaunches,asshown
+inFig.13a.Third,AppFlowmaintainsitsadvantageunder
+memorypressure,reducinglaunchlatencybyupto57%on
+amemory-constrainedPixel8(6GB)withhighworkload
+(Fig.13b).Fourth,naivelycombiningpreloadingwithrecla-
+mationmayintroduceperformancedegradation;forexample,
+Paralfetch+AcclaimslowsGemma’slaunchby14.4%over
+
+===== PAGE 11 =====
+AppFlow:MemorySchedulingforColdLaunchofLargeAppsonMobileandVehicleSystems MobiCom’26,October26–30,2026,Austin,TX,USA
+10
+5
+0 Pixel 7 (6G) Pixel 7 (8G)
+hcnualer-dloC
+tnuoc
+Cold-relaunch count 800
+600
+400
+200
+0 0
+0 Pixel 7 (6G) Pixel 7 (8G)
+hcnualer
+.gvA
+)sm(
+emit
+Android OS Acclaim Paralfetch Acclaim+Paralfetch AppFlow
+Relaunch time
+Figure14:Multitaskingperformancewith17apps:cold-
+relaunchcount(left)andaveragerelaunchtime(right).
+600
+400 200
+00 600 1200 1850 Time (ms)
+)s/BM(
+tuphguorht
+O/I
+200
+100
+0
+Android OS Paralfetch AppFlow
+Game: PUBG 1500 Multimedia: Tiktok 2000 Local LM: Qwen 2.5
+1000
+1000 AppFlow: 972 ms AppFlow: 794 ms AppFlow: 717 ms 500 Paralfetch: 1432 ms Paralfetch: 946 ms Paralfetch: 1510 ms
+Android OS: 1689 ms Android OS: 1126 ms Android OS: 2027 ms 00 450 900 1350 00 700 1400 2150 Time (ms) Time (ms)
+Figure15:I/Othroughputandcold-launchlatencyof
+threeGB-scalelargeapps:PUBG(left),TikTok(mid-
+dle),Qwen2.5(right).
+Paralfetch alone and 4.8% over Acclaim alone under high
+workload.AppFlowmitigatesthisbyprotectingpreloaded
+pages,achieving56.7%fasterlaunchesthanthecombination.
+Summary.AppFlowdeliversthelowestcold-launchla-
+tencyacrossdiversedevices,workloads,andappscales,while
+avoidingpitfallsofnaivebaselinecombinations,showing
+robustnessandapplicabilityinreal-worldmobilesystems.
+6.3 MultitaskPerformance
+WetestmultitaskingperformancebycomparingAppFlow
+withAndroidOS[9],Paralfetch[33],andParalfetch+Acclaim
+onPixel7(6/8GB)underhighworkload(seeSec.6.1).Two
+GB-scaleapps(i.e.,TikTok-1.1GB,Snow-1.1GB)and15low-
+memory apps are each launched twice to simulate multi-
+taskingswitchingfromotherapps;inthesecondrun,we
+measure the average relaunch latency and cold relaunch
+counts.Fig.14showstheresults.First,AppFlowpreserves
+1.85×morebackgroundapps(i.e.,from7/17to13/17)and
+reducesaveragelaunchtimeby37.6%comparedtoAndroid
+OS by rapidly freeing memory at both app and page lev-
+els, thus avoiding frequent LMK events. Second, AppFlow
+prevents the degradation of preloading: on Pixel 7 (6GB),
+Paralfetchincurs20%morecoldrelaunchesthanAndroid
+OS, while AppFlow achieves 60% fewer. This comes from
+preloading-induced memory pressure that triggers exces-
+sive app killing. Third, AppFlow incurs 42.8% fewer cold
+launchesthanParalfetch+Acclaimbyprotectingpreloaded
+pageswhileensuringreclaimedpagesareunlikelytoreload.
+Summary.AppFlowsustainsmultitaskresponsiveness
+underhighmemorypressure,reducingrelaunchoverheads.
+RD
+fo
+rebmuN
+Number of DR
+100
+0
+KML
+fo
+rebmuN
+Number of LMK
+1000
+0
+)sm(
+emit
+hcnuaL
+Android OS Acclaim AppFlow
+Avg. launch time
+Figure16:Memory-pressuremitigationcomparison:
+numberofkernelDR(left),LMKevents(middle),and
+averagelaunchlatency(right).
+1000
+0
+)sm(emit
+hcnuaL
+GB-scale app launch time 10
+5
+0
+hcnualer-dloC
+tnuoc
+Android OS w/ AMR w/ SFP w/ CPK AppFlow
+Cold-relaunch count
+Figure17:Ablationstudy:GB-scalelargeapplaunch
+time(left)andcold-relaunchcount(right).
+6.4 UnderstandingPerformanceGains
+6.4.1 I/OThroughputDuringGB-ScaleAppLaunch. Wemea-
+sureI/OthroughputduringGB-scalecoldlaunchesunder
+alowworkloadonaGooglePixel8(8GB)toillustratehow
+theSelectiveFilePreloader acceleratescoldlaunches(Fig.15).
+AppFlowsurpassesAndroidOS[9]andParalfetch[33]via
+atwo-phase,file-andapp-awarepreloadingstrategy:small
+filesareprefetchedbeforelaunchtoreduceblocking,while
+large files are streamed during launch with larger blocks
+to maximize I/O efficiency. In Qwen2.5, it achieves 1.92×
+and1.58×higherthroughput,yielding29.4%∼64.6%faster
+launchesacrossdiverseGB-scalelargeapps.Summary.By
+aligningpreloadingwithfileaccesspatterns,AppFlowoffers
+aprincipledpathtoscalablecold-launchacceleration.
+6.4.2 MemoryReclaimEfficiencyDuringGB-ScaleAppLaunch.
+ToevaluatehowAppFlowmitigatesmemorypressure,we
+measure kernel direct reclaims (DR), low memory killed
+(LMK)events,andaveragelaunchlatencyduringGB-scale
+applaunchesunderhighworkloadonGooglePixel8(6GB)
+(Fig.16).AppFlowreducesthenumberofkernelDRby67.9%
+comparedtoAndroidOS,cuttingallocationstallsandlaunch
+delays,andlowersLMKeventsby33.7%,sustainingmore
+backgroundapps.ThesegainscomefromitsAdaptiveMem-
+oryReclaimer,whichacceleratesreclamationbyselectively
+targetingpages,anditsContext-AwareAppKiller,which
+prevents repetitive LMKs by prioritizing the termination
+ofmemory-intensiveapps.Summary.Bycombiningfine-
+grainedreclamationwithintelligentappkilling,AppFlow
+turnsmemorypressureintoefficientresourcemanagement,
+preservingresponsivenessunderGB-scaleworkloads.
+
+===== PAGE 12 =====
+MobiCom’26,October26–30,2026,Austin,TX,USA XiaochenLi,SicongLiu,BinGuo,YuOuyang,FengminWu,YuanXu,andZhiwenYu
+1200
+1000
+800
+50MB 100MB 200MB
+)sm(
+emit
+hcnuaL
+1500
+1250
+1000
+750 6400 12800 25600
+(a)Preloadingsize𝑀𝑝
+)sm(
+emit
+hcnuaL
+(b)Allocatethresh.𝑁𝑎𝑙𝑙𝑜𝑐
+Figure18:ImpactofhyperparameterinAppFlow.
+40
+30
+20
+10 0 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 Week
+hcnual
+dloc
+fo .oN
+1500
+1250
+1000
+750 500
+%5
+tsewolS
+)sm(
+emit
+hcnual
+Android 15
+Linux kernel 5.10 10000
+DRAM：4GB
+Raspberry Pi 4B
+5000
+0
+Contact Map SpotifyTikTokAudible
+(a)In-vehicletestbed
+Android (non-GB) Android (GB-scale) AppFlow (non-GB) AppFlow (GB-scale)
+Android latency
+AppFlow latency
+Figure19:AppFlow’sperformanceina100-daytest.
+6.5 Micro-benchmark
+6.5.1 AblationStudy. WeevaluateeachAppFlowmoduleon
+Pixel8(6GB)toquantifyitscontributiontocold-launchand
+multitaskingperformance(Fig.17).First,theAdaptiveMem-
+oryReclaimer(AMR)cutscoldlaunchesby60%compared
+toAndroidOS,thoughlaunchtimedropsonly14.7%.Second,
+the Selective File Preloader (SFP) reduces launch time by
+26.1%butincreasescoldlaunchesby30%duetoaddedmem-
+orypressure.Third,theContext-AwareProcessKiller(CPK)
+lowerscoldlaunchesby30%byterminatingmemory-heavy
+processestopreventrepeatedkillings.Fourth.Wheninte-
+grated,thesethreemodulescomplementeachother,deliver-
+inga40.8%reductionincold-launchlatencywhilesustaining
+1.85×morebackgroundapps.
+6.5.2 HyperparameterSettings. Weexploredifferenthyper-
+parametersettingsinAppFlow.First,before-launchsize𝑀𝑝.
+Thiscontrolstheamountofdatapreloadedbeforelaunch
+(Sec.4.1).AsshowninFig.18a,𝑀𝑝 = 100MBstrikesthe
+bestbalance.Smallervaluesfailtocovercriticalsmallfiles
+(6.5%slower),whilelargervalueswastememoryandincrease
+launch-timevariance.Second,allocatethreshold𝑁𝑎𝑙𝑙𝑜𝑐.Itde-
+termineswhentheAdaptiveMemoryReclaimeristriggered
+(Sec.4.2).AsshowninFig.18b, 𝑁𝑎𝑙𝑙𝑜𝑐 = 12800yieldsthe
+bestresult;largerthresholdsdelayreclamationandcauseup
+to19.9%slowdownduringlaunch.
+6.5.3 ExtraOverheadAnalysis. Despiteitsbenefits,AppFlow
+introduces two extra overheads, i.e., memory for before-
+launchpreloadingandCPUtimeforcomputingpreloadsizes.
+First,memory.Preloadingiscappedat100MB(<5%ofDRAM
+on4GBdevices),andthesepagesarereclaimedunderpres-
+sure,leavingperformanceunaffected.Second,CPUtimeoc-
+cursonlywhenGB-scalelargeappschangestate(minutes
+apart);evenwith60apps,computationfinishesin<0.1ms,
+whichisalsonegligibleinpractice.
+)sm(emit
+hcnuaL
+Android OS AppFlow
+(b)App-launchperformance
+Figure20:AppFlow’sin-vehicleperformance.
+Text to Text Image to TextText to Image 10
+0
+Text to Text Image to Text Text to Image
+(a)On-deviceAGI
+sppa dnuorgkcaB ppa IGA
+yb
+dellik
+Android OS AppFlow 9 9 8
+3
+1
+0
+(b)Concurrencyperformance
+Figure21:PerformanceunderAGIworkload.
+6.6 CaseStudy
+TovalidateAppFlow’spracticalityandgenerality,wecon-
+ductreal-worldcasestudiesacrossdiversescenarios.
+100-day multitasking. In everyday use, users habitu-
+ally switch between social, productivity, and media apps
+dozensoftimesaday,creatingsustainedmemorypressure
+whereeverysecondoflaunchlatencyaffectsperceivedre-
+sponsiveness. To capture this, we test a 100-day trace of
+60+realapplaunchesonaGooglePixel8(8G),comparing
+AndroidOSwithAppFlow.AsshowninFig.19,GB-scale
+appsaccountedfor75.7%ofallcoldlaunchesexperienced
+bytheuser.AppFlowcutsaveragecold-launchlatencyby
+23% and GB-scale cold-relaunch counts by 31.6%, demon-
+stratingAppFlow’sconsistent,long-termgainsineveryday
+multitasking.Forexample,inthethirdweek,whiletheuser
+isengaginginatravelplanningtask,theAndroidsystem
+triggerscoldlaunchesforTikTokandRednote,resultingin
+frequentstuttering.Incontrast,withAppFlow,theseapps
+arehot-launched,ensuringasmoothuserexperience.
+In-vehicle systems. When a driver starts the car, the
+infotainmentsystembootswiththeignition,clearingallpro-
+cessesandforcingappssuchasnavigationormusictolaunch
+cold,makingcoldlaunchlatencydirectlynoticeable.Wede-
+ployedthelatestAndroidOS15andAppFlowonBYDSeal
+vehicle,equippedwithaRaspberryPi4Bwith4GBmem-
+ory(smallerthantypicalsmartphones),powereddirectlyby
+thevehicleignition(Fig.20a),ensuringeverylaunchwas
+a true cold launch. We then measured the cold-launch la-
+tencyoffivepopularapps,e.g.,TikTok-1.1GB[42](Fig.20b).
+AppFlowreducescold-launchlatencyby53.4%(4.3s→2.0s),
+comparedtoAndroidOS.Thisdemonstratessignificantbene-
+fitsinresource-constrainedautomotiveenvironments,where
+
+===== PAGE 13 =====
+AppFlow:MemorySchedulingforColdLaunchofLargeAppsonMobileandVehicleSystems MobiCom’26,October26–30,2026,Austin,TX,USA
+systemresponsivenessdirectlyimpactstheuserexperience profiling.AppFlowadoptstheon-demandduring-launchap-
+uponeveryvehiclestartup. proach,butgoesfurther.Itselectivelypreloadsfilestoboost
+On-deviceAGI.On-deviceAGIapps[7,37]representan launchspeedwithmodestmemoryoverhead,whilecooper-
+emergingtrend,offeringoffline,privacy-preservinggenera- atingseamlesslywithmemory-reclamationmechanisms.
+tiveintelligencepoweredbyon-deviceV/LLMmodels.How-
+ever, their massive memory footprint severely challenges 7.3 MobileMemoryReclamation
+multitasking.Forexample,whenauserdraftsanInstagram MemoryreclamationistriggeredwhenfreeRAMfallsbelow
+postwithanimage-to-textappandthenswitchesback,Insta- athreshold[35].Priorworkfollowstwodirections:deciding
+gramisoftenkilled,disruptingtheworkflow.Toreproduce what/when to reclaim (e.g., Acclaim [26] prioritizes back-
+this scenario, we launched an AGI app followed by back- groundapps[12,48])andshorteninghowlongreclamation
+groundswitchingonaGooglePixel8(8G)(Fig.21).Android takes (e.g., SWAM compresses pages in DRAM instead of
+OSkilled8∼9backgroundappsafterAGIuse,whileAppFlow writingtoFlash[14,24,29]).Ourworkinsteadfocuseson
+limited this to 0∼3, boosting multitask survivability from preloading-awaretargetselection,asevictingthewrongpages
+66.6%to100%.Thisensuresthatafterusingtheon-device cannegatethebenefitsofpreloading.
+AGIservice,userscanquicklyswitchtootherappswithout
+waitingthroughalongcoldlaunch. 8 Conclusion
+Summary.Acrosslong-term(100-day)dailyuse,ignition-
+Toaddresstherisingcold-launchlatencyofGB-scalelarge
+driven in-vehicle automotive systems, and emerging on-
+mobileappsunderconstrainedmemoryandI/O,AppFlow
+deviceAGIworkloads,AppFlowconsistentlyreduceslaunch
+aims to guarantee that both foreground and background
+latencyandpreventscoldrelaunches,demonstratingrobust-
+launchescompletewithin1s.Itachievesthisthroughthree
+nessacrossdiversemobileenvironmentsanditspotentialas
+coordinatedmodules:aSelectiveFilePreloaderforlatency-
+afoundationfornext-generationmobileintelligence.
+criticalfiles,anAdaptiveMemoryReclaimerthatprotects
+preloadeddata,andaContext-AwareAppKiller.Together,
+7 RelatedWork thesemodulesreducestalls,reclaimmemoryefficiently,and
+7.1 MobileAppLaunchOptimization sustainmultitasking.EvaluationsshowAppFlowcutscold
+launchlatencysignificantlywhilekeepingrelauncheswithin
+Applaunchtimeisakeyuser-experiencemetric[13,23,30].
+1sevenunderheavyworkloads.Across100-daydailytraces,
+Prior work tackles it by either caching more apps for hot
+launch [16, 28, 31, 47] (via swap space [19, 48], data com-
+in-vehiclesystems,andemergingon-deviceAGI,AppFlow
+consistentlyreduceslatencyandpreventscoldrelaunches,
+pression [22, 28]), or speeding up cold launch [24, 26] (via
+showingrobustnessindiversereal-worldscenarios.While
+file preloading [6, 33, 47] and faster reclamation [24, 26]).
+YetwithGB-scaleworkingsets[39],cachingfailstocover AppFlow’s gains are limited for small, low-I/O apps (e.g.,
+Calendar), it introduces no regression. In the future, on-
+most apps, making cold launches unavoidable [14], while
+deviceapps(notablylocalAIagents)willcontinuetogrow
+cold-launchacceleratorswasteresourcesbycompetingfor
+in size and I/O footprints, while DRAM capacity remains
+scarceI/Oandmemory[6,40].AppFlowisthefirsttoaccel-
+erateGB-scalecoldlauncheswhilepreservingbackground
+constrainedbyrisingDRAMprices;inthisregime,AppFlow
+iswellpositionedtoaddresstheincreasinglydominantI/O-
+survivability, by tightly coupling preloading, reclamation,
+latencybottleneck.Infuturework,wewillincorporateuser-
+andappkillingmechanisms.
+behaviorpredictiontoshiftfromapp-wisetoactivity-wise
+preloadingandreclamation,furtheracceleratinglaunches.
+7.2 PreloadingonMobileDevices
+Preloadingfallsintotwotypes,i.e.,before-launch[20,21,31]
+9 Acknowledgement
+andduring-launchpreloading[6,16,33]basedonthetiming
+ThisworkwaspartiallysupportedbytheNationalKeyR&D
+ofthepreload.Before-launchschemespredictthenextappa
+ProgramofChina(No.2024YFB4505502),theNationalSci-
+userwillopenandstageitsworkingsetinRAM[20,21,31].
+enceFundforDistinguishedYoungScholars(62025205)and
+Forinstance,MAPLE[17]promptsanLLMwithusercontext
+theNationalNaturalScienceFoundationofChina(62522215,
+tomakethatguess,yetits52%hitratemeanseverymiss
+62532009,62472354)
+wasteshundredsofmegabytesandleavescold-startlatency
+untouched,anunacceptabletrade-offforGB-scalelargeapps.
+During-launchschemesskippredictionaltogether.Oncethe
+usertapsanicon,theystreamtheapp’sneededpagesover
+idleI/Obandwidth[6,16,33].Identifyingthosepagesisreli-
+able,suchasParalfetch[33]covers97.2%ofthemviaoffline
+
+===== PAGE 14 =====
+MobiCom’26,October26–30,2026,Austin,TX,USA XiaochenLi,SicongLiu,BinGuo,YuOuyang,FengminWu,YuanXu,andZhiwenYu
+References mobileoperatingsystems.In2020USENIXAnnualTechnicalConference
+[1] AndroidOpenSourceProject.2025. Lowmemorykillerdaemon. (USENIXATC20).873–887.
+https://source.android.com/docs/core/perf/lmkd Accessed:2025-07- [20] JoohyunLee,KyunghanLee,EuijinJeong,JaeminJo,andNessB
+25. Shroff.2016.Context-awareapplicationschedulinginmobilesystems:
+[2] AppMagic.2025.LiveStoreRankings-AppMagic.https://appmagic. Whatwillusersdoandnotdonext?.InProceedingsofthe2016ACM
+rocks/top-charts/live-store-rankings. Accessed:2025-07-27. InternationalJointConferenceonPervasiveandUbiquitousComputing.
+[3] BuildFire.2021. MobileAppDownloadStatistics&UsageStatistics 1235–1246.
+(2025). https://buildfire.com/app-statistics/Accessed:2025-06-29. [21] JoohyunLee,KyunghanLee,EuijinJeong,JaeminJo,andNessB
+[4] CapCut.2025. CapCutVideoEditor. https://www.capcut.com/. Ac- Shroff.2017. CAS:Context-awarebackgroundapplicationschedul-
+cessed:2025-07-29. ingininteractivemobilesystems. IEEEJournalonSelectedAreasin
+[5] JamesCarbone.2022. DRAMpriceincreaseswillease. Electronics Communications35,5(2017),1013–1029.
+Sourcing. https://electronics-sourcing.com/2022/05/12/dram-price- [22] ChanglongLi,ZongweiZhu,ChaoWang,FangmingLiu,FeiXu,Edwin
+increases-will-easeAccessed:2025-07-27. H-MSha,andXuehaiZhou.2025. Archer:AdaptiveMemoryCom-
+[6] ShaleenGarg,JianZhang,RekhaPitchumani,ManishParashar,Bing pressionwith{Page-Association-Rule}Awarenessfor{High-Speed}
+Xie,andSudarsunKannan.2024. Crossprefetch:Acceleratingi/o ResponseofMobileDevices.In23rdUSENIXConferenceonFileand
+prefetchingformodernstorage.InProceedingsofthe29thACMInterna- StorageTechnologies(FAST25).497–511.
+[23] TongLi,TongXia,HuandongWang,ZhenTu,SasuTarkoma,Zhu
+tionalConferenceonArchitecturalSupportforProgrammingLanguages
+andOperatingSystems,Volume1.102–116. Han,andPanHui.2022. Smartphoneappusageanalysis:datasets,
+[7] GoogleAIEdge.2025.GoogleAIEdgeGallery:Agallerythatshow- methods,andapplications.IEEECommunicationsSurveys&Tutorials
+caseson-deviceML/GenAIusecases. https://github.com/google-ai- 24,2(2022),937–966.
+edge/galleryAccessed:2025-07-25. [24] WentongLi,Li-PinChang,YuMao,andLiangShi.2025. {PMR}:
+[8] GoogleAndroidDevelopers.2025.AndroidDebugBridge(adb).https: FastApplicationResponseviaParallelMemoryReclaimonMobile
+//developer.android.com/tools/adb. Accessed:2025-08-01. Devices.In2025USENIXAnnualTechnicalConference(USENIXATC
+[9] GoogleAndroidDevelopers.2025.Android15—AbouttheAndroid 25).1569–1584.
+platformversion15.https://developer.android.com/about/versions/15. [25] WentongLi,DingcuiYu,YunpengSong,LongfeiLuo,andLiangShi.
+Accessed:2025-08-01. 2024.Elasticzram:Revisitingzramforswappingonmobiledevices.In
+[10] GoogleAndroidDevelopers.2025.Logcat|AndroidDevelopers.https: Proceedingsofthe61stACM/IEEEDesignAutomationConference.1–6.
+//developer.android.com/tools/logcat. Accessed:2025-08-01. [26] YuLiang,JinhengLi,RachataAusavarungnirun,RiweiPan,LiangShi,
+[11] MelGorman.2004.UnderstandingtheLinuxvirtualmemorymanager. Tei-WeiKuo,andChunJasonXue.2020.Acclaim:Adaptivememory
+Vol.352.PrenticeHallUpperSaddleRiver. reclaimtoimproveuserexperienceinandroidsystems.In2020USENIX
+[12] WeichaoGuo,KangChen,HuanFeng,YongweiWu,RuiZhang,and AnnualTechnicalConference(USENIXATC20).897–910.
+WeiminZheng.2015.𝑚𝑎𝑟𝑠:Mobileapplicationrelaunchingspeed-up [27] YuLiang,RiweiPan,TianyuRen,YufeiCui,RachataAusavarungnirun,
+throughflash-awarepageswapping.IEEETrans.Comput.65,3(2015), XianzhangChen,ChanglongLi,Tei-WeiKuo,andChunJasonXue.
+916–928. 2022.{CacheSifter}:Siftingcachefilesforboostedmobileperformance
+[13] MaxHort,MariaKechagia,FedericaSarro,andMarkHarman.2021. andlifetime.In20thUSENIXConferenceonFileandStorageTechnologies
+Asurveyofperformanceoptimizationformobileapplications.IEEE (FAST22).445–459.
+TransactionsonSoftwareEngineering48,8(2021),2879–2904. [28] Yu Liang, Aofeng Shen, Chun Jason Xue, Riwei Pan, Haiyu Mao,
+[14] Jiacheng Huang, Yunmo Zhang, Junqiao Qiu, Yu Liang, Rachata NikaMansouriGhiasi,QingcaiJiang,RakeshNadig,LeiLi,Rachata
+Ausavarungnirun,QinganLi,andChunJasonXue.2024.MoreApps, Ausavarungnirun,etal.2025. Ariadne:Ahotness-awareandsize-
+FasterHot-LaunchonMobileDevicesviaFore/Background-aware adaptivecompressedswaptechniqueforfastapplicationrelaunch
+GC-SwapCo-design.InProceedingsofthe29thACMInternational andreducedcpuusageonmobiledevices.In2025IEEEInternational
+ConferenceonArchitecturalSupportforProgrammingLanguagesand
+SymposiumonHighPerformanceComputerArchitecture(HPCA).IEEE,
+OperatingSystems,Volume3.654–670. 1588–1602.
+[15] FranciscoJeronimo.2025. GlobalMemoryShortageCrisis:Market [29] GeunsikLim,DonghyunKang,MyungJooHam,andYoungIkEom.
+AnalysisandthePotentialImpactontheSmartphoneandPCMarkets 2023. Swam:Revisitingswapandoomkforimprovingapplication
+in2026.https://www.idc.com/resource-center/blog/global-memory- responsivenessonmobiledevices.InProceedingsofthe29thAnnual
+shortage-crisis-market-analysis-and-the-potential-impact-on-the- InternationalConferenceonMobileComputingandNetworking.1–15.
+smartphone-and-pc-markets-in-2026/. IDC Blog (Markets and [30] JakobNielsen.1994.Usabilityengineering.MorganKaufmann.
+Trends),published2025-12-18,accessed2026-01-03. [31] AbhinavParate,MatthiasBöhmer,DavidChu,DeepakGanesan,and
+[16] Yongsoo Joo, Junhee Ryu, Sangsoo Park, and Kang G Shin. 2011. BenjaminMMarlin.2013.Practicalpredictionandprefetchforfaster
+{FAST}:Quickapplicationlaunchon {Solid-State} drives.In9th accesstoapplicationsonmobilephones.InProceedingsofthe2013ACM
+USENIXConferenceonFileandStorageTechnologies(FAST11). internationaljointconferenceonPervasiveandubiquitouscomputing.
+[17] YonchanokKhaokaew,HaoXue,andFloraDSalim.2024. Maple: 275–284.
+Mobileapppredictionleveraginglargelanguagemodelembeddings. [32] PUBGCorporation.[n.d.]. PUBGMobileOfficialWebsite. https:
+//www.pubgmobile.com/en-US/home.shtml. Accessed:2025-08-05.
+ProceedingsoftheACMonInteractive,Mobile,WearableandUbiquitous
+Technologies8,1(2024),1–25. [33] JunheeRyu,DongeunLee,KangGShin,andKyungtaeKang.2023.
+[18] Sang-HoonKim,JinkyuJeong,andJin-SooKim.2017. Application- FastApplicationLaunchonPersonal{Computing/Communication}
+awareswappingformobilesystems.ACMTransactionsonEmbedded Devices.In21stUSENIXConferenceonFileandStorageTechnologies
+ComputingSystems(TECS)16,5s(2017),1–19. (FAST23).425–440.
+[19] NielLebeck,ArvindKrishnamurthy,HenryMLevy,andIreneZhang. [34] AndrewSanders.2016. AnintroductiontoUnrealengine4. AKPe-
+2020.Endthesenselesskilling:Improvingmemorymanagementfor ters/CRCPress.
+
+===== PAGE 15 =====
+AppFlow:MemorySchedulingforColdLaunchofLargeAppsonMobileandVehicleSystems MobiCom’26,October26–30,2026,Austin,TX,USA
+[35] MohitSaxenaandMichaelMSwift.2010.{FlashVM}:VirtualMemory informationretrieval.2357–2366.
+ManagementonFlash.In2010USENIXAnnualTechnicalConference [42] TikTok.2025. TikTok-MakeYourDay. https://www.tiktok.com/
+(USENIXATC10). Accessed:2025-07-25.
+[36] ZhihaoShen,KangYang,WanDu,XiZhao,andJianhuaZou.2019. [43] TrendForce.2025.DRAMspotpricetrends.TrendForceDRAMPrice
+DeepAPP:Adeepreinforcementlearningframeworkformobileap- Trends(DRAMSpotPrice). https://www.trendforce.com/price/dram/
+plicationusageprediction.InProceedingsofthe17thConferenceon dram_spotLastupdate:2025-07-25Accessed:2025-07-27.
+EmbeddedNetworkedSensorSystems.153–165. [44] u/DeckerSUandothers.2019. Whatnormalmemoryfootprintfor
+[37] ShiftHackZ.2025.Stable-Diffusion-Android:StableDiffusionAIClient anAndroidapp? https://www.reddit.com/r/androiddev/comments/
+(Android).https://github.com/ShiftHackZ/Stable-Diffusion-Android. atfccg/what_normal_memory_footprint_for_an_android_app/ Ac-
+Accessed:2025-09-01. cessed:2025-07-27.
+[38] ChoonsungShin,Jin-HyukHong,andAnindKDey.2012. Under- [45] WhitespaceGlobal.2025.CollectiveAI:SecureOfflineAIAssistant.
+standingandpredictionofmobileapplicationusageforsmartphones. AppleAppStore(US). https://apps.apple.com/us/app/collective-ai/
+Inproceedingsofthe2012ACMconferenceonubiquitouscomputing. id6608983600Version1.3.0(2025-10-02).Accessed:2026-01-13.
+173–182. [46] Wikipediacontributors.2025.Androidversionhistory–Wikipedia.
+[39] HadleeSimons.2025.HowmuchRAMdoesyourphonereallyneedin https://en.wikipedia.org/wiki/Android_version_history. https://en.
+2025?https://www.androidauthority.com/how-much-ram-do-i-need- wikipedia.org/wiki/Android_version_historyAccessed:2025-07-27.
+phone-3086661/. Accessed:2025-07-27. [47] TingxinYan,DavidChu,DeepakGanesan,AmanKansal,andJieLiu.
+[40] SamSon,SeungYulLee,YunhoJin,JonghyunBae,JinkyuJeong, 2012. Fastapplaunchingformobiledevicesusingpredictiveuser
+TaeJunHam,JaeWLee,andHongilYoon.2021. {ASAP}:Fastmobile context.InProceedingsofthe10thinternationalconferenceonMobile
+applicationswitchviaadaptiveprepaging.In2021USENIXAnnual systems,applications,andservices.113–126.
+TechnicalConference(USENIXATC21).365–380. [48] Xiao Zhu, Duo Liu, Kan Zhong, Jinting Ren, and Tao Li. 2017.
+[41] YuanTian,KeZhou,MouniaLalmas,andDanPelleg.2020.Identify- SmartSwap:High-performanceanduserexperiencefriendlyswapping
+ingtasksfrommobileappusagepatterns.InProceedingsofthe43rd inmobilesystems.InProceedingsofthe54thAnnualDesignAutomation
+internationalACMSIGIRconferenceonresearchanddevelopmentin Conference2017.1–6.

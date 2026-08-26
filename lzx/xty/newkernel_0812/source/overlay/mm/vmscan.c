@@ -59,6 +59,7 @@
 #include <linux/mmu_notifier.h>
 #include <linux/parser.h>
 #include <linux/parp.h>
+#include <linux/parp_tier2.h>
 #include "parp/adapter/adapter.h"
 
 #include <asm/tlbflush.h>
@@ -4402,6 +4403,8 @@ static unsigned int parp_memcg_reclaim_bin(struct mem_cgroup *memcg)
 	u64 headroom;
 
 	if (!memcg || mem_cgroup_is_root(memcg) ||
+	    !parp_tier2_runtime_enabled() ||
+	    !READ_ONCE(memcg->parp_tier2.enabled) ||
 	    parp_get_mode() == PARP_MODE_DISABLED)
 		return get_random_u32_below(MEMCG_NR_BINS);
 
@@ -5381,7 +5384,8 @@ static void shrink_many(struct pglist_data *pgdat, struct scan_control *sc)
 	struct hlist_nulls_node *pos;
 
 	gen = get_memcg_gen(READ_ONCE(pgdat->memcg_lru.seq));
-	bin = first_bin = parp_get_mode() == PARP_MODE_DISABLED ?
+	bin = first_bin = parp_get_mode() == PARP_MODE_DISABLED ||
+		!parp_tier2_runtime_enabled() ?
 		get_random_u32_below(MEMCG_NR_BINS) : 0;
 restart:
 	op = 0;
