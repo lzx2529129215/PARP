@@ -442,10 +442,19 @@ def apply_global_policy(variant: str) -> dict[str, Any]:
             raise RuntimeError("native kernel unexpectedly exposes PARP controls: " + ",".join(present))
         return original
     stats = original.get("effective_tier_stats") or ""
+    metadata_config = original.get("effective_tier_config") or ""  # lzx-note
     if desired["effective_tier_mode"] >= 2 and parse_debug_stat(stats, "apply_compiled") != "1":
         raise RuntimeError(
             "effective-tier Apply is not compiled; rebuild the Linux 6.17.13 target "
             "with LZX_EXPERIMENTAL_APPLY=1 tools/parp/build_lzx_kernel.sh all"  # lzx-note
+        )
+    if desired["effective_tier_mode"] and (
+        parse_debug_stat(metadata_config, "metadata_reservation_requested") != "1"
+        or parse_debug_stat(metadata_config, "metadata_ready") != "1"
+    ):
+        raise RuntimeError(
+            "effective-tier per-page metadata was not boot-reserved; boot this "
+            "kernel with parp_effective_tier_reserve=1"  # lzx-note
         )
     privileged_write(PARP_DEBUGFS / "effective_tier_mode", 0)
     privileged_write(TIER2_SYSCTL, 0)
@@ -604,6 +613,8 @@ def preflight(config: dict[str, Any], profile: str, suite: str, variant: str = "
     }
     apply_compiled = parse_debug_stat(effective_stats, "apply_compiled")
     model_provenance = parse_debug_stat(effective_config, "model_provenance")
+    metadata_requested = parse_debug_stat(effective_config, "metadata_reservation_requested")  # lzx-note
+    metadata_ready = parse_debug_stat(effective_config, "metadata_ready")  # lzx-note
     diagnostic_only = apply_compiled in {"", "0"} or "UNTRAINED" in effective_config
     if variant == "native":
         checks["native_parp_controls_absent"] = not any((mode, effective_stats, effective_config)) and not TIER2_SYSCTL.exists()  # lzx-note
@@ -613,6 +624,10 @@ def preflight(config: dict[str, Any], profile: str, suite: str, variant: str = "
         checks["tier2_master_switch"] = TIER2_SYSCTL.is_file()
         if desired["effective_tier_mode"] >= 2:
             checks["effective_tier_apply_compiled"] = apply_compiled == "1"
+        if desired["effective_tier_mode"]:
+            checks["effective_tier_metadata_boot_reserved"] = (
+                metadata_requested == "1" and metadata_ready == "1"
+            )  # lzx-note
         config_text = ""
         config_path = metadata.get("kernel_config", {}).get("path")
         if config_path:
@@ -651,6 +666,8 @@ def preflight(config: dict[str, Any], profile: str, suite: str, variant: str = "
             "effective_tier_mode": mode,
             "apply_compiled": apply_compiled,
             "model_provenance": model_provenance,
+            "metadata_reservation_requested": metadata_requested,  # lzx-note
+            "metadata_ready": metadata_ready,  # lzx-note
             "effective_tier_stats": effective_stats,
             "effective_tier_config": effective_config,
         },

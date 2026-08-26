@@ -1,0 +1,59 @@
+diff --git a/mm/parp/core/effective_tier.c b/mm/parp/core/effective_tier.c
+index 6a9cb6b44..5d781e0eb 100644
+--- a/mm/parp/core/effective_tier.c
++++ b/mm/parp/core/effective_tier.c
+@@ -1958,7 +1958,12 @@ int parp_effective_tier_set_mode(enum parp_effective_tier_mode mode)
+ 	if (mode >= PARP_EFFECTIVE_TIER_PROTECT_ONLY &&
+ 	    !IS_ENABLED(CONFIG_PARP_EFFECTIVE_TIER_EXPERIMENTAL_APPLY))
+ 		return -EOPNOTSUPP;
+-	if (mode == PARP_EFFECTIVE_TIER_SHADOW &&
++	/* Every active mode reads or updates the boot-reserved per-page state.
++	 * Reject the transition before enabling the static key instead of
++	 * accepting an APPLY mode that can only latch state_fault and fall back.
++	 * lzx-note
++	 */
++	if (mode != PARP_EFFECTIVE_TIER_OFF &&
+ 	    !parp_effective_tier_metadata_ready())
+ 		return -EOPNOTSUPP; /* #lzx */
+ 	mutex_lock(&parp_tier_mode_lock);
+diff --git a/mm/parp/tests/parp_test.c b/mm/parp/tests/parp_test.c
+--- a/mm/parp/tests/parp_test.c
++++ b/mm/parp/tests/parp_test.c
+@@ -1204,10 +1204,13 @@ static void parp_effective_config_safety_test(struct kunit *test)
+ 	KUNIT_EXPECT_FALSE(test, IS_ENABLED(CONFIG_PARP_FRONTIER_SCORE));
+ 	KUNIT_EXPECT_EQ(test, parp_effective_tier_get_mode(),
+ 		PARP_EFFECTIVE_TIER_OFF);
+-	if (!parp_effective_tier_metadata_ready())
++	if (!parp_effective_tier_metadata_ready()) {
+ 		KUNIT_EXPECT_EQ(test,
+ 				parp_effective_tier_set_mode(PARP_EFFECTIVE_TIER_SHADOW),
+ 				-EOPNOTSUPP); /* #lzx */
++		KUNIT_EXPECT_EQ(test, parp_effective_tier_set_mode(
++			PARP_EFFECTIVE_TIER_BIDIRECTIONAL), -EOPNOTSUPP); /* lzx-note */
++	}
+ 	if (!IS_ENABLED(CONFIG_PARP_EFFECTIVE_TIER_EXPERIMENTAL_APPLY))
+ 		KUNIT_EXPECT_EQ(test, parp_effective_tier_set_mode(
+ 			PARP_EFFECTIVE_TIER_BIDIRECTIONAL), -EOPNOTSUPP);
+diff --git a/tools/parp/effective_tier/README.md b/tools/parp/effective_tier/README.md
+index 8566c36b2..b731dcc29 100644
+--- a/tools/parp/effective_tier/README.md
++++ b/tools/parp/effective_tier/README.md
+@@ -48,15 +48,15 @@ non-overridable protection. Large folios are counted in base pages; scoring
+ does not multiply their influence by treating one folio as one page. Compressed
+ timestamps use modulo-2^32 subtraction via `u32_elapsed()`.
+ 
+-## Live SHADOW metadata reservation <!-- #lzx -->
++## Live active-mode metadata reservation <!-- #lzx -->
+ 
+ The kernel defaults to OFF without allocating per-page reuse metadata. A live
+-SHADOW boot must explicitly include `parp_effective_tier_reserve=1` on its
++SHADOW or APPLY boot must explicitly include `parp_effective_tier_reserve=1` on its
+ one-time kernel command line. This is intentionally a boot-only reservation:
+ the page-extension allocator runs before runtime debugfs mode changes, and a
+ runtime request cannot safely create metadata for pages that are already live.
+ Without that parameter, `effective_tier_config` reports `metadata_ready 0`
+-and the SHADOW mode write fails closed with `-EOPNOTSUPP`. The same file
++and every non-OFF mode write fails closed with `-EOPNOTSUPP`. The same file
+ reports `metadata_payload_bytes`; on this host the payload is 24B/page (about
+ 94 MiB at 16 GiB RAM, roughly 125 MiB including page-extension headers). The
+ read-only live preflight treats missing boot reservation as a blocker and never

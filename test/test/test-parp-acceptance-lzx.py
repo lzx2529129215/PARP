@@ -107,6 +107,17 @@ class AcceptanceConfigTests(unittest.TestCase):
         self.assertEqual(MODULE.POLICY_VARIANTS["combined"]["effective_tier_mode"], 2)
         self.assertEqual(MODULE.POLICY_VARIANTS["combined_no_reclaim"], MODULE.POLICY_VARIANTS["combined"])
 
+    def test_effective_policy_rejects_missing_boot_metadata(self) -> None:
+        state = {
+            "effective_tier_stats": "apply_compiled 1\n",
+            "effective_tier_config": (
+                "metadata_reservation_requested 0\nmetadata_ready 0\n"
+            ),
+        }
+        with mock.patch.object(MODULE, "policy_state", return_value=state):
+            with self.assertRaisesRegex(RuntimeError, "parp_effective_tier_reserve=1"):
+                MODULE.apply_global_policy("effective")
+
     def test_smoke_allows_small_vm_but_full_keeps_memory_class_gate(self) -> None:
         # lzx-note: Smoke validates plumbing; full preserves the acceptance host contract.
         checks = {"x11_display": True, "memory_16g_class": False}
