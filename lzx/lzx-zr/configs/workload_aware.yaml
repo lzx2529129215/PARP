@@ -1,0 +1,22 @@
+schema_version: 1
+feature_version: 1
+model_version: 1
+mode: OBSERVE
+horizon_ms: 3000
+ttl_ms: 5000
+sampling_interval_ms: 1000
+state_machine:
+  min_dwell_windows: 2
+  cooldown_windows: 1
+  confidence_threshold: 0.55
+fallback:
+  stale_snapshot: NATIVE
+  unknown_workload: NATIVE
+  invalid_q15: NATIVE
+  apply_enabled: false
+thresholds:
+  sequential_ratio: 0.55
+  random_entropy: 0.55
+  high_reuse_rate: 0.55
+  hotspot_shift_rate: 0.55
+  emergency_psi: 0.20

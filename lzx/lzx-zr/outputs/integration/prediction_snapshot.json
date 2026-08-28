@@ -1,0 +1,31 @@
+{
+  "scope_type": "cgroup",
+  "scope_id": "demo-cgroup",
+  "timestamp_ns": 4000000000,
+  "current_workload": {
+    "access_order": "RANDOM",
+    "reuse_mode": "ONE_SHOT",
+    "hotspot_mode": "MULTI_HOTSPOT",
+    "phase_mode": "EXPANDING",
+    "dominant": "BURST_EXPANSION",
+    "confidence_q15": 32767
+  },
+  "next_workload": {
+    "access_order": "RANDOM",
+    "reuse_mode": "ONE_SHOT",
+    "hotspot_mode": "MULTI_HOTSPOT",
+    "phase_mode": "STABLE",
+    "dominant": "STABLE_HOT",
+    "probability_q15": 32767
+  },
+  "horizon_ms": 3000,
+  "ttl_ms": 5000,
+  "prediction_seq": 3,
+  "wss_pages": 420,
+  "wss_slope_pages_per_sec": 0.0,
+  "model_version": 1,
+  "method": "rule_trend",
+  "mode": "SHADOW",
+  "native_fallback": false,
+  "generated_at_ns": 1787912280351549300
+}

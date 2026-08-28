@@ -1,0 +1,9 @@
+{
+  "schema_version": 1,
+  "scope_types": ["app", "cgroup", "region"],
+  "modes": ["OBSERVE", "SHADOW"],
+  "apply": false,
+  "q15_one": 32767,
+  "required": ["scope_type", "scope_id", "timestamp_ns", "current_workload", "next_workload", "horizon_ms", "ttl_ms", "prediction_seq", "model_version"],
+  "fallback": "NATIVE"
+}
