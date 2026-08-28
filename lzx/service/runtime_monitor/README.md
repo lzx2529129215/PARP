@@ -3,7 +3,7 @@
 > LSAPP 15 应用的 held-out 在线切换场景与运行方法见
 > [README_lsapp_expanded.md](README_lsapp_expanded.md)。 <!-- lzx-note -->
 
-本目录实现 PC runtime 数据采集器 v0。当前阶段只做本地采集和数据集生成，不做预取、不做 page cache 驱逐、不主动 swap、不修改 Linux 内核，也不做任何内存调度动作。
+本目录实现 PC runtime 数据采集器及常驻预测服务。采集器本身不做预取、不驱逐 page cache、不主动 swap；启用 `--enable-parp-myfs` 时只把 LSTM 上下文下沉给内核，由内核实验开关决定是否参与内存调度。`lzx-note`
 
 目标输出：
 
@@ -28,7 +28,7 @@
 - 应用级 I/O fallback：通过 `/proc/<pid>/io` 聚合 `read_bytes/write_bytes/rchar/wchar`。
 - 应用级内存状态：优先 cgroup v2，失败时 fallback 到 procfs。
 - 全局内存状态：采集 `/proc/meminfo` 和 `/proc/vmstat`。
-- 前台状态接口：支持 `manual` 和 `x11`；Wayland 当前只保留接口并降级为 manual。
+- 前台状态接口：支持 `desktop/x11/manual`；`desktop` 在 GNOME Wayland 上使用 Shell D-Bus 事件，并保留 X11 回退。`lzx-note`
 - 应用生命周期事件：通过 procfs 维护 `app_id -> pid_set`，输出 `APP_START/APP_EXIT/APP_CLOSE`。
 - 前台切换事件：通过 foreground collector 输出 `APP_SWITCH/APP_FOCUS_IN/APP_FOCUS_OUT`。
 - X11 窗口状态事件：尽量采集 `window_id/window_title/pid`，并通过 `_NET_WM_STATE_HIDDEN` 输出 `APP_MINIMIZE/APP_RESTORE`。
@@ -40,8 +40,7 @@ Best effort 或未实现：
 
 - path 级 `read/write/fsync/rename` 需要 eBPF/tracefs 才能可靠采集；v0 暂不启用 eBPF。
 - `close` 暂未单独输出。
-- Wayland 下全局前台窗口受权限限制；v0 默认使用 manual fallback。
-- Wayland 下窗口最小化/恢复状态不可可靠获取，当前降级为 manual，不会中断采集。
+- 非 GNOME 的 Wayland compositor 仍无法可靠提供全局前台窗口；应接入对应 compositor 的受信事件扩展。
 - `events.csv` 中 `offset/size` 对 fallback 事件只能尽力填充，不能等价于真实 syscall 参数。
 
 已保留但 v0 不默认使用：
@@ -54,7 +53,7 @@ Best effort 或未实现：
 python3 -m pip install --user -r runtime_monitor/requirements.txt
 ```
 
-Test2 已默认启用 `--direct-x11-events`。在事件驱动模式下，`direct_app_events.csv` 保存原生事件转换后的 `APP_OPEN/APP_SWITCH/APP_CLOSE/APP_MINIMIZE/APP_RESTORE`，其中 `APP_SWITCH` 和 `APP_OPEN` 直接触发当前 v3 LSTM；最小化、恢复和关闭事件仍会被完整记录并更新打开应用状态。
+在事件驱动模式下，`direct_app_events.csv` 保存原生事件转换后的 `APP_OPEN/APP_SWITCH/APP_CLOSE/APP_MINIMIZE/APP_RESTORE`。其中 `APP_SWITCH/APP_OPEN/APP_CLOSE/APP_MINIMIZE` 直接调用当前 v3 LSTM；`APP_RESTORE` 只更新状态，随后的真实前台切换再触发预测。`lzx-note`
 
 ## 目录结构
 
@@ -132,7 +131,7 @@ bash runtime_monitor/scripts/run_wps_monitor.sh
 - `--target-comm <comm>`：只采集 comm 包含指定字符串的进程。
 - `--duration <seconds>`：运行固定时长后退出。
 - `--path-mode raw|hash|basename`：控制 `events.csv` 中 path 的隐私模式。
-- `--foreground-backend x11|wayland|manual`：前台状态采集后端；Wayland v0 会降级为 manual。
+- `--foreground-backend desktop|x11|wayland|manual`：常驻服务默认 `desktop`，组合 GNOME D-Bus 与 X11 回退。
 - `--label WPS_LAUNCH|WPS_OPEN_DOC|WPS_SAVE_DOC|IDLE|OTHER`：给本次采集的 `features_1s.csv` 写入统一 label。
 - `--enable-ebpf`：预留参数；v0 会打印 warning 并继续使用 procfs fallback。
 - `--disable-ebpf`：显式使用 procfs fallback。

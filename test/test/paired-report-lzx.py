@@ -76,7 +76,7 @@ def build_pair(baseline_path: Path, optimized_path: Path) -> dict[str, Any]:
         errors.append("suite/profile mismatch")
     if baseline.get("variant") != "native":
         errors.append(f"baseline variant must be native, got {baseline.get('variant')}")
-    if optimized.get("variant") not in {"effective", "tier2", "combined", "combined_no_reclaim"}:
+    if optimized.get("variant") not in {"effective", "tier2", "tier2_bin", "combined", "combined_no_reclaim"}:
         errors.append(f"optimized variant is not a treatment: {optimized.get('variant')}")
     metadata_ok, metadata_differences = compatible_metadata(baseline_root, optimized_root)
     if not metadata_ok:

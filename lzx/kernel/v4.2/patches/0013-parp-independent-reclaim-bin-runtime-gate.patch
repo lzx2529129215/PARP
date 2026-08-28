@@ -1,0 +1,114 @@
+diff --git a/Documentation/admin-guide/mm/parp-tier2.rst b/Documentation/admin-guide/mm/parp-tier2.rst
+index 3b3e3713f..2ec05a97e 100644
+--- a/Documentation/admin-guide/mm/parp-tier2.rst
++++ b/Documentation/admin-guide/mm/parp-tier2.rst
+@@ -19,9 +19,12 @@ the centralized LZX PARP experiment menu and defaults to ``n``.
+ The MGLRU memcg-bin scorer has a second, independent build switch,
+ ``CONFIG_PARP_RECLAIM_BIN_SCORE``.  It defaults to ``n`` and depends on
+ ``CONFIG_PARP_TIER2``.  Even when compiled in, reclaim-bin scoring is active
+-only when PARP is in APPLY mode, ``vm.tier2_predict_enabled`` is one, and the
+-target cgroup's ``memory.tier2_enabled`` is one.  Otherwise MGLRU uses its
+-native random bin placement and random starting bin.
++only when PARP is in APPLY mode, ``vm.parp_reclaim_bin_enabled`` is one, and
++the target cgroup's ``memory.tier2_enabled`` is one.  The cgroup flag acts as
++the experiment-scope marker; ``vm.tier2_predict_enabled`` may remain zero so
++no Tier2 prediction or proactive reclaim runs in a bin-only ablation.
++Otherwise MGLRU uses its native random bin placement and random starting bin.
++.. lzx-note
+ 
+ For workloads launched as systemd scopes below an enabled experiment slice,
+ the scorer uses the nearest enabled ancestor's Tier2 headroom policy while
+@@ -147,6 +150,13 @@ Global sysctls
+ ``vm.tier2_predict_horizon_ratio``
+   Scheduling horizon multiplier, 0 through 100.  Default 3.
+ 
++``vm.parp_reclaim_bin_enabled``
++  Independent MGLRU memcg-bin APPLY switch, 0 or 1.  Default 0.  It requires
++  PARP APPLY mode and an experiment-scope cgroup with
++  ``memory.tier2_enabled=1``, but it does not enable Tier2 proactive reclaim.
++  This permits an exact same-kernel bin OFF/APPLY comparison while the LSTM
++  service and ``/dev/myfs`` prediction stream remain identical.  .. lzx-note
++
+ ``vm.tier2_wss_predict_enabled``
+   Runtime working-set gate, 0 or 1.  It exists only with
+   ``CONFIG_PARP_TIER2_WSS_PREDICT=y`` and defaults to 1.  Set it to 0 for an
+diff --git a/mm/parp/Kconfig b/mm/parp/Kconfig
+index 28ad8ed20..5af676b15 100644
+--- a/mm/parp/Kconfig
++++ b/mm/parp/Kconfig
+@@ -61,10 +61,12 @@ config PARP_RECLAIM_BIN_SCORE # lzx-note
+ 	help
+ 	  Build the app-prior and Tier2-headroom scorer that maps a memcg into
+ 	  the existing MGLRU reclaim bins. The scorer changes bin placement and
+-	  ordered bin scanning only while PARP is in APPLY mode, the global Tier2
+-	  switch is one, and the target cgroup has memory.tier2_enabled set to
+-	  one. When this option is disabled, MGLRU keeps its native random bin
+-	  placement and starting-bin behavior.
++	  ordered bin scanning only while PARP is in APPLY mode, the independent
++	  vm.parp_reclaim_bin_enabled switch is one, and the target cgroup has
++	  memory.tier2_enabled set to one as its experiment-scope marker. The
++	  Tier2 proactive-reclaim master may remain zero for a bin-only ablation.
++	  When this option is disabled, MGLRU keeps its native random bin placement
++	  and starting-bin behavior. # lzx-note
+ 
+ config PARP_DAMON_ALIGNMENT
+ 	bool "Collect DAMON VADDR aggregation evidence for PARP"
+diff --git a/mm/parp/control/debugfs.c b/mm/parp/control/debugfs.c
+index 603a69fae..242b4f2a7 100644
+--- a/mm/parp/control/debugfs.c
++++ b/mm/parp/control/debugfs.c
+@@ -174,6 +174,7 @@ static int reclaim_bin_stats_show(struct seq_file *m, void *v) /* lzx-note */
+ 
+ 	parp_tier2_reclaim_bin_stats_snapshot(&stats);
+ 	seq_printf(m,
++		   "compiled 1\napply_enabled %u\n"
+ 		   "lookups %llu\npolicy_hits %llu\ninherited_hits %llu\n"
+ 		   "context_hits %llu\nheadroom_hits %llu\nrank_scores %llu\n"
+ 		   "headroom_fallback_scores %llu\nrebin_moves %llu\n"
+@@ -181,6 +182,7 @@ static int reclaim_bin_stats_show(struct seq_file *m, void *v) /* lzx-note */
+ 		   "score_bin_0 %llu\nscore_bin_1 %llu\nscore_bin_2 %llu\n"
+ 		   "score_bin_3 %llu\nscore_bin_4 %llu\nscore_bin_5 %llu\n"
+ 		   "score_bin_6 %llu\nscore_bin_7 %llu\n",
++		   parp_tier2_reclaim_bin_apply_enabled(),
+ 		   stats.lookups, stats.policy_hits, stats.inherited_hits,
+ 		   stats.context_hits, stats.headroom_hits, stats.rank_scores,
+ 		   stats.headroom_fallback_scores, stats.rebin_moves,
+diff --git a/mm/parp/core/watermark.c b/mm/parp/core/watermark.c
+index 7f4547396..2cceef459 100644
+--- a/mm/parp/core/watermark.c
++++ b/mm/parp/core/watermark.c
+@@ -49,6 +49,7 @@ static int parp_tier2_thousand = 1000;
+ static int parp_tier2_hundred = 100;
+ 
+ #ifdef CONFIG_PARP_RECLAIM_BIN_SCORE /* lzx-note */
++static int sysctl_parp_reclaim_bin_enabled __read_mostly; /* lzx-note */
+ static struct { /* lzx-note */
+ 	atomic64_t lookups;
+ 	atomic64_t policy_hits;
+@@ -92,6 +93,17 @@ static const struct ctl_table parp_tier2_sysctls[] = {
+ 		.extra1 = SYSCTL_ZERO,
+ 		.extra2 = &parp_tier2_hundred,
+ 	},
++#ifdef CONFIG_PARP_RECLAIM_BIN_SCORE /* lzx-note */
++	{
++		.procname = "parp_reclaim_bin_enabled",
++		.data = &sysctl_parp_reclaim_bin_enabled,
++		.maxlen = sizeof(sysctl_parp_reclaim_bin_enabled),
++		.mode = 0644,
++		.proc_handler = proc_dointvec_minmax,
++		.extra1 = SYSCTL_ZERO,
++		.extra2 = &parp_tier2_one,
++	}, /* lzx-note */
++#endif /* CONFIG_PARP_RECLAIM_BIN_SCORE */ /* lzx-note */
+ #ifdef CONFIG_PARP_TIER2_WSS_PREDICT
+ 	{
+ 		.procname = "tier2_wss_predict_enabled",
+@@ -142,7 +154,7 @@ static struct mem_cgroup *parp_reclaim_bin_policy_memcg(
+ bool parp_tier2_reclaim_bin_apply_enabled(void) /* lzx-note */
+ {
+ 	return parp_get_mode() == PARP_MODE_APPLY &&
+-	       parp_tier2_runtime_enabled();
++	       READ_ONCE(sysctl_parp_reclaim_bin_enabled); /* lzx-note */
+ } /* lzx-note */
+ 
+ u32 parp_tier2_reclaim_rank_score_q15(u16 app_prior_q15, u16 app_rank,

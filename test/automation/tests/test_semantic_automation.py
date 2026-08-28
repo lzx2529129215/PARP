@@ -12,7 +12,7 @@ ROOT = Path(__file__).resolve().parents[2]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from automation.app_automation import Context, TraceWriter, infer_app, load_scenario, map_window_app, quiet_window_trace, trace_marker, verify_foreground
+from automation.app_automation import Context, TraceWriter, WindowInfo, infer_app, load_scenario, map_window_app, quiet_window_trace, robust_switch_to_app, trace_marker, verify_foreground
 from automation.semantic.compiler import CompileError, compile_scenario, load_operations
 
 
@@ -153,6 +153,22 @@ class SemanticAutomationTests(unittest.TestCase):
 
     def test_verify_foreground_dry_run_does_not_query_desktop(self) -> None:
         verify_foreground({"app_key": "WPS"}, Context(dry_run=True))
+
+    def test_robust_switch_uses_distinct_focus_fallbacks(self) -> None:
+        candidate = WindowInfo(window_id="23068849", mapped_app="FIREFOX")
+        blocked = WindowInfo(window_id="27262984", mapped_app="FILES")
+        with patch.dict("os.environ", {"DISPLAY": ":0"}, clear=False), \
+             patch("automation.app_automation.list_window_candidates", return_value=[candidate]), \
+             patch("automation.app_automation.best_window_candidate", return_value=candidate), \
+             patch("automation.app_automation.get_foreground_window_info", side_effect=[blocked, blocked, candidate]), \
+             patch("automation.app_automation.shutil.which", return_value="/usr/bin/wmctrl"), \
+             patch("automation.app_automation.subprocess.run") as run, \
+             patch("automation.app_automation.time.sleep"):
+            robust_switch_to_app({"app_key": "FIREFOX"}, Context(dry_run=False), "FIREFOX")
+        commands = [call.args[0] for call in run.call_args_list]
+        self.assertIn(["wmctrl", "-i", "-a", "23068849"], commands)
+        self.assertIn(["xdotool", "windowfocus", "23068849"], commands)  # lzx-note
+        self.assertNotIn("--sync", [arg for command in commands for arg in command])  # lzx-note
 
     def test_quiet_window_trace_tolerates_destroyed_window_property(self) -> None:
         class Outcome:

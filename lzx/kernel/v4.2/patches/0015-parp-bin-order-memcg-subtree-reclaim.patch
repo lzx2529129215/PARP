@@ -1,0 +1,23 @@
+From: PARP LZX <lzx-note@local>
+Subject: [PATCH] mm: apply prediction bins to non-root memcg subtree reclaim
+
+The original reclaim-bin hook only ordered root MGLRU reclaim.  A bounded
+application collection normally reaches its parent memory.max and takes the
+non-root memcg iterator path, which previously ignored application priors.
+
+When APPLY, the bin switch, and the target policy cgroup are all enabled,
+walk descendants in score-bin order and stop when the reclaim goal is met.
+Native iterator behavior remains unchanged when the independent switch is
+off.  Export pass/selection/skip counters for runtime proof.  lzx-note
+
+---
+ include/linux/parp_tier2.h   |  6 ++++++
+ mm/parp/control/debugfs.c    |  2 ++
+ mm/parp/core/watermark.c     | 17 +++++++++++++++++
+ mm/vmscan.c                  | 38 +++++++++++++++++++++++++++++++++++++-
+ 4 files changed, 62 insertions(+), 1 deletion(-)
+
+This patch is represented by the corresponding lzx-note changes in the v4.2
+source tree; it is kept as the release-series change record.  lzx-note
+-- 
+2.43.0

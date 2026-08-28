@@ -1,5 +1,5 @@
 [Unit]
-Description=PARP Runtime Monitor resident observation service
+Description=PARP resident application-event and LSTM prediction service
 Documentation=file://%h/Desktop/PARP/lzx/service/runtime_monitor/README_SERVICE.md
 After=default.target
 
@@ -7,6 +7,8 @@ After=default.target
 Type=simple
 WorkingDirectory=%h/Desktop/PARP/lzx/service
 Environment=PYTHONUNBUFFERED=1
+Environment=PARP_SERVICE_FOREGROUND_BACKEND=desktop
+Environment=PARP_SERVICE_MYFS_MODE=apply
 EnvironmentFile=-%h/.config/parp/runtime-monitor.env
 ExecStart=%h/Desktop/PARP/lzx/service/runtime_monitor/scripts/run_service_daemon.sh
 Restart=always

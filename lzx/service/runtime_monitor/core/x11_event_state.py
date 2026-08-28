@@ -13,6 +13,8 @@ from collectors.foreground import WindowState
 DIRECT_PREDICTION_EVENTS = {
     "APP_SWITCH",
     "APP_OPEN",
+    "APP_CLOSE",  # lzx-note: lifecycle changes invalidate the previous app prior.
+    "APP_MINIMIZE",  # lzx-note: minimized foreground becomes reclaim-relevant.
 }
 
 
@@ -73,6 +75,26 @@ class X11EventState:
             return []
         if kind == "CGROUP_APP_EMPTY":
             return self._close_from_cgroup(str(raw.get("app", "")), raw)
+        if kind == "POLL_FOREGROUND_RECHECK":
+            # Some compositors do not deliver every _NET_ACTIVE_WINDOW/
+            # FocusIn edge to the long-running X11 connection.  The resident
+            # monitor therefore reconciles the event state with its normal
+            # active-window sample once per sampling period.  Feed that
+            # observation through the same state machine so a late native
+            # event is naturally de-duplicated. lzx-note
+            app = str(raw.get("app", "") or "UNKNOWN")
+            if not window_id or not _is_known_app(app):
+                return []
+            current = TrackedWindow(
+                app=app,
+                pid=int(raw.get("pid", 0) or 0),
+                title=str(raw.get("title", "") or ""),
+                hidden=bool(raw.get("hidden", False)),
+            )
+            self.windows[window_id] = current
+            return self._focus_changed(window_id, raw, current=current)
+        if kind.startswith("GNOME_WINDOW_"):
+            return self._handle_gnome_event(kind, window_id, raw)  # lzx-note
         if kind in {"WINDOW_CREATED", "WINDOW_MAPPED", "WINDOW_PROPERTY"}:
             previous = self.windows.get(window_id)
             current = self._remember(window_id)
@@ -122,11 +144,48 @@ class X11EventState:
             return self._focus_changed(window_id, raw)
         return []
 
-    def _focus_changed(self, window_id: str, raw: dict[str, Any]) -> list[dict[str, Any]]:
+    def _handle_gnome_event(
+        self, kind: str, window_id: str, raw: dict[str, Any]
+    ) -> list[dict[str, Any]]:
+        current = TrackedWindow(
+            app=str(raw.get("app", "") or "UNKNOWN"),
+            pid=int(raw.get("pid", 0) or 0),
+            title=str(raw.get("title", "") or ""),
+            hidden=bool(raw.get("hidden", False)),
+        )
+        if kind == "GNOME_WINDOW_OPENED":
+            self.windows[window_id] = current
+            if _is_known_app(current.app) and current.app not in self._announced_apps:
+                self._announced_apps.add(current.app)
+                self._closed_apps.discard(current.app)
+                return [self._lifecycle("APP_OPEN", current.app, window_id, current, raw)]
+            return []
+        if kind == "GNOME_WINDOW_MINIMIZED":
+            previous = self.windows.get(window_id)
+            self.windows[window_id] = current
+            if _is_known_app(current.app) and (previous is None or not previous.hidden):
+                return [self._foreground("APP_MINIMIZE", current.app, window_id, current, raw)]
+            return []
+        if kind == "GNOME_WINDOW_CLOSED":
+            previous = self.windows.pop(window_id, None) or current
+            if not _is_known_app(previous.app) or previous.app in self.open_apps:
+                return []
+            self._announced_apps.discard(previous.app)
+            self._closed_apps.add(previous.app)
+            return [self._lifecycle("APP_CLOSE", previous.app, window_id, previous, raw)]
+        if kind == "GNOME_WINDOW_SWITCHED":
+            self.windows[window_id] = current
+            return self._focus_changed(window_id, raw, current=current)
+        return []
+
+    def _focus_changed(
+        self, window_id: str, raw: dict[str, Any],
+        *, current: TrackedWindow | None = None,
+    ) -> list[dict[str, Any]]:
         previous_app = self.foreground_app
         previous_window = self.foreground_window_id
         previous_since_ns = self.foreground_since_ns
-        current = self._remember(window_id)
+        current = current if current is not None else self._remember(window_id)
         current_app = current.app if current is not None and _is_known_app(current.app) else "UNKNOWN"
         current_pid = current.pid if current is not None else 0
         current_title = current.title if current is not None else ""
@@ -188,8 +247,7 @@ class X11EventState:
         """Close an app when its controlled cgroup has become empty.
 
         This is a lifecycle fallback for applications terminated by the test
-        harness.  It does not trigger inference; foreground predictions remain
-        driven solely by direct X11 APP_OPEN/APP_SWITCH events.
+        harness. APP_CLOSE is one of the explicit LSTM trigger events. lzx-note
         """
         if not _is_known_app(app):
             return []

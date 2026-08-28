@@ -1,0 +1,207 @@
+diff --git a/Documentation/admin-guide/mm/parp-tier2.rst b/Documentation/admin-guide/mm/parp-tier2.rst
+index 313f8b790..f53eb4402 100644
+--- a/Documentation/admin-guide/mm/parp-tier2.rst
++++ b/Documentation/admin-guide/mm/parp-tier2.rst
+@@ -153,6 +153,13 @@ Global sysctls
+   exact same-kernel Tier2-without-WSS ablation; Tier2 then uses its original
+   fixed demote watermark.  .. lzx-note
+ 
++  The two-generation filter controls entry into ``RELAX`` and ``STRENGTHEN``.
++  ``memory.tier2_stats`` reports that accepted value as
++  ``workingset_policy_action`` and the current live-headroom result as
++  ``workingset_action``.  The live result exits an exceptional action
++  immediately when its condition disappears, so a recovered cgroup does not
++  continue reclaiming until the next user-space event.  .. lzx-note
++
+ Cgroup v2 files
+ ===============
+ 
+@@ -178,7 +185,7 @@ Each non-root memory cgroup has these files:
+   Configuration, live values, EWMA, predicted time and per-cgroup counters.
+   WSS builds also expose the effective headroom/usage watermark, predicted
+   working set/resident/growth, raw and hysteresis-filtered action, confidence,
+-  skips, fallbacks and hard-line overrides.  .. lzx-note
++  skips, fallbacks, hard-line overrides and live-action restores.  .. lzx-note
+ 
+ Example
+ -------
+diff --git a/include/linux/parp_tier2.h b/include/linux/parp_tier2.h
+index 2ae951cca..7dbab9498 100644
+--- a/include/linux/parp_tier2.h
++++ b/include/linux/parp_tier2.h
+@@ -68,6 +68,7 @@ struct parp_tier2_memcg {
+ 	u32 workingset_prediction_generation; /* lzx-note */
+ 	u16 workingset_confidence_q15; /* lzx-note */
+ 	u8 workingset_raw_action; /* lzx-note */
++	u8 workingset_policy_action; /* lzx-note */
+ 	u8 workingset_action; /* lzx-note */
+ 	u8 workingset_action_streak; /* lzx-note */
+ 
+@@ -89,6 +90,7 @@ struct parp_tier2_memcg {
+ 	atomic64_t workingset_hysteresis_holds; /* lzx-note */
+ 	atomic64_t workingset_reclaim_skips; /* lzx-note */
+ 	atomic64_t workingset_safety_overrides; /* lzx-note */
++	atomic64_t workingset_live_restores; /* lzx-note */
+ };
+ 
+ void parp_tier2_memcg_init(struct mem_cgroup *memcg);
+diff --git a/mm/parp/core/watermark.c b/mm/parp/core/watermark.c
+index 3211f1b53..70785f62c 100644
+--- a/mm/parp/core/watermark.c
++++ b/mm/parp/core/watermark.c
+@@ -412,6 +412,29 @@ enum parp_tier2_wss_action parp_tier2_workingset_guard_action(
+ 	return action;
+ } /* lzx-note */
+ 
++enum parp_tier2_wss_action parp_tier2_workingset_effective_action(
++		enum parp_tier2_wss_action policy_action,
++		enum parp_tier2_wss_action live_action,
++		u64 headroom_bytes, u64 demote_wmark_bytes)
++{
++	/*
++	 * Two prediction generations are still required to enter RELAX or
++	 * STRENGTHEN, but a confirmed action must not become sticky while live
++	 * headroom changes. Exit either exceptional action immediately when the
++	 * same prediction no longer justifies it. NORMAL cannot become more
++	 * aggressive without a new generation passing hysteresis. lzx-note
++	 */
++	if (policy_action == PARP_TIER2_WSS_STRENGTHEN &&
++	    live_action != PARP_TIER2_WSS_STRENGTHEN)
++		policy_action = PARP_TIER2_WSS_NORMAL;
++	else if (policy_action == PARP_TIER2_WSS_RELAX &&
++		 live_action != PARP_TIER2_WSS_RELAX)
++		policy_action = PARP_TIER2_WSS_NORMAL;
++
++	return parp_tier2_workingset_guard_action(policy_action,
++			headroom_bytes, demote_wmark_bytes);
++} /* lzx-note */
++
+ u64 parp_tier2_workingset_demote_wmark(u64 limit_bytes,
+ 		u64 alloc_wmark_bytes, u64 demote_wmark_bytes,
+ 		u64 predicted_workingset_bytes, u64 predicted_resident_bytes,
+@@ -468,6 +491,7 @@ static void parp_tier2_workingset_update_locked(
+ 		state->workingset_prediction_generation = 0;
+ 		state->workingset_confidence_q15 = 0;
+ 		state->workingset_raw_action = PARP_TIER2_WSS_FALLBACK;
++		state->workingset_policy_action = PARP_TIER2_WSS_FALLBACK;
+ 		state->workingset_action = PARP_TIER2_WSS_FALLBACK;
+ 		state->workingset_action_streak = 0;
+ 		return;
+@@ -497,7 +521,7 @@ static void parp_tier2_workingset_update_locked(
+ 			action = PARP_TIER2_WSS_NORMAL;
+ 			atomic64_inc(&state->workingset_hysteresis_holds);
+ 		}
+-		state->workingset_action = action;
++		state->workingset_policy_action = action; /* lzx-note */
+ 		if (action == PARP_TIER2_WSS_STRENGTHEN)
+ 			atomic64_inc(&state->workingset_strengthen);
+ 		else if (action == PARP_TIER2_WSS_RELAX)
+@@ -515,18 +539,21 @@ static void parp_tier2_workingset_update_locked(
+ 	state->predicted_growth_bytes = prediction->predicted_workingset_bytes -
+ 		prediction->predicted_resident_bytes;
+ 	state->workingset_confidence_q15 = prediction->confidence_q15;
++	action = parp_tier2_workingset_effective_action(
++		state->workingset_policy_action, raw, headroom, demote); /* lzx-note */
++	if (action != state->workingset_action) {
++		if (action != state->workingset_policy_action)
++			atomic64_inc(&state->workingset_safety_overrides);
++		else if (!new_generation && state->workingset_action !=
++			 state->workingset_policy_action)
++			atomic64_inc(&state->workingset_live_restores);
++		state->workingset_action = action; /* lzx-note */
++	}
+ 	state->effective_demote_wmark_bytes =
+ 		parp_tier2_workingset_demote_wmark(limit, alloc, demote,
+ 			prediction->predicted_workingset_bytes,
+ 			prediction->predicted_resident_bytes,
+ 			state->workingset_action);
+-	action = parp_tier2_workingset_guard_action(
+-		state->workingset_action, headroom, demote); /* lzx-note */
+-	if (action != state->workingset_action) {
+-		state->workingset_action = action; /* lzx-note */
+-		state->effective_demote_wmark_bytes = demote; /* lzx-note */
+-		atomic64_inc(&state->workingset_safety_overrides); /* lzx-note */
+-	}
+ } /* lzx-note */
+ #endif /* CONFIG_PARP_TIER2_WSS_PREDICT */
+ 
+@@ -550,6 +577,7 @@ static void parp_tier2_workingset_state_reset(
+ 	state->workingset_prediction_generation = 0;
+ 	state->workingset_confidence_q15 = 0;
+ 	state->workingset_raw_action = PARP_TIER2_WSS_FALLBACK;
++	state->workingset_policy_action = PARP_TIER2_WSS_FALLBACK;
+ 	state->workingset_action = PARP_TIER2_WSS_FALLBACK;
+ 	state->workingset_action_streak = 0;
+ } /* lzx-note */
+@@ -679,6 +707,7 @@ void parp_tier2_memcg_init(struct mem_cgroup *memcg)
+ 	atomic64_set(&state->workingset_hysteresis_holds, 0);
+ 	atomic64_set(&state->workingset_reclaim_skips, 0);
+ 	atomic64_set(&state->workingset_safety_overrides, 0); /* lzx-note */
++	atomic64_set(&state->workingset_live_restores, 0); /* lzx-note */
+ }
+ 
+ void parp_tier2_memcg_online(struct mem_cgroup *memcg)
+@@ -1106,6 +1135,8 @@ int parp_tier2_stats_show(struct seq_file *m, void *v)
+ 	seq_printf(m, "workingset_runtime_enabled %u\n",
+ 		   workingset_runtime_enabled);
+ 	seq_printf(m, "workingset_action %u\n", workingset_action);
++	seq_printf(m, "workingset_policy_action %u\n",
++		   READ_ONCE(state->workingset_policy_action)); /* lzx-note */
+ 	seq_printf(m, "workingset_raw_action %u\n",
+ 		   READ_ONCE(state->workingset_raw_action));
+ 	seq_printf(m, "workingset_action_streak %u\n",
+@@ -1136,6 +1167,8 @@ int parp_tier2_stats_show(struct seq_file *m, void *v)
+ 		   atomic64_read(&state->workingset_reclaim_skips));
+ 	seq_printf(m, "workingset_safety_overrides %lld\n",
+ 		   atomic64_read(&state->workingset_safety_overrides)); /* lzx-note */
++	seq_printf(m, "workingset_live_restores %lld\n",
++		   atomic64_read(&state->workingset_live_restores)); /* lzx-note */
+ 	return 0;
+ }
+ 
+diff --git a/mm/parp/internal.h b/mm/parp/internal.h
+index a0c2a5395..60ed369bc 100644
+--- a/mm/parp/internal.h
++++ b/mm/parp/internal.h
+@@ -529,6 +529,10 @@ enum parp_tier2_wss_action parp_tier2_workingset_action(u64 limit_bytes,
+ enum parp_tier2_wss_action parp_tier2_workingset_guard_action(
+ 		enum parp_tier2_wss_action action, u64 headroom_bytes,
+ 		u64 demote_wmark_bytes); /* lzx-note */
++enum parp_tier2_wss_action parp_tier2_workingset_effective_action(
++		enum parp_tier2_wss_action policy_action,
++		enum parp_tier2_wss_action live_action,
++		u64 headroom_bytes, u64 demote_wmark_bytes); /* lzx-note */
+ u64 parp_tier2_workingset_demote_wmark(u64 limit_bytes,
+ 		u64 alloc_wmark_bytes, u64 demote_wmark_bytes,
+ 		u64 predicted_workingset_bytes, u64 predicted_resident_bytes,
+diff --git a/mm/parp/tests/parp_test.c b/mm/parp/tests/parp_test.c
+index 05b8beed7..e3add2b8c 100644
+--- a/mm/parp/tests/parp_test.c
++++ b/mm/parp/tests/parp_test.c
+@@ -103,6 +103,26 @@ static void parp_tier2_workingset_action_test(struct kunit *test)
+ 		parp_tier2_workingset_guard_action(PARP_TIER2_WSS_STRENGTHEN,
+ 			alloc, demote),
+ 		PARP_TIER2_WSS_STRENGTHEN); /* lzx-note */
++	KUNIT_EXPECT_EQ(test,
++		parp_tier2_workingset_effective_action(
++			PARP_TIER2_WSS_RELAX, PARP_TIER2_WSS_RELAX,
++			demote + PAGE_SIZE, demote),
++		PARP_TIER2_WSS_RELAX); /* lzx-note */
++	KUNIT_EXPECT_EQ(test,
++		parp_tier2_workingset_effective_action(
++			PARP_TIER2_WSS_RELAX, PARP_TIER2_WSS_NORMAL,
++			demote + PAGE_SIZE, demote),
++		PARP_TIER2_WSS_NORMAL); /* lzx-note */
++	KUNIT_EXPECT_EQ(test,
++		parp_tier2_workingset_effective_action(
++			PARP_TIER2_WSS_STRENGTHEN, PARP_TIER2_WSS_NORMAL,
++			2ULL << 30, demote),
++		PARP_TIER2_WSS_NORMAL); /* lzx-note */
++	KUNIT_EXPECT_EQ(test,
++		parp_tier2_workingset_effective_action(
++			PARP_TIER2_WSS_NORMAL, PARP_TIER2_WSS_STRENGTHEN,
++			alloc, demote),
++		PARP_TIER2_WSS_NORMAL); /* lzx-note */
+ 	KUNIT_EXPECT_GT(test,
+ 		parp_tier2_workingset_demote_wmark(limit, alloc, demote,
+ 			2ULL << 30, 1ULL << 30,

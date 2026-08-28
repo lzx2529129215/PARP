@@ -1,0 +1,52 @@
+From: PARP LZX <lzx-note@local>
+Subject: [PATCH] mm: restart scored reclaim after moving a memcg to a passed bin
+
+A memcg can be created before its final application prior arrives and thus be
+placed in a high fallback bin.  During reclaim, moving a newly cold memcg to a
+lower bin that has already been visited must restart the ordered scan.  Without
+the restart, the current invocation can reclaim hot memcgs left in the high bin
+before it ever observes the cold target.  lzx-note
+
+---
+ mm/vmscan.c | 20 ++++++++++++++++++++
+ 1 file changed, 20 insertions(+)
+
+diff --git a/mm/vmscan.c b/mm/vmscan.c
+--- a/mm/vmscan.c
++++ b/mm/vmscan.c
+@@
+ 	int bin;
+ 	int first_bin;
++	bool restart_lower_bin = false; /* lzx-note */
+ 	struct lruvec *lruvec;
+@@
+ 		if (parp_memcg_reclaim_bin_scored(memcg, &scored_bin) &&
+ 		    scored_bin != bin) {
+ 			parp_reclaim_bin_note_rebin();
+ 			op = MEMCG_LRU_REBIN;
++			/*
++			 * An entry can be online in a high fallback bin before its
++			 * application prior arrives.  If the refreshed cold score moves
++			 * it to a bin already passed by this cycle, continuing here would
++			 * reclaim the remaining hot entries first.  Rotate it, then restart
++			 * at bin zero so a late cold prediction takes effect in this reclaim
++			 * invocation rather than the next one. lzx-note
++			 */
++			if (scored_bin < bin)
++				restart_lower_bin = true;
+ 			rcu_read_lock();
++			if (restart_lower_bin)
++				break;
+ 			continue;
+ 		}
+@@
+ 	mem_cgroup_put(memcg);
++	if (restart_lower_bin) {
++		restart_lower_bin = false;
++		bin = first_bin;
++		goto restart;
++	} /* lzx-note */
+ 
+ 	if (!is_a_nulls(pos))
+-- 
+2.43.0

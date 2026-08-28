@@ -78,12 +78,12 @@ class ForegroundCollector:
         self._last_since = time.monotonic()
         self._last_state = ForegroundState(foreground_app=manual_app, foreground_pid=manual_pid, source="manual")
         self.last_debug = ForegroundDebugState()
-        if backend == "x11":
+        if backend in {"x11", "desktop"}:  # lzx-note
             _configure_x11_env()
 
     def sample(self) -> ForegroundState:
         previous_app = self._last_state.foreground_app
-        if self.backend == "x11":
+        if self.backend in {"x11", "desktop"}:
             state, debug = self._sample_x11(previous_app)
             self.last_debug = debug
         else:
@@ -106,7 +106,7 @@ class ForegroundCollector:
         return state
 
     def sample_windows(self) -> list[WindowState]:
-        if self.backend != "x11":
+        if self.backend not in {"x11", "desktop"}:
             return []
         return self._sample_x11_windows()
 
@@ -117,7 +117,7 @@ class ForegroundCollector:
         is intentionally public so the native event collector can share the
         existing application mapping rules.
         """
-        if self.backend != "x11" or not window_id:
+        if self.backend not in {"x11", "desktop"} or not window_id:
             return WindowState(window_id=window_id, source="x11-event")
         window = self._read_x11_window(window_id)
         if window.app != "UNKNOWN":
@@ -130,6 +130,23 @@ class ForegroundCollector:
             if stacking_window.window_id and stacking_window.app != "UNKNOWN":
                 return stacking_window
         return window
+
+    def resolve_desktop_event(self, payload: dict[str, object]) -> WindowState:
+        """Map GNOME Wayland metadata with the same 15-app rules. lzx-note"""
+        pid = int(payload.get("pid", 0) or 0)
+        title = str(payload.get("title", "") or "")
+        classes = [
+            str(payload.get("wm_class", "") or ""),
+            str(payload.get("gtk_app_id", "") or ""),
+        ]
+        return WindowState(
+            window_id=str(payload.get("window_id", "") or ""),
+            app=_map_foreground_app(classes, title, pid, self.app_window_keywords),
+            pid=pid,
+            window_title=title,
+            is_hidden=bool(payload.get("is_minimized", False)),
+            source="gnome-shell-dbus",
+        )
 
     def _is_active_window(self, window_id: str) -> bool:
         active = _run_text(["xprop", "-root", "_NET_ACTIVE_WINDOW"])

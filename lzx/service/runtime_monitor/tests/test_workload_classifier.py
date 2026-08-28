@@ -22,6 +22,26 @@ from core.workload_markov_builder import build_workload_markov
 
 
 class WorkloadClassifierTests(unittest.TestCase):
+    def test_disabled_legacy_writer_never_probes_debugfs(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            writer = MGLRUMarkovDebugfsWriter(
+                enabled=False,
+                strict=False,
+                debugfs_path=root / "must-not-be-opened",
+                session_id="session_test",
+                model_dir=root / "model",
+                review_dir=root / "review",
+                ttl_ms=180000,
+            )
+
+            def unexpected_probe() -> bool:
+                raise AssertionError("disabled debugfs endpoint was probed")
+
+            writer._debugfs_exists = unexpected_probe
+            self.assertEqual(writer.read_snapshot(), "")
+            writer.close()
+
     def test_rule_priority_and_workload_ids(self) -> None:
         cases = [
             ({"pgmajfault_delta": 1, "workingset_refault_file_delta": 2}, 4),

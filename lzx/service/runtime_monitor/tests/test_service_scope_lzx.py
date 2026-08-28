@@ -8,6 +8,7 @@ RUNTIME_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(RUNTIME_ROOT))
 
 from core.app_mapper import AppMapper, ProcessIdentity
+from core.runtime_scope import load_runtime_app_scope
 from collectors.cgroup import _exact_cgroup_paths
 from collectors.process import ProcessSample
 
@@ -20,6 +21,31 @@ class ResidentServiceScopeTest(unittest.TestCase):
         self.assertEqual(data["slice"], "")
         self.assertEqual(len(data["apps"]), 15)
         self.assertIn("lzx-note", data["implementation_note"])
+
+    def test_fixture_scope_alias_is_binding_only(self) -> None:
+        path = Path(__file__).resolve().parents[2] / "configs" / "runtime" / "runtime_app_scope.service.json"
+        scope = load_runtime_app_scope(path)
+        firefox = next(app for app in scope.apps if app.app_key == "FIREFOX")
+        self.assertEqual(
+            firefox.binding_scope_names,
+            ["automation-fixture-firefox.scope"],
+        )
+        mapper = AppMapper(
+            scope.as_process_mapper_config({}),
+            target_app="FIREFOX",
+            target_apps=scope.target_apps,
+        )
+        fixture = ProcessIdentity(
+            pid=10,
+            tgid=10,
+            comm="python3",
+            exe_path="/usr/bin/python3",
+            cgroup_path=(
+                "/user.slice/parp-predictive-reclaim.slice/"
+                "automation-fixture-firefox.scope"
+            ),
+        )
+        self.assertEqual(mapper.map_process(fixture), "")
 
     def test_solitaire_short_name_does_not_match_systemd_resolved(self) -> None:
         # lzx-note: Resident discovery must not contaminate Solitaire metrics.

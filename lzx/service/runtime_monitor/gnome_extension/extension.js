@@ -7,6 +7,9 @@ const OBJECT_PATH = "/org/huawei/RuntimeAppMonitor";
 const INTERFACE = "org.huawei.RuntimeAppMonitor";
 const SIGNAL = "WindowEvent";
 
+// lzx-note: This extension is the authoritative foreground source on GNOME
+// Wayland; the resident service consumes its signals and keeps X11 as fallback.
+
 class RuntimeAppMonitorExtension {
     constructor() {
         this._displaySignals = [];

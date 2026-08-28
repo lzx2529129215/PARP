@@ -1,0 +1,155 @@
+diff --git a/Documentation/admin-guide/mm/parp-tier2.rst b/Documentation/admin-guide/mm/parp-tier2.rst
+index f53eb4402..3b3e3713f 100644
+--- a/Documentation/admin-guide/mm/parp-tier2.rst
++++ b/Documentation/admin-guide/mm/parp-tier2.rst
+@@ -160,6 +160,14 @@ Global sysctls
+   immediately when its condition disappears, so a recovered cgroup does not
+   continue reclaiming until the next user-space event.  .. lzx-note
+ 
++``vm.tier2_wss_strengthen_enabled``
++  Independent APPLY switch for the WSS ``STRENGTHEN`` action, 0 or 1.  It
++  defaults to 0.  With the switch off, prediction still records an accepted
++  ``STRENGTHEN`` in ``workingset_policy_action`` and its counters, while the
++  effective action is clamped to ``NORMAL`` and cannot raise the proactive
++  reclaim watermark.  Enable it only after the future-cold page selector has
++  demonstrated useful effective-tier or reclaim-bin coverage.  .. lzx-note
++
+ Cgroup v2 files
+ ===============
+ 
+diff --git a/mm/parp/core/watermark.c b/mm/parp/core/watermark.c
+index 70785f62c..7f4547396 100644
+--- a/mm/parp/core/watermark.c
++++ b/mm/parp/core/watermark.c
+@@ -42,6 +42,7 @@ static int sysctl_tier2_predict_latency_ms __read_mostly = 100;
+ static int sysctl_tier2_predict_horizon_ratio __read_mostly = 3;
+ #ifdef CONFIG_PARP_TIER2_WSS_PREDICT
+ static int sysctl_tier2_wss_predict_enabled __read_mostly = 1; /* lzx-note */
++static int sysctl_tier2_wss_strengthen_enabled __read_mostly; /* lzx-note */
+ #endif
+ static int parp_tier2_one = 1;
+ static int parp_tier2_thousand = 1000;
+@@ -101,6 +102,15 @@ static const struct ctl_table parp_tier2_sysctls[] = {
+ 		.extra1 = SYSCTL_ZERO,
+ 		.extra2 = &parp_tier2_one,
+ 	}, /* lzx-note */
++	{
++		.procname = "tier2_wss_strengthen_enabled",
++		.data = &sysctl_tier2_wss_strengthen_enabled,
++		.maxlen = sizeof(sysctl_tier2_wss_strengthen_enabled),
++		.mode = 0644,
++		.proc_handler = proc_dointvec_minmax,
++		.extra1 = SYSCTL_ZERO,
++		.extra2 = &parp_tier2_one,
++	}, /* lzx-note */
+ #endif
+ }; /* #lzx */
+ 
+@@ -435,6 +445,21 @@ enum parp_tier2_wss_action parp_tier2_workingset_effective_action(
+ 			headroom_bytes, demote_wmark_bytes);
+ } /* lzx-note */
+ 
++enum parp_tier2_wss_action parp_tier2_workingset_apply_policy(
++		enum parp_tier2_wss_action policy_action,
++		bool strengthen_enabled)
++{
++	/* Keep STRENGTHEN observable as a prediction decision, but do not let an
++	 * unvalidated page selector raise the reclaim watermark unless its own
++	 * APPLY switch is explicitly enabled. lzx-note
++	 */
++	if (policy_action == PARP_TIER2_WSS_STRENGTHEN &&
++	    !strengthen_enabled)
++		return PARP_TIER2_WSS_NORMAL;
++
++	return policy_action;
++} /* lzx-note */
++
+ u64 parp_tier2_workingset_demote_wmark(u64 limit_bytes,
+ 		u64 alloc_wmark_bytes, u64 demote_wmark_bytes,
+ 		u64 predicted_workingset_bytes, u64 predicted_resident_bytes,
+@@ -478,6 +503,7 @@ static void parp_tier2_workingset_update_locked(
+ {
+ 	enum parp_tier2_wss_action raw;
+ 	enum parp_tier2_wss_action action;
++	enum parp_tier2_wss_action apply_policy_action; /* lzx-note */
+ 	bool new_generation;
+ 
+ 	if (!READ_ONCE(sysctl_tier2_wss_predict_enabled) ||
+@@ -539,13 +565,16 @@ static void parp_tier2_workingset_update_locked(
+ 	state->predicted_growth_bytes = prediction->predicted_workingset_bytes -
+ 		prediction->predicted_resident_bytes;
+ 	state->workingset_confidence_q15 = prediction->confidence_q15;
++	apply_policy_action = parp_tier2_workingset_apply_policy(
++		state->workingset_policy_action,
++		READ_ONCE(sysctl_tier2_wss_strengthen_enabled)); /* lzx-note */
+ 	action = parp_tier2_workingset_effective_action(
+-		state->workingset_policy_action, raw, headroom, demote); /* lzx-note */
++		apply_policy_action, raw, headroom, demote); /* lzx-note */
+ 	if (action != state->workingset_action) {
+-		if (action != state->workingset_policy_action)
++		if (action != apply_policy_action)
+ 			atomic64_inc(&state->workingset_safety_overrides);
+ 		else if (!new_generation && state->workingset_action !=
+-			 state->workingset_policy_action)
++			 apply_policy_action)
+ 			atomic64_inc(&state->workingset_live_restores);
+ 		state->workingset_action = action; /* lzx-note */
+ 	}
+@@ -1087,8 +1116,11 @@ int parp_tier2_stats_show(struct seq_file *m, void *v)
+ #ifdef CONFIG_PARP_TIER2_WSS_PREDICT
+ 	int workingset_runtime_enabled =
+ 		READ_ONCE(sysctl_tier2_wss_predict_enabled);
++	int workingset_strengthen_apply_enabled =
++		READ_ONCE(sysctl_tier2_wss_strengthen_enabled); /* lzx-note */
+ #else
+ 	int workingset_runtime_enabled = 0;
++	int workingset_strengthen_apply_enabled = 0; /* lzx-note */
+ #endif
+ 
+ 	parp_tier2_live_values(memcg, &limit, &usage, &headroom, &alloc, &demote);
+@@ -1134,6 +1166,8 @@ int parp_tier2_stats_show(struct seq_file *m, void *v)
+ 		   IS_ENABLED(CONFIG_PARP_TIER2_WSS_PREDICT));
+ 	seq_printf(m, "workingset_runtime_enabled %u\n",
+ 		   workingset_runtime_enabled);
++	seq_printf(m, "workingset_strengthen_apply_enabled %u\n",
++		   workingset_strengthen_apply_enabled); /* lzx-note */
+ 	seq_printf(m, "workingset_action %u\n", workingset_action);
+ 	seq_printf(m, "workingset_policy_action %u\n",
+ 		   READ_ONCE(state->workingset_policy_action)); /* lzx-note */
+diff --git a/mm/parp/internal.h b/mm/parp/internal.h
+index 60ed369bc..f6c4593ff 100644
+--- a/mm/parp/internal.h
++++ b/mm/parp/internal.h
+@@ -533,6 +533,9 @@ enum parp_tier2_wss_action parp_tier2_workingset_effective_action(
+ 		enum parp_tier2_wss_action policy_action,
+ 		enum parp_tier2_wss_action live_action,
+ 		u64 headroom_bytes, u64 demote_wmark_bytes); /* lzx-note */
++enum parp_tier2_wss_action parp_tier2_workingset_apply_policy(
++		enum parp_tier2_wss_action policy_action,
++		bool strengthen_enabled); /* lzx-note */
+ u64 parp_tier2_workingset_demote_wmark(u64 limit_bytes,
+ 		u64 alloc_wmark_bytes, u64 demote_wmark_bytes,
+ 		u64 predicted_workingset_bytes, u64 predicted_resident_bytes,
+diff --git a/mm/parp/tests/parp_test.c b/mm/parp/tests/parp_test.c
+index e3add2b8c..9e2db9e94 100644
+--- a/mm/parp/tests/parp_test.c
++++ b/mm/parp/tests/parp_test.c
+@@ -123,6 +123,18 @@ static void parp_tier2_workingset_action_test(struct kunit *test)
+ 			PARP_TIER2_WSS_NORMAL, PARP_TIER2_WSS_STRENGTHEN,
+ 			alloc, demote),
+ 		PARP_TIER2_WSS_NORMAL); /* lzx-note */
++	KUNIT_EXPECT_EQ(test,
++		parp_tier2_workingset_apply_policy(
++			PARP_TIER2_WSS_STRENGTHEN, false),
++		PARP_TIER2_WSS_NORMAL); /* lzx-note */
++	KUNIT_EXPECT_EQ(test,
++		parp_tier2_workingset_apply_policy(
++			PARP_TIER2_WSS_STRENGTHEN, true),
++		PARP_TIER2_WSS_STRENGTHEN); /* lzx-note */
++	KUNIT_EXPECT_EQ(test,
++		parp_tier2_workingset_apply_policy(
++			PARP_TIER2_WSS_RELAX, false),
++		PARP_TIER2_WSS_RELAX); /* lzx-note */
+ 	KUNIT_EXPECT_GT(test,
+ 		parp_tier2_workingset_demote_wmark(limit, alloc, demote,
+ 			2ULL << 30, 1ULL << 30,

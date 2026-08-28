@@ -100,12 +100,76 @@ class AcceptanceConfigTests(unittest.TestCase):
             self.assertEqual(plan, replayed["metadata"]["scenario_plan"])
             self.assertEqual(len(plan["cases"]), aligned["profiles"]["smoke"]["hotcold_steps"])
 
+    def test_lsapp_predictive_pressure_follows_context_prediction(self) -> None:
+        config = json.loads((ROOT / "parp-predictive-reclaim-config-lzx.json").read_text(encoding="utf-8"))
+        with tempfile.TemporaryDirectory() as temporary:
+            scenario = MODULE.generate_scenario(
+                config, suite="peak", profile="smoke", round_index=1,
+                seed=20260826, session_dir=Path(temporary) / "positive",
+                trace_instance="predictive-positive",
+            )
+        plan = scenario["metadata"]["scenario_plan"]
+        self.assertEqual(plan["sequence_mode"], "lsapp_heldout")
+        self.assertTrue(plan["sequence_dataset_sha256"])
+        self.assertEqual(len(plan["cases"]), config["profiles"]["smoke"]["peak_steps"])
+        for previous, current in zip(plan["cases"], plan["cases"][1:]):
+            if not current["block_start"]:
+                self.assertEqual(previous["app"], current["current_app"])
+        labels = [str(action.get("label", "")) for action in scenario["actions"]]
+        context = next(index for index, label in enumerate(labels) if "_CONTEXT_" in label and "VERIFY" not in label and "HOT" not in label)
+        pressure = labels.index("OOM_THRESHOLD_PRESSURE_LAUNCH")
+        target = next(index for index, label in enumerate(labels) if "PEAK_CASE_000_SWITCH_" in label)
+        self.assertLess(context, pressure)
+        self.assertLess(pressure, target)
+        pressure_action = scenario["actions"][pressure]
+        self.assertIn("--target-headroom-mib 192", pressure_action["command"])
+        self.assertIn("--reclaim-probe-mib 128", pressure_action["command"])
+        settle = next(
+            action for action in scenario["actions"]
+            if action.get("label") == "PEAK_APPLICATION_STARTUP_SETTLE"
+        )
+        self.assertEqual(settle["seconds"], 5.0)
+        self.assertLess(labels.index("WAIT_GIMP"), labels.index("PEAK_APPLICATION_STARTUP_SETTLE"))
+        self.assertLess(labels.index("PEAK_APPLICATION_STARTUP_SETTLE"), context)
+
+    def test_random_negative_sequence_is_deterministic_and_not_lsapp_labeled(self) -> None:
+        apps = ["FIREFOX", "LIBREOFFICE", "VLC", "GIMP"]
+        first = MODULE.random_negative_case_rows(apps, 12, 77)
+        second = MODULE.random_negative_case_rows(apps, 12, 77)
+        self.assertEqual(first, second)
+        self.assertTrue(all(row["dwell_bucket"] == "RANDOM_NEGATIVE" for row in first))
+        self.assertTrue(all(row["current_app"] != row["app"] for row in first))
+
+    def test_libreoffice_fixture_disables_first_run_modal_windows(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            session = Path(temporary) / "session"
+            MODULE.write_local_app_fixtures(session)
+            registry = (
+                session / "fixtures/libreoffice-profile/user/registrymodifications.xcu"
+            ).read_text(encoding="utf-8")
+            spec = MODULE.app_specs(session)["LIBREOFFICE"]
+        self.assertIn('oor:name="ShowTipOfTheDay"', registry)
+        self.assertIn("<value>false</value>", registry)
+        self.assertNotIn("|LibreOffice", spec.window_title)
+        self.assertIn("--nofirststartwizard", spec.command)
+
+    def test_gimp_ready_match_excludes_startup_splash(self) -> None:
+        spec = MODULE.app_specs(Path("/tmp/parp-readiness-unit"))["GIMP"]
+        self.assertEqual(spec.window_title, "image-test")
+        self.assertNotIn("Startup", spec.window_title)
+
     def test_policy_variants_isolate_effective_tier_and_tier2(self) -> None:
         self.assertEqual(MODULE.POLICY_VARIANTS["native"], {"parp_mode": 0, "effective_tier_mode": 0, "tier2_enabled": 0})
         self.assertEqual(MODULE.POLICY_VARIANTS["effective"]["tier2_enabled"], 0)
         self.assertEqual(MODULE.POLICY_VARIANTS["tier2"]["effective_tier_mode"], 0)
-        self.assertEqual(MODULE.POLICY_VARIANTS["combined"]["effective_tier_mode"], 2)
+        self.assertEqual(MODULE.POLICY_VARIANTS["tier2"]["parp_mode"], 0)
+        self.assertEqual(MODULE.POLICY_VARIANTS["tier2_bin"]["parp_mode"], 2)
+        self.assertEqual(MODULE.POLICY_VARIANTS["combined"]["effective_tier_mode"], 3)
         self.assertEqual(MODULE.POLICY_VARIANTS["combined_no_reclaim"], MODULE.POLICY_VARIANTS["combined"])
+        self.assertEqual(MODULE.POLICY_VARIANTS["bin_apply"]["tier2_enabled"], 0)
+        self.assertEqual(MODULE.reclaim_bin_enabled_for_variant("bin_off"), 0)
+        self.assertEqual(MODULE.reclaim_bin_enabled_for_variant("bin_apply"), 1)
+        self.assertEqual(MODULE.tier2_scope_enabled_for_variant("bin_apply"), 1)  # lzx-note
 
     def test_effective_policy_rejects_missing_boot_metadata(self) -> None:
         state = {
@@ -130,10 +194,29 @@ class AcceptanceConfigTests(unittest.TestCase):
             MODULE.safety_threshold(self.config, "full", "min_memavailable_bytes"),
         )
 
-    def test_pristine_native_does_not_require_parp_tracepoint(self) -> None:
-        checks = {"tracefs_page_fault_user": True, "tracefs_parp_decision": False, "native_parp_controls_absent": True}
-        self.assertNotIn("tracefs_parp_decision", MODULE.preflight_blocking_checks(checks, "full", "native"))
-        self.assertIn("tracefs_parp_decision", MODULE.preflight_blocking_checks(checks, "full", "combined"))
+    def test_native_off_requires_same_binary_trace_and_controls(self) -> None:
+        checks = {
+            "tracefs_page_fault_user": True,
+            "tracefs_parp_decision": False,
+            "native_off_controls": True,
+            "tier2_master_switch": True,
+        }
+        self.assertIn("tracefs_parp_decision", MODULE.preflight_blocking_checks(checks, "full", "native"))
+
+    def test_native_off_applies_all_zero_switches(self) -> None:
+        initial = {
+            "parp_mode": "1", "effective_tier_mode": "0",
+            "effective_tier_trace_all_candidates": "0", "tier2_enabled": "0",
+            "effective_tier_stats": "apply_compiled 1\n",
+            "effective_tier_config": "metadata_reservation_requested 1\nmetadata_ready 1\n",
+        }
+        applied = dict(initial, parp_mode="0")
+        with mock.patch.object(MODULE, "policy_state", side_effect=[initial, applied]), \
+                mock.patch.object(MODULE, "privileged_write") as write:
+            self.assertEqual(MODULE.apply_global_policy("native"), initial)
+        writes = [(str(call.args[0]), call.args[1]) for call in write.call_args_list]
+        self.assertIn((str(MODULE.PARP_DEBUGFS / "mode"), 0), writes)
+        self.assertIn((str(MODULE.TIER2_SYSCTL), 0), writes)
 
     def test_xvfb_dev_null_xauthority_is_preserved(self) -> None:
         # lzx-note: Isolated GUI automation deliberately uses Xvfb -ac.

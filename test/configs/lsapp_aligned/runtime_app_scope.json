@@ -4,6 +4,7 @@
     {
       "app_key": "FIREFOX", "app_id": 1, "vocab_name": "Firefox",
       "scope_name": "automation-firefox.scope", "unit_name": "automation-firefox",
+      "binding_scope_names": ["automation-fixture-firefox.scope"],
       "workload_enabled": true, "prediction_enabled": true,
       "window_keywords": ["epiphany", "org.gnome.Epiphany", "Web", "PARP LSAPP"],
       "process_keywords": ["epiphany", "epiphany-browser"]
@@ -11,6 +12,7 @@
     {
       "app_key": "LIBREOFFICE", "app_id": 2, "vocab_name": "LibreOffice",
       "scope_name": "automation-libreoffice.scope", "unit_name": "automation-libreoffice",
+      "binding_scope_names": ["automation-fixture-libreoffice.scope"],
       "workload_enabled": true, "prediction_enabled": true,
       "window_keywords": ["libreoffice", "soffice", "writer"],
       "process_keywords": ["soffice.bin", "soffice", "lowriter"]
@@ -18,6 +20,7 @@
     {
       "app_key": "VLC", "app_id": 3, "vocab_name": "VLC",
       "scope_name": "automation-vlc.scope", "unit_name": "automation-vlc",
+      "binding_scope_names": ["automation-fixture-vlc.scope"],
       "workload_enabled": true, "prediction_enabled": true,
       "window_keywords": ["vlc", "videolan", "audio-test"],
       "process_keywords": ["vlc"]
@@ -25,6 +28,7 @@
     {
       "app_key": "GIMP", "app_id": 4, "vocab_name": "GIMP",
       "scope_name": "automation-gimp.scope", "unit_name": "automation-gimp",
+      "binding_scope_names": ["automation-fixture-gimp.scope"],
       "workload_enabled": true, "prediction_enabled": true,
       "window_keywords": ["gimp", "gnu image manipulation", "image-test"],
       "process_keywords": ["gimp", "gimp-2.10"]
@@ -39,6 +43,7 @@
     {
       "app_key": "THUNDERBIRD", "app_id": 6, "vocab_name": "Thunderbird",
       "scope_name": "automation-thunderbird.scope", "unit_name": "automation-thunderbird",
+      "binding_scope_names": ["automation-fixture-thunderbird.scope"],
       "workload_enabled": true, "prediction_enabled": true,
       "window_keywords": ["thunderbird", "PARP local message"],
       "process_keywords": ["thunderbird"]
@@ -53,6 +58,7 @@
     {
       "app_key": "FILES", "app_id": 8, "vocab_name": "Files",
       "scope_name": "automation-files.scope", "unit_name": "automation-files",
+      "binding_scope_names": ["automation-fixture-files.scope"],
       "workload_enabled": true, "prediction_enabled": true,
       "window_keywords": ["nautilus", "files", "文件", "lsapp-fixtures"],
       "process_keywords": ["nautilus", "org.gnome.Nautilus"]

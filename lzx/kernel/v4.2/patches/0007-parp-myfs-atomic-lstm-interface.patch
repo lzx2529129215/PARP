@@ -1,0 +1,831 @@
+diff --git a/Documentation/admin-guide/mm/index.rst b/Documentation/admin-guide/mm/index.rst
+--- a/Documentation/admin-guide/mm/index.rst
++++ b/Documentation/admin-guide/mm/index.rst
+@@ -37,6 +37,7 @@
+    numaperf
+    pagemap
+    parp-experiments
++   parp-myfs
+    parp-tier2
+    shrinker_debugfs
+    slab
+diff --git a/mm/parp/internal.h b/mm/parp/internal.h
+--- a/mm/parp/internal.h
++++ b/mm/parp/internal.h
+@@ -510,6 +510,9 @@
+ int parp_snapshot_update_binding(const struct parp_binding *binding);
+ int parp_snapshot_update_prior(const struct parp_app_prior *prior);
+ int parp_snapshot_replace_prior_batch(const struct parp_app_prior_batch *batch);
++int parp_snapshot_replace_state(const struct parp_app_prior_batch *batch,
++				const struct parp_binding *bindings,
++				u32 nr_bindings); /* lzx-note */
+ void parp_snapshot_fill_scan_budget_input(u64 domain_id, u64 now_ns,
+ 					 struct parp_scan_budget_input *input);
+ int parp_compute_scan_budget(const struct parp_scan_budget_input *input,
+diff --git a/mm/parp/Kconfig b/mm/parp/Kconfig
+--- a/mm/parp/Kconfig
++++ b/mm/parp/Kconfig
+@@ -19,6 +19,16 @@
+ 	  Test fixed-point scoring, expiry, state assignment and observe-only
+ 	  behavior.
+ 
++config PARP_MYFS # lzx-note
++	bool "Enable the /dev/myfs PARP prediction interface"
++	depends on PARP
++	default y
++	help
++	  Expose a versioned misc character device used by the resident PARP
++	  service to replace one LSTM prediction batch and its cgroup bindings
++	  atomically. This is the supported prediction control interface; writable
++	  app-prior and app-bind debugfs files are not created.
++
+ config PARP_TIER2 # lzx-note
+ 	bool "Enable PARP cgroup Tier2 prediction and reclaim scheduling"
+ 	depends on PARP
+diff --git a/mm/parp/Makefile b/mm/parp/Makefile
+--- a/mm/parp/Makefile
++++ b/mm/parp/Makefile
+@@ -10,6 +10,7 @@
+ 	  adapter/file_adapter.o adapter/anon_adapter.o adapter/feedback_adapter.o \
+ 	  adapter/scan_budget_adapter.o \
+ 	  control/debugfs.o control/sysfs.o control/genl.o control/trace.o
++parp-$(CONFIG_PARP_MYFS) += control/dev.o # lzx-note
+ parp-$(CONFIG_PARP_TIER2) += core/watermark.o # lzx-note
+ parp-$(CONFIG_PARP_DAMON_ALIGNMENT) += adapter/damon_adapter.o
+ parp-$(CONFIG_PARP_FRONTIER_SCORE) += core/frontier_score.o
+diff --git a/mm/parp/control/debugfs.c b/mm/parp/control/debugfs.c
+--- a/mm/parp/control/debugfs.c
++++ b/mm/parp/control/debugfs.c
+@@ -9,7 +9,6 @@
+ #include "../internal.h"
+ 
+ static struct dentry *parp_dir;
+-static atomic_t parp_bind_generation = ATOMIC_INIT(0);
+ 
+ static ssize_t mode_read(struct file *file, char __user *buf, size_t len,
+ 			 loff_t *ppos)
+@@ -439,107 +438,6 @@
+ 
+ DEFINE_SHOW_ATTRIBUTE(scan_budget_stats); /* #lzx */
+ 
+-static int parp_parse_prior_entry(char **argv, struct parp_app_prior *entry)
+-{
+-	unsigned int foreground, valid;
+-	int error;
+-
+-	error = kstrtou32(argv[0], 0, &entry->app_id);
+-	error |= kstrtou16(argv[1], 0, &entry->use_score_q15);
+-	error |= kstrtou16(argv[2], 0, &entry->rank);
+-	error |= kstrtouint(argv[3], 0, &foreground);
+-	error |= kstrtouint(argv[4], 0, &valid);
+-	error |= kstrtou32(argv[5], 0, &entry->flags);
+-	if (error || foreground > 1 || valid != 1)
+-		return -EINVAL;
+-	entry->foreground = foreground;
+-	entry->valid = valid;
+-	return 0;
+-}
+-
+-static ssize_t prior_batch_write(struct file *file, const char __user *buf,
+-				 size_t len, loff_t *ppos)
+-{
+-	struct parp_app_prior_batch *batch;
+-	char **argv;
+-	char *text;
+-	int argc, error = 0;
+-	unsigned int i;
+-
+-	if (!len || len > 4095)
+-		return -E2BIG;
+-	text = memdup_user_nul(buf, len);
+-	if (IS_ERR(text))
+-		return PTR_ERR(text);
+-	argv = argv_split(GFP_KERNEL, text, &argc);
+-	if (!argv) {
+-		kfree(text);
+-		return -ENOMEM;
+-	}
+-	batch = kzalloc(sizeof(*batch), GFP_KERNEL);
+-	if (!batch) {
+-		error = -ENOMEM;
+-		goto out;
+-	}
+-	if (argc < 7) {
+-		error = -EINVAL;
+-		goto free_batch;
+-	}
+-	error = kstrtou32(argv[0], 0, &batch->schema_version);
+-	error |= kstrtou32(argv[1], 0, &batch->model_version);
+-	error |= kstrtou32(argv[2], 0, &batch->prediction_generation);
+-	error |= kstrtou64(argv[3], 0, &batch->timestamp_ns);
+-	error |= kstrtou64(argv[4], 0, &batch->horizon_ns);
+-	error |= kstrtou64(argv[5], 0, &batch->expiry_ns);
+-	error |= kstrtou32(argv[6], 0, &batch->nr_entries);
+-	if (error || batch->nr_entries > PARP_MAX_APPS ||
+-	    argc != 7 + batch->nr_entries * 6) {
+-		error = -EINVAL;
+-		goto free_batch;
+-	}
+-	for (i = 0; i < batch->nr_entries; i++) {
+-		error = parp_parse_prior_entry(&argv[7 + i * 6],
+-					       &batch->entries[i]);
+-		if (error)
+-			goto free_batch;
+-	}
+-	error = parp_snapshot_replace_prior_batch(batch);
+-free_batch:
+-	kfree(batch);
+-out:
+-	argv_free(argv);
+-	kfree(text);
+-	return error ? error : len;
+-}
+-
+-static ssize_t prior_batch_read(struct file *file, char __user *buf,
+-				size_t len, loff_t *ppos)
+-{
+-	const struct parp_snapshot *snapshot;
+-	char text[160];
+-	int size = 0;
+-
+-	snapshot = parp_snapshot_acquire();
+-	if (snapshot)
+-		size = scnprintf(text, sizeof(text),
+-			"schema=%u model=%u generation=%u timestamp_ns=%llu horizon_ns=%llu expiry_ns=%llu entries=%u\n",
+-			snapshot->prediction_schema_version,
+-			snapshot->prediction_model_version,
+-			snapshot->prediction_generation,
+-			snapshot->prediction_timestamp_ns,
+-			snapshot->prediction_horizon_ns,
+-			snapshot->prediction_expiry_ns, snapshot->nr_priors);
+-	parp_snapshot_release();
+-	return simple_read_from_buffer(buf, len, ppos, text, size);
+-}
+-
+-static const struct file_operations prior_batch_fops = {
+-	.owner = THIS_MODULE,
+-	.read = prior_batch_read,
+-	.write = prior_batch_write,
+-	.llseek = default_llseek,
+-};
+-
+ static ssize_t scan_budget_clear_write(struct file *file,
+ 				       const char __user *buf, size_t len,
+ 				       loff_t *ppos)
+@@ -582,67 +480,6 @@
+ 
+ DEFINE_SHOW_ATTRIBUTE(scan_budget_circuits); /* #lzx */
+ 
+-static ssize_t bind_write(struct file *file, const char __user *buf,
+-			  size_t len, loff_t *ppos)
+-{
+-	struct parp_binding binding = { .active = true };
+-	char text[128];
+-	unsigned long ttl_ms;
+-	u64 now = ktime_get_mono_fast_ns();
+-
+-	if (!len || len >= sizeof(text) || copy_from_user(text, buf, len))
+-		return -EINVAL;
+-	text[len] = '\0';
+-	if (sscanf(text, "%llu %u %lu %llu %llu",
+-		   &binding.domain_id, &binding.app_id, &ttl_ms,
+-		   &binding.epoch_id, &binding.model_version) != 5)
+-		return -EINVAL;
+-	binding.updated_ns = now;
+-	binding.expires_ns = now + ttl_ms * NSEC_PER_MSEC;
+-	binding.bind_generation = atomic_inc_return(&parp_bind_generation);
+-	if (!binding.bind_generation)
+-		binding.bind_generation = atomic_inc_return(&parp_bind_generation);
+-	if (parp_snapshot_update_binding(&binding))
+-		return -ENOMEM;
+-	return len;
+-}
+-
+-static ssize_t prior_write(struct file *file, const char __user *buf,
+-			   size_t len, loff_t *ppos)
+-{
+-	struct parp_app_prior prior = { .valid = true };
+-	char text[128];
+-	unsigned long ttl_ms;
+-	u64 now = ktime_get_mono_fast_ns();
+-
+-	if (!len || len >= sizeof(text) || copy_from_user(text, buf, len))
+-		return -EINVAL;
+-	text[len] = '\0';
+-	if (sscanf(text, "%u %hu %hu %u %lu %llu", &prior.app_id,
+-		   &prior.use_score_q15, &prior.rank, &prior.horizon_ms,
+-		   &ttl_ms, &prior.model_version) != 6)
+-		return -EINVAL;
+-	if (prior.use_score_q15 > PARP_Q15_ONE)
+-		return -ERANGE;
+-	prior.updated_ns = now;
+-	prior.expires_ns = now + ttl_ms * NSEC_PER_MSEC;
+-	if (parp_snapshot_update_prior(&prior))
+-		return -ENOMEM;
+-	return len;
+-}
+-
+-static const struct file_operations bind_fops = {
+-	.owner = THIS_MODULE,
+-	.write = bind_write,
+-	.llseek = noop_llseek,
+-};
+-
+-static const struct file_operations prior_fops = {
+-	.owner = THIS_MODULE,
+-	.write = prior_write,
+-	.llseek = noop_llseek,
+-};
+-
+ static int snapshot_show(struct seq_file *m, void *v) /* #lzx */
+ {
+ 	const struct parp_snapshot *snapshot = parp_snapshot_acquire();
+@@ -739,14 +576,11 @@
+ 			    &scan_budget_apply_domain_fops);
+ 	debugfs_create_file("scan_budget_stats", 0400, parp_dir, NULL,
+ 			    &scan_budget_stats_fops);
+-	debugfs_create_file("app_prior_batch", 0600, parp_dir, NULL,
+-			    &prior_batch_fops);
+ 	debugfs_create_file("scan_budget_circuit_clear", 0200, parp_dir, NULL,
+ 			    &scan_budget_clear_fops);
+ 	debugfs_create_file("scan_budget_circuits", 0400, parp_dir, NULL,
+ 			    &scan_budget_circuits_fops);
+-	debugfs_create_file("app_bind", 0200, parp_dir, NULL, &bind_fops);
+-	debugfs_create_file("app_prior", 0200, parp_dir, NULL, &prior_fops);
++	/* lzx-note: Prediction writes moved atomically to /dev/myfs. */
+ 	debugfs_create_file("snapshot", 0400, parp_dir, NULL, &snapshot_fops); /* #lzx */
+ 	debugfs_create_file("stats", 0400, parp_dir, NULL, &stats_fops); /* #lzx */
+ 	return 0;
+diff --git a/mm/parp/core/snapshot.c b/mm/parp/core/snapshot.c
+--- a/mm/parp/core/snapshot.c
++++ b/mm/parp/core/snapshot.c
+@@ -203,6 +203,103 @@
+ 	return 0;
+ }
+ 
++static int parp_validate_bindings(const struct parp_app_prior_batch *batch,
++				  const struct parp_binding *bindings,
++				  u32 nr_bindings)
++{
++	unsigned int i, j;
++
++	if (nr_bindings > PARP_MAX_DOMAINS || (nr_bindings && !bindings))
++		return -EINVAL;
++	for (i = 0; i < nr_bindings; i++) {
++		bool prior_found = false;
++
++		if (!bindings[i].active || !bindings[i].domain_id ||
++		    !bindings[i].app_id || !bindings[i].bind_generation ||
++		    bindings[i].model_version != batch->model_version ||
++		    bindings[i].expires_ns != batch->expiry_ns)
++			return -EINVAL;
++		for (j = 0; j < batch->nr_entries; j++)
++			if (batch->entries[j].app_id == bindings[i].app_id) {
++				prior_found = true;
++				break;
++			}
++		if (!prior_found)
++			return -ENOENT;
++		for (j = 0; j < i; j++)
++			if (bindings[j].domain_id == bindings[i].domain_id)
++				return -EINVAL;
++	}
++	return 0;
++}
++
++/* lzx-note: Publish one event's LSTM priors and cgroup ownership atomically. */
++int parp_snapshot_replace_state(const struct parp_app_prior_batch *batch,
++				const struct parp_binding *bindings,
++				u32 nr_bindings)
++{
++	struct parp_snapshot *active;
++	struct parp_snapshot *new;
++	u64 now_ns = ktime_get_mono_fast_ns();
++	unsigned int i;
++	int error;
++
++	error = parp_validate_prior_batch(batch, now_ns);
++	if (!error)
++		error = parp_validate_bindings(batch, bindings, nr_bindings);
++	if (error) {
++		atomic64_inc(&parp_scan_budget_stats.invalid_batch);
++		return error;
++	}
++
++	mutex_lock(&parp_snapshot_update_lock);
++	rcu_read_lock();
++	active = rcu_dereference(parp_active_snapshot);
++	if (active && batch->prediction_generation <=
++	    active->prediction_generation) {
++		error = batch->prediction_generation ==
++			active->prediction_generation ? -EALREADY : -ESTALE;
++		rcu_read_unlock();
++		mutex_unlock(&parp_snapshot_update_lock);
++		atomic64_inc(&parp_scan_budget_stats.stale_batch);
++		return error;
++	}
++	rcu_read_unlock();
++
++	new = parp_clone_snapshot(GFP_KERNEL);
++	if (!new) {
++		mutex_unlock(&parp_snapshot_update_lock);
++		return -ENOMEM;
++	}
++	memset(new->priors, 0, sizeof(new->priors));
++	memset(new->bindings, 0, sizeof(new->bindings));
++	new->nr_priors = batch->nr_entries;
++	new->nr_bindings = nr_bindings;
++	new->prediction_schema_version = batch->schema_version;
++	new->prediction_model_version = batch->model_version;
++	new->prediction_generation = batch->prediction_generation;
++	new->prediction_timestamp_ns = batch->timestamp_ns;
++	new->prediction_horizon_ns = batch->horizon_ns;
++	new->prediction_expiry_ns = batch->expiry_ns;
++	new->expires_ns = batch->expiry_ns;
++	for (i = 0; i < batch->nr_entries; i++) {
++		new->priors[i] = batch->entries[i];
++		new->priors[i].updated_ns = batch->timestamp_ns;
++		new->priors[i].expires_ns = batch->expiry_ns;
++		new->priors[i].horizon_ms = div_u64(batch->horizon_ns,
++						     NSEC_PER_MSEC);
++		new->priors[i].model_version = batch->model_version;
++		new->priors[i].prediction_generation =
++			batch->prediction_generation;
++	}
++	for (i = 0; i < nr_bindings; i++)
++		new->bindings[i] = bindings[i];
++
++	parp_publish_snapshot(new);
++	mutex_unlock(&parp_snapshot_update_lock);
++	return 0;
++}
++
+ void parp_snapshot_fill_scan_budget_input(u64 domain_id, u64 now_ns,
+ 					 struct parp_scan_budget_input *input)
+ {
+diff --git a/mm/parp/tests/parp_test.c b/mm/parp/tests/parp_test.c
+--- a/mm/parp/tests/parp_test.c
++++ b/mm/parp/tests/parp_test.c
+@@ -747,6 +747,58 @@
+ 	KUNIT_EXPECT_EQ(test, parp_snapshot_replace_prior_batch(&batch), -ERANGE);
+ }
+ 
++static void parp_atomic_prediction_state_test(struct kunit *test) /* lzx-note */
++{
++	u64 now = ktime_get_mono_fast_ns();
++	struct parp_app_prior_batch batch = {
++		.schema_version = PARP_APP_PRIOR_BATCH_SCHEMA,
++		.model_version = 401,
++		.prediction_generation = 300,
++		.timestamp_ns = now,
++		.horizon_ns = 180 * NSEC_PER_SEC,
++		.expiry_ns = now + 180 * NSEC_PER_SEC,
++		.nr_entries = 2,
++		.entries = {
++			{ .app_id = 1, .use_score_q15 = PARP_Q15_ONE, .rank = 1,
++			  .foreground = true, .valid = true },
++			{ .app_id = 3, .use_score_q15 = 12000, .rank = 2,
++			  .valid = true },
++		},
++	};
++	struct parp_binding bindings[2] = {
++		{
++			.domain_id = 1001, .app_id = 1, .bind_generation = 300,
++			.updated_ns = now, .expires_ns = batch.expiry_ns,
++			.epoch_id = 77, .model_version = 401, .active = true,
++		},
++		{
++			.domain_id = 1002, .app_id = 3, .bind_generation = 300,
++			.updated_ns = now, .expires_ns = batch.expiry_ns,
++			.epoch_id = 77, .model_version = 401, .active = true,
++		},
++	};
++	const struct parp_snapshot *snapshot;
++
++	KUNIT_ASSERT_EQ(test,
++		parp_snapshot_replace_state(&batch, bindings, 2), 0);
++	snapshot = parp_snapshot_acquire();
++	KUNIT_ASSERT_NOT_NULL(test, snapshot);
++	KUNIT_EXPECT_EQ(test, snapshot->prediction_generation, 300U);
++	KUNIT_EXPECT_EQ(test, snapshot->nr_priors, 2U);
++	KUNIT_EXPECT_EQ(test, snapshot->nr_bindings, 2U);
++	KUNIT_EXPECT_EQ(test, snapshot->bindings[1].app_id, 3U);
++	parp_snapshot_release();
++
++	bindings[1].domain_id = bindings[0].domain_id;
++	batch.prediction_generation++;
++	KUNIT_EXPECT_EQ(test,
++		parp_snapshot_replace_state(&batch, bindings, 2), -EINVAL);
++	snapshot = parp_snapshot_acquire();
++	KUNIT_ASSERT_NOT_NULL(test, snapshot);
++	KUNIT_EXPECT_EQ(test, snapshot->prediction_generation, 300U);
++	parp_snapshot_release();
++}
++
+ static void parp_scan_budget_circuit_test(struct kunit *test)
+ {
+ 	parp_scan_budget_guard_reset_all_for_test();
+@@ -1320,6 +1372,7 @@
+ 	KUNIT_CASE(parp_scan_budget_apply_domain_test),
+ 	KUNIT_CASE(parp_prior_batch_test),
+ 	KUNIT_CASE(parp_prior_batch_validation_test),
++	KUNIT_CASE(parp_atomic_prediction_state_test), /* lzx-note */
+ 	KUNIT_CASE(parp_scan_budget_circuit_test),
+ 	KUNIT_CASE(parp_phase27_region_trace_schema_test),
+ #ifdef CONFIG_PARP_EFFECTIVE_TIER
+diff --git a/tools/parp/build_lzx_kernel.sh b/tools/parp/build_lzx_kernel.sh
+--- a/tools/parp/build_lzx_kernel.sh
++++ b/tools/parp/build_lzx_kernel.sh
+@@ -91,6 +91,10 @@
+ 	fi
+ fi
+ 
++if [[ "$PROFILE" != native ]]; then
++	"$CONFIG_TOOL" --file "$BUILD_DIR/.config" --enable PARP_MYFS # lzx-note
++fi
++
+ if [[ -n "${LZX_LOCALVERSION:-}" ]]; then
+ 	CONFIG_LOCALVERSION_VALUE="$LZX_LOCALVERSION" # lzx-note
+ elif [[ "$PROFILE" == native ]]; then
+diff --git a/Documentation/admin-guide/mm/parp-myfs.rst b/Documentation/admin-guide/mm/parp-myfs.rst
+new file mode 100644
+index 000000000..9ab9bf617
+--- /dev/null
++++ b/Documentation/admin-guide/mm/parp-myfs.rst
+@@ -0,0 +1,26 @@
++.. SPDX-License-Identifier: GPL-2.0
++
++PARP ``/dev/myfs`` prediction interface
++=========================================
++
++``CONFIG_PARP_MYFS`` creates the ``myfs`` misc character device.  It is the
++only supported userspace interface for application LSTM priors and cgroup
++bindings; PARP does not create the former writable ``app_prior``,
++``app_prior_batch`` or ``app_bind`` debugfs files.  Read-only debugfs counters
++remain available for experiment diagnosis.  ``lzx-note``
++
++The version-1 ABI is declared in ``include/uapi/linux/parp_predict.h``.  The
++``PARP_PREDICT_SET_STATE`` ioctl accepts a fixed-size, pointer-free structure
++containing up to 32 predictions and 64 cgroup bindings.  One ioctl validates
++the complete message and performs one RCU publication, so reclaim cannot see
++new probabilities paired with old ownership metadata.
++
++All timestamps use ``CLOCK_MONOTONIC`` nanoseconds.  Generations must increase,
++scores use unsigned Q15, ranks and application IDs must be unique, and every
++binding must refer to an application in the same prediction batch.  Invalid,
++expired, duplicate or stale updates fail without changing the active snapshot.
++
++``PARP_PREDICT_GET_STATE`` returns the current generation and state for service
++restart synchronization and diagnostics.  The recommended udev rule applies
++``TAG+=\"uaccess\"`` to give the active desktop user access without making the
++device world-writable.
+diff --git a/include/uapi/linux/parp_predict.h b/include/uapi/linux/parp_predict.h
+new file mode 100644
+index 000000000..fc32048f3
+--- /dev/null
++++ b/include/uapi/linux/parp_predict.h
+@@ -0,0 +1,60 @@
++/* SPDX-License-Identifier: GPL-2.0 WITH Linux-syscall-note */
++#ifndef _UAPI_LINUX_PARP_PREDICT_H
++#define _UAPI_LINUX_PARP_PREDICT_H
++
++#include <linux/ioctl.h>
++#include <linux/types.h>
++
++/* lzx-note: Versioned, pointer-free ABI for the /dev/myfs prediction sink. */
++#define PARP_PREDICT_ABI_VERSION	1U
++#define PARP_PREDICT_MAX_APPS	32U
++#define PARP_PREDICT_MAX_BINDINGS	64U
++
++#define PARP_PREDICT_ENTRY_FOREGROUND	(1U << 0)
++#define PARP_PREDICT_BINDING_ACTIVE	(1U << 0)
++
++struct parp_predict_entry_v1 {
++	__u32 app_id;
++	__u16 score_q15;
++	__u16 rank;
++	__u32 flags;
++	__u32 reserved;
++};
++
++struct parp_predict_binding_v1 {
++	__u64 domain_id;
++	__u32 app_id;
++	__u32 flags;
++	__u64 epoch_id;
++	__u64 reserved;
++};
++
++/*
++ * SET_STATE replaces predictions and bindings in one RCU publication.  All
++ * time values use CLOCK_MONOTONIC nanoseconds.  ttl_ns is relative to
++ * timestamp_ns; generation must increase for every accepted update.
++ */
++struct parp_predict_state_v1 {
++	__u32 abi_version;
++	__u32 struct_size;
++	__u32 schema_version;
++	__u32 model_version;
++	__u32 generation;
++	__u32 nr_predictions;
++	__u32 nr_bindings;
++	__u32 flags;
++	__u64 timestamp_ns;
++	__u64 horizon_ns;
++	__u64 ttl_ns;
++	__u64 reserved[5];
++	struct parp_predict_entry_v1 predictions[PARP_PREDICT_MAX_APPS];
++	struct parp_predict_binding_v1 bindings[PARP_PREDICT_MAX_BINDINGS];
++};
++
++#define PARP_PREDICT_IOC_MAGIC	0xb7
++#define PARP_PREDICT_SET_STATE	_IOW(PARP_PREDICT_IOC_MAGIC, 1, \
++				     struct parp_predict_state_v1)
++#define PARP_PREDICT_GET_STATE	_IOR(PARP_PREDICT_IOC_MAGIC, 2, \
++				     struct parp_predict_state_v1)
++
++#endif /* _UAPI_LINUX_PARP_PREDICT_H */
+diff --git a/mm/parp/control/dev.c b/mm/parp/control/dev.c
+new file mode 100644
+index 000000000..fb6340750
+--- /dev/null
++++ b/mm/parp/control/dev.c
+@@ -0,0 +1,212 @@
++// SPDX-License-Identifier: GPL-2.0
++#include <linux/compat.h>
++#include <linux/fs.h>
++#include <linux/init.h>
++#include <linux/miscdevice.h>
++#include <linux/module.h>
++#include <linux/overflow.h>
++#include <linux/parp_predict.h>
++#include <linux/slab.h>
++#include <linux/uaccess.h>
++
++#include "../internal.h"
++
++static int parp_predict_validate_header(const struct parp_predict_state_v1 *state)
++{
++	unsigned int i;
++
++	if (state->abi_version != PARP_PREDICT_ABI_VERSION ||
++	    state->struct_size != sizeof(*state) || state->flags ||
++	    state->schema_version != PARP_APP_PRIOR_BATCH_SCHEMA ||
++	    !state->model_version || !state->generation ||
++	    !state->nr_predictions ||
++	    state->nr_predictions > PARP_PREDICT_MAX_APPS ||
++	    state->nr_bindings > PARP_PREDICT_MAX_BINDINGS ||
++	    !state->timestamp_ns || !state->horizon_ns || !state->ttl_ns)
++		return -EINVAL;
++	for (i = 0; i < ARRAY_SIZE(state->reserved); i++)
++		if (state->reserved[i])
++			return -EINVAL;
++	if (state->ttl_ns > PARP_APP_PRIOR_MAX_TTL_NS ||
++	    state->horizon_ns > PARP_APP_PRIOR_MAX_HORIZON_NS)
++		return -ERANGE;
++	return 0;
++}
++
++/* lzx-note: Translate the stable UAPI into the internal immutable snapshot. */
++static int parp_predict_set_state(void __user *argp)
++{
++	struct parp_predict_state_v1 *state;
++	struct parp_app_prior_batch *batch;
++	struct parp_binding *bindings;
++	u64 expiry_ns;
++	unsigned int i;
++	int error;
++
++	state = memdup_user(argp, sizeof(*state));
++	if (IS_ERR(state))
++		return PTR_ERR(state);
++	error = parp_predict_validate_header(state);
++	if (error)
++		goto out_state;
++	if (check_add_overflow(state->timestamp_ns, state->ttl_ns, &expiry_ns)) {
++		error = -EOVERFLOW;
++		goto out_state;
++	}
++
++	batch = kzalloc(sizeof(*batch), GFP_KERNEL);
++	bindings = kcalloc(state->nr_bindings, sizeof(*bindings), GFP_KERNEL);
++	if (!batch || (state->nr_bindings && !bindings)) {
++		error = -ENOMEM;
++		goto out_alloc;
++	}
++	batch->schema_version = state->schema_version;
++	batch->model_version = state->model_version;
++	batch->prediction_generation = state->generation;
++	batch->timestamp_ns = state->timestamp_ns;
++	batch->horizon_ns = state->horizon_ns;
++	batch->expiry_ns = expiry_ns;
++	batch->nr_entries = state->nr_predictions;
++	for (i = 0; i < state->nr_predictions; i++) {
++		const struct parp_predict_entry_v1 *source =
++			&state->predictions[i];
++
++		if (source->reserved ||
++		    source->flags & ~PARP_PREDICT_ENTRY_FOREGROUND) {
++			error = -EINVAL;
++			goto out_alloc;
++		}
++		batch->entries[i].app_id = source->app_id;
++		batch->entries[i].use_score_q15 = source->score_q15;
++		batch->entries[i].rank = source->rank;
++		batch->entries[i].foreground =
++			!!(source->flags & PARP_PREDICT_ENTRY_FOREGROUND);
++		batch->entries[i].valid = true;
++	}
++	for (i = 0; i < state->nr_bindings; i++) {
++		const struct parp_predict_binding_v1 *source =
++			&state->bindings[i];
++
++		if (source->reserved ||
++		    source->flags != PARP_PREDICT_BINDING_ACTIVE) {
++			error = -EINVAL;
++			goto out_alloc;
++		}
++		bindings[i] = (struct parp_binding) {
++			.domain_id = source->domain_id,
++			.app_id = source->app_id,
++			.bind_generation = state->generation,
++			.updated_ns = state->timestamp_ns,
++			.expires_ns = expiry_ns,
++			.epoch_id = source->epoch_id,
++			.model_version = state->model_version,
++			.active = true,
++		};
++	}
++	error = parp_snapshot_replace_state(batch, bindings,
++					    state->nr_bindings);
++out_alloc:
++	kfree(bindings);
++	kfree(batch);
++out_state:
++	kfree(state);
++	return error;
++}
++
++static int parp_predict_get_state(void __user *argp)
++{
++	const struct parp_snapshot *snapshot;
++	struct parp_predict_state_v1 *state;
++	unsigned int i;
++	int error = 0;
++
++	state = kzalloc(sizeof(*state), GFP_KERNEL);
++	if (!state)
++		return -ENOMEM;
++	state->abi_version = PARP_PREDICT_ABI_VERSION;
++	state->struct_size = sizeof(*state);
++
++	snapshot = parp_snapshot_acquire();
++	if (snapshot) {
++		state->schema_version = snapshot->prediction_schema_version;
++		state->model_version = snapshot->prediction_model_version;
++		state->generation = snapshot->prediction_generation;
++		state->timestamp_ns = snapshot->prediction_timestamp_ns;
++		state->horizon_ns = snapshot->prediction_horizon_ns;
++		if (snapshot->prediction_expiry_ns >
++		    snapshot->prediction_timestamp_ns)
++			state->ttl_ns = snapshot->prediction_expiry_ns -
++				snapshot->prediction_timestamp_ns;
++		state->nr_predictions = min_t(u32, snapshot->nr_priors,
++						 PARP_PREDICT_MAX_APPS);
++		state->nr_bindings = min_t(u32, snapshot->nr_bindings,
++					      PARP_PREDICT_MAX_BINDINGS);
++		for (i = 0; i < state->nr_predictions; i++) {
++			state->predictions[i].app_id = snapshot->priors[i].app_id;
++			state->predictions[i].score_q15 =
++				snapshot->priors[i].use_score_q15;
++			state->predictions[i].rank = snapshot->priors[i].rank;
++			if (snapshot->priors[i].foreground)
++				state->predictions[i].flags =
++					PARP_PREDICT_ENTRY_FOREGROUND;
++		}
++		for (i = 0; i < state->nr_bindings; i++) {
++			state->bindings[i].domain_id =
++				snapshot->bindings[i].domain_id;
++			state->bindings[i].app_id = snapshot->bindings[i].app_id;
++			state->bindings[i].epoch_id = snapshot->bindings[i].epoch_id;
++			if (snapshot->bindings[i].active)
++				state->bindings[i].flags =
++					PARP_PREDICT_BINDING_ACTIVE;
++		}
++	}
++	parp_snapshot_release();
++
++	if (copy_to_user(argp, state, sizeof(*state)))
++		error = -EFAULT;
++	kfree(state);
++	return error;
++}
++
++static long parp_predict_ioctl(struct file *file, unsigned int cmd,
++			       unsigned long arg)
++{
++	void __user *argp = (void __user *)arg;
++
++	switch (cmd) {
++	case PARP_PREDICT_SET_STATE:
++		return parp_predict_set_state(argp);
++	case PARP_PREDICT_GET_STATE:
++		return parp_predict_get_state(argp);
++	default:
++		return -ENOTTY;
++	}
++}
++
++static const struct file_operations parp_predict_fops = {
++	.owner = THIS_MODULE,
++	.open = nonseekable_open,
++	.unlocked_ioctl = parp_predict_ioctl,
++	.compat_ioctl = compat_ptr_ioctl,
++	.llseek = noop_llseek,
++};
++
++static struct miscdevice parp_predict_device = {
++	.minor = MISC_DYNAMIC_MINOR,
++	.name = "myfs",
++	.fops = &parp_predict_fops,
++	.mode = 0660,
++};
++
++static int __init parp_predict_dev_init(void)
++{
++	int error = misc_register(&parp_predict_device);
++
++	if (error)
++		pr_err("PARP: failed to register /dev/myfs: %d\n", error);
++	else
++		pr_info("PARP: /dev/myfs prediction interface ABI v%u ready\n",
++			PARP_PREDICT_ABI_VERSION);
++	return error;
++}
++device_initcall(parp_predict_dev_init); /* lzx-note: misc class must exist first. */
+diff --git a/tools/parp/test_prediction_interfaces.sh b/tools/parp/test_prediction_interfaces.sh
+new file mode 100755
+index 000000000..5c95d0dd0
+--- /dev/null
++++ b/tools/parp/test_prediction_interfaces.sh
+@@ -0,0 +1,29 @@
++#!/usr/bin/env bash
++set -euo pipefail
++
++kernel_root="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/../.." && pwd)"
++temp_root="$(mktemp -d --tmpdir parp-uapi.XXXXXX)"
++binary="$temp_root/uapi-layout"
++trap 'case "$temp_root" in /tmp/parp-uapi.*) rm -rf -- "$temp_root" ;; esac' EXIT
++
++# lzx-note: Prediction writes must be exposed only through parp/myfs.
++make -s -C "$kernel_root" O="$temp_root/build" headers_install \
++  INSTALL_HDR_PATH="$temp_root/headers"
++cc -Wall -Wextra -Werror -I"$temp_root/headers/include" \
++  "$kernel_root/tools/parp/uapi_layout_check.c" -o "$binary"
++"$binary"
++
++debugfs_root="${PARP_DEBUGFS_ROOT:-/sys/kernel/debug/parp}"
++for legacy in app_prior app_prior_batch app_bind; do
++  if [[ -e "$debugfs_root/$legacy" ]]; then
++    echo "FAIL: legacy writable prediction node still exists: $debugfs_root/$legacy" >&2
++    exit 1
++  fi
++done
++
++if [[ -e /dev/myfs ]]; then
++  test -c /dev/myfs
++  echo "PASS: /dev/myfs is a character device"
++else
++  echo "SKIP: /dev/myfs is not present on the running (pre-update) kernel"
++fi
+diff --git a/tools/parp/uapi_layout_check.c b/tools/parp/uapi_layout_check.c
+new file mode 100644
+index 000000000..3a76cce74
+--- /dev/null
++++ b/tools/parp/uapi_layout_check.c
+@@ -0,0 +1,25 @@
++// SPDX-License-Identifier: GPL-2.0
++#include <stddef.h>
++#include <stdio.h>
++#include <linux/parp_predict.h>
++
++/* lzx-note: Compile-time/userspace guard for Python ctypes ABI parity. */
++_Static_assert(sizeof(struct parp_predict_entry_v1) == 16, "entry ABI drift");
++_Static_assert(sizeof(struct parp_predict_binding_v1) == 32, "binding ABI drift");
++_Static_assert(sizeof(struct parp_predict_state_v1) == 2656, "state ABI drift");
++_Static_assert(offsetof(struct parp_predict_state_v1, predictions) == 96,
++	       "prediction offset drift");
++_Static_assert(offsetof(struct parp_predict_state_v1, bindings) == 608,
++	       "binding offset drift");
++
++int main(void)
++{
++	printf("abi=%u entry=%zu binding=%zu state=%zu set=0x%lx get=0x%lx\n",
++	       PARP_PREDICT_ABI_VERSION,
++	       sizeof(struct parp_predict_entry_v1),
++	       sizeof(struct parp_predict_binding_v1),
++	       sizeof(struct parp_predict_state_v1),
++	       (unsigned long)PARP_PREDICT_SET_STATE,
++	       (unsigned long)PARP_PREDICT_GET_STATE);
++	return 0;
++}

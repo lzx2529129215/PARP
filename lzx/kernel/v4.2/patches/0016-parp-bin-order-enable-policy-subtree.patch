@@ -1,0 +1,26 @@
+From: PARP LZX v4.2
+Subject: parp: enable reclaim-bin ordering for policy-owned memcg subtrees
+
+The reclaim target in the trained-sequence experiment is the parent slice.
+It intentionally has no application binding; its descendant GUI/fixture scopes
+carry the application domains and LSTM scores.  Requiring the parent itself to
+produce an application score left the non-root reclaim ordering path disabled.
+
+Add parp_tier2_reclaim_bin_order_enabled() to distinguish policy ownership from
+application scoring.  shrink_node_memcgs() now enables ordered subtree walks
+when the target has an enabled Tier2 policy ancestor, then continues to score
+each descendant independently.  OFF and targets outside an enabled policy
+subtree retain the native iterator path.
+
+Files:
+- include/linux/parp_tier2.h
+- mm/parp/core/watermark.c
+- mm/vmscan.c
+
+Build verification:
+- kernel release: 6.17.13-parp-lzx-v4.2-apply-myfs-guided-r7
+- build number: #34
+- CONFIG_PARP_RECLAIM_BIN_SCORE=y
+- symbol: parp_tier2_reclaim_bin_order_enabled
+
+lzx-note

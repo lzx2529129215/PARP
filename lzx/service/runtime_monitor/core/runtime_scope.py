@@ -15,6 +15,7 @@ class RuntimeApp:
     vocab_name: str
     scope_name: str
     unit_name: str
+    binding_scope_names: list[str]
     workload_enabled: bool
     prediction_enabled: bool
     window_keywords: list[str]
@@ -72,6 +73,9 @@ class RuntimeAppScope:
             previous = apps_config.get(app.app_key, {})
             exclude_keywords = previous.get("exclude_keywords", []) if isinstance(previous, dict) else []
             apps_config[app.app_key] = {
+                # binding_scope_names are intentionally excluded: fixtures
+                # share an App ID only in /dev/myfs and must not create GUI
+                # APP_OPEN/APP_CLOSE or foreground state. lzx-note
                 "keywords": list(app.process_keywords),
                 "exclude_keywords": list(exclude_keywords),
             }
@@ -82,6 +86,7 @@ class RuntimeAppScope:
         mapping = ", ".join(f"{key}->{value}" for key, value in self.app_key_to_vocab_name.items())
         app_id_mapping = ", ".join(
             f"{app.app_key}->{app.app_id}->{app.vocab_name}->{app.scope_name}"
+            f"[{','.join(app.binding_scope_names)}]"
             for app in self.apps
         )
         lines = [
@@ -118,6 +123,11 @@ def load_runtime_app_scope(path: str | Path, vocab_path: str | Path | None = Non
                 vocab_name=str(raw.get("vocab_name", "")).strip(),
                 scope_name=str(raw.get("scope_name", "")).strip(),
                 unit_name=str(raw.get("unit_name", "")).strip(),
+                binding_scope_names=[
+                    str(item).strip()
+                    for item in raw.get("binding_scope_names", [])
+                    if str(item).strip()
+                ],
                 workload_enabled=bool(raw.get("workload_enabled", False)),
                 prediction_enabled=bool(raw.get("prediction_enabled", False)),
                 window_keywords=[str(item) for item in raw.get("window_keywords", [])],

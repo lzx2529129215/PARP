@@ -8,7 +8,7 @@ boot_id="$(tr -d '-' </proc/sys/kernel/random/boot_id | cut -c1-12)"
 session_id="service_${boot_id}_$(date +%Y%m%d_%H%M%S)"
 scope_config="${PARP_SERVICE_SCOPE_CONFIG:-$PARP_RUNTIME_CONFIG_ROOT/runtime_app_scope.service.json}"
 sample_interval="${PARP_SERVICE_SAMPLE_INTERVAL:-1.0}"
-foreground_backend="${PARP_SERVICE_FOREGROUND_BACKEND:-manual}"
+foreground_backend="${PARP_SERVICE_FOREGROUND_BACKEND:-desktop}" # lzx-note
 history_window="${PARP_SERVICE_HISTORY_WINDOW:-64}"
 session_duration="${PARP_SERVICE_SESSION_DURATION:-86400}"
 retention_sessions="${PARP_SERVICE_RETENTION_SESSIONS:-7}"
@@ -17,6 +17,9 @@ min_free_bytes="${PARP_SERVICE_MIN_FREE_BYTES:-5368709120}"
 storage_check_interval="${PARP_SERVICE_STORAGE_CHECK_INTERVAL:-60}"
 app_vocab="${PARP_SERVICE_APP_VOCAB:-$PARP_OPERATION_PREDICTOR_ROOT/data/vocab/lsapp_expanded/app_vocab_duration.json}"
 group_vocab="${PARP_SERVICE_GROUP_VOCAB:-$PARP_OPERATION_PREDICTOR_ROOT/data/vocab/lsapp_expanded/user_group_vocab.json}"
+checkpoint="${PARP_SERVICE_LSTM_CHECKPOINT:-$PARP_OPERATION_PREDICTOR_ROOT/outputs/lsapp_expanded/checkpoints/app_lstm_switch_v3.pt}"
+myfs_device="${PARP_SERVICE_MYFS_DEVICE:-/dev/myfs}"
+myfs_mode="${PARP_SERVICE_MYFS_MODE:-apply}"
 
 mkdir -p "$PARP_SERVICE_OUTPUT_ROOT"
 # lzx-note: Rotate resident collection into daily sessions and remove only
@@ -44,14 +47,21 @@ monitor_args=(
   --min-output-free-bytes "$min_free_bytes"
   --storage-check-interval "$storage_check_interval"
   --foreground-backend "$foreground_backend"
+  --enable-online-lstm
+  --lstm-model-type v3
+  --lstm-checkpoint "$checkpoint"
+  --score-mode softmax
+  --enable-parp-myfs
+  --parp-myfs-device "$myfs_device"
+  --parp-myfs-mode "$myfs_mode"
   --path-mode hash
   --disable-ebpf
   --label SERVICE_BOOT
 )
 
-# lzx-note: Boot-time manual mode must remain headless-safe; X11 mode adds the
-# foreground-dependent memory observer only when explicitly requested.
-if [[ "$foreground_backend" == "x11" ]]; then
+# lzx-note: The X11 collector reconnects after graphical login, so the service
+# can remain resident from boot without permanently losing desktop events.
+if [[ "$foreground_backend" == "x11" || "$foreground_backend" == "desktop" ]]; then
   monitor_args+=(
     --direct-x11-events
     --enable-memory-shadow

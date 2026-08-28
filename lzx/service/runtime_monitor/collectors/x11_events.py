@@ -11,6 +11,7 @@ import os
 import select
 import threading
 import time
+from pathlib import Path
 from collections.abc import Callable
 from typing import Any
 
@@ -32,6 +33,7 @@ class X11EventCollector:
         # more reliable than Root children under a reparenting window manager
         # (such as Openbox), where the client can be below a frame window.
         self._client_window_ids: set[int] = set()
+        self._last_connection_error = ""  # lzx-note
 
     def start(self) -> None:
         if self._thread is not None:
@@ -62,62 +64,93 @@ class X11EventCollector:
             self._emit("COLLECTOR_ERROR", error=f"python-xlib unavailable: {exc}")
             return
 
-        try:
-            self._display = display.Display(self.display_name)
-            # Windows can disappear between a native notification and the
-            # metadata lookup.  Treat BadWindow as an event-time miss rather
-            # than printing an asynchronous X protocol traceback.
-            self._display.set_error_handler(lambda *_args: None)
-            self._root = self._display.screen().root
-            self._atoms = {
-                name: self._display.intern_atom(name, only_if_exists=False)
-                for name in (
-                    "_NET_ACTIVE_WINDOW",
-                    "_NET_CLIENT_LIST",
-                    "_NET_CLIENT_LIST_STACKING",
-                    "_NET_WM_STATE",
-                    "_NET_WM_STATE_HIDDEN",
-                    "_NET_WM_NAME",
-                    "_NET_WM_PID",
-                    "WM_CLASS",
-                    "WM_NAME",
-                    "WM_STATE",
-                )
-            }
-            self._root.change_attributes(event_mask=X.PropertyChangeMask | X.SubstructureNotifyMask)
-            self._display.flush()
+        # lzx-note: A lingering user service starts before the graphical login.
+        # Re-discover Xwayland credentials and reconnect instead of permanently
+        # losing foreground events after the first boot-time connection error.
+        while not self._stop.is_set():
+            try:
+                self._discover_display_environment()
+                self._display = display.Display(self.display_name)
+                # Windows can disappear between a native notification and the
+                # metadata lookup.  Treat BadWindow as an event-time miss.
+                self._display.set_error_handler(lambda *_args: None)
+                self._root = self._display.screen().root
+                self._atoms = {
+                    name: self._display.intern_atom(name, only_if_exists=False)
+                    for name in (
+                        "_NET_ACTIVE_WINDOW",
+                        "_NET_CLIENT_LIST",
+                        "_NET_CLIENT_LIST_STACKING",
+                        "_NET_WM_STATE",
+                        "_NET_WM_STATE_HIDDEN",
+                        "_NET_WM_NAME",
+                        "_NET_WM_PID",
+                        "WM_CLASS",
+                        "WM_NAME",
+                        "WM_STATE",
+                    )
+                }
+                self._watched_windows.clear()
+                self._client_window_ids.clear()
+                self._root.change_attributes(event_mask=X.PropertyChangeMask | X.SubstructureNotifyMask)
+                self._display.flush()
+                self._last_connection_error = ""
 
-            # Establish a baseline without manufacturing APP_OPEN events for
-            # windows that existed before the monitor started.
-            for window in self._query_children():
-                self._watch_window(window)
-                self._emit("WINDOW_INITIAL", window_id=self._window_id(window))
-            self._sync_client_windows(emit_changes=False)
-            self._emit("FOCUS_CHANGED", window_id=self._active_window_id())
+                # Establish a baseline without manufacturing APP_OPEN events.
+                for window in self._query_children():
+                    self._watch_window(window)
+                    self._emit("WINDOW_INITIAL", window_id=self._window_id(window))
+                self._sync_client_windows(emit_changes=False)
+                self._emit("FOCUS_CHANGED", window_id=self._active_window_id())
 
-            while not self._stop.is_set():
-                readable, _, _ = select.select(
-                    [self._display.fileno(), self._wake_r], [], [], None
-                )
-                if self._wake_r in readable:
+                while not self._stop.is_set():
+                    readable, _, _ = select.select(
+                        [self._display.fileno(), self._wake_r], [], [], None
+                    )
+                    if self._wake_r in readable:
+                        try:
+                            os.read(self._wake_r, 4096)
+                        except OSError:
+                            pass
+                        break
+                    if self._display.fileno() not in readable:
+                        continue
+                    while self._display.pending_events():
+                        self._handle_event(self._display.next_event(), X, error)
+            except Exception as exc:  # keep monitor alive until a desktop exists
+                message = f"x11 collector waiting: {type(exc).__name__}: {exc}"
+                if message != self._last_connection_error:
+                    self._emit("COLLECTOR_ERROR", error=message)
+                    self._last_connection_error = message
+            finally:
+                if self._display is not None:
                     try:
-                        os.read(self._wake_r, 4096)
-                    except OSError:
+                        self._display.close()
+                    except Exception:
                         pass
-                    break
-                if self._display.fileno() not in readable:
-                    continue
-                while self._display.pending_events():
-                    self._handle_event(self._display.next_event(), X, error)
-        except Exception as exc:  # keep monitor failure explicit and bounded
-            self._emit("COLLECTOR_ERROR", error=f"x11 collector stopped: {type(exc).__name__}: {exc}")
-        finally:
-            if self._display is not None:
-                try:
-                    self._display.close()
-                except Exception:
-                    pass
-            self._display = None
+                self._display = None
+                self._root = None
+            if not self._stop.is_set():
+                self._stop.wait(2.0)
+
+    def _discover_display_environment(self) -> None:
+        if self.display_name is None and not os.environ.get("DISPLAY"):
+            sockets = sorted(Path("/tmp/.X11-unix").glob("X*"))
+            if sockets:
+                os.environ["DISPLAY"] = f":{sockets[0].name[1:]}"
+        authority = os.environ.get("XAUTHORITY", "")
+        if not authority or not Path(authority).exists():
+            runtime_dir = Path(f"/run/user/{os.getuid()}")
+            candidates = sorted(
+                runtime_dir.glob(".mutter-Xwaylandauth.*"),
+                key=lambda path: path.stat().st_mtime_ns,
+                reverse=True,
+            )
+            home_authority = Path.home() / ".Xauthority"
+            if home_authority.exists():
+                candidates.append(home_authority)
+            if candidates:
+                os.environ["XAUTHORITY"] = str(candidates[0])
 
     def _handle_event(self, event: Any, X: Any, error: Any) -> None:
         event_type = int(getattr(event, "type", -1))

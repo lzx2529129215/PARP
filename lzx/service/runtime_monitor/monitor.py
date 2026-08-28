@@ -1,12 +1,13 @@
 #!/usr/bin/env python3
-"""Runtime Monitor v0: local PC state collector for dataset generation.
+"""Runtime Monitor: resident collection and event-triggered PARP prediction.
 
 Output directory (per session):
   outputs/runtime_monitor/<session_id>/
   ├── model/     — machine-training data (9 CSVs)
   └── review/    — human-inspection data (7 files)
 
-No prefetch, eviction, swap, or kernel policy action is performed.
+The service performs no reclaim itself; optional LSTM state is sent atomically
+through /dev/myfs for kernel-side policy consumers.  lzx-note
 """
 
 from __future__ import annotations
@@ -55,7 +56,7 @@ from core.test4b_reclaim_controller import Test4BReclaimConfig, Test4BReclaimCon
 from core.online_causal_workload_markov import OnlineCausalWorkloadMarkov
 from core.online_cgroup_workload import OnlineCgroupWorkloadSampler
 from core.online_markov_debugfs_audit import OnlineMarkovDebugfsAuditWriter
-from core.parp_bridge import PARPDebugfsBridge
+from core.parp_myfs import PARPMyfsBridge  # lzx-note
 from core.dual_workload_markov import DualWorkloadMarkov
 from core.operation_tracker import OperationTracker
 from core.review_builder import ReviewBuilder
@@ -76,6 +77,7 @@ from core.schema import (
 from core.writer import CsvWriter
 from online_duration_lstm import OnlineDurationLSTMRunner
 from collectors.x11_events import X11EventCollector
+from collectors.gnome_events import GnomeEventCollector  # lzx-note
 from core.x11_event_state import DIRECT_PREDICTION_EVENTS, X11EventState
 
 
@@ -133,8 +135,8 @@ class RuntimeMonitorV0:
             app_window_keywords=self.runtime_scope.window_keywords if self.runtime_scope else None,
         )
         self.direct_x11_events = bool(getattr(args, "direct_x11_events", False))
-        if self.direct_x11_events and args.foreground_backend != "x11":
-            raise ValueError("--direct-x11-events requires --foreground-backend x11")
+        if self.direct_x11_events and args.foreground_backend not in {"x11", "desktop"}:
+            raise ValueError("--direct-x11-events requires the x11 or desktop backend")
         self._direct_event_queue: queue.Queue[dict[str, Any]] = queue.Queue()
         self._direct_event_wake_r, self._direct_event_wake_w = os.pipe()
         # _drain_direct_x11_events may run at a scheduled sampling boundary
@@ -142,7 +144,7 @@ class RuntimeMonitorV0:
         # would prevent both the duration limit and SIGINT from being handled.
         os.set_blocking(self._direct_event_wake_r, False)
         os.set_blocking(self._direct_event_wake_w, False)
-        self._direct_event_collector: X11EventCollector | None = None
+        self._direct_event_collectors: list[Any] = []  # lzx-note
         self._direct_event_state = X11EventState(self.foreground_collector.resolve_window)
         self._direct_event_id = 0
         self._direct_event_writer: CsvWriter | None = None
@@ -206,21 +208,17 @@ class RuntimeMonitorV0:
         )
         self.online_lstm = OnlineDurationLSTMRunner(args, self.model_dir, self.review_dir) if args.enable_online_lstm else None
         self.parp_bridge = None
-        if args.enable_parp_bridge:
-            self.parp_bridge = PARPDebugfsBridge(
-                mode=args.parp_bridge_mode,
-                debugfs_root=args.parp_debugfs_root,
+        if args.enable_parp_myfs or args.enable_parp_bridge:
+            self.parp_bridge = PARPMyfsBridge(
+                mode=args.parp_myfs_mode,
+                device=args.parp_myfs_device,
                 runtime_scope=self.runtime_scope,
                 output_dir=self.output_dir,
                 session_id=self.session_id,
-                slice_name=args.test_slice,
-                app_bind_config=args.parp_app_bind_config,
-                model_name=args.parp_model_name,
                 model_version=args.parp_model_version,
-                schema_version=args.parp_schema_version,
+                schema_version=args.parp_myfs_schema_version,
                 prior_ttl_ms=args.parp_prior_ttl_ms,
-                min_update_interval_ms=args.parp_min_update_interval_ms,
-                max_retries=args.parp_max_retries,
+                horizon_ms=args.parp_prediction_horizon_ms,
             )
         self.memory_shadow: MemoryShadowObserver | None = None
         if args.enable_memory_shadow:
@@ -467,15 +465,15 @@ class RuntimeMonitorV0:
             print("  MGLRU LSTM app reclaim policy: disabled")
         if self.parp_bridge is not None:
             preflight = self.parp_bridge.preflight()
-            print(f"  PARP bridge: {self.args.parp_bridge_mode}")
+            print(f"  PARP prediction sink: parp/myfs ({self.args.parp_myfs_mode})")
             print(f"  PARP bridge preflight: {preflight['status']}")
             self.parp_bridge.startup_bindings()
         else:
             print("  PARP bridge: disabled")
         if self.direct_x11_events:
             self._start_direct_x11_events()
-            print("  native X11 app events: enabled")
-            print("  app event source: X11 event queue (not sample polling)")
+            print("  native desktop app events: enabled")
+            print("  app event source: GNOME D-Bus + X11 fallback (not sample polling)")
         else:
             print("  native X11 app events: disabled")
         if self.memory_shadow is not None:
@@ -566,13 +564,32 @@ class RuntimeMonitorV0:
 
         # 1. Collect raw data
         samples = self.process_collector.sample()
+        if self.parp_bridge is not None:
+            try:
+                # Learn each GUI and fixture working set continuously, so an
+                # event-time LSTM inference does not begin from a cold sample.
+                # This is observation-only; /dev/myfs is written atomically
+                # only by submit_prediction below. lzx-note
+                self.parp_bridge.observe_working_sets(samples)
+            except Exception as exc:
+                print(f"warning: PARP working-set sample failed: {exc}", file=sys.stderr)
         if self.memory_shadow is not None:
             self.memory_shadow.sample_if_due(samples, window_start_ns)
         file_events = self.file_collector.poll(samples)  # in-memory only, not written to disk
 
         meminfo = read_meminfo()
         vmstat = read_vmstat()
-        foreground = self._current_foreground_state() if self.direct_x11_events else self.foreground_collector.sample()
+        if self.direct_x11_events:
+            # Native X11/GNOME notifications remain the low-latency path, but
+            # GNOME can omit active-window edges from a long-lived listener.
+            # Reconcile against the authoritative sampled active window.  The
+            # X11EventState equality checks suppress duplicates when the
+            # native notification already arrived or arrives later. lzx-note
+            sampled_foreground = self.foreground_collector.sample()
+            self._reconcile_direct_foreground(sampled_foreground, window_start_ns)
+            foreground = self._current_foreground_state()
+        else:
+            foreground = self.foreground_collector.sample()
         if self.app_memory_activity is not None:
             try:
                 self._latest_app_activity = self.app_memory_activity.sample_if_due(
@@ -699,7 +716,10 @@ class RuntimeMonitorV0:
             self._maybe_write_mglru_predictions(prediction_result)
             if self.parp_bridge is not None:
                 try:
-                    self.parp_bridge.submit_prediction(feature_row, prediction_result)
+                    self.parp_bridge.submit_prediction(
+                        feature_row, prediction_result,
+                        process_samples=samples,
+                    )
                 except Exception as exc:
                     print(f"warning: PARP bridge submission failed: {exc}", file=sys.stderr)
         if self.live_cgroup_sampler is not None:
@@ -755,13 +775,20 @@ class RuntimeMonitorV0:
     # ------------------------------------------------------------------
 
     def _start_direct_x11_events(self) -> None:
-        self._direct_event_collector = X11EventCollector(self._enqueue_direct_x11_event)
-        self._direct_event_collector.start()
+        collectors: list[Any] = [X11EventCollector(self._enqueue_direct_x11_event)]
+        if self.args.foreground_backend == "desktop":
+            collectors.insert(0, GnomeEventCollector(
+                self._enqueue_direct_x11_event,
+                self.foreground_collector.resolve_desktop_event,
+            ))
+        self._direct_event_collectors = collectors
+        for collector in collectors:
+            collector.start()
 
     def _stop_direct_x11_events(self) -> None:
-        collector = self._direct_event_collector
-        self._direct_event_collector = None
-        if collector is not None:
+        collectors = self._direct_event_collectors
+        self._direct_event_collectors = []
+        for collector in collectors:
             collector.stop()
         for fd_name in ("_direct_event_wake_r", "_direct_event_wake_w"):
             fd = getattr(self, fd_name, -1)
@@ -819,11 +846,19 @@ class RuntimeMonitorV0:
             }
             snapshot = self._direct_event_state.snapshot()
             if self.online_lstm is not None and event_type in DIRECT_PREDICTION_EVENTS:
+                # lzx-note: A minimize/close can clear the compositor's active
+                # window before the event is drained.  Preserve the concrete
+                # triggering app as the LSTM context instead of degrading the
+                # event to UNKNOWN.
+                prediction_foreground = str(snapshot["foreground_app"] or "").strip()
+                event_app = str(event.get("app", "") or "").strip()
+                if prediction_foreground in {"", "UNKNOWN"} and event_app not in {"", "UNKNOWN"}:
+                    prediction_foreground = event_app
                 feature_row = {
                     "session_id": self.session_id,
                     "feature_window_id": event_id,
                     "timestamp": event.get("timestamp", ""),
-                    "foreground_app": snapshot["foreground_app"],
+                    "foreground_app": prediction_foreground,
                     "foreground_window_id": snapshot["foreground_window_id"],
                     "foreground_pid": snapshot["foreground_pid"],
                     "foreground_window_title": snapshot["foreground_window_title"],
@@ -835,7 +870,11 @@ class RuntimeMonitorV0:
                 self._maybe_write_mglru_predictions(prediction_result)
                 if self.parp_bridge is not None:
                     try:
-                        self.parp_bridge.submit_prediction(feature_row, prediction_result)
+                        self.parp_bridge.submit_prediction(
+                            feature_row, prediction_result,
+                            process_samples=self.process_collector.sample(),
+                            event=event,
+                        )
                     except Exception as exc:
                         print(f"warning: PARP bridge event submission failed: {exc}", file=sys.stderr)
                 if self.memory_shadow is not None:
@@ -929,6 +968,31 @@ class RuntimeMonitorV0:
             foreground_duration=duration_s,
             source="x11-event",
         )
+
+    def _reconcile_direct_foreground(
+        self, sampled: ForegroundState, timestamp_ns: int
+    ) -> None:
+        """Synthesize only native foreground edges missed by event collectors."""
+        app = str(sampled.foreground_app or "").strip()
+        window_id = str(sampled.window_id or "").strip()
+        if app in {"", "UNKNOWN"} or not window_id:
+            return
+        snapshot = self._direct_event_state.snapshot()
+        if (
+            str(snapshot.get("foreground_app", "")) == app
+            and str(snapshot.get("foreground_window_id", "")) == window_id
+        ):
+            return
+        self._handle_direct_x11_event({
+            "event_type": "POLL_FOREGROUND_RECHECK",
+            "timestamp_ns": int(timestamp_ns),
+            "window_id": window_id,
+            "app": app,
+            "pid": int(sampled.foreground_pid or 0),
+            "title": str(sampled.window_title or ""),
+            "hidden": bool(sampled.is_hidden),
+            "source": "x11-poll-reconcile",
+        })
 
     # ------------------------------------------------------------------
     # private
@@ -1533,7 +1597,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--duration", type=float, default=0.0)
     parser.add_argument("--enable-ebpf", action="store_true", help="Reserved.")
     parser.add_argument("--disable-ebpf", action="store_true", help="Use procfs polling fallback.")
-    parser.add_argument("--foreground-backend", choices=["x11", "wayland", "manual"], default="x11")
+    parser.add_argument("--foreground-backend", choices=["desktop", "x11", "wayland", "manual"], default="desktop")
     parser.add_argument(
         "--direct-x11-events",
         action="store_true",
@@ -1570,6 +1634,11 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--enable-online-lstm", action="store_true", help="Enable online duration-aware switch LSTM prediction.")
     parser.add_argument("--lstm-model-type", choices=["duration", "v2", "v3"], default="duration", help="Online LSTM checkpoint contract.")
     parser.add_argument("--enable-parp-bridge", action="store_true", help="Enable the independent PARP prediction sink bridge.")
+    parser.add_argument("--enable-parp-myfs", action="store_true", help="Enable atomic PARP prediction updates through /dev/myfs.")
+    parser.add_argument("--parp-myfs-device", default="/dev/myfs")
+    parser.add_argument("--parp-myfs-mode", choices=["off", "dry-run", "apply"], default="off")
+    parser.add_argument("--parp-myfs-schema-version", type=int, default=1)
+    parser.add_argument("--parp-prediction-horizon-ms", type=int, default=180000)
     parser.add_argument("--parp-debugfs-root", default="/sys/kernel/debug/parp")
     parser.add_argument("--parp-bridge-mode", choices=["off", "dry-run", "shadow-write"], default="off")
     parser.add_argument("--parp-app-bind-config", default="", help="Optional app_key -> domain_id/memcg_path JSON.")
@@ -1828,6 +1897,19 @@ def _read_test_slice_memory(test_slice: str) -> dict[str, int]:
 
 def main(argv: list[str] | None = None) -> int:
     args = parse_args(argv)
+    # lzx-note: Legacy experiment flags now route to parp/myfs; no prediction
+    # bridge in Runtime Monitor opens writable debugfs files.
+    if args.enable_parp_bridge and not args.enable_parp_myfs:
+        args.enable_parp_myfs = True
+        args.parp_myfs_mode = {
+            "off": "off", "dry-run": "dry-run", "shadow-write": "apply",
+        }[args.parp_bridge_mode]
+    if args.parp_myfs_mode != "off" and not args.enable_parp_myfs:
+        print(
+            "error: --parp-myfs-mode requires --enable-parp-myfs",
+            file=sys.stderr,
+        )
+        return 2
     if args.parp_bridge_mode != "off" and not args.enable_parp_bridge:
         print(
             "error: --parp-bridge-mode requires --enable-parp-bridge",

@@ -371,6 +371,10 @@ class MGLRUMarkovDebugfsWriter:
         return command, status, error
 
     def read_snapshot(self) -> str:
+        # lzx-note: Disabled legacy paths must never probe debugfs; resident
+        # prediction delivery is exclusively handled by parp/myfs.
+        if not self.enabled:
+            return ""
         try:
             return self.debugfs_path.read_text(encoding="utf-8")
         except PermissionError:

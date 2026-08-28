@@ -389,6 +389,8 @@ def default_label(action: dict[str, Any], app: str) -> str:
         return "APP_KEY"
     if action_type == "wait":
         return "WAIT"
+    if action_type == "wait_json":
+        return "WAIT_JSON"
     if action_type == "open_file":
         return "WPS_OPEN_FILE"
     if action_type == "save_as":
@@ -1109,6 +1111,43 @@ def wait(action: dict[str, Any], ctx: Context) -> None:
         time.sleep(seconds)
 
 
+def wait_json(action: dict[str, Any], ctx: Context) -> None:
+    """Wait for an atomically replaced JSON state file to reach one value."""
+    path_text = get_str(action, "path")
+    field_name = get_str(action, "field", "status")
+    expected = action.get("equals")
+    timeout = max(0.0, get_float(action, "timeout", 60.0))
+    poll = max(0.05, get_float(action, "poll_seconds", 0.2))
+    if not path_text or expected is None:
+        raise AutomationError("wait_json 需要 path 和 equals")
+    log(f"wait_json {path_text} {field_name}={expected!r} timeout={timeout:g}s")
+    if ctx.dry_run:
+        return
+    path = Path(path_text)
+    deadline = time.monotonic() + timeout
+    last_value: Any = None
+    last_error = "file not created"
+    while time.monotonic() <= deadline:
+        try:
+            payload = json.loads(path.read_text(encoding="utf-8"))
+            last_value = payload.get(field_name)
+            last_error = ""
+            if last_value == expected:
+                return
+            if last_value in {"ALLOCATION_ERROR", "MEMORY_ERROR"}:
+                raise AutomationError(
+                    f"wait_json pressure worker failed: {payload.get('error', last_value)}"
+                )
+        except (FileNotFoundError, json.JSONDecodeError, OSError) as exc:
+            last_error = f"{type(exc).__name__}: {exc}"
+        time.sleep(poll)
+    detail = last_error or f"last {field_name}={last_value!r}"
+    raise AutomationError(
+        f"wait_json timeout after {timeout:g}s: {path} expected "
+        f"{field_name}={expected!r}; {detail}"
+    )
+
+
 def key(action: dict[str, Any], ctx: Context) -> None:
     value = get_str(action, "key")
     if not value:
@@ -1466,7 +1505,7 @@ def robust_switch_to_app(action: dict[str, Any], ctx: Context, app: str) -> None
         return
     require_xdotool()
     errors: list[str] = []
-    for attempt in range(1, 4):
+    for attempt in range(1, 7):  # lzx-note: tolerate a loaded compositor without weakening foreground verification
         candidates = list_window_candidates(action, app)
         if not candidates:
             errors.append(f"attempt {attempt}: no candidates")
@@ -1478,9 +1517,27 @@ def robust_switch_to_app(action: dict[str, Any], ctx: Context, app: str) -> None
             time.sleep(0.5)
             continue
         log(f"switch {app} candidate: {format_window_info(candidate)}")
-        subprocess.run(["xdotool", "windowactivate", "--sync", candidate.window_id], check=False)
-        subprocess.run(["xdotool", "windowraise", candidate.window_id], check=False)
-        time.sleep(0.2)
+        if attempt == 1:
+            # lzx-note: Do not wait inside xdotool.  GNOME may reject an EWMH
+            # focus request under reclaim pressure, and --sync can then block
+            # forever.  The bounded retry loop below performs the authoritative
+            # foreground verification.
+            subprocess.run(["xdotool", "windowactivate", candidate.window_id], check=False)
+            subprocess.run(["xdotool", "windowraise", candidate.window_id], check=False)
+        elif attempt % 2 == 0 and shutil.which("wmctrl"):
+            # lzx-note: GNOME can defer/reject repeated identical EWMH
+            # activation requests while the target cgroup is reclaiming.
+            # wmctrl emits a fresh WM-mediated request before verification.
+            subprocess.run(["wmctrl", "-i", "-a", candidate.window_id], check=False)
+            subprocess.run(["xdotool", "windowraise", candidate.window_id], check=False)
+        else:
+            # lzx-note: Last-resort X11 input focus remains deterministic and
+            # does not inject a click or mutate application content.
+            subprocess.run(["xdotool", "windowmap", candidate.window_id], check=False)
+            subprocess.run(["xdotool", "windowraise", candidate.window_id], check=False)
+            subprocess.run(["xdotool", "windowfocus", candidate.window_id], check=False)
+            subprocess.run(["xdotool", "windowactivate", candidate.window_id], check=False)
+        time.sleep(min(1.0, 0.2 + attempt * 0.15))  # lzx-note
         active = get_foreground_window_info()
         if active.mapped_app == app:
             log(f"switch {app} verified: {format_window_info(active)}")
@@ -1749,6 +1806,7 @@ ACTION_HANDLERS = {
     "trace_marker": trace_marker_action,
     "launch": launch,
     "wait": wait,
+    "wait_json": wait_json,
     "key": key,
     "hotkey": key,
     "type": type_text,
@@ -1885,7 +1943,7 @@ def main(argv: list[str] | None = None) -> int:
                     continue
                 trace_action(ctx, index, "start", "running", action)
                 try:
-                    calibration_safe_actions = {"launch", "shell", "wait", "wait_window", "focus", "gnome_search_focus", "switch", "verify_foreground", "verify_window_profile", "close"}
+                    calibration_safe_actions = {"launch", "shell", "wait", "wait_json", "wait_window", "focus", "gnome_search_focus", "switch", "verify_foreground", "verify_window_profile", "close"}
                     if ctx.calibration_only and action_type not in calibration_safe_actions:
                         calibration_trace(action, ctx)
                         continue

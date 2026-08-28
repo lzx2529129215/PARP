@@ -1,0 +1,594 @@
+From: lzx <lzx@local>
+Subject: [PATCH 8/8] mm: guide effective-tier protection with myfs app priors
+
+Use the atomic application prediction state delivered through /dev/myfs to
+add a bounded, positive-only bias to effective-tier scoring. Keep the native
+pressure gates and page budgets, expose action counters and trace provenance,
+and add a dedicated compile-time ablation switch.
+
+Signed-off-by: lzx <lzx@local>
+---
+--- a/mm/parp/Kconfig
++++ b/mm/parp/Kconfig
+@@ -98,4 +98,15 @@
+ 	  KUnit runtime and reclaim-lock latency gates have passed. When disabled,
+ 	  every APPLY mode setter returns -EOPNOTSUPP.
+ 
++config PARP_APP_PRIOR_TIER_PROTECT # lzx-note
++	bool "Guide effective-tier protection with /dev/myfs app priors"
++	depends on PARP_EFFECTIVE_TIER && PARP_MYFS
++	default n
++	help
++	  Add a bounded, positive-only bias from the atomic /dev/myfs application
++	  prediction state to the per-page reuse score. The foreground application
++	  and LSTM Top-3 candidates receive rank-calibrated protection, while the
++	  existing effective-tier pressure gates and page budgets remain mandatory.
++	  Disable this option for a compile-time application-prior ablation.
++
+ endmenu # lzx-note
+--- a/mm/parp/internal.h
++++ b/mm/parp/internal.h
+@@ -197,12 +197,15 @@
+ 	u64 domain_id;
+ 	u32 app_id;
+ 	u32 bind_generation;
++	u32 prediction_generation; /* lzx-note */
+ 	u64 foreground_epoch_id;
+ 	u64 bind_expiry_ns;
+ 	u64 model_version;
+ 	u16 app_prior_q15;
++	u16 app_rank; /* lzx-note */
+ 	u16 owner_confidence_q15;
+ 	u32 owner_source;
++	bool foreground; /* lzx-note */
+ };
+ 
+ struct parp_region_identity {
+--- a/mm/parp/core/snapshot.c
++++ b/mm/parp/core/snapshot.c
+@@ -391,12 +391,15 @@
+ 		.domain_id = domain_id,
+ 		.app_id = binding->app_id,
+ 		.bind_generation = binding->bind_generation,
++		.prediction_generation = prior->prediction_generation, /* lzx-note */
+ 		.foreground_epoch_id = binding->epoch_id,
+ 		.bind_expiry_ns = binding->expires_ns,
+ 		.model_version = binding->model_version,
+ 		.app_prior_q15 = prior->use_score_q15,
++		.app_rank = prior->rank, /* lzx-note */
+ 		.owner_confidence_q15 = PARP_Q15_ONE,
+ 		.owner_source = 1,
++		.foreground = prior->foreground, /* lzx-note */
+ 	};
+ 	found = true;
+ out:
+--- a/include/linux/parp.h
++++ b/include/linux/parp.h
+@@ -203,6 +203,8 @@
+ struct parp_tier_decision {
+ 	s64 features[PARP_TIER_FEATURES];
+ 	s32 reuse_score;
++	s32 page_reuse_score; /* lzx-note */
++	s32 app_prior_bias; /* lzx-note */
+ 	s32 raw_delta_tier_q8;
+ 	s32 delta_tier_q8;
+ 	s32 fixed_delta_q8;
+@@ -227,6 +229,10 @@
+ 	u8 reclaim_context;
+ 	u8 pressure_bypass_reason;
+ 	u16 page_state_sequence;
++	u16 app_prior_q15; /* lzx-note */
++	u16 app_rank; /* lzx-note */
++	u32 app_id; /* lzx-note */
++	u32 prediction_generation; /* lzx-note */
+ 	u32 pressure_policy_version;
+ 	bool evaluated;
+ 	bool model_valid;
+@@ -235,6 +241,8 @@
+ 	bool effective_protect;
+ 	bool fixed_effective_protect;
+ 	bool pressure_aware_effective_protect; /* #lzx */
++	bool app_context_valid; /* lzx-note */
++	bool app_prior_changed_protect; /* lzx-note */
+ 	bool special_native_protect;
+ 	bool actual_tier_protect;
+ 	bool reservation_active;
+@@ -247,6 +255,7 @@
+ 	u64 batch_id;
+ 	u64 epoch_id;
+ 	u64 memcg_id;
++	u64 app_domain_id; /* lzx-note */
+ 	u64 model_time_ns;
+ 	u64 nr_to_reclaim;
+ 	u64 nr_reclaimed_before;
+@@ -260,6 +269,8 @@
+ 	unsigned long batch_reclaimed_pages; /* #lzx */
+ 	u32 nid;
+ 	u32 config_sequence;
++	u32 app_id; /* lzx-note */
++	u32 prediction_generation; /* lzx-note */
+ 	s32 reclaim_priority;
+ 	u16 epoch_tag;
+ 	u8 type;
+@@ -269,9 +280,13 @@
+ 	u8 reclaim_context;
+ 	u8 pressure_bypass_reason;
+ 	u16 consecutive_no_progress_batches; /* #lzx */
++	u16 app_prior_q15; /* lzx-note */
++	u16 app_rank; /* lzx-note */
+ 	bool enabled;
+ 	bool severe_pressure;
+ 	bool no_progress;
++	bool app_context_valid; /* lzx-note */
++	bool app_foreground; /* lzx-note */
+ 	bool rcu_held;
+ };
+ 
+@@ -377,6 +392,8 @@
+ 		u8 pressure_level_kernel); /* #lzx */
+ s32 parp_effective_tier_recency_score(u32 access_age_ms,
+ 		const struct parp_tier_policy *policy);
++s32 parp_effective_tier_app_prior_bias(u16 app_prior_q15, u16 app_rank,
++		bool foreground, const struct parp_tier_policy *policy); /* lzx-note */
+ int parp_effective_tier_next_generation(int generation);
+ unsigned long parp_effective_tier_policy_flags(unsigned long old_flags,
+ 		int new_generation);
+--- a/include/trace/events/parp.h
++++ b/include/trace/events/parp.h
+@@ -101,6 +101,7 @@
+ 	u64 session_id;
+ 	u64 folio_cookie;
+ 	u64 memcg_id;
++	u64 app_domain_id; /* lzx-note */
+ 	u64 source_seq;
+ 	u64 batch_id;
+ 	u64 reclaim_epoch;
+@@ -109,6 +110,8 @@
+ 	u64 trace_sequence;
+ 	s64 features[6];
+ 	s32 reuse_score;
++	s32 page_reuse_score; /* lzx-note */
++	s32 app_prior_bias; /* lzx-note */
+ 	s32 cold_threshold;
+ 	s32 hot_threshold_1;
+ 	s32 hot_threshold_2;
+@@ -132,11 +135,15 @@
+ 	u32 expected_model_version;
+ 	u32 feature_schema_version;
+ 	u32 pressure_policy_version;
++	u32 app_id; /* lzx-note */
++	u32 prediction_generation; /* lzx-note */
+ 	char model_type[PARP_TIER_TRACE_MODEL_TYPE_LEN];
+ 	char model_checksum[PARP_TIER_TRACE_CHECKSUM_LEN];
+ 	char model_provenance[PARP_TIER_TRACE_PROVENANCE_LEN];
+ 	char pressure_policy_provenance[PARP_TIER_TRACE_PRESSURE_PROVENANCE_LEN];
+ 	u16 consecutive_no_progress_batches; /* #lzx */
++	u16 app_prior_q15; /* lzx-note */
++	u16 app_rank; /* lzx-note */
+ 	u8 generation_index;
+ 	u8 native_tier;
+ 	u8 native_tier_idx;
+@@ -155,6 +162,8 @@
+ 	bool effective_protect;
+ 	bool fixed_effective_protect;
+ 	bool pressure_aware_effective_protect; /* #lzx */
++	bool app_context_valid; /* lzx-note */
++	bool app_prior_changed_protect; /* lzx-note */
+ 	bool actual_tier_protect;
+ 	bool sort_result;
+ 	bool isolate_attempted;
+@@ -355,6 +364,7 @@
+ 		__field(u64, session_id)
+ 		__field(u64, folio_cookie)
+ 		__field(u64, memcg_id)
++		__field(u64, app_domain_id) /* lzx-note */
+ 		__field(u64, source_seq)
+ 		__field(u64, batch_id)
+ 		__field(u64, reclaim_epoch)
+@@ -363,6 +373,8 @@
+ 		__field(u64, trace_sequence)
+ 		__array(s64, features, 6)
+ 		__field(s32, reuse_score)
++		__field(s32, page_reuse_score) /* lzx-note */
++		__field(s32, app_prior_bias) /* lzx-note */
+ 		__field(s32, cold_threshold)
+ 		__field(s32, hot_threshold_1)
+ 		__field(s32, hot_threshold_2)
+@@ -386,12 +398,16 @@
+ 		__field(u32, expected_model_version)
+ 		__field(u32, feature_schema_version)
+ 		__field(u32, pressure_policy_version)
++		__field(u32, app_id) /* lzx-note */
++		__field(u32, prediction_generation) /* lzx-note */
+ 		__string(model_type, event->model_type) /* #lzx */
+ 		__string(model_checksum, event->model_checksum) /* #lzx */
+ 		__string(model_provenance, event->model_provenance) /* #lzx */
+ 		__string(pressure_policy_provenance,
+ 			event->pressure_policy_provenance) /* #lzx */
+ 		__field(u16, consecutive_no_progress_batches) /* #lzx */
++		__field(u16, app_prior_q15) /* lzx-note */
++		__field(u16, app_rank) /* lzx-note */
+ 		__field(u8, generation_index)
+ 		__field(u8, native_tier)
+ 		__field(u8, native_tier_idx)
+@@ -410,6 +426,8 @@
+ 		__field(bool, effective_protect)
+ 		__field(bool, fixed_effective_protect)
+ 		__field(bool, pressure_aware_effective_protect) /* #lzx */
++		__field(bool, app_context_valid) /* lzx-note */
++		__field(bool, app_prior_changed_protect) /* lzx-note */
+ 		__field(bool, actual_tier_protect)
+ 		__field(bool, sort_result)
+ 		__field(bool, isolate_attempted)
+@@ -421,6 +439,7 @@
+ 		__entry->session_id = event->session_id;
+ 		__entry->folio_cookie = event->folio_cookie;
+ 		__entry->memcg_id = event->memcg_id;
++		__entry->app_domain_id = event->app_domain_id; /* lzx-note */
+ 		__entry->source_seq = event->source_seq;
+ 		__entry->batch_id = event->batch_id;
+ 		__entry->reclaim_epoch = event->reclaim_epoch;
+@@ -430,6 +449,8 @@
+ 		memcpy(__entry->features, event->features,
+ 		       sizeof(__entry->features));
+ 		__entry->reuse_score = event->reuse_score;
++		__entry->page_reuse_score = event->page_reuse_score; /* lzx-note */
++		__entry->app_prior_bias = event->app_prior_bias; /* lzx-note */
+ 		__entry->cold_threshold = event->cold_threshold;
+ 		__entry->hot_threshold_1 = event->hot_threshold_1;
+ 		__entry->hot_threshold_2 = event->hot_threshold_2;
+@@ -454,12 +475,17 @@
+ 		__entry->expected_model_version = event->expected_model_version;
+ 		__entry->feature_schema_version = event->feature_schema_version;
+ 		__entry->pressure_policy_version = event->pressure_policy_version;
++		__entry->app_id = event->app_id; /* lzx-note */
++		__entry->prediction_generation = event->prediction_generation;
++		/* lzx-note */
+ 		__assign_str(model_type); /* #lzx */
+ 		__assign_str(model_checksum); /* #lzx */
+ 		__assign_str(model_provenance); /* #lzx */
+ 		__assign_str(pressure_policy_provenance); /* #lzx */
+ 		__entry->consecutive_no_progress_batches =
+ 			event->consecutive_no_progress_batches; /* #lzx */
++		__entry->app_prior_q15 = event->app_prior_q15; /* lzx-note */
++		__entry->app_rank = event->app_rank; /* lzx-note */
+ 		__entry->generation_index = event->generation_index;
+ 		__entry->native_tier = event->native_tier;
+ 		__entry->native_tier_idx = event->native_tier_idx;
+@@ -479,12 +505,15 @@
+ 		__entry->fixed_effective_protect = event->fixed_effective_protect;
+ 		__entry->pressure_aware_effective_protect =
+ 			event->pressure_aware_effective_protect; /* #lzx */
++		__entry->app_context_valid = event->app_context_valid; /* lzx-note */
++		__entry->app_prior_changed_protect =
++			event->app_prior_changed_protect; /* lzx-note */
+ 		__entry->actual_tier_protect = event->actual_tier_protect;
+ 		__entry->sort_result = event->sort_result;
+ 		__entry->isolate_attempted = event->isolate_attempted;
+ 		__entry->isolate_result = event->isolate_result;
+ 	),
+-	TP_printk("time=%llu experiment=%llu session=%llu cookie=%llu lifetime=%u memcg=%llu nid=%u type=%u source_seq=%llu gen=%u native_tier=%u tier_idx=%u special=%d mode=%u model_type=%s model_version=%u expected_model_version=%u feature_schema_version=%u model_checksum=%s model_provenance=%s pressure_policy_provenance=%s model_valid=%d features_valid=%d native_protect=%d effective_protect=%d actual_tier_protect=%d score=%d score_bin=%u rank_score_bin=%u thresholds=%d/%d/%d/%d delta_q8=%d effective_q8=%d action=%u bypass=%u pages=%llu batch=%llu epoch=%llu priority=%d score_ns=%llu decision_ns=%llu trace_seq=%llu sort=%d isolate_attempted=%d isolate_result=%d features=%lld,%lld,%lld,%lld,%lld,%lld pressure_level_kernel=%u reclaim_context=%u sc_priority=%d nr_to_reclaim=%llu nr_reclaimed_before=%llu epoch_reclaimed_pages=%llu batch_scanned_pages=%llu batch_isolated_pages=%llu batch_reclaimed_pages=%llu consecutive_no_progress_batches=%u fixed_delta_q8=%d binary_bypass_delta_q8=%d pressure_aware_delta_q8=%d fixed_effective_protect=%d pressure_aware_effective_protect=%d pressure_policy_version=%u pressure_bypass_reason=%u", /* #lzx */
++	TP_printk("time=%llu experiment=%llu session=%llu cookie=%llu lifetime=%u memcg=%llu nid=%u type=%u source_seq=%llu gen=%u native_tier=%u tier_idx=%u special=%d mode=%u model_type=%s model_version=%u expected_model_version=%u feature_schema_version=%u model_checksum=%s model_provenance=%s pressure_policy_provenance=%s model_valid=%d features_valid=%d native_protect=%d effective_protect=%d actual_tier_protect=%d score=%d score_bin=%u rank_score_bin=%u thresholds=%d/%d/%d/%d delta_q8=%d effective_q8=%d action=%u bypass=%u pages=%llu batch=%llu epoch=%llu priority=%d score_ns=%llu decision_ns=%llu trace_seq=%llu sort=%d isolate_attempted=%d isolate_result=%d features=%lld,%lld,%lld,%lld,%lld,%lld pressure_level_kernel=%u reclaim_context=%u sc_priority=%d nr_to_reclaim=%llu nr_reclaimed_before=%llu epoch_reclaimed_pages=%llu batch_scanned_pages=%llu batch_isolated_pages=%llu batch_reclaimed_pages=%llu consecutive_no_progress_batches=%u fixed_delta_q8=%d binary_bypass_delta_q8=%d pressure_aware_delta_q8=%d fixed_effective_protect=%d pressure_aware_effective_protect=%d pressure_policy_version=%u pressure_bypass_reason=%u app_domain=%llu app=%u prediction_generation=%u app_prior_q15=%u app_rank=%u app_context_valid=%d page_score=%d app_prior_bias=%d app_prior_changed_protect=%d", /* lzx-note */
+ 		  __entry->timestamp_ns, __entry->experiment_id,
+ 		  __entry->session_id, __entry->folio_cookie,
+ 		  __entry->lifetime_epoch, __entry->memcg_id, __entry->nid,
+@@ -523,7 +552,12 @@
+ 		  __entry->fixed_effective_protect,
+ 		  __entry->pressure_aware_effective_protect,
+ 		  __entry->pressure_policy_version,
+-		  __entry->pressure_bypass_reason) /* #lzx */
++		  __entry->pressure_bypass_reason,
++		  __entry->app_domain_id, __entry->app_id,
++		  __entry->prediction_generation, __entry->app_prior_q15,
++		  __entry->app_rank, __entry->app_context_valid,
++		  __entry->page_reuse_score, __entry->app_prior_bias,
++		  __entry->app_prior_changed_protect) /* lzx-note */
+ );
+ 
+ TRACE_EVENT(parp_effective_tier_access,
+--- a/mm/parp/core/effective_tier.c
++++ b/mm/parp/core/effective_tier.c
+@@ -16,6 +16,11 @@
+ #include <linux/string.h>
+ #include <trace/events/parp.h>
+ 
++#include "../internal.h" /* lzx-note */
++#ifdef CONFIG_PARP_APP_PRIOR_TIER_PROTECT
++#include "../adapter/adapter.h" /* lzx-note */
++#endif
++
+ #define PARP_TIER_SCHEMA_VERSION	1U
+ #define PARP_TIER_STATE_TRIES		4
+ #define PARP_TIER_LATENCY_BUCKETS	32
+@@ -84,6 +89,12 @@
+ 	atomic64_t metadata_missing;
+ 	atomic64_t state_unstable;
+ 	atomic64_t model_invalid;
++	atomic64_t app_context_lookups; /* lzx-note */
++	atomic64_t app_context_hits; /* lzx-note */
++	atomic64_t app_context_misses; /* lzx-note */
++	atomic64_t app_context_candidate_pages; /* lzx-note */
++	atomic64_t app_prior_bias_pages; /* lzx-note */
++	atomic64_t app_prior_protect_pages; /* lzx-note */
+ 	atomic64_t action_pages[5];
+ 	atomic64_t bypass[PARP_TIER_BYPASS_NR];
+ 	atomic64_t access_events[PARP_ACCESS_EVENT_NR];
+@@ -687,6 +698,32 @@
+ 	return true;
+ }
+ 
++s32 parp_effective_tier_app_prior_bias(u16 app_prior_q15, u16 app_rank,
++		bool foreground, const struct parp_tier_policy *policy)
++{
++	s32 bias;
++
++	if (!parp_tier_policy_valid(policy) || app_prior_q15 > PARP_Q15_ONE ||
++	    !app_rank)
++		return 0;
++
++	/*
++	 * Preserve the LSTM probability ordering, then calibrate rank 1 (the
++	 * foreground app) and ranks 2..4 (LSTM Top-3) to the page model's hot
++	 * thresholds. This is positive-only and capped at hot_threshold_2; the
++	 * ordinary pressure and page-budget gates still decide whether a page can
++	 * actually be protected. lzx-note
++	 */
++	bias = div_u64((u64)app_prior_q15 * policy->hot_threshold_2,
++		       PARP_Q15_ONE);
++	if (foreground || app_rank <= 2)
++		bias = max(bias, policy->hot_threshold_2);
++	else if (app_rank <= 4)
++		bias = max(bias, policy->hot_threshold_1);
++
++	return clamp(bias, 0, policy->hot_threshold_2);
++}
++
+ u8 parp_effective_tier_pressure_level(int reclaim_priority,
+ 		bool no_progress, unsigned long nr_to_reclaim,
+ 		unsigned long nr_reclaimed)
+@@ -1253,6 +1290,9 @@
+ 	typeof(lrugen->parp_effective_tier[0]) *state =
+ 		&lrugen->parp_effective_tier[type];
+ 	struct parp_tier_runtime_config config;
++	#ifdef CONFIG_PARP_APP_PRIOR_TIER_PROTECT
++	struct parp_app_context app_context;
++	#endif
+ 	u16 tag;
+ 
+ 	memset(ctx, 0, sizeof(*ctx));
+@@ -1270,6 +1310,22 @@
+ 	ctx->type = type;
+ 	ctx->nid = lruvec_pgdat(lruvec)->node_id;
+ 	ctx->memcg_id = mem_cgroup_id(lruvec_memcg(lruvec));
++	#ifdef CONFIG_PARP_APP_PRIOR_TIER_PROTECT
++	ctx->app_domain_id = parp_memcg_domain_id(lruvec_memcg(lruvec));
++	atomic64_inc(&parp_tier_stats.app_context_lookups);
++	if (ctx->app_domain_id && parp_context_lookup(ctx->app_domain_id,
++			ktime_get_mono_fast_ns(), &app_context)) {
++		ctx->app_id = app_context.app_id;
++		ctx->prediction_generation = app_context.prediction_generation;
++		ctx->app_prior_q15 = app_context.app_prior_q15;
++		ctx->app_rank = app_context.app_rank;
++		ctx->app_foreground = app_context.foreground;
++		ctx->app_context_valid = true;
++		atomic64_inc(&parp_tier_stats.app_context_hits);
++	} else {
++		atomic64_inc(&parp_tier_stats.app_context_misses);
++	}
++	#endif /* CONFIG_PARP_APP_PRIOR_TIER_PROTECT */ /* lzx-note */
+ 	ctx->reclaim_priority = reclaim_priority;
+ 	ctx->nr_to_reclaim = nr_to_reclaim;
+ 	ctx->nr_reclaimed_before = nr_reclaimed;
+@@ -1412,8 +1468,12 @@
+ 	u64 score_started;
+ 	u64 score_duration = 0;
+ 	s32 score = 0;
++	s32 page_score = 0; /* lzx-note */
++	s32 app_prior_bias = 0; /* lzx-note */
+ 	bool metadata_valid = false;
+ 	bool score_valid = false;
++	bool page_only_effective_protect = false; /* lzx-note */
++	bool app_context_candidate = false; /* lzx-note */
+ 	bool allowed;
+ 	bool applies;
+ 	enum parp_tier_bypass_reason bypass = PARP_TIER_BYPASS_NONE;
+@@ -1463,6 +1523,18 @@
+ 	} else {
+ 		score_valid = parp_effective_tier_score_values(values, &score);
+ 	}
++	page_score = score;
++	if (IS_ENABLED(CONFIG_PARP_APP_PRIOR_TIER_PROTECT) && score_valid &&
++	    ctx->app_context_valid &&
++	    ctx->mode != PARP_EFFECTIVE_TIER_RANDOM_MATCHED &&
++	    ctx->mode != PARP_EFFECTIVE_TIER_RECENCY_BASELINE) {
++		app_context_candidate = true;
++		app_prior_bias = parp_effective_tier_app_prior_bias(
++			ctx->app_prior_q15, ctx->app_rank, ctx->app_foreground,
++			&config.policy);
++		score = clamp_t(s64, (s64)score + app_prior_bias,
++				S32_MIN, S32_MAX);
++	} /* lzx-note */
+ 	score_duration = ktime_get_mono_fast_ns() - score_started;
+ 	ctx->model_time_ns += score_duration;
+ 	parp_account_latency(&parp_tier_stats.score_time_ns_total,
+@@ -1475,6 +1547,14 @@
+ 	parp_effective_tier_classify(score, score_valid, native_tier,
+ 			tier_idx, special_native_protect, &config.policy,
+ 			decision);
++	if (app_prior_bias > 0) {
++		struct parp_tier_decision page_only;
++
++		parp_effective_tier_classify(page_score, score_valid, native_tier,
++			tier_idx, special_native_protect, &config.policy,
++			&page_only);
++		page_only_effective_protect = page_only.effective_protect;
++	} /* lzx-note */
+ 	if (!score_valid)
+ 		goto copy_features;
+ 	if (special_native_protect)
+@@ -1563,6 +1643,26 @@
+ 		}
+ 	}
+ copy_features:
++	decision->page_reuse_score = page_score;
++	decision->app_prior_bias = app_prior_bias;
++	decision->app_id = ctx->app_id;
++	decision->prediction_generation = ctx->prediction_generation;
++	decision->app_prior_q15 = ctx->app_prior_q15;
++	decision->app_rank = ctx->app_rank;
++	decision->app_context_valid = app_context_candidate;
++	decision->app_prior_changed_protect = app_context_candidate &&
++		app_prior_bias > 0 && !page_only_effective_protect &&
++		decision->effective_protect &&
++		decision->action == PARP_TIER_PREDICTIVE_UPGRADE;
++	if (app_context_candidate) {
++		atomic64_add(pages,
++			&parp_tier_stats.app_context_candidate_pages);
++		if (app_prior_bias > 0)
++			atomic64_add(pages, &parp_tier_stats.app_prior_bias_pages);
++		if (decision->app_prior_changed_protect)
++			atomic64_add(pages,
++				&parp_tier_stats.app_prior_protect_pages);
++	} /* lzx-note */
+ 	parp_effective_tier_pressure_counterfactuals(ctx, decision); /* #lzx */
+ 	if (ctx->mode == PARP_EFFECTIVE_TIER_RECENCY_BASELINE)
+ 		decision->scorer_kind = PARP_TIER_SCORER_RECENCY_BASELINE;
+@@ -1627,6 +1727,7 @@
+ 		trace.session_id = ctx->session_id;
+ 		trace.folio_cookie = cookie;
+ 		trace.memcg_id = ctx->memcg_id;
++		trace.app_domain_id = ctx->app_domain_id; /* lzx-note */
+ 		trace.source_seq = ctx->source_seq;
+ 		trace.batch_id = ctx->batch_id;
+ 		trace.reclaim_epoch = ctx->epoch_id;
+@@ -1635,6 +1736,8 @@
+ 		memcpy(trace.features, decision->features,
+ 		       sizeof(trace.features));
+ 		trace.reuse_score = decision->reuse_score;
++		trace.page_reuse_score = decision->page_reuse_score; /* lzx-note */
++		trace.app_prior_bias = decision->app_prior_bias; /* lzx-note */
+ 		trace.cold_threshold = decision->cold_threshold;
+ 		trace.hot_threshold_1 = decision->hot_threshold_1;
+ 		trace.hot_threshold_2 = decision->hot_threshold_2;
+@@ -1657,6 +1760,10 @@
+ 		trace.nid = ctx->nid;
+ 		trace.expected_model_version = PARP_TIER_MODEL_VERSION;
+ 		trace.pressure_policy_version = decision->pressure_policy_version;
++		trace.app_id = decision->app_id;
++		trace.prediction_generation = decision->prediction_generation;
++		trace.app_prior_q15 = decision->app_prior_q15;
++		trace.app_rank = decision->app_rank; /* lzx-note */
+ 		strscpy(trace.pressure_policy_provenance,
+ 			PARP_TIER_PRESSURE_PROVENANCE,
+ 			sizeof(trace.pressure_policy_provenance)); /* #lzx */
+@@ -1705,6 +1812,9 @@
+ 		trace.fixed_effective_protect = decision->fixed_effective_protect;
+ 		trace.pressure_aware_effective_protect =
+ 			decision->pressure_aware_effective_protect; /* #lzx */
++		trace.app_context_valid = decision->app_context_valid;
++		trace.app_prior_changed_protect =
++			decision->app_prior_changed_protect; /* lzx-note */
+ 		trace.actual_tier_protect = decision->actual_tier_protect;
+ 		trace.sort_result = sort_result;
+ 		trace.isolate_attempted = isolate_attempted;
+@@ -2128,7 +2238,11 @@
+ 		"candidate_pages %lld\n"
+ 		"state_fault %u\n"
+ 		"scores %lld\nmetadata_missing %lld\nstate_unstable %lld\n"
+-		"model_invalid %lld\nkeep_reclaim_pages %lld\n"
++		"model_invalid %lld\napp_prior_tier_compiled %u\n"
++		"app_context_lookups %lld\napp_context_hits %lld\n"
++		"app_context_misses %lld\napp_context_candidate_pages %lld\n"
++		"app_prior_bias_pages %lld\napp_prior_protect_pages %lld\n"
++		"keep_reclaim_pages %lld\n"
+ 		"upgrade_pages %lld\nkeep_protect_pages %lld\n"
+ 		"downgrade_pages %lld\nspecial_protect_pages %lld\n"
+ 		"policy_promotions %lld\nnative_tier_promotions %lld\n"
+@@ -2151,6 +2265,13 @@
+ 		atomic64_read(&parp_tier_stats.metadata_missing),
+ 		atomic64_read(&parp_tier_stats.state_unstable),
+ 		atomic64_read(&parp_tier_stats.model_invalid),
++		IS_ENABLED(CONFIG_PARP_APP_PRIOR_TIER_PROTECT), /* lzx-note */
++		atomic64_read(&parp_tier_stats.app_context_lookups),
++		atomic64_read(&parp_tier_stats.app_context_hits),
++		atomic64_read(&parp_tier_stats.app_context_misses),
++		atomic64_read(&parp_tier_stats.app_context_candidate_pages),
++		atomic64_read(&parp_tier_stats.app_prior_bias_pages),
++		atomic64_read(&parp_tier_stats.app_prior_protect_pages),
+ 		atomic64_read(&parp_tier_stats.action_pages[0]),
+ 		atomic64_read(&parp_tier_stats.action_pages[1]),
+ 		atomic64_read(&parp_tier_stats.action_pages[2]),
+--- a/mm/parp/tests/parp_test.c
++++ b/mm/parp/tests/parp_test.c
+@@ -1131,6 +1131,28 @@
+ 	KUNIT_EXPECT_EQ(test, parp_effective_tier_metadata_size(), 24UL);
+ }
+ 
++static void parp_effective_app_prior_bias_test(struct kunit *test)
++{
++	KUNIT_EXPECT_EQ(test, parp_effective_tier_app_prior_bias(0, 0, false,
++		&parp_effective_test_policy), 0);
++	KUNIT_EXPECT_EQ(test, parp_effective_tier_app_prior_bias(0, 1, true,
++		&parp_effective_test_policy), 96);
++	KUNIT_EXPECT_EQ(test, parp_effective_tier_app_prior_bias(1, 2, false,
++		&parp_effective_test_policy), 96);
++	KUNIT_EXPECT_EQ(test, parp_effective_tier_app_prior_bias(1, 3, false,
++		&parp_effective_test_policy), 48);
++	KUNIT_EXPECT_EQ(test, parp_effective_tier_app_prior_bias(1, 4, false,
++		&parp_effective_test_policy), 48);
++	KUNIT_EXPECT_EQ(test, parp_effective_tier_app_prior_bias(0, 5, false,
++		&parp_effective_test_policy), 0);
++	KUNIT_EXPECT_EQ(test, parp_effective_tier_app_prior_bias(16384, 5,
++		false, &parp_effective_test_policy), 48);
++	KUNIT_EXPECT_EQ(test, parp_effective_tier_app_prior_bias(32767, 5,
++		false, &parp_effective_test_policy), 96);
++	KUNIT_EXPECT_EQ(test, parp_effective_tier_app_prior_bias(32768, 1,
++		true, &parp_effective_test_policy), 0);
++} /* lzx-note */
++
+ static void parp_effective_candidate_access_trace_gate_test(struct kunit *test)
+ {
+ 	KUNIT_EXPECT_FALSE(test,
+@@ -1389,6 +1411,7 @@
+ 	KUNIT_CASE(parp_effective_tier_pressure_policy_test), /* #lzx */
+ 	KUNIT_CASE(parp_effective_random_matched_test),
+ 	KUNIT_CASE(parp_effective_recency_time_test),
++	KUNIT_CASE(parp_effective_app_prior_bias_test), /* lzx-note */
+ 	KUNIT_CASE(parp_effective_candidate_access_trace_gate_test), /* #lzx */
+ 	KUNIT_CASE(parp_effective_access_lifetime_test),
+ 	KUNIT_CASE(parp_effective_epoch_limit_test),
+--- a/tools/parp/build_lzx_kernel.sh
++++ b/tools/parp/build_lzx_kernel.sh
+@@ -10,6 +10,7 @@
+ BUILD_DIR="${3:-$KERNEL_WORK_ROOT/build/linux-6.17.13-parp-lzx-$PROFILE}"
+ JOBS="${JOBS:-$(nproc)}"
+ RECLAIM_BIN_SCORE="${LZX_RECLAIM_BIN_SCORE:-1}"
++APP_PRIOR_TIER_PROTECT="${LZX_APP_PRIOR_TIER_PROTECT:-1}" # lzx-note
+ NATIVE_SRC_ROOT="${NATIVE_SRC_ROOT:-$KERNEL_WORK_ROOT/src/linux-6.17.13-native}"
+ NATIVE_BASELINE_COMMIT="${NATIVE_BASELINE_COMMIT:-6609c4d49ebe220a5c40d3105c3f0e68f569ba1a}"
+ SRC_ROOT="$PARP_SRC_ROOT"
+@@ -52,6 +53,7 @@
+ 			--enable PARP_TIER2 \
+ 			--disable PARP_EFFECTIVE_TIER \
+ 			--disable PARP_EFFECTIVE_TIER_EXPERIMENTAL_APPLY \
++			--disable PARP_APP_PRIOR_TIER_PROTECT \
+ 			--disable PARP_FRONTIER_SCORE
+ 		;;
+ 	effective-tier|all)
+@@ -59,6 +61,16 @@
+ 			--enable PARP \
+ 			--enable PARP_EFFECTIVE_TIER \
+ 			--disable PARP_FRONTIER_SCORE
++		if [[ "$APP_PRIOR_TIER_PROTECT" == 1 ]]; then
++			"$CONFIG_TOOL" --file "$BUILD_DIR/.config" \
++				--enable PARP_APP_PRIOR_TIER_PROTECT
++		elif [[ "$APP_PRIOR_TIER_PROTECT" == 0 ]]; then
++			"$CONFIG_TOOL" --file "$BUILD_DIR/.config" \
++				--disable PARP_APP_PRIOR_TIER_PROTECT
++		else
++			echo "LZX_APP_PRIOR_TIER_PROTECT must be 0 or 1" >&2
++			exit 2
++		fi # lzx-note
+ 		if [[ "$PROFILE" == all ]]; then
+ 			"$CONFIG_TOOL" --file "$BUILD_DIR/.config" --enable PARP_TIER2
+ 		else

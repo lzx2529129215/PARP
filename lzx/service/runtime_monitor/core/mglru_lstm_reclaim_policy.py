@@ -389,7 +389,10 @@ class MGLRULSTMReclaimPolicyController:
         return "PASS" if ok else "FAIL"
 
     def write_summary(self) -> None:
-        self.refresh_kernel_observation()
+        # lzx-note: Do not touch the legacy debugfs observation endpoint when
+        # the policy is disabled; the resident service uses parp/myfs only.
+        if self.enabled:
+            self.refresh_kernel_observation()
         sources = ",".join(sorted(self.probability_sources)) or "none"
         mode = self.config.mode if self.config else "unavailable"
         lines = [

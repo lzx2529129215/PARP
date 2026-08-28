@@ -29,6 +29,7 @@ import sys
 import time
 import wave
 import zlib  # lzx-note
+from collections import defaultdict
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -45,6 +46,9 @@ OOM_THRESHOLD_PRESSURE = TEST_ROOT / "automation/oom_threshold_pressure_lzx.py" 
 TRACE_HELPER = TEST_DIR / "trace-helper-lzx.sh"
 PARP_DEBUGFS = Path("/sys/kernel/debug/parp")
 TIER2_SYSCTL = Path("/proc/sys/vm/tier2_predict_enabled")
+RECLAIM_BIN_SYSCTL = Path("/proc/sys/vm/parp_reclaim_bin_enabled")  # lzx-note
+TIER2_WSS_SYSCTL = Path("/proc/sys/vm/tier2_wss_predict_enabled")  # lzx-note
+TIER2_WSS_STRENGTHEN_SYSCTL = Path("/proc/sys/vm/tier2_wss_strengthen_enabled")  # lzx-note
 MIB = 1024 * 1024
 GIB = 1024 * MIB
 KEEPER_UNIT = "parp-acceptance-keeper.service"
@@ -53,6 +57,15 @@ LOW_MEMORY_RE = re.compile(
     r"low[ -]?memory|out of memory|not enough memory|内存不足|低内存|无法分配内存",
     re.IGNORECASE,
 )
+
+LSAPP_NAME_BY_APP_KEY = {  # lzx-note: shared LSTM vocabulary contract
+    "FIREFOX": "Firefox", "LIBREOFFICE": "LibreOffice", "VLC": "VLC",
+    "GIMP": "GIMP", "AUDACITY": "Audacity", "THUNDERBIRD": "Thunderbird",
+    "EVINCE": "Evince", "FILES": "Files", "CALCULATOR": "Calculator",
+    "CALENDAR": "Calendar", "RHYTHMBOX": "Rhythmbox",
+    "IMAGE_VIEWER": "ImageViewer", "SHOTWELL": "Shotwell",
+    "SYSTEM_MONITOR": "SystemMonitor", "SOLITAIRE": "Solitaire",
+}
 
 
 @dataclass(frozen=True)
@@ -82,8 +95,8 @@ def app_specs(session_dir: Path) -> dict[str, AppSpec]:
         "FILES": AppSpec("FILES", "files", file_manager, file_manager_command, "org.gnome.Nautilus|Nautilus|nautilus|Pcmanfm|pcmanfm", "文件|Files|Home|主文件夹|PARP", ("nautilus", "pcmanfm"), "Page_Down"),
         "QQ": AppSpec("QQ", "qq", "qq", "qq", "qq|QQ|linuxqq", "QQ", ("qq", "linuxqq"), "Tab"),
         "FIREFOX": AppSpec("FIREFOX", "firefox", "epiphany-browser", f"env -u http_proxy -u https_proxy -u HTTP_PROXY -u HTTPS_PROXY epiphany-browser --private-instance --profile={shlex.quote(str(firefox_profile))} --new-window {shlex.quote((fixture_dir / 'local-page.html').as_uri())}", "", "PARP local page", ("epiphany", "epiphany-browser"), "Page_Down"),  # lzx-note
-        "GIMP": AppSpec("GIMP", "gimp", "gimp", f"gimp {shlex.quote(str(fixture_dir / 'image-test.png'))}", "gimp|Gimp", "GIMP|image-test", ("gimp", "gimp-2.10"), "plus"),
-        "LIBREOFFICE": AppSpec("LIBREOFFICE", "libreoffice", "libreoffice", f"libreoffice -env:UserInstallation=file://{shlex.quote(str(fixture_dir / 'libreoffice-profile'))} --writer --norestore {shlex.quote(str(fixture_dir / 'writer-test.txt'))}", "libreoffice-writer|soffice", "writer-test|Writer|LibreOffice", ("soffice.bin", "soffice"), "Page_Down"),
+        "GIMP": AppSpec("GIMP", "gimp", "gimp", f"gimp {shlex.quote(str(fixture_dir / 'image-test.png'))}", "gimp|Gimp", "image-test", ("gimp", "gimp-2.10"), "plus"),  # lzx-note: startup splash is not workload-ready
+        "LIBREOFFICE": AppSpec("LIBREOFFICE", "libreoffice", "libreoffice", f"libreoffice -env:UserInstallation=file://{shlex.quote(str(fixture_dir / 'libreoffice-profile'))} --writer --nologo --nofirststartwizard --norestore {shlex.quote(str(fixture_dir / 'writer-test.txt'))}", "libreoffice-writer|soffice", "writer-test|Writer", ("soffice.bin", "soffice"), "Page_Down"),  # lzx-note: reject splash/tip modal windows
         "VLC": AppSpec("VLC", "vlc", "vlc", f"vlc --no-one-instance --no-video-title-show --no-qt-privacy-ask --no-metadata-network-access {shlex.quote(str(fixture_dir / 'audio-test.wav'))}", "vlc|Vlc", "VLC|audio-test", ("vlc",), "space"),
         "AUDACITY": AppSpec("AUDACITY", "audacity", "audacity", f"env HOME={shlex.quote(str(fixture_dir / 'audacity-home'))} XDG_CONFIG_HOME={shlex.quote(str(fixture_dir / 'audacity-config'))} audacity {shlex.quote(str(fixture_dir / 'audio-test.wav'))}", "audacity|Audacity", "Audacity|audio-test", ("audacity",), "space"),
         "THUNDERBIRD": AppSpec("THUNDERBIRD", "thunderbird", "thunderbird", f"thunderbird --no-remote --profile {shlex.quote(str(thunderbird_profile))} {shlex.quote(str(fixture_dir / 'mail-test.eml'))}", "", "PARP local message", ("thunderbird",), "Page_Down"),
@@ -106,6 +119,25 @@ def write_local_app_fixtures(session_dir: Path) -> None:
     (session_dir / "thunderbird-profile").mkdir(parents=True, exist_ok=True)
     for name in ("libreoffice-profile", "audacity-home", "audacity-config", "shotwell"):
         (fixture_dir / name).mkdir(parents=True, exist_ok=True)  # lzx-note
+    # lzx-note: Every round uses a fresh LibreOffice profile. Seed the profile
+    # before launch so first-run and Tip-of-the-Day dialogs cannot steal focus
+    # and turn an otherwise identical replay into an invalid GUI round.
+    libreoffice_user = fixture_dir / "libreoffice-profile" / "user"
+    libreoffice_user.mkdir(parents=True, exist_ok=True)
+    (libreoffice_user / "registrymodifications.xcu").write_text(
+        "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n"
+        "<oor:items xmlns:oor=\"http://openoffice.org/2001/registry\" "
+        "xmlns:xs=\"http://www.w3.org/2001/XMLSchema\" "
+        "xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\">\n"
+        "<item oor:path=\"/org.openoffice.Office.Common/Misc\">"
+        "<prop oor:name=\"FirstRun\" oor:op=\"fuse\"><value>false</value></prop>"
+        "<prop oor:name=\"ShowTipOfTheDay\" oor:op=\"fuse\"><value>false</value></prop>"
+        "</item>\n"
+        "<item oor:path=\"/org.openoffice.Setup/Office\">"
+        "<prop oor:name=\"ooSetupInstCompleted\" oor:op=\"fuse\"><value>true</value></prop>"
+        "</item>\n</oor:items>\n",
+        encoding="utf-8",
+    )
     (fixture_dir / "local-page.html").write_text(
         "<html><head><title>PARP local page</title></head><body>" +
         "".join(f"<h2>Section {index}</h2><p>{'local workload ' * 80}</p>" for index in range(1, 31)) +
@@ -402,23 +434,91 @@ def parse_debug_stat(text: str, key: str) -> str:
     return match.group(1) if match else ""
 
 
+def effective_tier_config_payload(
+    config_text: str, *, experiment_id: int | None = None,
+    session_id: int | None = None,
+) -> str:
+    keys = (
+        "cold_threshold", "hot_threshold_1", "hot_threshold_2",
+        "hot_threshold_3", "max_upgrade_tiers", "require_two_cold",
+        "upgrade_batch_pages", "upgrade_epoch_pages",
+        "upgrade_ratio_permyriad", "downgrade_batch_pages",
+        "downgrade_epoch_pages", "downgrade_ratio_permyriad",
+        "experiment_id", "session_id",
+    )
+    values = {key: parse_debug_stat(config_text, key) for key in keys}
+    missing = [key for key, value in values.items() if value == ""]
+    if missing:
+        raise RuntimeError("effective-tier config fields missing: " + ",".join(missing))
+    if experiment_id is not None:
+        values["experiment_id"] = str(experiment_id)
+    if session_id is not None:
+        values["session_id"] = str(session_id)
+    return " ".join(values[key] for key in keys)
+
+
+def set_effective_tier_session_identity(
+    variant: str, experiment_id: int, session_id: int,
+) -> None:
+    desired = POLICY_VARIANTS[variant]
+    if not desired["effective_tier_mode"]:
+        return
+    privileged_write(PARP_DEBUGFS / "effective_tier_mode", 0)
+    current = debugfs_value("effective_tier_config")
+    privileged_write(
+        PARP_DEBUGFS / "effective_tier_config",
+        effective_tier_config_payload(
+            current, experiment_id=experiment_id, session_id=session_id,
+        ),
+    )
+    privileged_write(
+        PARP_DEBUGFS / "effective_tier_mode", desired["effective_tier_mode"],
+    )
+    applied = debugfs_value("effective_tier_config")
+    if (
+        int(parse_debug_stat(applied, "experiment_id") or -1) != experiment_id
+        or int(parse_debug_stat(applied, "session_id") or -1) != session_id
+    ):
+        raise RuntimeError("effective-tier trace session identity mismatch")
+
+
 POLICY_VARIANTS: dict[str, dict[str, int]] = {
     "native": {"parp_mode": 0, "effective_tier_mode": 0, "tier2_enabled": 0},
-    "effective": {"parp_mode": 0, "effective_tier_mode": 2, "tier2_enabled": 0},
-    "tier2": {"parp_mode": 2, "effective_tier_mode": 0, "tier2_enabled": 1},
-    "combined": {"parp_mode": 2, "effective_tier_mode": 2, "tier2_enabled": 1},
-    "combined_no_reclaim": {"parp_mode": 2, "effective_tier_mode": 2, "tier2_enabled": 1},  # lzx-note
+    "effective": {"parp_mode": 0, "effective_tier_mode": 3, "tier2_enabled": 0},
+    "tier2": {"parp_mode": 0, "effective_tier_mode": 0, "tier2_enabled": 1},
+    "tier2_bin": {"parp_mode": 2, "effective_tier_mode": 0, "tier2_enabled": 1},
+    "combined": {"parp_mode": 2, "effective_tier_mode": 3, "tier2_enabled": 1},
+    "combined_no_reclaim": {"parp_mode": 2, "effective_tier_mode": 3, "tier2_enabled": 1},  # lzx-note
+    "shadow_train": {"parp_mode": 0, "effective_tier_mode": 1, "tier2_enabled": 0},
+    "bin_off": {"parp_mode": 2, "effective_tier_mode": 0, "tier2_enabled": 0},  # lzx-note
+    "bin_apply": {"parp_mode": 2, "effective_tier_mode": 0, "tier2_enabled": 0},  # lzx-note
 }
+
+
+def reclaim_bin_enabled_for_variant(variant: str) -> int:
+    return int(variant in {"tier2_bin", "combined", "bin_apply"})  # lzx-note
+
+
+def tier2_scope_enabled_for_variant(variant: str) -> int:
+    if variant in {"bin_off", "bin_apply"}:
+        return 1
+    return POLICY_VARIANTS[variant]["tier2_enabled"]  # lzx-note
 
 
 def policy_state(cgroup_path: Path | None = None) -> dict[str, Any]:
     return {
         "parp_mode": debugfs_value("mode"),
         "effective_tier_mode": debugfs_value("effective_tier_mode"),
+        "effective_tier_trace_all_candidates": debugfs_value("effective_tier_trace_all_candidates"),
         "tier2_enabled": optional_text(TIER2_SYSCTL),
+        "reclaim_bin_enabled": optional_text(RECLAIM_BIN_SYSCTL),  # lzx-note
+        "tier2_wss_enabled": optional_text(TIER2_WSS_SYSCTL),  # lzx-note
+        "tier2_wss_strengthen_enabled": optional_text(TIER2_WSS_STRENGTHEN_SYSCTL),  # lzx-note
         "cgroup_tier2_enabled": optional_text(cgroup_path / "memory.tier2_enabled") if cgroup_path else None,
+        "cgroup_tier2_stats": optional_text(cgroup_path / "memory.tier2_stats") if cgroup_path else None,  # lzx-note
         "effective_tier_stats": debugfs_value("effective_tier_stats"),
         "effective_tier_config": debugfs_value("effective_tier_config"),
+        "reclaim_bin_stats": debugfs_value("reclaim_bin_stats"),  # lzx-note
     }
 
 
@@ -436,11 +536,6 @@ def apply_global_policy(variant: str) -> dict[str, Any]:
         raise ValueError(f"unknown policy variant: {variant}")
     desired = POLICY_VARIANTS[variant]
     original = policy_state()
-    if variant == "native":  # lzx-note: pristine Native has no PARP controls.
-        present = [key for key in ("parp_mode", "effective_tier_mode", "tier2_enabled") if original.get(key) not in (None, "")]
-        if present:
-            raise RuntimeError("native kernel unexpectedly exposes PARP controls: " + ",".join(present))
-        return original
     stats = original.get("effective_tier_stats") or ""
     metadata_config = original.get("effective_tier_config") or ""  # lzx-note
     if desired["effective_tier_mode"] >= 2 and parse_debug_stat(stats, "apply_compiled") != "1":
@@ -458,35 +553,80 @@ def apply_global_policy(variant: str) -> dict[str, Any]:
         )
     privileged_write(PARP_DEBUGFS / "effective_tier_mode", 0)
     privileged_write(TIER2_SYSCTL, 0)
+    if RECLAIM_BIN_SYSCTL.is_file():
+        privileged_write(RECLAIM_BIN_SYSCTL, 0)  # lzx-note
+    if variant in {"bin_off", "bin_apply"}:
+        privileged_write(TIER2_WSS_SYSCTL, 0)
+        privileged_write(TIER2_WSS_STRENGTHEN_SYSCTL, 0)  # lzx-note
+    privileged_write(
+        PARP_DEBUGFS / "effective_tier_trace_all_candidates",
+        1 if variant == "shadow_train" else 0,
+    )
     privileged_write(PARP_DEBUGFS / "mode", desired["parp_mode"])
     if desired["effective_tier_mode"]:
         privileged_write(PARP_DEBUGFS / "effective_tier_mode", desired["effective_tier_mode"])
     if desired["tier2_enabled"]:
         privileged_write(TIER2_SYSCTL, 1)
+    desired_reclaim_bin = reclaim_bin_enabled_for_variant(variant)
+    if desired_reclaim_bin:
+        if not RECLAIM_BIN_SYSCTL.is_file():
+            raise RuntimeError("independent reclaim-bin runtime switch is missing")
+        privileged_write(RECLAIM_BIN_SYSCTL, 1)  # lzx-note
     current = policy_state()
     for key in ("parp_mode", "effective_tier_mode", "tier2_enabled"):
         if int(current[key] or -1) != desired[key]:
             raise RuntimeError(f"policy state mismatch for {key}: desired={desired[key]} actual={current[key]}")
+    current_reclaim_bin = current.get("reclaim_bin_enabled")
+    if current_reclaim_bin is not None and int(current_reclaim_bin or -1) != desired_reclaim_bin:
+        raise RuntimeError(
+            "policy state mismatch for reclaim_bin_enabled: "
+            f"desired={desired_reclaim_bin} actual={current_reclaim_bin}"
+        )  # lzx-note
+    if variant in {"bin_off", "bin_apply"}:
+        for key in ("tier2_wss_enabled", "tier2_wss_strengthen_enabled"):
+            if int(current.get(key) or -1) != 0:
+                raise RuntimeError(
+                    f"policy state mismatch for {key}: desired=0 actual={current.get(key)}"
+                )  # lzx-note
+    expected_trace_all = 1 if variant == "shadow_train" else 0
+    if int(current["effective_tier_trace_all_candidates"] or -1) != expected_trace_all:
+        raise RuntimeError("effective-tier full-candidate trace mode mismatch")
     return original
 
 
 def apply_cgroup_policy(cgroup_path: Path, variant: str) -> None:
-    desired = POLICY_VARIANTS[variant]
+    desired_scope = tier2_scope_enabled_for_variant(variant)  # lzx-note
     tier2_path = cgroup_path / "memory.tier2_enabled"
     if not tier2_path.exists():
-        if desired["tier2_enabled"]:
+        if desired_scope:
             raise RuntimeError(f"Tier2 cgroup switch missing: {tier2_path}")
         return
-    privileged_write(tier2_path, desired["tier2_enabled"])
+    privileged_write(tier2_path, desired_scope)
     actual = optional_text(tier2_path)
-    if int(actual or -1) != desired["tier2_enabled"]:
-        raise RuntimeError(f"Tier2 cgroup switch mismatch: desired={desired['tier2_enabled']} actual={actual}")
+    if int(actual or -1) != desired_scope:
+        raise RuntimeError(f"Tier2 cgroup switch mismatch: desired={desired_scope} actual={actual}")
 
 
 def restore_global_policy(original: dict[str, Any]) -> None:
     privileged_write(PARP_DEBUGFS / "effective_tier_mode", 0)
+    if original.get("effective_tier_config"):
+        privileged_write(
+            PARP_DEBUGFS / "effective_tier_config",
+            effective_tier_config_payload(str(original["effective_tier_config"])),
+        )
+    if original.get("effective_tier_trace_all_candidates") not in (None, ""):
+        privileged_write(
+            PARP_DEBUGFS / "effective_tier_trace_all_candidates",
+            original["effective_tier_trace_all_candidates"],
+        )
     if original.get("tier2_enabled") is not None:
         privileged_write(TIER2_SYSCTL, original["tier2_enabled"])
+    if original.get("reclaim_bin_enabled") is not None and RECLAIM_BIN_SYSCTL.is_file():
+        privileged_write(RECLAIM_BIN_SYSCTL, original["reclaim_bin_enabled"])  # lzx-note
+    if original.get("tier2_wss_enabled") is not None and TIER2_WSS_SYSCTL.is_file():
+        privileged_write(TIER2_WSS_SYSCTL, original["tier2_wss_enabled"])
+    if original.get("tier2_wss_strengthen_enabled") is not None and TIER2_WSS_STRENGTHEN_SYSCTL.is_file():
+        privileged_write(TIER2_WSS_STRENGTHEN_SYSCTL, original["tier2_wss_strengthen_enabled"])  # lzx-note
     if original.get("parp_mode"):
         privileged_write(PARP_DEBUGFS / "mode", original["parp_mode"])
     original_effective = int(original.get("effective_tier_mode") or 0)
@@ -554,7 +694,6 @@ def preflight_blocking_checks(checks: dict[str, bool], profile: str, variant: st
     return [
         name for name in checks
         if (name != "memory_16g_class" or profile == "full")
-        and (name != "tracefs_parp_decision" or variant != "native")
     ]
 
 
@@ -617,7 +756,11 @@ def preflight(config: dict[str, Any], profile: str, suite: str, variant: str = "
     metadata_ready = parse_debug_stat(effective_config, "metadata_ready")  # lzx-note
     diagnostic_only = apply_compiled in {"", "0"} or "UNTRAINED" in effective_config
     if variant == "native":
-        checks["native_parp_controls_absent"] = not any((mode, effective_stats, effective_config)) and not TIER2_SYSCTL.exists()  # lzx-note
+        # lzx-note: Native/OFF is the same r3 binary with all optimization
+        # switches at zero. A pristine upstream kernel remains a separate
+        # external baseline and is not this paired-replay variant.
+        checks["native_off_controls"] = bool(mode and effective_stats and effective_config)
+        checks["tier2_master_switch"] = TIER2_SYSCTL.is_file()
     elif variant != "observe":
         desired = POLICY_VARIANTS[variant]
         checks["parp_policy_controls"] = bool(mode and effective_stats and effective_config)
@@ -628,6 +771,10 @@ def preflight(config: dict[str, Any], profile: str, suite: str, variant: str = "
             checks["effective_tier_metadata_boot_reserved"] = (
                 metadata_requested == "1" and metadata_ready == "1"
             )  # lzx-note
+        if variant == "shadow_train":
+            checks["effective_tier_full_candidate_trace_control"] = (
+                PARP_DEBUGFS / "effective_tier_trace_all_candidates"
+            ).is_file()  # lzx-note
         config_text = ""
         config_path = metadata.get("kernel_config", {}).get("path")
         if config_path:
@@ -636,8 +783,14 @@ def preflight(config: dict[str, Any], profile: str, suite: str, variant: str = "
             except OSError:
                 pass
         reclaim_bin_compiled = "CONFIG_PARP_RECLAIM_BIN_SCORE=y" in config_text
-        if variant in {"tier2", "combined"}:
+        if variant in {"tier2_bin", "combined", "bin_off", "bin_apply"}:
             checks["reclaim_bin_compiled"] = reclaim_bin_compiled  # lzx-note
+            checks["reclaim_bin_runtime_switch"] = RECLAIM_BIN_SYSCTL.is_file()  # lzx-note
+        if variant in {"bin_off", "bin_apply"}:
+            checks["wss_runtime_switches"] = (
+                TIER2_WSS_SYSCTL.is_file() and TIER2_WSS_STRENGTHEN_SYSCTL.is_file()
+            )  # lzx-note
+            checks["reclaim_bin_runtime_switch"] = RECLAIM_BIN_SYSCTL.is_file()  # lzx-note
         elif variant == "combined_no_reclaim":
             checks["reclaim_bin_compiled_out"] = not reclaim_bin_compiled  # lzx-note
     blocking_checks = preflight_blocking_checks(checks, profile, variant)
@@ -732,6 +885,127 @@ def allocation_by_app(total_bytes: int, apps: list[str], ratios: dict[str, float
     return {app: max(8 * MIB, each) for app in apps}
 
 
+def config_path(value: str | Path) -> Path:
+    path = Path(value)
+    return path.resolve() if path.is_absolute() else (TEST_ROOT / path).resolve()
+
+
+def lsapp_dwell_seconds(row: dict[str, str]) -> tuple[float, str]:
+    """Compress an LSAPP dwell bucket without destroying its ordering."""
+    values = [float(item) for item in row.get("history_durations_s", "").split("|") if item]
+    source = values[-1] if values else 1.0
+    if source <= 10:
+        return 0.8, "LE_10S"
+    if source <= 60:
+        return 1.2, "LE_60S"
+    if source <= 300:
+        return 1.8, "LE_300S"
+    return 2.5, "GT_300S"
+
+
+def lsapp_heldout_case_rows(
+    dataset: Path, apps: list[str], steps: int, seed: int,
+) -> list[dict[str, Any]]:
+    """Select deterministic, diverse transition blocks from held-out LSAPP."""
+    # lzx-note: A block preserves current->next continuity, which gives the
+    # resident LSTM a causal prediction window before the target app is used.
+    key_by_name = {LSAPP_NAME_BY_APP_KEY[key]: key for key in apps}
+    missing = [key for key in apps if key not in LSAPP_NAME_BY_APP_KEY]
+    if missing:
+        raise ValueError("LSAPP vocabulary mapping missing: " + ",".join(missing))
+    sessions: dict[str, list[dict[str, str]]] = defaultdict(list)
+    with dataset.open(encoding="utf-8", newline="") as stream:
+        for row in csv.DictReader(stream):
+            if (
+                row.get("trigger_type") == "foreground_transition"
+                and row.get("has_next_switch") == "1"
+                and row.get("current_app") in key_by_name
+                and row.get("next_app") in key_by_name
+                and row.get("current_app") != row.get("next_app")
+            ):
+                sessions[str(row["session_id"])].append(row)
+    blocks: list[list[dict[str, str]]] = []
+    for rows in sessions.values():
+        rows.sort(key=lambda item: item["timestamp"])
+        chain: list[dict[str, str]] = []
+        for row in rows:
+            if chain and chain[-1]["next_app"] != row["current_app"]:
+                blocks.extend(chain[index:index + 12] for index in range(0, len(chain), 12))
+                chain = []
+            chain.append(row)
+        blocks.extend(chain[index:index + 12] for index in range(0, len(chain), 12))
+    blocks = [block for block in blocks if block]
+    if not blocks:
+        raise ValueError(f"no eligible held-out LSAPP transitions in {dataset}")
+
+    rng = random.Random(seed)
+    rng.shuffle(blocks)
+    selected: list[list[dict[str, str]]] = []
+    used: set[tuple[str, str]] = set()
+    covered_apps: set[str] = set()
+    covered_pairs: set[tuple[str, str]] = set()
+    while sum(len(block) for block in selected) < steps:
+        ranked: list[tuple[tuple[int, int, int, int, float], list[dict[str, str]]]] = []
+        for block in blocks:
+            identity = (block[0]["session_id"], block[0]["timestamp"])
+            if identity in used:
+                continue
+            block_apps = {
+                name for row in block for name in (row["current_app"], row["next_app"])
+            }
+            block_pairs = {(row["current_app"], row["next_app"]) for row in block}
+            score = (
+                len(block_apps - covered_apps), len(block_pairs - covered_pairs),
+                len(block_apps), len(block), rng.random(),
+            )
+            ranked.append((score, block))
+        if not ranked:
+            raise ValueError(f"held-out LSAPP data has fewer than {steps} selectable transitions")
+        block = max(ranked, key=lambda item: item[0])[1]
+        remaining = steps - sum(len(item) for item in selected)
+        block = block[:remaining]
+        selected.append(block)
+        used.add((block[0]["session_id"], block[0]["timestamp"]))
+        covered_apps.update(
+            name for row in block for name in (row["current_app"], row["next_app"])
+        )
+        covered_pairs.update((row["current_app"], row["next_app"]) for row in block)
+
+    cases: list[dict[str, Any]] = []
+    for block_index, block in enumerate(selected, start=1):
+        for row_index, row in enumerate(block):
+            dwell, bucket = lsapp_dwell_seconds(row)
+            cases.append({
+                "current_app": key_by_name[row["current_app"]],
+                "app": key_by_name[row["next_app"]],
+                "block": block_index,
+                "block_start": row_index == 0,
+                "source_session_id": row["session_id"],
+                "source_timestamp": row["timestamp"],
+                "source_history_apps": row.get("history_apps", ""),
+                "source_history_durations_s": row.get("history_durations_s", ""),
+                "dwell_seconds": dwell,
+                "dwell_bucket": bucket,
+            })
+    return cases
+
+
+def random_negative_case_rows(apps: list[str], steps: int, seed: int) -> list[dict[str, Any]]:
+    """Build a deterministic sequence intentionally unrelated to LSAPP labels."""
+    rng = random.Random(seed)
+    current = rng.choice(apps)
+    cases: list[dict[str, Any]] = []
+    for index in range(steps):
+        target = rng.choice([app for app in apps if app != current])
+        cases.append({
+            "current_app": current, "app": target, "block": 1,
+            "block_start": index == 0, "dwell_seconds": 1.2,
+            "dwell_bucket": "RANDOM_NEGATIVE",
+        })
+        current = target
+    return cases
+
+
 def generate_scenario(config: dict[str, Any], *, suite: str, profile: str, round_index: int, seed: int, session_dir: Path, trace_instance: str, replay_plan: dict[str, Any] | None = None) -> dict[str, Any]:
     profile_cfg = config["profiles"][profile]
     suite_cfg = config[suite]
@@ -765,6 +1039,19 @@ def generate_scenario(config: dict[str, Any], *, suite: str, profile: str, round
     actions: list[dict[str, Any]] = []
     oom_probe_cfg = suite_cfg.get("oom_probe", {}) if suite == "peak" else {}
     oom_threshold_cfg = suite_cfg.get("oom_threshold", {}) if suite == "peak" else {}  # lzx-note
+    sequence_mode = str(suite_cfg.get("sequence_mode", "random"))
+    if sequence_mode not in {"random", "lsapp_heldout", "random_negative"}:
+        raise ValueError(f"unsupported sequence_mode: {sequence_mode}")
+    transition_cases: list[dict[str, Any]] = []
+    sequence_dataset: Path | None = None
+    if not replay_plan and sequence_mode == "lsapp_heldout":
+        dataset_value = suite_cfg.get("lsapp_heldout_dataset")
+        if not dataset_value:
+            raise ValueError("lsapp_heldout sequence requires lsapp_heldout_dataset")
+        sequence_dataset = config_path(str(dataset_value))
+        transition_cases = lsapp_heldout_case_rows(sequence_dataset, apps, steps, seed)
+    elif not replay_plan and sequence_mode == "random_negative":
+        transition_cases = random_negative_case_rows(apps, steps, seed)
 
     def append_oom_probe(probe_index: int) -> None:
         probe_command = [
@@ -829,6 +1116,63 @@ def generate_scenario(config: dict[str, Any], *, suite: str, profile: str, round
         actions.append({"type": "trace_marker", "event_type": "ACCEPTANCE_MEASURE_START", "status": "running", "label": "MEASURE_START"})
         measurement_started = True
 
+    pressure_started = False
+
+    def append_threshold_pressure() -> None:
+        nonlocal pressure_started
+        if pressure_started or not oom_threshold_cfg.get("enabled"):
+            return
+        append_measurement_start()
+        pressure_command = [sys.executable, str(OOM_THRESHOLD_PRESSURE)]
+        if oom_threshold_cfg.get("target_headroom_mib") is not None:
+            pressure_command.extend([
+                "--target-headroom-mib",
+                str(int(oom_threshold_cfg["target_headroom_mib"])),
+            ])
+        else:
+            pressure_command.extend([
+                "--target-mib", str(int(oom_threshold_cfg["pressure_mib"])),
+            ])
+        state_path = session_dir / "oom-threshold-pressure-state.json"
+        pressure_command.extend([
+            "--chunk-mib", str(int(oom_threshold_cfg.get("chunk_mib", 64))),
+            "--reclaim-probe-mib", str(int(oom_threshold_cfg.get("reclaim_probe_mib", 0))),
+            "--ramp-interval", str(float(oom_threshold_cfg.get("ramp_interval_seconds", 0.25))),
+            "--hold-seconds", str(float(oom_threshold_cfg.get("hold_seconds", 600))),
+            "--oom-score-adj", str(int(oom_threshold_cfg.get("oom_score_adj", 1000))),
+            "--seed", str(seed), "--state", str(state_path),
+        ])
+        actions.append({
+            "type": "trace_marker", "event_type": "OOM_THRESHOLD_RAMP_START",
+            "status": "running", "label": "OOM_THRESHOLD_RAMP_START",
+        })
+        actions.append({
+            "type": "launch", "name": "oom-threshold-pressure",
+            "scope_name": "oom-threshold-pressure",
+            "command": shlex.join(pressure_command),
+            "label": "OOM_THRESHOLD_PRESSURE_LAUNCH",
+        })
+        if oom_threshold_cfg.get("target_headroom_mib") is not None:
+            actions.append({
+                "type": "wait_json", "path": str(state_path), "field": "status",
+                "equals": "HOLDING",
+                "timeout": float(oom_threshold_cfg.get("ramp_timeout_seconds", 120)),
+                "poll_seconds": 0.2, "label": "OOM_THRESHOLD_RAMP_WAIT",
+            })
+        else:
+            # lzx-note: Forced-OOM calibration expects the disposable worker
+            # to die before HOLDING; keep its fixed observation interval.
+            actions.append({
+                "type": "wait",
+                "seconds": float(oom_threshold_cfg.get("ramp_wait_seconds", 22)),
+                "label": "OOM_THRESHOLD_RAMP_WAIT",
+            })
+        actions.append({
+            "type": "trace_marker", "event_type": "OOM_THRESHOLD_RAMP_DONE",
+            "status": "success", "label": "OOM_THRESHOLD_RAMP_DONE",
+        })
+        pressure_started = True
+
     if suite == "peak":
         if oom_probe_cfg.get("enabled"):
             append_oom_probe(0)
@@ -837,32 +1181,27 @@ def generate_scenario(config: dict[str, Any], *, suite: str, profile: str, round
             actions.append(launch_and_wait[app][0])
         for app in apps:
             actions.append(launch_and_wait[app][1])
-    if oom_threshold_cfg.get("enabled"):  # lzx-note
+        # lzx-note: Some desktop applications expose their real document
+        # window before the rest of startup has quiesced.  In particular GIMP
+        # can request focus once more after WAIT_GIMP has succeeded.  Keep a
+        # fixed, policy-independent settle interval before the measured
+        # sequence so that paired replays are not invalidated by that startup
+        # race.
+        actions.append({
+            "type": "wait",
+            "seconds": float(suite_cfg.get("startup_settle_seconds", 5.0)),
+            "label": "PEAK_APPLICATION_STARTUP_SETTLE",
+        })
+    pressure_after_prediction = (
+        oom_threshold_cfg.get("enabled")
+        and oom_threshold_cfg.get("phase") == "after_prediction"
+    )
+    if oom_threshold_cfg.get("enabled") and not pressure_after_prediction:  # lzx-note
         # Launch and verify the six controlled applications before the final
         # pressure ramp.  This makes the high-score pressure worker the
         # disposable memcg OOM victim and keeps the UI sequence replayable.
         # lzx-note
-        append_measurement_start()
-        pressure_command = [
-            sys.executable, str(OOM_THRESHOLD_PRESSURE),
-            "--target-mib", str(int(oom_threshold_cfg["pressure_mib"])),
-            "--chunk-mib", str(int(oom_threshold_cfg.get("chunk_mib", 64))),
-            "--ramp-interval", str(float(oom_threshold_cfg.get("ramp_interval_seconds", 0.25))),
-            "--hold-seconds", str(float(oom_threshold_cfg.get("hold_seconds", 600))),
-            "--oom-score-adj", str(int(oom_threshold_cfg.get("oom_score_adj", 1000))),
-            "--seed", str(seed),
-            "--state", str(session_dir / "oom-threshold-pressure-state.json"),
-        ]
-        actions.append({"type": "trace_marker", "event_type": "OOM_THRESHOLD_RAMP_START", "status": "running", "label": "OOM_THRESHOLD_RAMP_START"})
-        actions.append({
-            "type": "launch", "name": "oom-threshold-pressure", "scope_name": "oom-threshold-pressure",
-            "command": shlex.join(pressure_command), "label": "OOM_THRESHOLD_PRESSURE_LAUNCH",
-        })
-        actions.append({
-            "type": "wait", "seconds": float(oom_threshold_cfg.get("ramp_wait_seconds", 22)),
-            "label": "OOM_THRESHOLD_RAMP_WAIT",
-        })
-        actions.append({"type": "trace_marker", "event_type": "OOM_THRESHOLD_RAMP_DONE", "status": "success", "label": "OOM_THRESHOLD_RAMP_DONE"})
+        append_threshold_pressure()
     append_measurement_start()
     previous = ""
     case_plan: list[dict[str, Any]] = []
@@ -874,6 +1213,8 @@ def generate_scenario(config: dict[str, Any], *, suite: str, profile: str, round
             raise ValueError("replay plan seed/step count does not match requested experiment")
         if list(replay_plan.get("apps", [])) != apps:
             raise ValueError("replay plan app order does not match current config")
+        if replay_plan.get("sequence_mode", "random") != sequence_mode:
+            raise ValueError("replay plan sequence mode does not match current config")
         expected_oom_probe = suite_cfg.get("oom_probe", {"enabled": False}) if suite == "peak" else {"enabled": False}
         if replay_plan.get("oom_probe", {"enabled": False}) != expected_oom_probe:
             raise ValueError("replay plan OOM probe settings do not match current config")
@@ -884,16 +1225,82 @@ def generate_scenario(config: dict[str, Any], *, suite: str, profile: str, round
         repeat_every = int(oom_probe_cfg.get("repeat_every_steps", 0) or 0)
         if step > 0 and repeat_every and step % repeat_every == 0:
             append_oom_probe(step // repeat_every)
-        if replay_plan:
-            planned = replay_cases[step]
+        planned: dict[str, Any] = replay_cases[step] if replay_plan else {}
+        transition_aligned = sequence_mode in {"lsapp_heldout", "random_negative"}
+        if transition_aligned:
+            if not replay_plan:
+                planned = transition_cases[step]
+            current_app = str(planned.get("current_app", ""))
+            app = str(planned.get("app", ""))
+            block_start = bool(planned.get("block_start"))
+            if current_app not in apps or app not in apps or app == current_app:
+                raise ValueError(
+                    f"invalid {sequence_mode} transition at step {step}: "
+                    f"{current_app}->{app}"
+                )
+            if not block_start and current_app != previous:
+                raise ValueError(
+                    f"discontinuous {sequence_mode} transition at step {step}: "
+                    f"previous={previous} current={current_app}"
+                )
+            if block_start:
+                current_spec = specs[current_app]
+                actions.append({
+                    "type": "trace_marker", "event_type": "PREDICTION_BLOCK_START",
+                    "status": "running", "app_key": current_app,
+                    "label": f"PREDICTION_BLOCK_{int(planned.get('block', 0)):03d}_START",
+                })
+                actions.append({
+                    "type": "switch", "name": current_spec.name,
+                    "app_key": current_app, "class": current_spec.window_class,
+                    "title": current_spec.window_title,
+                    "label": f"{suite.upper()}_CASE_{step:03d}_CONTEXT_{current_app}",
+                })
+                actions.append({
+                    "type": "verify_foreground", "name": current_spec.name,
+                    "app_key": current_app, "class": current_spec.window_class,
+                    "title": current_spec.window_title,
+                    "label": f"{suite.upper()}_CASE_{step:03d}_CONTEXT_VERIFY_{current_app}",
+                })
+                actions.append(py_fixture_action(
+                    sockets[current_app], "TOUCH_HOT", timeout=120,
+                    label=f"{suite.upper()}_CASE_{step:03d}_CONTEXT_HOT_{current_app}",
+                ))
+                actions.append({
+                    "type": "wait",
+                    "seconds": float(suite_cfg.get("prediction_settle_seconds", 0.8)),
+                    "label": f"{suite.upper()}_CASE_{step:03d}_PREDICTION_SETTLE",
+                })
+        elif replay_plan:
             app = str(planned["app"])
+            current_app = previous
             if app not in apps or app == previous:
                 raise ValueError(f"invalid replay app at step {step}: {app}")
         else:
             choices = [app for app in apps if app != previous] or apps
             app = rng.choice(choices)
+            current_app = previous
         spec = specs[app]
-        actions.append({"type": "trace_marker", "event_type": f"{suite.upper()}_CASE_START", "status": "running", "app_key": app, "label": f"{suite.upper()}_CASE_{step:03d}_START", "metadata": {"seed": seed, "round": round_index, "case": step}})
+        actions.append({
+            "type": "trace_marker", "event_type": f"{suite.upper()}_CASE_START",
+            "status": "running", "app_key": app,
+            "label": f"{suite.upper()}_CASE_{step:03d}_START",
+            "metadata": {
+                "seed": seed, "round": round_index, "case": step,
+                "sequence_mode": sequence_mode, "current_app": current_app,
+                "expected_next_app": app,
+            },
+        })
+        if pressure_after_prediction and not pressure_started:
+            if not transition_aligned:
+                raise ValueError("after_prediction pressure requires a transition-aligned sequence")
+            append_threshold_pressure()
+        if transition_aligned:
+            dwell = float(planned["dwell_seconds"])
+            actions.append({
+                "type": "wait", "seconds": round(dwell, 3),
+                "label": f"{suite.upper()}_CASE_{step:03d}_PREDICTION_WINDOW",
+            })
         actions.append({"type": "switch", "name": spec.name, "app_key": app, "class": spec.window_class, "title": spec.window_title, "label": f"{suite.upper()}_CASE_{step:03d}_SWITCH_{app}"})
         actions.append({"type": "verify_foreground", "name": spec.name, "app_key": app, "class": spec.window_class, "title": spec.window_title, "label": f"{suite.upper()}_CASE_{step:03d}_VERIFY_{app}"})
         actions.append(py_fixture_action(sockets[app], "TOUCH_HOT", timeout=120, label=f"{suite.upper()}_CASE_{step:03d}_HOT_{app}"))
@@ -909,18 +1316,33 @@ def generate_scenario(config: dict[str, Any], *, suite: str, profile: str, round
         else:
             offset = cold_start + rng.randrange(0, cold_span, 4096) if cold_span > 4096 else cold_start
             touch_sample = rng.random() < (0.35 if suite == "hotcold" else 0.20)
-            dwell = rng.uniform(float(profile_cfg["dwell_min_seconds"]), float(profile_cfg["dwell_max_seconds"]))
-        case_plan.append({
+            if not transition_aligned:
+                dwell = rng.uniform(float(profile_cfg["dwell_min_seconds"]), float(profile_cfg["dwell_max_seconds"]))
+        case_entry = dict(planned) if transition_aligned else {}
+        case_entry.update({
             "case": step, "app": app, "touch_sample": touch_sample,
             "sample_offset_bytes": offset, "sample_bytes": sample_bytes,
             "dwell_seconds": round(dwell, 3),
         })
+        case_plan.append(case_entry)
         if touch_sample:
             actions.append(py_fixture_action(sockets[app], f"TOUCH_SAMPLE {offset} {sample_bytes}", timeout=180, label=f"{suite.upper()}_CASE_{step:03d}_SAMPLE_{app}"))
         actions.append({"type": "key", "name": spec.name, "app_key": app, "key": spec.operation_key, "optional": app == "FIREFOX", "label": f"{suite.upper()}_CASE_{step:03d}_UI_{app}"})
-        actions.append({"type": "wait", "seconds": round(dwell, 3), "label": f"{suite.upper()}_CASE_{step:03d}_DWELL"})
+        actions.append({
+            "type": "wait",
+            "seconds": (
+                float(suite_cfg.get("post_target_touch_seconds", 0.2))
+                if transition_aligned else round(dwell, 3)
+            ),
+            "label": f"{suite.upper()}_CASE_{step:03d}_TARGET_DWELL",
+        })
         actions.append({"type": "trace_marker", "event_type": f"{suite.upper()}_CASE_DONE", "status": "success", "app_key": app, "label": f"{suite.upper()}_CASE_{step:03d}_DONE"})
         previous = app
+    if float(suite_cfg.get("label_tail_seconds", 0.0)) > 0:
+        actions.append({
+            "type": "wait", "seconds": float(suite_cfg["label_tail_seconds"]),
+            "label": "EFFECTIVE_TIER_FUTURE_LABEL_TAIL",
+        })  # lzx-note: observe the complete 5s label horizon after last candidate
     actions.append({"type": "trace_marker", "event_type": "ACCEPTANCE_MEASURE_DONE", "status": "success", "label": "MEASURE_DONE"})
     actions.append(trace_action(trace_instance, "disable", "TRACE_MEASURE_DISABLE"))
     if oom_threshold_cfg.get("enabled"):  # lzx-note
@@ -933,6 +1355,8 @@ def generate_scenario(config: dict[str, Any], *, suite: str, profile: str, round
         "logical_ratio": logical_ratio,
         "logical_total_bytes": sum(allocation.values()),
         "memtotal_bytes": total_memory,
+        "sequence_mode": sequence_mode,
+        "prediction_before_pressure": bool(pressure_after_prediction),
     }
     if suite == "hotcold":
         workload_contract.update({
@@ -953,9 +1377,16 @@ def generate_scenario(config: dict[str, Any], *, suite: str, profile: str, round
             "oom_probe": suite_cfg.get("oom_probe", {"enabled": False}),
             "oom_threshold": suite_cfg.get("oom_threshold", {"enabled": False}),  # lzx-note
         })
+    sequence_dataset_sha256 = (
+        str(replay_plan.get("sequence_dataset_sha256", "")) if replay_plan
+        else (hashlib.sha256(sequence_dataset.read_bytes()).hexdigest() if sequence_dataset else "")
+    )
     portable_plan = replay_plan if replay_plan else {  # lzx-note
-        "schema_version": 2, "suite": suite, "profile": profile,  # lzx-note
+        "schema_version": 3, "suite": suite, "profile": profile,  # lzx-note
         "round": round_index, "seed": seed, "apps": apps,
+        "sequence_mode": sequence_mode,
+        "sequence_dataset": str(sequence_dataset) if sequence_dataset else "",
+        "sequence_dataset_sha256": sequence_dataset_sha256,
         "memtotal_bytes": total_memory, "logical_total_bytes": sum(allocation.values()),
         "fixture_layout": fixture_layout,
         "oom_probe": suite_cfg.get("oom_probe", {"enabled": False}) if suite == "peak" else {"enabled": False},
@@ -963,7 +1394,10 @@ def generate_scenario(config: dict[str, Any], *, suite: str, profile: str, round
         "cases": case_plan,
     }
     scenario = {
-        "description": f"PARP {suite} diagnostic acceptance round {round_index}",
+        "description": (
+            f"PARP {suite} {sequence_mode} acceptance round {round_index}; "
+            "prediction context precedes pressure when configured"
+        ),
         "validation_mode": True,
         "metadata": {
             "suite": suite, "profile": profile, "round": round_index, "seed": seed,
@@ -971,6 +1405,8 @@ def generate_scenario(config: dict[str, Any], *, suite: str, profile: str, round
             "memtotal_bytes": total_memory, "logical_ratio": logical_ratio,
             "logical_total_bytes": sum(allocation.values()), "fixture_layout": fixture_layout,
             "scored_steps": steps, "workload_contract": workload_contract,
+            "sequence_mode": sequence_mode,
+            "sequence_dataset_sha256": sequence_dataset_sha256,
         },
         "actions": actions,
     }
@@ -1067,7 +1503,7 @@ def setup_slice(config: dict[str, Any], variant: str = "observe") -> Path:
     missing = [name for name in REQUIRED_CGROUP_FILES if not endpoint.get("read_status", {}).get(name, {}).get("ok", False)]  #lzx
     if missing:  #lzx
         raise RuntimeError("test slice required cgroup files unavailable: " + ",".join(missing))  #lzx
-    if variant not in {"observe", "native"}:
+    if variant != "observe":
         apply_cgroup_policy(path, variant)
     return path
 
@@ -1537,18 +1973,31 @@ def finalize_round(session_dir: Path, suite: str, expected_steps: int, automatio
     except (FileNotFoundError, OSError, json.JSONDecodeError):
         policy_before = policy_after = {"variant": "observe"}
     variant = str(policy_before.get("variant", "observe"))
-    if variant == "native":  # lzx-note: absence of controls is the Native policy contract.
-        for phase, state in (("before", policy_before), ("after", policy_after)):
-            for key in ("parp_mode", "effective_tier_mode", "tier2_enabled", "cgroup_tier2_enabled"):
-                if state.get(key) not in (None, ""):
-                    invalid_reasons.append(f"native policy control present {phase} {key}: actual={state.get(key)}")
-    elif variant in POLICY_VARIANTS:
+    if variant in POLICY_VARIANTS:
         desired = POLICY_VARIANTS[variant]
         for phase, state in (("before", policy_before), ("after", policy_after)):
-            for key in ("parp_mode", "effective_tier_mode", "tier2_enabled", "cgroup_tier2_enabled"):
-                expected = desired["tier2_enabled"] if key == "cgroup_tier2_enabled" else desired[key]
+            for key in ("parp_mode", "effective_tier_mode", "tier2_enabled", "cgroup_tier2_enabled", "reclaim_bin_enabled"):
+                if key == "cgroup_tier2_enabled":
+                    expected = tier2_scope_enabled_for_variant(variant)
+                elif key == "reclaim_bin_enabled":
+                    expected = reclaim_bin_enabled_for_variant(variant)
+                else:
+                    expected = desired[key]
                 if int(state.get(key) or -1) != expected:
                     invalid_reasons.append(f"policy drift {phase} {key}: expected={expected} actual={state.get(key)}")
+            if variant in {"bin_off", "bin_apply"}:
+                for key in ("tier2_wss_enabled", "tier2_wss_strengthen_enabled"):
+                    if int(state.get(key) or -1) != 0:
+                        invalid_reasons.append(
+                            f"policy drift {phase} {key}: expected=0 actual={state.get(key)}"
+                        )  # lzx-note
+            expected_trace_all = 1 if variant == "shadow_train" else 0
+            if int(state.get("effective_tier_trace_all_candidates") or -1) != expected_trace_all:
+                invalid_reasons.append(
+                    f"policy drift {phase} effective_tier_trace_all_candidates: "
+                    f"expected={expected_trace_all} "
+                    f"actual={state.get('effective_tier_trace_all_candidates')}"
+                )
     if automation_rc != 0:  #lzx
         invalid_reasons.append(f"automation returned {automation_rc}")  #lzx
     if abort_reason:  #lzx
@@ -1807,6 +2256,8 @@ def aggregate(parent: Path, preflight_data: dict[str, Any], results: list[dict[s
 
 def execute(args: argparse.Namespace) -> int:
     config = load_config(args.config)
+    if args.sequence_mode is not None:
+        config.setdefault(args.suite, {})["sequence_mode"] = args.sequence_mode
     if args.oom_probe_ratio is not None:
         if args.suite != "peak" or not 0 < args.oom_probe_ratio < 1:
             raise ValueError("--oom-probe-ratio is only valid for peak and must be between zero and one")
@@ -1840,9 +2291,13 @@ def execute(args: argparse.Namespace) -> int:
     if args.rounds:
         rounds = args.rounds
     results = []
+    experiment_id = int.from_bytes(
+        hashlib.sha256(str(parent.resolve()).encode("utf-8")).digest()[:8],
+        "big",
+    ) or 1  # lzx-note: stable numeric trace identity for this suite directory
     original_policy: dict[str, Any] | None = None
     try:
-        if variant not in {"observe", "native"}:
+        if variant != "observe":
             original_policy = policy_state()
             apply_global_policy(variant)
             pf["parp"]["applied_policy"] = policy_state()
@@ -1856,6 +2311,10 @@ def execute(args: argparse.Namespace) -> int:
                     raise RuntimeError(f"replay plan missing: {plan_path}")
                 replay_plan = json.loads(plan_path.read_text(encoding="utf-8"))
                 seed = int(replay_plan["seed"])
+            if variant != "observe":
+                set_effective_tier_session_identity(
+                    variant, experiment_id, (experiment_id + index) & ((1 << 64) - 1),
+                )
             print(f"round={index}/{rounds} seed={seed} variant={variant}", flush=True)
             results.append(run_round(
                 config, suite=args.suite, profile=args.profile, round_index=index,
@@ -2020,6 +2479,10 @@ def parser() -> argparse.ArgumentParser:
     execute_parser.add_argument("--seed", type=int, default=20260809)
     execute_parser.add_argument("--rounds", type=int)
     execute_parser.add_argument("--variant", choices=["observe", *POLICY_VARIANTS], default="observe")
+    execute_parser.add_argument(
+        "--sequence-mode", choices=["random", "lsapp_heldout", "random_negative"],
+        help="override the configured application transition sequence",
+    )
     execute_parser.add_argument("--replay-from", type=Path, help="Baseline suite directory containing round-NN/scenario-plan.json")
     execute_parser.add_argument("--oom-probe-ratio", type=float, help="Enable the cgroup-confined anonymous OOM calibration burst")
     execute_parser.add_argument("--oom-threshold-pressure-mib", type=int, help="Override bounded OOM-THRESHOLD anonymous pressure in MiB")  # lzx-note

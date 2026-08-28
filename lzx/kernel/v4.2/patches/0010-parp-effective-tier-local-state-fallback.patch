@@ -1,0 +1,113 @@
+From: lzx <lzx@local>
+Subject: [PATCH 10/10] mm: contain effective-tier state contention per folio
+
+Treat bounded sequence-lock contention as a per-folio invalid sample.
+Do not latch the global effective-tier fault for that case. Keep the global
+circuit breaker for MGLRU state changes and reservation-accounting faults.
+
+Signed-off-by: lzx <lzx@local>
+---
+--- a/mm/parp/core/effective_tier.c
++++ b/mm/parp/core/effective_tier.c
+@@ -302,6 +302,18 @@
+ 	}
+ }
+ 
++static void parp_state_skip_unstable(struct parp_reuse_page_ext *ext)
++{
++	/* A bounded per-folio sequence-lock collision invalidates only this
++	 * sample.  Latching the global state fault here would let one hot folio
++	 * disable effective-tier for the rest of the experiment.  The uncertain
++	 * bit keeps the affected folio on the native MGLRU path until a later
++	 * real access refreshes its metadata.  lzx-note
++	 */
++	atomic64_inc(&parp_tier_stats.state_unstable);
++	parp_state_mark_uncertain(ext);
++}
++
+ static u16 parp_sat_u16(u32 value)
+ {
+ 	return min_t(u32, value, U16_MAX);
+@@ -520,9 +532,7 @@
+ 	if (!ext)
+ 		return;
+ 	if (!parp_state_write_begin(ext, &old_state)) {
+-		atomic64_inc(&parp_tier_stats.state_unstable);
+-		parp_state_mark_uncertain(ext);
+-		atomic_set(&parp_tier_state_fault, 1);
++		parp_state_skip_unstable(ext); /* lzx-note */
+ 		goto emit;
+ 	}
+ 	new_state = old_state;
+@@ -601,9 +611,7 @@
+ 	if (!ext)
+ 		return;
+ 	if (!parp_state_write_begin(ext, &old_state)) {
+-		atomic64_inc(&parp_tier_stats.state_unstable);
+-		parp_state_mark_uncertain(ext);
+-		atomic_set(&parp_tier_state_fault, 1);
++		parp_state_skip_unstable(ext); /* lzx-note */
+ 		goto emit;
+ 	}
+ 	old_generation = FIELD_GET(PARP_STATE_GENERATION_MASK, old_state);
+@@ -1246,9 +1254,7 @@
+ 	if (!ext)
+ 		return false;
+ 	if (!parp_state_write_begin(ext, &old_state)) {
+-		atomic64_inc(&parp_tier_stats.state_unstable);
+-		parp_state_mark_uncertain(ext);
+-		atomic_set(&parp_tier_state_fault, 1);
++		parp_state_skip_unstable(ext); /* lzx-note */
+ 		page_ext_put(page_ext);
+ 		return false;
+ 	}
+@@ -1441,7 +1447,11 @@
+ 		return;
+ 	if (!parp_effective_tier_release_epoch(folio,
+ 			decision->reservation_upgrade, ctx->epoch_tag)) {
+-		atomic_set(&parp_tier_state_fault, 1);
++		/* Keep the consumed budget as a conservative per-epoch fallback;
++		 * parp_effective_tier_release_epoch() already marked the folio
++		 * unstable.  This is not a global metadata invariant failure.
++		 * lzx-note
++		 */
+ 		decision->reservation_active = false;
+ 		return;
+ 	}
+@@ -1734,7 +1744,10 @@
+ 
+ 	if (isolate_result && !parp_set_pending_action(folio, decision->action)) {
+ 		atomic64_inc(&parp_tier_stats.state_unstable);
+-		atomic_set(&parp_tier_state_fault, 1);
++		/* The isolated folio falls back to native outcome accounting; a
++		 * transient per-folio collision must not disable other lruvecs.
++		 * lzx-note
++		 */
+ 	}
+ 	if (trace_parp_effective_tier_decision_enabled() &&
+ 	    parp_effective_tier_trace_decision_eligible(decision)) {
+@@ -1742,9 +1755,10 @@
+ 		u32 lifetime_epoch;
+ 		u64 cookie;
+ 
+-		if (!parp_effective_tier_identity(folio, &lifetime_epoch,
+-				&cookie))
+-			atomic_set(&parp_tier_state_fault, 1);
++		/* A missing trace identity affects evidence for this record only;
++		 * it is not a policy-state invariant failure.  lzx-note
++		 */
++		parp_effective_tier_identity(folio, &lifetime_epoch, &cookie);
+ 		memset(&trace, 0, sizeof(trace));
+ 		trace.timestamp_ns = ktime_get_mono_fast_ns();
+ 		trace.experiment_id = ctx->experiment_id;
+@@ -1946,9 +1960,7 @@
+ 	if (!ext)
+ 		return;
+ 	if (!parp_state_write_begin(ext, &old_state)) {
+-		atomic64_inc(&parp_tier_stats.state_unstable);
+-		parp_state_mark_uncertain(ext);
+-		atomic_set(&parp_tier_state_fault, 1);
++		parp_state_skip_unstable(ext); /* lzx-note */
+ 		page_ext_put(page_ext);
+ 		return;
+ 	}

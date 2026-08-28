@@ -61,11 +61,22 @@ python3 test/test/lstm-online-report-lzx.py \
 | 变体 | PARP mode | effective-tier | Tier2全局/测试cgroup | 用途 |
 |---|---:|---:|---:|---|
 | native | 0 | 0 | 0/0 | 原生 MGLRU 基线 |
-| effective | 0 | 2（protect-only） | 0/0 | 只验证页面 effective-tier |
-| tier2 | 2 | 0 | 1/1 | 只验证 cgroup 排序和提前回收 |
-| combined | 2 | 2 | 1/1 | 验证组合收益和交互 |
+| effective | 0 | 3（bidirectional） | 0/0 | 只验证页面双向 effective-tier |
+| tier2 | 0 | 0 | 1/1 | 只验证 Tier2 水位预测和主动回收 |
+| tier2_bin | 2 | 0 | 1/1 | 验证 Tier2 + LSTM memcg-bin 排序 |
+| combined | 2 | 3 | 1/1 | 验证双向 tier、Tier2 和 bin 的组合收益 |
+| bin_off | 2 | 0 | 0/1（仅作用域标记） | LSTM 与 `/dev/myfs` 保持工作，原生随机 memcg-bin 基线 |
+| bin_apply | 2 | 0 | 0/1（仅作用域标记） | 只打开 `vm.parp_reclaim_bin_enabled` 验证前台预测排序 |
+| shadow_train | 0 | 1 | 0/0 | 完整候选 trace；只用于页面模型离线训练 |
 
-`vm.tier2_predict_enabled` 现在同时约束主动回收和预测式 memcg-bin 排序，避免 Tier2 标记为 OFF 时仍然改变回收顺序。测试工具在每轮前后读取开关，发生漂移则该轮无效；运行结束恢复原状态。
+`tier2` 不再隐含 memcg-bin；只有 `tier2_bin`/`combined` 同时打开 PARP
+APPLY。这样主动回收和预测排序可以分别消融。测试工具在每轮前后读取开关，
+发生漂移则该轮无效；运行结束恢复原状态。<!-- lzx-note -->
+
+`bin_off` 与 `bin_apply` 的 LSTM 服务、预测批次、PARP APPLY、场景计划和
+cgroup 作用域完全相同，唯一处理变量是 `vm.parp_reclaim_bin_enabled=0/1`。
+两者均保持 Tier2 全局开关、effective-tier 和 WSS 为 0，因此不会把主动回收
+或页面 tier 保护的效果计入 bin-reclaim。<!-- lzx-note -->
 
 Apply 能力需要编译，但运行时默认仍为 OFF。使用目标源码树内的统一构建入口：
 
@@ -105,6 +116,25 @@ python3 test/test/parp-acceptance-lzx.py run \
 ```
 
 pilot 主要检查方向和副作用：PageFault、major fault、真实 refault、direct reclaim 次数/P95、kswapd CPU、测试 slice CPU/IO。方向合理且无安全回退后，再运行冷热10轮和峰值3轮。
+
+LSTM 因果验证使用 `parp-predictive-reclaim-config-lzx.json`：held-out LSAPP
+链先产生“当前应用→下一应用”预测，再启动有界 headroom 压力，最后切换并
+访问真实下一应用。`--sequence-mode random_negative` 保持相同压力器但故意
+破坏标签，用作预测价值的负对照。<!-- lzx-note -->
+
+页面模型不得继续把工程 fixture 当训练结果。先用 `shadow_train` 收集至少
+跨多个 session 的完整候选与未来 5 秒真实访问，再执行：
+
+```bash
+python3 test/test/build-effective-tier-dataset-lzx.py \
+  --round-dir <shadow输出>/round-01 \
+  --round-dir <shadow输出>/round-02 \
+  --output-dir test/outputs/effective-tier-training
+```
+
+入口会拒绝候选采样、trace loss、重复 session identity 或非 SHADOW 数据；
+它只生成离线 `ranking_model.json`，不会自动把未经审核的模型写入内核。
+<!-- lzx-note -->
 
 ## 6. Native/OFF 与 Apply 精确配对
 

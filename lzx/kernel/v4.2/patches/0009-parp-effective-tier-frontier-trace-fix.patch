@@ -1,0 +1,153 @@
+From: lzx <lzx@local>
+Subject: [PATCH 9/9] mm: fix virtual tier frontier and bound trace volume
+
+Allow the virtual effective tier to cross the native tier-3 frontier and
+sample bulk no-op decision/outcome traces while retaining every policy
+action. This restores real protection and prevents trace-ring overruns.
+
+Signed-off-by: lzx <lzx@local>
+---
+--- a/mm/parp/core/effective_tier.c
++++ b/mm/parp/core/effective_tier.c
+@@ -24,6 +24,8 @@
+ #define PARP_TIER_SCHEMA_VERSION	1U
+ #define PARP_TIER_STATE_TRIES		4
+ #define PARP_TIER_LATENCY_BUCKETS	32
++#define PARP_TIER_TRACE_SAMPLE_MASK	255U /* 1/256 keep-reclaim events. lzx-note */
++#define PARP_TIER_MAX_VIRTUAL_UPGRADE	3 /* lzx-note */
+ #define PARP_TIER_EPOCH_MASK		GENMASK(11, 0)
+ #define PARP_TIER_DOWNGRADE_SHIFT	12
+ #define PARP_TIER_STATE_EPOCH_SHIFT	24
+@@ -112,8 +114,10 @@
+ 	atomic64_t decision_hist[PARP_TIER_LATENCY_BUCKETS];
+ 	atomic64_t lock_hist[PARP_TIER_LATENCY_BUCKETS];
+ 	atomic64_t trace_decisions;
++	atomic64_t trace_decisions_sampled_out; /* lzx-note */
+ 	atomic64_t trace_accesses;
+ 	atomic64_t trace_outcomes;
++	atomic64_t trace_outcomes_sampled_out; /* lzx-note */
+ 	atomic64_t trace_batches;
+ 	atomic64_t trace_locks;
+ };
+@@ -168,6 +172,8 @@
+ static enum parp_effective_tier_mode parp_tier_mode;
+ static atomic64_t parp_tier_batch_id = ATOMIC64_INIT(0);
+ static atomic64_t parp_tier_trace_sequence = ATOMIC64_INIT(0);
++static atomic64_t parp_tier_outcome_sample_sequence = ATOMIC64_INIT(0);
++/* lzx-note */
+ static siphash_key_t parp_tier_cookie_key __read_mostly;
+ static u8 parp_tier_state_epoch __read_mostly;
+ static atomic_t parp_tier_state_fault = ATOMIC_INIT(0);
+@@ -854,8 +860,15 @@
+ 	if (native_tier < 0 || native_tier > PARP_MAX_TIER)
+ 		return 0;
+ 	effective = (s64)native_tier * PARP_TIER_SCALE + delta_tier_q8;
++	/*
++	 * This value is virtual: it is compared with the native tier frontier but
++	 * is never stored in LRU_REFS. Allowing it above PARP_MAX_TIER is required
++	 * to cross a native frontier of tier 3; clamping to 3 made every predicted
++	 * upgrade at that frontier mathematically impossible. lzx-note
++	 */
+ 	return clamp_t(s64, effective, 0,
+-		       PARP_MAX_TIER * PARP_TIER_SCALE);
++		       (PARP_MAX_TIER + PARP_TIER_MAX_VIRTUAL_UPGRADE) *
++		       PARP_TIER_SCALE);
+ }
+ 
+ void parp_effective_tier_classify(s32 score, bool model_valid,
+@@ -1687,6 +1700,16 @@
+ 		decision->decision_duration_ns);
+ }
+ 
++static bool parp_effective_tier_trace_decision_eligible(
++		const struct parp_tier_decision *decision)
++{
++	/* Keep every policy/native protection event; sample only the no-op bulk. */
++	if (decision->action != PARP_TIER_KEEP_RECLAIM)
++		return true;
++	return !(atomic64_read(&parp_tier_stats.candidates) &
++		 PARP_TIER_TRACE_SAMPLE_MASK);
++} /* lzx-note */
++
+ void __parp_effective_tier_finish(struct parp_tier_scan_ctx *ctx,
+ 		struct lruvec *lruvec, struct folio *folio,
+ 		struct parp_tier_decision *decision, bool sort_result,
+@@ -1713,7 +1736,8 @@
+ 		atomic64_inc(&parp_tier_stats.state_unstable);
+ 		atomic_set(&parp_tier_state_fault, 1);
+ 	}
+-	if (trace_parp_effective_tier_decision_enabled()) {
++	if (trace_parp_effective_tier_decision_enabled() &&
++	    parp_effective_tier_trace_decision_eligible(decision)) {
+ 		struct parp_effective_tier_trace trace;
+ 		u32 lifetime_epoch;
+ 		u64 cookie;
+@@ -1823,7 +1847,9 @@
+ 			&parp_tier_trace_sequence);
+ 		atomic64_inc(&parp_tier_stats.trace_decisions);
+ 		trace_parp_effective_tier_decision(&trace);
+-	}
++	} else if (trace_parp_effective_tier_decision_enabled()) {
++		atomic64_inc(&parp_tier_stats.trace_decisions_sampled_out);
++	} /* lzx-note */
+ } /* #lzx */
+ 
+ static void parp_effective_tier_trace_batch(
+@@ -1937,7 +1963,10 @@
+ 		return;
+ 	}
+ 	atomic64_inc(&parp_tier_stats.outcomes[outcome]);
+-	if (trace_parp_effective_tier_outcome_enabled()) {
++	if (trace_parp_effective_tier_outcome_enabled() &&
++	    ((pending - 1) != PARP_TIER_KEEP_RECLAIM ||
++	     !(atomic64_inc_return(&parp_tier_outcome_sample_sequence) &
++	       PARP_TIER_TRACE_SAMPLE_MASK))) {
+ 		struct parp_effective_tier_outcome_trace trace = { };
+ 		struct parp_tier_runtime_config config = { };
+ 
+@@ -1958,7 +1987,9 @@
+ 			&parp_tier_trace_sequence);
+ 		atomic64_inc(&parp_tier_stats.trace_outcomes);
+ 		trace_parp_effective_tier_outcome(&trace);
+-	}
++	} else if (trace_parp_effective_tier_outcome_enabled()) {
++		atomic64_inc(&parp_tier_stats.trace_outcomes_sampled_out);
++	} /* lzx-note */
+ 	page_ext_put(page_ext);
+ }
+ 
+@@ -2250,7 +2281,9 @@
+ 		"score_time_ns_max %lld\ndecision_time_ns_total %lld\n"
+ 		"decision_time_ns_max %lld\nlock_time_ns_total %lld\n"
+ 		"lock_time_ns_max %lld\ntrace_decisions %lld\n"
+-		"trace_accesses %lld\ntrace_outcomes %lld\ntrace_batches %lld\n"
++		"trace_decisions_sampled_out %lld\ntrace_accesses %lld\n"
++		"trace_outcomes %lld\ntrace_outcomes_sampled_out %lld\n"
++		"trace_batches %lld\n"
+ 		"trace_locks %lld\n",
+ 		parp_effective_tier_get_mode(),
+ 		IS_ENABLED(CONFIG_PARP_EFFECTIVE_TIER_EXPERIMENTAL_APPLY),
+@@ -2287,8 +2320,10 @@
+ 		atomic64_read(&parp_tier_stats.lock_time_ns_total),
+ 		atomic64_read(&parp_tier_stats.lock_time_ns_max),
+ 		atomic64_read(&parp_tier_stats.trace_decisions),
++		atomic64_read(&parp_tier_stats.trace_decisions_sampled_out),
+ 		atomic64_read(&parp_tier_stats.trace_accesses),
+ 		atomic64_read(&parp_tier_stats.trace_outcomes),
++		atomic64_read(&parp_tier_stats.trace_outcomes_sampled_out),
+ 		atomic64_read(&parp_tier_stats.trace_batches),
+ 		atomic64_read(&parp_tier_stats.trace_locks));
+ 	len = parp_format_histogram(buf, size, len, "score_hist_log2_ns",
+--- a/mm/parp/tests/parp_test.c
++++ b/mm/parp/tests/parp_test.c
+@@ -942,7 +942,9 @@
+ 	KUNIT_EXPECT_EQ(test, parp_effective_tier_q8(0, PARP_TIER_SCALE),
+ 		PARP_TIER_SCALE);
+ 	KUNIT_EXPECT_EQ(test, parp_effective_tier_q8(3,
+-		3 * PARP_TIER_SCALE), 3 * PARP_TIER_SCALE);
++		3 * PARP_TIER_SCALE), 6 * PARP_TIER_SCALE);
++	KUNIT_EXPECT_GT(test, parp_effective_tier_q8(2,
++		2 * PARP_TIER_SCALE), 3 * PARP_TIER_SCALE); /* lzx-note */
+ 	KUNIT_EXPECT_EQ(test, parp_effective_tier_q8(2,
+ 		-PARP_TIER_SCALE), PARP_TIER_SCALE);
+ }

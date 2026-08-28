@@ -244,10 +244,13 @@ class ControllerTests(unittest.TestCase):
         self.assertNotIn("PROCESS_START", DIRECT_PREDICTION_EVENTS)
         self.assertNotIn("PROCESS_EXIT", DIRECT_PREDICTION_EVENTS)
 
-    def test_minimize_restore_do_not_directly_trigger_prediction(self) -> None:
-        self.assertNotIn("APP_MINIMIZE", DIRECT_PREDICTION_EVENTS)
+    def test_lifecycle_and_minimize_prediction_trigger_contract(self) -> None:
+        self.assertIn("APP_MINIMIZE", DIRECT_PREDICTION_EVENTS)
         self.assertNotIn("APP_RESTORE", DIRECT_PREDICTION_EVENTS)
-        self.assertEqual(DIRECT_PREDICTION_EVENTS, {"APP_OPEN", "APP_SWITCH"})
+        self.assertEqual(
+            DIRECT_PREDICTION_EVENTS,
+            {"APP_OPEN", "APP_SWITCH", "APP_CLOSE", "APP_MINIMIZE"},
+        )
 
 
 if __name__ == "__main__":
