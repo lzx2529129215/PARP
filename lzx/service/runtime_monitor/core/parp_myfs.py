@@ -20,15 +20,23 @@ from pathlib import Path
 from typing import Any, Iterable
 
 from core.working_set_predictor import WorkingSetPrediction, WorkingSetPredictor
+from core.reclaim_workload import (  # lzx-note
+    CgroupReclaimWorkloadProfiler,
+    ReclaimWorkloadProfile,
+    WORKLOAD_NAMES,
+    profile_summary,
+)
 
 
 ABI_VERSION = 1
 ABI_VERSION_V2 = 2
+ABI_VERSION_V3 = 3  # lzx-note
 MAX_APPS = 32
 MAX_BINDINGS = 64
 Q15_ONE = 32767
 ENTRY_FOREGROUND = 1 << 0
 BINDING_ACTIVE = 1 << 0
+BINDING_WORKLOAD_VALID = 1 << 1  # lzx-note
 STATE_WORKINGSET_VALID = 1 << 0
 MYFS_MODES = {"off", "dry-run", "apply"}
 
@@ -50,6 +58,16 @@ class PredictBindingV1(ctypes.Structure):
         ("flags", ctypes.c_uint32),
         ("epoch_id", ctypes.c_uint64),
         ("reserved", ctypes.c_uint64),
+    ]
+
+
+class PredictBindingV3(ctypes.Structure):  # lzx-note
+    _fields_ = [
+        ("domain_id", ctypes.c_uint64),
+        ("app_id", ctypes.c_uint32),
+        ("flags", ctypes.c_uint32),
+        ("epoch_id", ctypes.c_uint64),
+        ("workload_hint", ctypes.c_uint64),
     ]
 
 
@@ -97,6 +115,31 @@ class PredictStateV2(ctypes.Structure):
     ]
 
 
+class PredictStateV3(ctypes.Structure):  # lzx-note
+    _fields_ = [
+        ("abi_version", ctypes.c_uint32),
+        ("struct_size", ctypes.c_uint32),
+        ("schema_version", ctypes.c_uint32),
+        ("model_version", ctypes.c_uint32),
+        ("generation", ctypes.c_uint32),
+        ("nr_predictions", ctypes.c_uint32),
+        ("nr_bindings", ctypes.c_uint32),
+        ("flags", ctypes.c_uint32),
+        ("timestamp_ns", ctypes.c_uint64),
+        ("horizon_ns", ctypes.c_uint64),
+        ("ttl_ns", ctypes.c_uint64),
+        ("policy_domain_id", ctypes.c_uint64),
+        ("predicted_workingset_bytes", ctypes.c_uint64),
+        ("predicted_resident_bytes", ctypes.c_uint64),
+        ("workingset_confidence_q15", ctypes.c_uint16),
+        ("workingset_estimator_version", ctypes.c_uint16),
+        ("reserved32", ctypes.c_uint32),
+        ("reserved64", ctypes.c_uint64),
+        ("predictions", PredictEntryV1 * MAX_APPS),
+        ("bindings", PredictBindingV3 * MAX_BINDINGS),
+    ]
+
+
 def _ioc(direction: int, ioctl_type: int, number: int, size: int) -> int:
     return (direction << 30) | (ioctl_type << 8) | number | (size << 16)
 
@@ -105,6 +148,8 @@ PARP_PREDICT_SET_STATE = _ioc(1, 0xB7, 1, ctypes.sizeof(PredictStateV1))
 PARP_PREDICT_GET_STATE = _ioc(2, 0xB7, 2, ctypes.sizeof(PredictStateV1))
 PARP_PREDICT_SET_STATE_V2 = _ioc(1, 0xB7, 3, ctypes.sizeof(PredictStateV2))
 PARP_PREDICT_GET_STATE_V2 = _ioc(2, 0xB7, 4, ctypes.sizeof(PredictStateV2))
+PARP_PREDICT_SET_STATE_V3 = _ioc(1, 0xB7, 5, ctypes.sizeof(PredictStateV3))  # lzx-note
+PARP_PREDICT_GET_STATE_V3 = _ioc(2, 0xB7, 6, ctypes.sizeof(PredictStateV3))  # lzx-note
 
 
 AUDIT_FIELDS = [
@@ -114,6 +159,8 @@ AUDIT_FIELDS = [
     "kernel_abi_version", "workingset_valid", "policy_domain_id",
     "predicted_workingset_bytes", "predicted_resident_bytes",
     "predicted_growth_bytes", "workingset_confidence_q15", "workingset_action_hint",
+    "workload_profiles", "workload_valid_profiles", "workload_classes",
+    "workload_binding_details",  # lzx-note
 ]
 
 
@@ -148,7 +195,8 @@ class PARPMyfsBridge:
             raise ValueError(f"invalid /dev/myfs mode: {mode}")
         if ctypes.sizeof(PredictStateV1) >= (1 << 14):
             raise RuntimeError("PARP myfs UAPI exceeds Linux ioctl size field")
-        if ctypes.sizeof(PredictStateV2) != ctypes.sizeof(PredictStateV1):
+        if (ctypes.sizeof(PredictStateV2) != ctypes.sizeof(PredictStateV1)
+                or ctypes.sizeof(PredictStateV3) != ctypes.sizeof(PredictStateV1)):
             raise RuntimeError("PARP myfs v2 must preserve the v1 ioctl payload size")
         self.mode = mode
         self.device = Path(device)
@@ -182,6 +230,8 @@ class PARPMyfsBridge:
             "alias_tree_scans": 0,
             "workingset_v2_submitted": 0,
             "workingset_v1_fallbacks": 0,
+            "workload_v3_submitted": 0,  # lzx-note
+            "workload_v2_fallbacks": 0,  # lzx-note
         }
         self.parp_dir = Path(output_dir) / "parp"
         self.parp_dir.mkdir(parents=True, exist_ok=True)
@@ -192,6 +242,7 @@ class PARPMyfsBridge:
         self._audit.writeheader()
         self._audit_file.flush()
         self.workingset_predictor = WorkingSetPredictor(output_dir=self.parp_dir)
+        self.workload_profiler = CgroupReclaimWorkloadProfiler()  # lzx-note
         self._synchronize_generation()
         self.preflight()
 
@@ -207,7 +258,18 @@ class PARPMyfsBridge:
             os.close(fd)
         return state_type.from_buffer_copy(buffer)
 
-    def _get_state(self) -> PredictStateV1 | PredictStateV2:
+    def _get_state(self) -> PredictStateV1 | PredictStateV2 | PredictStateV3:
+        try:
+            state = self._get_state_with(PredictStateV3, PARP_PREDICT_GET_STATE_V3)
+            if (
+                state.abi_version == ABI_VERSION_V3
+                and state.struct_size == ctypes.sizeof(PredictStateV3)
+            ):
+                self.kernel_abi_version = ABI_VERSION_V3
+                return state
+        except OSError as exc:
+            if exc.errno not in {errno.ENOTTY, errno.EINVAL}:
+                raise
         try:
             state = self._get_state_with(PredictStateV2, PARP_PREDICT_GET_STATE_V2)
             if (
@@ -241,11 +303,12 @@ class PARPMyfsBridge:
             "interface": "parp/myfs",
             "device": str(self.device),
             "mode": self.mode,
-            "service_abi_version": ABI_VERSION_V2,
+            "service_abi_version": ABI_VERSION_V3,  # lzx-note
             "kernel_abi_version": self.kernel_abi_version,
             "struct_size": ctypes.sizeof(PredictStateV1),
             "v2_struct_size": ctypes.sizeof(PredictStateV2),
-            "workingset_prediction_supported": self.kernel_abi_version == ABI_VERSION_V2,
+            "workingset_prediction_supported": self.kernel_abi_version >= ABI_VERSION_V2,
+            "workload_prediction_supported": self.kernel_abi_version >= ABI_VERSION_V3,  # lzx-note
             "exists": exists,
             "read_write": writable,
             "generation": self.generation,
@@ -313,15 +376,20 @@ class PARPMyfsBridge:
             timestamp_ns=now_ns,
             foreground_flag=ENTRY_FOREGROUND,
         )
+        workload_profiles = self.workload_profiler.sample(self._last_binding_paths)  # lzx-note
         state_v1 = self._make_state_v1(entries, bindings, event, now_ns)
         state_v2 = self._make_state_v2(
             entries, bindings, event, now_ns, workingset
+        )
+        state_v3 = self._make_state_v3(  # lzx-note
+            entries, bindings, event, now_ns, workingset, workload_profiles
         )
 
         if self.mode == "dry-run":
             self._stats["dry_runs"] += 1
             self._record(event, prediction_result, current_app, len(entries), len(bindings), ambiguous,
-                         status="DRY_RUN", workingset=workingset)
+                         status="DRY_RUN", workingset=workingset,
+                         workload_profiles=workload_profiles)
             return
 
         start_ns = time.monotonic_ns()
@@ -332,12 +400,12 @@ class PARPMyfsBridge:
             try:
                 fd = self._open()
                 try:
+                    use_v3 = self.kernel_abi_version == ABI_VERSION_V3  # lzx-note
                     use_v2 = self.kernel_abi_version == ABI_VERSION_V2
-                    state = state_v2 if use_v2 else state_v1
-                    command = (
-                        PARP_PREDICT_SET_STATE_V2
-                        if use_v2 else PARP_PREDICT_SET_STATE
-                    )
+                    state = state_v3 if use_v3 else state_v2 if use_v2 else state_v1
+                    command = (PARP_PREDICT_SET_STATE_V3 if use_v3 else
+                               PARP_PREDICT_SET_STATE_V2 if use_v2 else
+                               PARP_PREDICT_SET_STATE)
                     payload = bytearray(bytes(state))
                     fcntl.ioctl(fd, command, payload, True)
                 finally:
@@ -345,14 +413,18 @@ class PARPMyfsBridge:
                 self._stats["ioctl_success"] += 1
                 if use_v2:
                     self._stats["workingset_v2_submitted"] += 1
-                else:
+                elif not use_v3:
                     self._stats["workingset_v1_fallbacks"] += 1
+                if use_v3:
+                    self._stats["workload_v3_submitted"] += 1
+                else:
+                    self._stats["workload_v2_fallbacks"] += 1
                 self._successful_apps = successful_apps
                 self._record(
                     event, prediction_result, current_app, len(entries), len(bindings), ambiguous,
                     attempted=True, success=True,
                     latency_us=(time.monotonic_ns() - start_ns) // 1000, status="APPLIED",
-                    workingset=workingset,
+                    workingset=workingset, workload_profiles=workload_profiles,
                 )
                 return
             except OSError as exc:
@@ -365,6 +437,7 @@ class PARPMyfsBridge:
                     self.generation += 1
                     state_v1.generation = self.generation
                     state_v2.generation = self.generation
+                    state_v3.generation = self.generation  # lzx-note
                     continue
                 break
         self._stats["ioctl_failures"] += 1
@@ -373,6 +446,7 @@ class PARPMyfsBridge:
             attempted=True, success=False, error_number=error_number,
             latency_us=(time.monotonic_ns() - start_ns) // 1000,
             status="FAIL_CLOSED", error=error_text, workingset=workingset,
+            workload_profiles=workload_profiles,  # lzx-note
         )
 
     def _prediction_entries(
@@ -497,11 +571,12 @@ class PARPMyfsBridge:
 
     def _fill_state(
         self,
-        state: PredictStateV1 | PredictStateV2,
+        state: PredictStateV1 | PredictStateV2 | PredictStateV3,
         entries: list[tuple[int, int, int, int]],
         bindings: list[tuple[int, int]],
         event: dict[str, Any] | None,
         now_ns: int,
+        workload_profiles: dict[int, ReclaimWorkloadProfile] | None = None,
     ) -> None:
         state.schema_version = self.schema_version
         state.model_version = self.model_version
@@ -515,9 +590,20 @@ class PARPMyfsBridge:
         for index, (app_id, score, rank, flags) in enumerate(entries):
             state.predictions[index] = PredictEntryV1(app_id, score, rank, flags, 0)
         for index, (domain_id, app_id) in enumerate(bindings):
-            state.bindings[index] = PredictBindingV1(
-                domain_id, app_id, BINDING_ACTIVE, epoch_id, 0
-            )
+            profile = (workload_profiles or {}).get(domain_id)
+            if isinstance(state, PredictStateV3):
+                flags = BINDING_ACTIVE
+                hint = 0
+                if profile is not None and profile.valid:
+                    flags |= BINDING_WORKLOAD_VALID
+                    hint = profile.workload_hint()
+                state.bindings[index] = PredictBindingV3(
+                    domain_id, app_id, flags, epoch_id, hint
+                )
+            else:
+                state.bindings[index] = PredictBindingV1(
+                    domain_id, app_id, BINDING_ACTIVE, epoch_id, 0
+                )
 
     def _make_state_v1(
         self,
@@ -553,6 +639,31 @@ class PARPMyfsBridge:
             state.workingset_estimator_version = workingset.estimator_version
         return state
 
+    def _make_state_v3(
+        self,
+        entries: list[tuple[int, int, int, int]],
+        bindings: list[tuple[int, int]],
+        event: dict[str, Any] | None,
+        now_ns: int,
+        workingset: WorkingSetPrediction,
+        workload_profiles: dict[int, ReclaimWorkloadProfile],
+    ) -> PredictStateV3:
+        """Publish LSTM, WSS, and cgroup composition in one ioctl.  lzx-note"""
+        state = PredictStateV3()
+        state.abi_version = ABI_VERSION_V3
+        state.struct_size = ctypes.sizeof(PredictStateV3)
+        self._fill_state(
+            state, entries, bindings, event, now_ns, workload_profiles
+        )
+        if workingset.valid:
+            state.flags |= STATE_WORKINGSET_VALID
+            state.policy_domain_id = workingset.policy_domain_id
+            state.predicted_workingset_bytes = workingset.predicted_workingset_bytes
+            state.predicted_resident_bytes = workingset.predicted_resident_bytes
+            state.workingset_confidence_q15 = workingset.confidence_q15
+            state.workingset_estimator_version = workingset.estimator_version
+        return state
+
     def _record(
         self,
         event: dict[str, Any] | None,
@@ -569,7 +680,21 @@ class PARPMyfsBridge:
         status: str,
         error: str = "",
         workingset: WorkingSetPrediction = WorkingSetPrediction(),
+        workload_profiles: dict[int, ReclaimWorkloadProfile] | None = None,
     ) -> None:
+        workload_details: list[dict[str, Any]] = []  # lzx-note
+        for domain_id, profile in sorted((workload_profiles or {}).items()):
+            binding = self._last_binding_paths.get(domain_id)
+            workload_details.append({
+                "domain_id": int(domain_id),
+                "app_id": int(binding[0]) if binding else 0,
+                "app_key": str(binding[1]) if binding else "",
+                "scope": str(binding[2].name) if binding else "",
+                "class": WORKLOAD_NAMES.get(profile.workload_class, "UNKNOWN"),
+                "valid": bool(profile.valid),
+                "swappiness": int(profile.swappiness),
+                "allow_writepage": bool(profile.allow_writepage),
+            })
         self._audit.writerow({
             "timestamp_ns": time.monotonic_ns(),
             "event_type": str((event or {}).get("event_type", result.get("trigger_type", ""))),
@@ -595,6 +720,15 @@ class PARPMyfsBridge:
             "predicted_growth_bytes": workingset.predicted_growth_bytes,
             "workingset_confidence_q15": workingset.confidence_q15,
             "workingset_action_hint": workingset.action_hint,
+            "workload_profiles": len(workload_profiles or {}),
+            "workload_valid_profiles": sum(
+                int(profile.valid) for profile in (workload_profiles or {}).values()
+            ),
+            "workload_classes": json.dumps(
+                profile_summary(workload_profiles or {}).get("classes", {}),
+                sort_keys=True,
+            ),
+            "workload_binding_details": json.dumps(workload_details, sort_keys=True),  # lzx-note
         })
         self._audit_file.flush()
 
@@ -607,7 +741,7 @@ class PARPMyfsBridge:
             "interface": "parp/myfs",
             "device": str(self.device),
             "mode": self.mode,
-            "service_abi_version": ABI_VERSION_V2,
+            "service_abi_version": ABI_VERSION_V3,  # lzx-note
             "kernel_abi_version": self.kernel_abi_version,
             "struct_size": ctypes.sizeof(PredictStateV1),
             "last_generation": self.generation,

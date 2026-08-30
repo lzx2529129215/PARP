@@ -247,6 +247,15 @@ def evaluate_prediction_gate(args: argparse.Namespace) -> dict[str, Any]:
         ):
             myfs_candidates.append(row)
     myfs = myfs_candidates[-1] if myfs_candidates else {}
+    expected_workload: dict[str, str] = {}
+    for item in filter(None, str(args.expected_workload_profiles).split("|")):
+        try:
+            app_key, workload_class = item.split(":", 1)
+        except ValueError:
+            reasons.append(f"invalid expected workload profile: {item}")
+            continue
+        expected_workload[app_key] = workload_class
+    observed_workload: dict[str, list[dict[str, Any]]] = {}
     if args.require_myfs:
         if not myfs:
             reasons.append("no post-marker /dev/myfs event for current app")
@@ -265,8 +274,38 @@ def evaluate_prediction_gate(args: argparse.Namespace) -> dict[str, Any]:
                 )
             if myfs.get("ambiguous_domains") not in {"0", 0}:
                 reasons.append(f"ambiguous /dev/myfs domains={myfs.get('ambiguous_domains')}")
-            if myfs.get("kernel_abi_version") != "2":
-                reasons.append(f"kernel myfs ABI={myfs.get('kernel_abi_version')}, expected 2")
+            try:
+                kernel_abi = int(myfs.get("kernel_abi_version", "0"))
+            except (TypeError, ValueError):
+                kernel_abi = 0
+            if kernel_abi < int(args.minimum_myfs_abi):
+                reasons.append(
+                    f"kernel myfs ABI={myfs.get('kernel_abi_version')}, "
+                    f"expected >= {args.minimum_myfs_abi}"
+                )  # lzx-note
+            if expected_workload:
+                try:
+                    workload_details = json.loads(myfs.get("workload_binding_details", "[]"))
+                except (TypeError, json.JSONDecodeError):
+                    workload_details = []
+                if not isinstance(workload_details, list):
+                    workload_details = []
+                for detail in workload_details:
+                    if not isinstance(detail, dict):
+                        continue
+                    app_key = str(detail.get("app_key", ""))
+                    if app_key:
+                        observed_workload.setdefault(app_key, []).append(detail)
+                for app_key, workload_class in sorted(expected_workload.items()):
+                    matched = any(
+                        item.get("class") == workload_class and item.get("valid") is True
+                        for item in observed_workload.get(app_key, [])
+                    )
+                    if not matched:
+                        reasons.append(
+                            f"/dev/myfs workload profile mismatch for {app_key}: "
+                            f"expected {workload_class}, got {observed_workload.get(app_key, [])}"
+                        )  # lzx-note
     return {
         "schema_version": 1,
         "valid": not reasons,
@@ -282,6 +321,8 @@ def evaluate_prediction_gate(args: argparse.Namespace) -> dict[str, Any]:
         "prediction_feature_window_id": selected[0].get("feature_window_id") if selected else None,
         "prediction_trigger": selected[0].get("trigger_type") if selected else None,
         "myfs": myfs,
+        "expected_workload_profiles": expected_workload,
+        "observed_workload_profiles": observed_workload,  # lzx-note
     }
 
 
@@ -504,6 +545,8 @@ def parser() -> argparse.ArgumentParser:
     gate.add_argument("--minimum-hot-probability", type=float, default=0.10)
     gate.add_argument("--maximum-cold-probability", type=float, default=0.01)
     gate.add_argument("--minimum-bindings", type=int, default=16)
+    gate.add_argument("--minimum-myfs-abi", type=int, default=2)  # lzx-note
+    gate.add_argument("--expected-workload-profiles", default="")  # APP_KEY:CLASS|... lzx-note
     gate.add_argument("--require-myfs", action=argparse.BooleanOptionalAction, default=True)
     gate.add_argument("--timeout", type=float, default=20.0)
     gate.add_argument("--poll-seconds", type=float, default=0.25)

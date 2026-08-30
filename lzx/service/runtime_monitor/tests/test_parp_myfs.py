@@ -10,15 +10,20 @@ from runtime_monitor.core.parp_myfs import (
     ENTRY_FOREGROUND,
     PARP_PREDICT_GET_STATE,
     PARP_PREDICT_GET_STATE_V2,
+    PARP_PREDICT_GET_STATE_V3,
     PARP_PREDICT_SET_STATE,
     PARP_PREDICT_SET_STATE_V2,
+    PARP_PREDICT_SET_STATE_V3,
     PredictBindingV1,
+    PredictBindingV3,
     PredictEntryV1,
     PredictStateV1,
     PredictStateV2,
+    PredictStateV3,
     PARPMyfsBridge,
 )
 from runtime_monitor.core.working_set_predictor import WorkingSetPrediction
+from runtime_monitor.core.reclaim_workload import ReclaimWorkloadProfile, WORKLOAD_FILE_DIRTY  # lzx-note
 
 
 def _scope():
@@ -62,6 +67,12 @@ class PARPMyfsTests(unittest.TestCase):
         self.assertEqual(PredictStateV2.bindings.offset, 608)
         self.assertEqual(PARP_PREDICT_SET_STATE_V2, 0x4A60B703)
         self.assertEqual(PARP_PREDICT_GET_STATE_V2, 0x8A60B704)
+        self.assertEqual(ctypes.sizeof(PredictBindingV3), 32)
+        self.assertEqual(ctypes.sizeof(PredictStateV3), 2656)
+        self.assertEqual(PredictStateV3.predictions.offset, 96)
+        self.assertEqual(PredictStateV3.bindings.offset, 608)
+        self.assertEqual(PARP_PREDICT_SET_STATE_V3, 0x4A60B705)
+        self.assertEqual(PARP_PREDICT_GET_STATE_V3, 0x8A60B706)
 
     def test_foreground_and_lstm_candidates_are_ranked_once(self) -> None:
         bridge = self.bridge()
@@ -169,6 +180,7 @@ class PARPMyfsTests(unittest.TestCase):
             text = bridge.audit_path.read_text(encoding="utf-8")
             self.assertIn("APP_SWITCH", text)
             self.assertIn("DRY_RUN", text)
+            self.assertIn("workload_binding_details", text)
         finally:
             bridge.close()
 
@@ -199,6 +211,26 @@ class PARPMyfsTests(unittest.TestCase):
             self.assertEqual(state.predicted_resident_bytes, 384 << 20)
             self.assertEqual(state.workingset_confidence_q15, 24576)
             self.assertEqual(state.bindings[0].domain_id, 202)
+        finally:
+            bridge.close()
+
+    def test_v3_state_keeps_workload_per_cgroup_binding(self) -> None:
+        bridge = self.bridge()
+        try:
+            bridge.generation = 8
+            state = bridge._make_state_v3(
+                [(1, 32767, 1, ENTRY_FOREGROUND)], [(202, 1)], {"ts_ns": 303}, 404,
+                WorkingSetPrediction(),
+                {202: ReclaimWorkloadProfile(
+                    domain_id=202, workload_class=WORKLOAD_FILE_DIRTY,
+                    swappiness=20, confidence_q8=240, allow_writepage=True,
+                )},
+            )
+            self.assertEqual(state.abi_version, 3)
+            self.assertEqual(state.bindings[0].flags, 3)
+            self.assertEqual(state.bindings[0].workload_hint & 0x0F, WORKLOAD_FILE_DIRTY)
+            self.assertEqual((state.bindings[0].workload_hint >> 8) & 0xFF, 20)
+            self.assertTrue(state.bindings[0].workload_hint & (1 << 24))
         finally:
             bridge.close()
 

@@ -1,0 +1,57 @@
+{
+  "schema_version": 1,
+  "description": "Equal per-app mmap-dirty MADV_COLD file working sets for bin-only versus cold-aggressive selectivity. lzx-note",
+  "output_root": "/home/lzx/Desktop/PARP/test/outputs/cold_dirty_reclaim",
+  "asset_root": "/home/lzx/Desktop/PARP/test/outputs/real_pc_assets",
+  "slice": "parp-cold-dirty.slice",
+  "apps": [
+    "FIREFOX", "THUNDERBIRD", "VLC", "GIMP",
+    "LIBREOFFICE", "EVINCE", "IMAGE_VIEWER", "SOLITAIRE"
+  ],
+  "hot_apps": ["FIREFOX", "THUNDERBIRD", "VLC"],
+  "cold_apps": ["GIMP", "LIBREOFFICE", "EVINCE", "IMAGE_VIEWER", "SOLITAIRE"],
+  "trained_history": ["THUNDERBIRD", "FIREFOX", "THUNDERBIRD", "FIREFOX", "VLC"],
+  "trained_history_vocab": ["Thunderbird", "Firefox", "Thunderbird", "Firefox", "VLC"],
+  "expected_next_vocab": ["Firefox", "Thunderbird"],
+  "current_app": "VLC",
+  "current_vocab": "VLC",
+  "reuse_layout": {
+    "FIREFOX": {"file_mib": 96, "anon_mib": 32},
+    "THUNDERBIRD": {"file_mib": 96, "anon_mib": 32},
+    "VLC": {"file_mib": 96, "anon_mib": 32},
+    "GIMP": {"file_mib": 96, "anon_mib": 32},
+    "LIBREOFFICE": {"file_mib": 96, "anon_mib": 32},
+    "EVINCE": {"file_mib": 96, "anon_mib": 32},
+    "IMAGE_VIEWER": {"file_mib": 96, "anon_mib": 32},
+    "SOLITAIRE": {"file_mib": 96, "anon_mib": 32}
+  },
+  "startup_settle_seconds": 8.0,
+  "history_dwell_seconds": 1.5,
+  "prediction_settle_seconds": 1.5,
+  "pressure_mib": 768,
+  "reclaim_target_mib": 384,
+  "pressure_chunk_mib": 32,
+  "pressure_ramp_interval_seconds": 0.12,
+  "pressure_ramp_timeout_seconds": 240,
+  "pressure_hold_seconds": 900,
+  "memory_swap_max_mib": 1024,
+  "dirty_writeback_control": {
+    "background_mib": 2048,
+    "limit_mib": 3072
+  },
+  "prediction_gate": {
+    "minimum_hot_probability": 0.10,
+    "maximum_cold_probability": 0.01,
+    "minimum_bindings": 8,
+    "timeout_seconds": 20
+  },
+  "safety": {
+    "min_memavailable_mib": 3072,
+    "psi_full_avg10_abort": 0.8,
+    "abort_consecutive_samples": 4,
+    "sample_interval_seconds": 0.20,
+    "max_round_seconds": 1200,
+    "trace_buffer_kb_per_cpu": 8192
+  },
+  "scenarios": ["cold_dirty_reclaim"]
+}

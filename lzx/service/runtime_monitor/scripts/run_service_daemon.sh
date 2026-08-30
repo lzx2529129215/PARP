@@ -20,6 +20,7 @@ group_vocab="${PARP_SERVICE_GROUP_VOCAB:-$PARP_OPERATION_PREDICTOR_ROOT/data/voc
 checkpoint="${PARP_SERVICE_LSTM_CHECKPOINT:-$PARP_OPERATION_PREDICTOR_ROOT/outputs/lsapp_expanded/checkpoints/app_lstm_switch_v3.pt}"
 myfs_device="${PARP_SERVICE_MYFS_DEVICE:-/dev/myfs}"
 myfs_mode="${PARP_SERVICE_MYFS_MODE:-apply}"
+myfs_enabled="${PARP_SERVICE_ENABLE_MYFS:-1}" # lzx-note
 
 mkdir -p "$PARP_SERVICE_OUTPUT_ROOT"
 # lzx-note: Rotate resident collection into daily sessions and remove only
@@ -51,13 +52,30 @@ monitor_args=(
   --lstm-model-type v3
   --lstm-checkpoint "$checkpoint"
   --score-mode softmax
-  --enable-parp-myfs
-  --parp-myfs-device "$myfs_device"
-  --parp-myfs-mode "$myfs_mode"
   --path-mode hash
   --disable-ebpf
   --label SERVICE_BOOT
 )
+
+# Keep collection and online LSTM inference resident for a Native comparison,
+# while deliberately removing only the kernel prediction sink.  The default
+# remains the production /dev/myfs APPLY path. lzx-note
+case "$myfs_enabled" in
+  1)
+    monitor_args+=(
+      --enable-parp-myfs
+      --parp-myfs-device "$myfs_device"
+      --parp-myfs-mode "$myfs_mode"
+    )
+    ;;
+  0)
+    monitor_args+=(--parp-myfs-mode off)
+    ;;
+  *)
+    echo "invalid PARP_SERVICE_ENABLE_MYFS=$myfs_enabled (expected 0 or 1)" >&2
+    exit 2
+    ;;
+esac
 
 # lzx-note: The X11 collector reconnects after graphical login, so the service
 # can remain resident from boot without permanently losing desktop events.

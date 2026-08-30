@@ -12,122 +12,12 @@ index ebc83ca20..34ca316a1 100644
     shrinker_debugfs
     slab
     soft-dirty
-diff --git a/Documentation/admin-guide/mm/parp-experiments.rst b/Documentation/admin-guide/mm/parp-experiments.rst
-new file mode 100644
-index 000000000..b0c2994b4
---- /dev/null
-+++ b/Documentation/admin-guide/mm/parp-experiments.rst
-@@ -0,0 +1,64 @@
-+===========================
-+LZX PARP experiment switches
-+===========================
-+
-+The build-time switches for the LZX memory-reclaim experiments are grouped
-+under ``Memory Management -> LZX PARP memory optimization experiments``.
-+All treatment switches default to ``n`` so a new baseline config does not
-+silently enable an optimization.
-+
-+``CONFIG_PARP``
-+  Builds the common prediction, control and observation framework.
-+
-+``CONFIG_PARP_TIER2``
-+  Builds the per-cgroup secondary-watermark predictor, bounded proactive
-+  reclaim and its cgroup controls.
-+
-+``CONFIG_PARP_RECLAIM_BIN_SCORE``
-+  Builds prediction/headroom-based MGLRU memcg-bin placement and ordered
-+  scanning. It depends on ``CONFIG_PARP_TIER2`` and affects reclaim only in
-+  PARP APPLY mode with Tier2 enabled globally and for the target cgroup.
-+
-+``CONFIG_PARP_EFFECTIVE_TIER``
-+  Builds effective-tier scoring. Its runtime mode is OFF by default.
-+
-+``CONFIG_PARP_EFFECTIVE_TIER_EXPERIMENTAL_APPLY``
-+  Makes the effective-tier Apply modes available. It does not enable an Apply
-+  mode at boot.
-+
-+``CONFIG_PARP_FRONTIER_SCORE`` and ``CONFIG_PARP_DAMON_ALIGNMENT``
-+  Build the older frontier observation experiment and DAMON alignment
-+  evidence path respectively.
-+
-+The delivery baseline is a separate, pristine Linux 6.17.13 source worktree
-+at tag ``v6.17.13`` (commit ``6609c4d49ebe``).  Do not call the PARP image
-+"Native" merely because its runtime switches are zero.  The build helper's
-+``native`` profile refuses to build unless that pinned source is clean.
-+
-+Compare the pristine Native image with the APPLY image using the same machine,
-+kernel config apart from PARP/local-version symbols, scenario, random seed and
-+collection procedure.  Runtime-OFF remains a useful additional ablation for
-+measuring the APPLY binary's dormant instrumentation overhead:
-+
-+================  ===============================================
-+Treatment         Runtime state
-+================  ===============================================
-+Native baseline   pristine Linux 6.17.13 image; no PARP code or symbols
-+Runtime-OFF       PARP disabled; Tier2 0; effective tier 0
-+Tier2 APPLY       PARP APPLY; global and target Tier2 1; effective tier 0
-+Effective APPLY   PARP APPLY; Tier2 0; effective tier Apply mode
-+Combined APPLY    PARP APPLY; Tier2 1; effective tier Apply mode
-+================  ===============================================
-+
-+For a compile-time reclaim-bin ablation, keep ``CONFIG_PARP_TIER2=y`` and
-+build otherwise matched APPLY images with
-+``CONFIG_PARP_RECLAIM_BIN_SCORE=n/y``.  The ``n`` image preserves native
-+random memcg-bin placement and starting-bin selection.
-+
-+Before accepting a reclaim-bin APPLY round, capture
-+``/sys/kernel/debug/parp/reclaim_bin_stats`` before and after the workload.
-+The delta of ``scored`` must be positive.  When applications run in child
-+systemd scopes below the enabled test slice, ``inherited_hits`` must also grow.
-+This prevents a compiled but dormant scorer from being reported as APPLY.
-+
-+.. lzx-note: pristine Native baseline and build/runtime switch contract.
-diff --git a/Documentation/admin-guide/mm/parp-myfs.rst b/Documentation/admin-guide/mm/parp-myfs.rst
-new file mode 100644
-index 000000000..a96736dcd
---- /dev/null
-+++ b/Documentation/admin-guide/mm/parp-myfs.rst
-@@ -0,0 +1,34 @@
-+.. SPDX-License-Identifier: GPL-2.0
-+
-+PARP ``/dev/myfs`` prediction interface
-+=========================================
-+
-+``CONFIG_PARP_MYFS`` creates the ``myfs`` misc character device.  It is the
-+only supported userspace interface for application LSTM priors and cgroup
-+bindings; PARP does not create the former writable ``app_prior``,
-+``app_prior_batch`` or ``app_bind`` debugfs files.  Read-only debugfs counters
-+remain available for experiment diagnosis.  ``lzx-note``
-+
-+The version-1 and version-2 ABIs are declared in
-+``include/uapi/linux/parp_predict.h``.  The
-+``PARP_PREDICT_SET_STATE`` ioctl accepts a fixed-size, pointer-free structure
-+containing up to 32 predictions and 64 cgroup bindings.  One ioctl validates
-+the complete message and performs one RCU publication, so reclaim cannot see
-+new probabilities paired with old ownership metadata.
-+
-+ABI v2 preserves the v1 total size and prediction/binding array offsets, but
-+assigns the former reserved header bytes to one confidence-qualified future
-+working-set estimate and its exact Tier2 policy cgroup inode.  It uses separate
-+SET/GET ioctl numbers; userspace probes v2 first and falls back to v1 on an old
-+kernel.  Thus working-set-aware Tier2 can be upgraded without breaking the
-+existing application-prior path.  .. lzx-note
-+
-+All timestamps use ``CLOCK_MONOTONIC`` nanoseconds.  Generations must increase,
-+scores use unsigned Q15, ranks and application IDs must be unique, and every
-+binding must refer to an application in the same prediction batch.  Invalid,
-+expired, duplicate or stale updates fail without changing the active snapshot.
-+
-+The matching GET ioctl returns the current generation and state for service
-+restart synchronization and diagnostics.  The recommended udev rule applies
-+``TAG+=\"uaccess\"`` to give the active desktop user access without making the
-+device world-writable.
 diff --git a/Documentation/admin-guide/mm/parp-tier2.rst b/Documentation/admin-guide/mm/parp-tier2.rst
 new file mode 100644
-index 000000000..2ec05a97e
+index 000000000..f932566c7
 --- /dev/null
 +++ b/Documentation/admin-guide/mm/parp-tier2.rst
-@@ -0,0 +1,225 @@
+@@ -0,0 +1,268 @@
 +.. SPDX-License-Identifier: GPL-2.0
 +
 +===============================================
@@ -165,6 +55,40 @@ index 000000000..2ec05a97e
 +``inherited_hits`` and ``scored`` prove that descendant pages used the scorer.
 +
 +.. lzx-note: reclaim-bin hierarchy contract and auditable coverage counters.
++
++Prediction-cold first-pass pressure
++===================================
++
++``CONFIG_PARP_RECLAIM_COLD_AGGRESSIVE`` adds a third, independent treatment
++on top of reclaim-bin ordering.  It does nothing unless PARP is in APPLY mode,
++``vm.parp_reclaim_bin_enabled=1`` and
++``vm.parp_reclaim_cold_aggressive_enabled=1``.  A leaf memcg must also have a
++fresh application binding and application prediction from ``/dev/myfs``;
++headroom-only fallback scores and unrelated pressure-generator cgroups cannot
++activate this treatment.  .. lzx-note
++
++For prediction bins zero through ``vm.parp_reclaim_cold_bin_max`` (default
++two), the policy temporarily changes only the current memcg's scan control:
++
++* bin zero lowers reclaim priority by three levels and raises swappiness to at
++  least 140;
++* bin one lowers priority by two levels and raises swappiness to at least 120;
++* bin two lowers priority by one level and raises swappiness to at least 100.
++
++Lower priority values scan exponentially more pages, so these settings provide
++approximately 8x, 4x and 2x first-visit scan budgets.  Dirty-page writeback is
++permitted for that visit.  Swappiness stays below anonymous-only mode, allowing
++anonymous, clean file and dirty file pages to participate together.  The
++caller's original priority, writeback permission and swappiness are restored
++before the next memcg is visited; high-probability and unbound cgroups therefore
++retain their native pressure.  Existing swap availability, memcg protection,
++``memory.min``/``memory.low`` and reclaim target termination are not bypassed.
++.. lzx-note
++
++``/sys/kernel/debug/parp/reclaim_cold_stats`` is read-only evidence for
++experiments.  ``passes``, ``scanned``, ``reclaimed``, the per-bin pass counts
++and promotion counters distinguish an enabled switch from an effective action.
++Prediction publication remains exclusively on ``/dev/myfs``.  .. lzx-note
 +
 +Watermarks and EWMA
 +===================
@@ -286,6 +210,15 @@ index 000000000..2ec05a97e
 +  ``memory.tier2_enabled=1``, but it does not enable Tier2 proactive reclaim.
 +  This permits an exact same-kernel bin OFF/APPLY comparison while the LSTM
 +  service and ``/dev/myfs`` prediction stream remain identical.  .. lzx-note
++
++``vm.parp_reclaim_cold_aggressive_enabled``
++  Independent prediction-cold pressure switch, 0 or 1.  It defaults to zero
++  and requires reclaim-bin APPLY.  Use zero for bin-only and one for the
++  bin-plus-pressure ablation.  .. lzx-note
++
++``vm.parp_reclaim_cold_bin_max``
++  Greatest prediction bin allowed to receive increased first-pass pressure,
++  0 through 7.  The default is 2.  .. lzx-note
 +
 +``vm.tier2_wss_predict_enabled``
 +  Runtime working-set gate, 0 or 1.  It exists only with
@@ -2366,321 +2299,6 @@ index 000000000..a5bdc49e7
 +The timestamped external result directory contains the raw replay audit and
 +both C/Python benchmark JSON files. The handoff `summary.json` and
 +`FINAL_REPORT.md` record the final report commit HEAD.
-diff --git a/docs/reports/parp-dev-ioctl-sysfs-migration.md b/docs/reports/parp-dev-ioctl-sysfs-migration.md
-new file mode 100644
-index 000000000..374b17c1f
---- /dev/null
-+++ b/docs/reports/parp-dev-ioctl-sysfs-migration.md
-@@ -0,0 +1,193 @@
-+# PARP Prediction 控制面迁移报告
-+
-+## 1. 修改前架构
-+
-+正式 Prediction 输入依赖 debugfs 文本：
-+
-+```text
-+LSTM -> DebugfsTransport -> app_prior_batch -> 文本解析
-+     -> parp_snapshot_replace_prior_batch() -> mutex -> clone -> RCU publish
-+
-+Userspace -> app_bind -> bind_write()
-+          -> parp_snapshot_update_binding() -> 单独一次 RCU publish
-+```
-+
-+当 Prediction 与 Binding 分两次写入时，中间可能存在新旧表组合窗口；没有
-+字符设备 UAPI，也没有 `/sys/kernel/my_predict` 正式标量控制面。
-+
-+## 2. 修改后架构
-+
-+```text
-+Userspace LSTM
-+      │ probability + binding
-+      ▼
-+IoctlTransport (ctypes, fixed layout)
-+      │
-+      ▼
-+/dev/myfs
-+      │ PARP_IOC_SET_STATE
-+      ▼
-+copy_from_user -> UAPI/边界/重复项/flags/TTL 校验
-+      │
-+      ▼
-+Q15 Prediction entries
-+      │
-+      ▼
-+sort(score ascending, app_id ascending) -> kernel rank = i + 1
-+      │
-+      ▼
-+clone latest snapshot
-+      ├── replace predictions
-+      └── replace bindings
-+      │
-+      ▼
-+shared writer mutex -> one RCU publish -> parp_active_snapshot
-+      │
-+      ▼
-+existing reclaim readers（RCU + bounded scalar lookup）
-+```
-+
-+```text
-+Userspace cat/echo -> /sys/kernel/my_predict/ -> simple PARP scalars
-+Developer          -> /sys/kernel/debug/parp/ -> debug/statistics/dumps
-+```
-+
-+## 3. 新增文件
-+
-+- `include/uapi/linux/parp_predict.h`：独立、无指针、定长 UAPI。
-+- `mm/parp/control/dev.c`：`miscdevice`、ioctl、UAPI 转换。
-+- `tools/parp/uapi_layout_check.c`：C 端 ABI 布局真值检查器。
-+- `tools/parp/test_prediction_interfaces.sh`：启动后安全 smoke。
-+- `tools/parp/control/.kunitconfig`：控制面 UML KUnit 配置。
-+- 本报告及 `parp-dev-ioctl-sysfs-runtime-smoke.md`。
-+
-+## 4. 主要修改文件
-+
-+- `snapshot.c/internal.h`：统一校验、内核排序/rank、原子整表更新、状态导出。
-+- `control/sysfs.c`：建立正式标量控制目录。
-+- `control/debugfs.c`：legacy gate/告警、overflow-safe TTL、只读 dumps。
-+- `Kconfig/Makefile`：SYSFS 依赖、legacy 选项、`control/dev.o`。
-+- `lstm_prior_bridge.py/parpctl.py/phase26_*`：正式路径切换到 ioctl。
-+- `parp_test.c` 与 Python tests：边界、并发、ABI、错误传播覆盖。
-+
-+## 5. UAPI
-+
-+- ABI/schema version：1。
-+- Probability：`u16` Q15，范围 0..32767；没有 float/double。
-+- Prediction：最多 32 项，key=`u32 app_id`；UAPI 不接收 rank。
-+- Binding：最多 64 项，`u64 domain_id -> u32 app_id`，相对 `ttl_ns`。
-+- State 大小 3664 bytes；Prediction/Binding offset 分别为 80/592。
-+- 所有数组定长、数量显式、reserved 必须为零，不包含用户/内核指针。
-+
-+## 6. ioctl commands
-+
-+- `PARP_IOC_SET_STATE`：一次复制、完整校验、完整构造、一次 publish。
-+- `PARP_IOC_GET_STATE`：导出当前规范化状态；Binding TTL 转为剩余相对 TTL。
-+- `PARP_IOC_CLEAR_STATE`：一次 publish 清空两张表。
-+- magic/nr/direction/encoded size 全部校验；未知命令拒绝。
-+- `/dev/myfs` 由 miscdevice 创建，mode `0600`；所有 ioctl 另查
-+  `CAP_SYS_ADMIN`。handler 的数 KB 对象均用 `kvzalloc`，不进内核栈。
-+
-+## 7. sysfs
-+
-+路径：`/sys/kernel/my_predict/`。
-+
-+| 属性 | 权限 | 语义 |
-+|---|---:|---|
-+| `enabled` | 0600 | `0 -> DISABLED`；disabled 时 `1 -> OBSERVE` |
-+| `mode` | 0600 | 已有 `DISABLED/OBSERVE/APPLY` 权威状态 |
-+| `current_generation` | 0444 | 当前 Prediction generation |
-+| `nr_predictions` | 0444 | 当前 Prediction 数量 |
-+| `nr_bindings` | 0444 | 当前 Binding 数量 |
-+| `max_predictions` | 0444 | 32 |
-+| `max_bindings` | 0444 | 64 |
-+
-+没有创建第二个 enabled 状态；原 module parameters 和独立 Tier2 predictor
-+均保持不变。
-+
-+## 8. debugfs compatibility
-+
-+`CONFIG_PARP_LEGACY_DEBUGFS_CONTROL` 默认 `y`，控制
-+`app_prior_batch/app_bind/app_prior` 的旧写能力。旧路径有 ratelimited
-+弃用告警，并进入相同 snapshot core；未知 flags、重复 app、TTL/overflow、
-+容量等不再比 ioctl 更宽松。`prediction_dump` 与 `binding_dump` 新增为只读
-+诊断节点，原 snapshot/stats/evidence/effective-tier 节点保留。
-+
-+## 9. Prediction 排序和 rank
-+
-+用户态提交顺序不可信。writer 在 process context 对最多 32 项执行：
-+
-+```text
-+use_score_q15 ascending
-+then app_id ascending
-+then rank = index + 1
-+```
-+
-+因此 `entry[0]/rank=1` 始终为最低概率。排序不在 reclaim reader 热路径，
-+本轮也没有让 rank 改变 reclaim 算法。
-+
-+## 10. Binding 处理
-+
-+Prediction 与 Binding 继续分表建模，不保存 memcg 指针。SET_STATE 验证
-+domain/app/model/TTL、重复 domain、app 引用和容量后整体替换；内部动态
-+`parp_snapshot_update_binding()` 保留，并使用同一 writer mutex。满 64 项
-+时新增 domain 返回 `-ENOSPC`，不再静默覆盖。
-+
-+## 11. mutex/RCU 并发
-+
-+所有 writer 按 `parp_snapshot_update_lock (mutex) -> parp_snapshot_lock
-+(spinlock)` 的固定顺序发布；没有 spinlock->mutex 反向路径。分配、用户复制、
-+校验和排序都发生在可睡眠 writer context，spinlock 内只交换 RCU pointer。
-+reader 继续只使用 RCU 和有界标量查找，不加 mutex、不分配、不解析字符串。
-+旧 snapshot 必须经 `call_rcu()` 等待 grace period，不能在仍有 reader 引用时
-+立即释放。
-+
-+## 12. 安全校验
-+
-+覆盖 ABI/size/schema、数量、Q15、ID、model/generation、timestamp/horizon/
-+expiry、TTL、整数溢出、重复 key、active binding、flags/reserved、unused
-+array tail 及 generation monotonicity。非法 sysfs 值先完整解析再提交，失败
-+不修改已有 mode。
-+
-+## 13. 测试
-+
-+- 修改前 Python baseline：41 tests PASS；reference model 5 PASS。
-+- 当前 Python：45/45 PASS；reference model 5/5 PASS。
-+- UAPI layout：C/ctypes `sizeof/offsetof/ioctl` 逐项一致；state 3664
-+  bytes，offset 80/592，三个 request number 一致。
-+- KUnit：UML `parp` 30/30 PASS，含 legacy/ioctl 等价和并发 reader
-+  原子性测试。宿主机头缺 `__NR_close_range`，测试构建通过仅对
-+  UML 生效的 `KCFLAGS/HOSTCFLAGS=-D__NR_close_range=436` 兼容宏运行，
-+  未修改 UML 或生产源码。
-+- PARP object build：PASS，无新增大栈帧警告。
-+- checkpatch：整体 diff 0 errors / 0 warnings / 0 checks。
-+
-+## 14. reclaim 行为边界
-+
-+- `mm/vmscan.c`：未修改。
-+- `shrink_many()`/global kswapd memcg 顺序：未修改。
-+- scan-budget 数学公式和 APPLY 范围：未修改。
-+- default PARP mode 仍为 OBSERVE；Prediction 缺失、过期、model mismatch 等
-+  原有 native fallback 继续存在。
-+- `/proc/sys/vm/tier2_predict_*` 与 `memory.tier2_*` 未修改。
-+
-+## 15. 构建
-+
-+- 命令：`../../scripts/build-kernel-lzx.sh -j4 bzImage modules`。
-+- 最终增量重建：1:00.60，exit 0；`bzImage` 和 5818 个 `.ko`
-+  产物存在。
-+- kernelrelease：`6.17.13-parp-effective-tier-shadow-657a65b0a-r9+`。
-+- `bzImage` 大小 13,095,104 bytes；`vmlinux` 65,350,968 bytes。
-+- `nm/System.map` 已确认 `parp_predict_ioctl`、`parp_uapi_apply_state`、
-+  `parp_uapi_export_state`、`parp_predict_sysfs_init`、
-+  `parp_predict_dev_init`、`parp_snapshot_replace_state` 及对应 initcall
-+  均链入 `vmlinux`。
-+- `strings` 已确认 `myfs`、`my_predict`、`/dev/myfs` 和
-+  `/sys/kernel/my_predict` 注册消息存在。
-+
-+## 16. 运行时剩余工作
-+
-+本轮不安装、不改 GRUB、不自动重启。源码、单元测试和构建可以标记
-+BUILD VALIDATED；`/dev/myfs` 节点、真实 sysfs 读写、SET/GET/CLEAR 以及
-+reclaim observe-only 不变性仍需启动新内核后按配套 runtime smoke 文档验证，
-+必须明确标记 `RUNTIME NOT YET VALIDATED`。
-diff --git a/docs/reports/parp-dev-ioctl-sysfs-runtime-smoke.md b/docs/reports/parp-dev-ioctl-sysfs-runtime-smoke.md
-new file mode 100644
-index 000000000..eed875a34
---- /dev/null
-+++ b/docs/reports/parp-dev-ioctl-sysfs-runtime-smoke.md
-@@ -0,0 +1,110 @@
-+# PARP `/dev/myfs` + sysfs 启动后验证
-+
-+本文档只用于人工启动本次新内核后验证。构建阶段没有安装内核、
-+修改 GRUB 或重启，因此不能把当前运行中的旧内核当作新接口的运行时证据。
-+
-+## 1. 确认启动产物
-+
-+```bash
-+uname -a
-+uname -r
-+cat /proc/cmdline
-+dmesg | grep -E 'PARP|BUG:|WARNING:|Oops|lockdep'
-+```
-+
-+`uname -r` 必须与本次构建记录的 kernelrelease 一致，否则立即停止验证。
-+
-+## 2. 只读接口发现
-+
-+```bash
-+test -c /dev/myfs
-+stat -c '%F %a %U:%G %n' /dev/myfs
-+
-+find /sys/kernel/my_predict -maxdepth 1 -type f -printf '%m %f\n' | sort
-+cat /sys/kernel/my_predict/enabled
-+cat /sys/kernel/my_predict/mode
-+cat /sys/kernel/my_predict/current_generation
-+cat /sys/kernel/my_predict/nr_predictions
-+cat /sys/kernel/my_predict/nr_bindings
-+cat /sys/kernel/my_predict/max_predictions
-+cat /sys/kernel/my_predict/max_bindings
-+
-+find /sys/kernel/debug/parp -maxdepth 1 -type f -printf '%m %f\n' | sort
-+cat /sys/kernel/debug/parp/prediction_dump
-+cat /sys/kernel/debug/parp/binding_dump
-+```
-+
-+预期：`/dev/myfs` 为字符设备且权限为 `0600`；sysfs 最大值分别为 32 和
-+64；debugfs 继续提供统计、snapshot 和 dump，不再是正式主数据通道。
-+
-+也可以运行仓库内只读 smoke：
-+
-+```bash
-+sudo tools/parp/test_prediction_interfaces.sh
-+```
-+
-+## 3. sysfs 标量语义
-+
-+先记录旧值，非法写入必须失败且旧值不变：
-+
-+```bash
-+old_mode=$(cat /sys/kernel/my_predict/mode)
-+if echo 99 | sudo tee /sys/kernel/my_predict/mode; then
-+    echo 'ERROR: invalid mode unexpectedly accepted' >&2
-+    exit 1
-+fi
-+test "$(cat /sys/kernel/my_predict/mode)" = "$old_mode"
-+```
-+
-+在专用测试机上再验证：`enabled=0` 映射 `DISABLED(0)`；随后
-+`enabled=1` 只恢复到 `OBSERVE(1)`，不会自动进入 APPLY。结束时恢复原
-+`mode`。不要在未知生产负载上切换 APPLY。
-+
-+## 4. ioctl SET/GET/CLEAR
-+
-+下列命令会替换并最终清空当前 Prediction/Binding，具有破坏性，只能在
-+专用测试环境运行：
-+
-+```bash
-+sudo tools/parp/test_prediction_interfaces.sh --exercise
-+```
-+
-+脚本故意以乱序概率提交 3 个 app，GET 必须返回 Q15 `0,8192,32767` 的
-+低到高顺序；随后 CLEAR，GET 必须报告两张表都为空。人工补充检查：
-+
-+```bash
-+cat /sys/kernel/my_predict/current_generation
-+cat /sys/kernel/debug/parp/prediction_dump
-+cat /sys/kernel/debug/parp/binding_dump
-+```
-+
-+## 5. legacy debugfs 等价性
-+
-+仅当 `CONFIG_PARP_LEGACY_DEBUGFS_CONTROL=y` 时执行。旧
-+`app_prior_batch/app_bind/app_prior` 写入应出现 ratelimited deprecated
-+告警，并与 ioctl 共用校验、低到高排序和 RCU publish。分别提交相同数据
-+后，保存 `prediction_dump`、`binding_dump` 和 `snapshot` 比较；忽略动态
-+生成的 snapshot version、bind generation 和时间差，只比较 app/domain、
-+score、rank、model、prediction generation 及数量。
-+
-+## 6. 原子性与 reclaim 不变性
-+
-+在持续读取 `prediction_dump`/`binding_dump` 的同时循环 SET 两组具有不同
-+generation 和 domain 集合的完整状态。任一采样只能属于完整 A 或完整 B，
-+不能出现新 Prediction 与旧 Binding 拼接。同步收集：
-+
-+```bash
-+cat /sys/kernel/debug/parp/scan_budget_stats
-+cat /sys/kernel/debug/parp/stats
-+dmesg | grep -E 'BUG:|WARNING:|Oops|KASAN|lockdep'
-+```
-+
-+保持 `mode=OBSERVE` 和原 scan-budget mode，确认 proposed 统计可变化但
-+applied/native 关系与迁移前一致；本轮没有改变 `shrink_many()`、global
-+kswapd memcg 顺序或 scan-budget 数学公式。
-+
-+## 7. 清理
-+
-+测试结束后执行 CLEAR，恢复测试前记录的 `mode` 及所有独立 scan-budget
-+参数。debugfs legacy 写入不创建持久文件；无需卸载设备或删除 sysfs
-+kobject。最后保存完整 dmesg 与接口 dump 到测试报告。
 diff --git a/docs/superpowers/plans/2026-08-02-parp-kernel-page-prediction.md b/docs/superpowers/plans/2026-08-02-parp-kernel-page-prediction.md
 new file mode 100644
 index 000000000..4e0c62427
@@ -4540,10 +4158,10 @@ index 000000000..35df6f635
 +#endif
 diff --git a/include/linux/parp_tier2.h b/include/linux/parp_tier2.h
 new file mode 100644
-index 000000000..fbe8ced02
+index 000000000..4656824f7
 --- /dev/null
 +++ b/include/linux/parp_tier2.h
-@@ -0,0 +1,150 @@
+@@ -0,0 +1,175 @@
 +/* SPDX-License-Identifier: GPL-2.0 */
 +#ifndef _LINUX_PARP_TIER2_H
 +#define _LINUX_PARP_TIER2_H
@@ -4579,6 +4197,16 @@ index 000000000..fbe8ced02
 +	u64 scored;
 +	u64 fallbacks;
 +	u64 score_bins[8];
++}; /* lzx-note */
++
++struct parp_reclaim_cold_stats { /* lzx-note */
++	u64 passes;
++	u64 scanned;
++	u64 reclaimed;
++	u64 priority_boost_total;
++	u64 writepage_promotions;
++	u64 swappiness_promotions;
++	u64 bin_passes[8];
 +}; /* lzx-note */
 +
 +#ifdef CONFIG_PARP_TIER2 /* lzx-note */
@@ -4655,7 +4283,8 @@ index 000000000..fbe8ced02
 +bool parp_tier2_reclaim_bin_apply_enabled(void); /* lzx-note */
 +bool parp_tier2_reclaim_bin_order_enabled(struct mem_cgroup *memcg); /* lzx-note */
 +bool parp_tier2_reclaim_bin_score(struct mem_cgroup *memcg,
-+				  u32 *score_q15); /* lzx-note */
++				  u32 *score_q15,
++				  bool *prediction_backed); /* lzx-note */
 +u32 parp_tier2_reclaim_rank_score_q15(u16 app_prior_q15, u16 app_rank,
 +				      bool foreground); /* lzx-note */
 +void parp_tier2_reclaim_bin_stats_snapshot(
@@ -4664,6 +4293,20 @@ index 000000000..fbe8ced02
 +void parp_tier2_reclaim_bin_note_subtree_pass(void); /* lzx-note */
 +void parp_tier2_reclaim_bin_note_subtree(bool selected); /* lzx-note */
 +#endif /* CONFIG_PARP_RECLAIM_BIN_SCORE */ /* lzx-note */
++
++#ifdef CONFIG_PARP_RECLAIM_COLD_AGGRESSIVE /* lzx-note */
++bool parp_tier2_reclaim_cold_aggressive_apply_enabled(void); /* lzx-note */
++bool parp_tier2_reclaim_cold_pressure(unsigned int bin,
++				       u8 *priority_boost,
++				       u16 *swappiness); /* lzx-note */
++void parp_tier2_reclaim_cold_note(unsigned int bin, u8 priority_boost,
++				  bool writepage_promoted,
++				  bool swappiness_promoted,
++				  unsigned long scanned,
++				  unsigned long reclaimed); /* lzx-note */
++void parp_tier2_reclaim_cold_stats_snapshot(
++		struct parp_reclaim_cold_stats *stats); /* lzx-note */
++#endif /* CONFIG_PARP_RECLAIM_COLD_AGGRESSIVE */ /* lzx-note */
 +
 +int parp_tier2_enabled_show(struct seq_file *m, void *v);
 +ssize_t parp_tier2_enabled_write(struct kernfs_open_file *of, char *buf,
@@ -5610,109 +5253,6 @@ index 000000000..01f12d67c
 +
 +#endif
 +#include <trace/define_trace.h>
-diff --git a/include/uapi/linux/parp_predict.h b/include/uapi/linux/parp_predict.h
-new file mode 100644
-index 000000000..aaefef5f6
---- /dev/null
-+++ b/include/uapi/linux/parp_predict.h
-@@ -0,0 +1,97 @@
-+/* SPDX-License-Identifier: GPL-2.0 WITH Linux-syscall-note */
-+#ifndef _UAPI_LINUX_PARP_PREDICT_H
-+#define _UAPI_LINUX_PARP_PREDICT_H
-+
-+#include <linux/ioctl.h>
-+#include <linux/types.h>
-+
-+/* lzx-note: Versioned, pointer-free ABI for the /dev/myfs prediction sink. */
-+#define PARP_PREDICT_ABI_VERSION	1U
-+#define PARP_PREDICT_ABI_VERSION_V2	2U /* lzx-note */
-+#define PARP_PREDICT_MAX_APPS	32U
-+#define PARP_PREDICT_MAX_BINDINGS	64U
-+
-+#define PARP_PREDICT_ENTRY_FOREGROUND	(1U << 0)
-+#define PARP_PREDICT_BINDING_ACTIVE	(1U << 0)
-+#define PARP_PREDICT_STATE_WORKINGSET_VALID	(1U << 0) /* lzx-note */
-+
-+struct parp_predict_entry_v1 {
-+	__u32 app_id;
-+	__u16 score_q15;
-+	__u16 rank;
-+	__u32 flags;
-+	__u32 reserved;
-+};
-+
-+struct parp_predict_binding_v1 {
-+	__u64 domain_id;
-+	__u32 app_id;
-+	__u32 flags;
-+	__u64 epoch_id;
-+	__u64 reserved;
-+};
-+
-+/*
-+ * SET_STATE replaces predictions and bindings in one RCU publication.  All
-+ * time values use CLOCK_MONOTONIC nanoseconds.  ttl_ns is relative to
-+ * timestamp_ns; generation must increase for every accepted update.
-+ */
-+struct parp_predict_state_v1 {
-+	__u32 abi_version;
-+	__u32 struct_size;
-+	__u32 schema_version;
-+	__u32 model_version;
-+	__u32 generation;
-+	__u32 nr_predictions;
-+	__u32 nr_bindings;
-+	__u32 flags;
-+	__u64 timestamp_ns;
-+	__u64 horizon_ns;
-+	__u64 ttl_ns;
-+	__u64 reserved[5];
-+	struct parp_predict_entry_v1 predictions[PARP_PREDICT_MAX_APPS];
-+	struct parp_predict_binding_v1 bindings[PARP_PREDICT_MAX_BINDINGS];
-+};
-+
-+/*
-+ * ABI v2 keeps the v1 array offsets and total size.  It gives the five v1
-+ * reserved words explicit working-set semantics, so old kernels can still be
-+ * used through the separate v1 ioctl while new kernels receive an auditable
-+ * future-working-set estimate.  predicted_resident_bytes is the portion of
-+ * predicted_workingset_bytes already resident; their difference is the
-+ * expected near-horizon allocation demand. lzx-note
-+ */
-+struct parp_predict_state_v2 {
-+	__u32 abi_version;
-+	__u32 struct_size;
-+	__u32 schema_version;
-+	__u32 model_version;
-+	__u32 generation;
-+	__u32 nr_predictions;
-+	__u32 nr_bindings;
-+	__u32 flags;
-+	__u64 timestamp_ns;
-+	__u64 horizon_ns;
-+	__u64 ttl_ns;
-+	__u64 policy_domain_id;
-+	__u64 predicted_workingset_bytes;
-+	__u64 predicted_resident_bytes;
-+	__u16 workingset_confidence_q15;
-+	__u16 workingset_estimator_version;
-+	__u32 reserved32;
-+	__u64 reserved64;
-+	struct parp_predict_entry_v1 predictions[PARP_PREDICT_MAX_APPS];
-+	struct parp_predict_binding_v1 bindings[PARP_PREDICT_MAX_BINDINGS];
-+};
-+
-+#define PARP_PREDICT_IOC_MAGIC	0xb7
-+#define PARP_PREDICT_SET_STATE	_IOW(PARP_PREDICT_IOC_MAGIC, 1, \
-+				     struct parp_predict_state_v1)
-+#define PARP_PREDICT_GET_STATE	_IOR(PARP_PREDICT_IOC_MAGIC, 2, \
-+				     struct parp_predict_state_v1)
-+#define PARP_PREDICT_SET_STATE_V2	_IOW(PARP_PREDICT_IOC_MAGIC, 3, \
-+				     struct parp_predict_state_v2) /* lzx-note */
-+#define PARP_PREDICT_GET_STATE_V2	_IOR(PARP_PREDICT_IOC_MAGIC, 4, \
-+				     struct parp_predict_state_v2) /* lzx-note */
-+
-+#endif /* _UAPI_LINUX_PARP_PREDICT_H */
 diff --git a/kernel/trace/trace_events.c b/kernel/trace/trace_events.c
 index e00da4182..8b2ae5774 100644
 --- a/kernel/trace/trace_events.c
@@ -6375,10 +5915,10 @@ index a82b340dc..cce826079 100644
  		 * We cleared the referenced bit in a mapping to this page. To
 diff --git a/mm/parp/Kconfig b/mm/parp/Kconfig
 new file mode 100644
-index 000000000..5af676b15
+index 000000000..d2350ef89
 --- /dev/null
 +++ b/mm/parp/Kconfig
-@@ -0,0 +1,129 @@
+@@ -0,0 +1,143 @@
 +# SPDX-License-Identifier: GPL-2.0
 +menu "LZX PARP memory optimization experiments" # lzx-note
 +
@@ -6448,6 +5988,20 @@ index 000000000..5af676b15
 +	  Tier2 proactive-reclaim master may remain zero for a bin-only ablation.
 +	  When this option is disabled, MGLRU keeps its native random bin placement
 +	  and starting-bin behavior. # lzx-note
++
++config PARP_RECLAIM_COLD_AGGRESSIVE # lzx-note
++	bool "Increase first-pass reclaim pressure for prediction-cold memcgs"
++	depends on PARP_RECLAIM_BIN_SCORE
++	default n
++	help
++	  Build a bounded per-memcg pressure policy on top of reclaim-bin ordering.
++	  Prediction-cold bins receive a probability-dependent priority boost,
++	  balanced anonymous/file pressure, and dirty-page writeback permission on
++	  their first visit. The original scan_control values are restored before
++	  scanning the next memcg, so predicted-hot and unrelated workloads retain
++	  native pressure. The independent
++	  vm.parp_reclaim_cold_aggressive_enabled switch defaults to zero and permits
++	  exact bin-only versus bin-plus-pressure ablation. # lzx-note
 +
 +config PARP_DAMON_ALIGNMENT
 +	bool "Collect DAMON VADDR aggregation evidence for PARP"
@@ -7358,10 +6912,10 @@ index 000000000..4abf513f1
 +}
 diff --git a/mm/parp/control/debugfs.c b/mm/parp/control/debugfs.c
 new file mode 100644
-index 000000000..e21ea0b80
+index 000000000..a174d2e3a
 --- /dev/null
 +++ b/mm/parp/control/debugfs.c
-@@ -0,0 +1,637 @@
+@@ -0,0 +1,670 @@
 +// SPDX-License-Identifier: GPL-2.0
 +#include <linux/debugfs.h>
 +#include <linux/fs.h>
@@ -7561,6 +7115,35 @@ index 000000000..e21ea0b80
 +
 +DEFINE_SHOW_ATTRIBUTE(reclaim_bin_stats); /* lzx-note */
 +#endif /* CONFIG_PARP_RECLAIM_BIN_SCORE */ /* lzx-note */
++
++#ifdef CONFIG_PARP_RECLAIM_COLD_AGGRESSIVE /* lzx-note */
++static int reclaim_cold_stats_show(struct seq_file *m, void *v) /* lzx-note */
++{
++	struct parp_reclaim_cold_stats stats;
++
++	parp_tier2_reclaim_cold_stats_snapshot(&stats);
++	seq_printf(m,
++		   "compiled 1\napply_enabled %u\n"
++		   "passes %llu\nscanned %llu\nreclaimed %llu\n"
++		   "priority_boost_total %llu\nwritepage_promotions %llu\n"
++		   "swappiness_promotions %llu\n"
++		   "bin_0_passes %llu\nbin_1_passes %llu\n"
++		   "bin_2_passes %llu\nbin_3_passes %llu\n"
++		   "bin_4_passes %llu\nbin_5_passes %llu\n"
++		   "bin_6_passes %llu\nbin_7_passes %llu\n",
++		   parp_tier2_reclaim_cold_aggressive_apply_enabled(),
++		   stats.passes, stats.scanned, stats.reclaimed,
++		   stats.priority_boost_total, stats.writepage_promotions,
++		   stats.swappiness_promotions,
++		   stats.bin_passes[0], stats.bin_passes[1],
++		   stats.bin_passes[2], stats.bin_passes[3],
++		   stats.bin_passes[4], stats.bin_passes[5],
++		   stats.bin_passes[6], stats.bin_passes[7]);
++	return 0;
++} /* lzx-note */
++
++DEFINE_SHOW_ATTRIBUTE(reclaim_cold_stats); /* lzx-note */
++#endif /* CONFIG_PARP_RECLAIM_COLD_AGGRESSIVE */ /* lzx-note */
 +
 +#ifdef CONFIG_PARP_EFFECTIVE_TIER
 +static ssize_t effective_tier_mode_read(struct file *file, char __user *buf,
@@ -7983,6 +7566,10 @@ index 000000000..e21ea0b80
 +	debugfs_create_file("reclaim_bin_stats", 0400, parp_dir, NULL,
 +			    &reclaim_bin_stats_fops); /* lzx-note */
 +#endif /* CONFIG_PARP_RECLAIM_BIN_SCORE */ /* lzx-note */
++#ifdef CONFIG_PARP_RECLAIM_COLD_AGGRESSIVE /* lzx-note */
++	debugfs_create_file("reclaim_cold_stats", 0400, parp_dir, NULL,
++			    &reclaim_cold_stats_fops); /* lzx-note */
++#endif /* CONFIG_PARP_RECLAIM_COLD_AGGRESSIVE */ /* lzx-note */
 +	debugfs_create_file("scan_budget_mode", 0600, parp_dir, NULL,
 +			    &scan_budget_mode_fops);
 +	debugfs_create_file("scan_budget_apply_domain", 0600, parp_dir, NULL,
@@ -7999,424 +7586,6 @@ index 000000000..e21ea0b80
 +	return 0;
 +}
 +subsys_initcall(parp_init);
-diff --git a/mm/parp/control/dev.c b/mm/parp/control/dev.c
-new file mode 100644
-index 000000000..5fbff9e5f
---- /dev/null
-+++ b/mm/parp/control/dev.c
-@@ -0,0 +1,412 @@
-+// SPDX-License-Identifier: GPL-2.0
-+#include <linux/compat.h>
-+#include <linux/fs.h>
-+#include <linux/init.h>
-+#include <linux/miscdevice.h>
-+#include <linux/module.h>
-+#include <linux/overflow.h>
-+#include <linux/parp_predict.h>
-+#include <linux/slab.h>
-+#include <linux/uaccess.h>
-+
-+#include "../internal.h"
-+
-+static int parp_predict_validate_header(const struct parp_predict_state_v1 *state)
-+{
-+	unsigned int i;
-+
-+	if (state->abi_version != PARP_PREDICT_ABI_VERSION ||
-+	    state->struct_size != sizeof(*state) || state->flags ||
-+	    state->schema_version != PARP_APP_PRIOR_BATCH_SCHEMA ||
-+	    !state->model_version || !state->generation ||
-+	    !state->nr_predictions ||
-+	    state->nr_predictions > PARP_PREDICT_MAX_APPS ||
-+	    state->nr_bindings > PARP_PREDICT_MAX_BINDINGS ||
-+	    !state->timestamp_ns || !state->horizon_ns || !state->ttl_ns)
-+		return -EINVAL;
-+	for (i = 0; i < ARRAY_SIZE(state->reserved); i++)
-+		if (state->reserved[i])
-+			return -EINVAL;
-+	if (state->ttl_ns > PARP_APP_PRIOR_MAX_TTL_NS ||
-+	    state->horizon_ns > PARP_APP_PRIOR_MAX_HORIZON_NS)
-+		return -ERANGE;
-+	return 0;
-+}
-+
-+static int parp_predict_validate_header_v2(
-+		const struct parp_predict_state_v2 *state)
-+{
-+	if (state->abi_version != PARP_PREDICT_ABI_VERSION_V2 ||
-+	    state->struct_size != sizeof(*state) ||
-+	    state->flags & ~PARP_PREDICT_STATE_WORKINGSET_VALID ||
-+	    state->schema_version != PARP_APP_PRIOR_BATCH_SCHEMA ||
-+	    !state->model_version || !state->generation ||
-+	    !state->nr_predictions ||
-+	    state->nr_predictions > PARP_PREDICT_MAX_APPS ||
-+	    state->nr_bindings > PARP_PREDICT_MAX_BINDINGS ||
-+	    !state->timestamp_ns || !state->horizon_ns || !state->ttl_ns ||
-+	    state->reserved32 || state->reserved64)
-+		return -EINVAL;
-+	if (state->ttl_ns > PARP_APP_PRIOR_MAX_TTL_NS ||
-+	    state->horizon_ns > PARP_APP_PRIOR_MAX_HORIZON_NS)
-+		return -ERANGE;
-+	if (state->flags & PARP_PREDICT_STATE_WORKINGSET_VALID) {
-+		if (!state->policy_domain_id ||
-+		    !state->predicted_workingset_bytes ||
-+		    state->predicted_resident_bytes >
-+			state->predicted_workingset_bytes ||
-+		    !state->workingset_confidence_q15 ||
-+		    state->workingset_confidence_q15 > PARP_Q15_ONE ||
-+		    !state->workingset_estimator_version)
-+			return -EINVAL;
-+	} else if (state->policy_domain_id ||
-+		   state->predicted_workingset_bytes ||
-+		   state->predicted_resident_bytes ||
-+		   state->workingset_confidence_q15 ||
-+		   state->workingset_estimator_version) {
-+		return -EINVAL;
-+	}
-+	return 0;
-+} /* lzx-note */
-+
-+/* lzx-note: Translate the stable UAPI into the internal immutable snapshot. */
-+static int parp_predict_set_state(void __user *argp)
-+{
-+	struct parp_predict_state_v1 *state;
-+	struct parp_app_prior_batch *batch;
-+	struct parp_binding *bindings;
-+	u64 expiry_ns;
-+	unsigned int i;
-+	int error;
-+
-+	state = memdup_user(argp, sizeof(*state));
-+	if (IS_ERR(state))
-+		return PTR_ERR(state);
-+	error = parp_predict_validate_header(state);
-+	if (error)
-+		goto out_state;
-+	if (check_add_overflow(state->timestamp_ns, state->ttl_ns, &expiry_ns)) {
-+		error = -EOVERFLOW;
-+		goto out_state;
-+	}
-+
-+	batch = kzalloc(sizeof(*batch), GFP_KERNEL);
-+	bindings = kcalloc(state->nr_bindings, sizeof(*bindings), GFP_KERNEL);
-+	if (!batch || (state->nr_bindings && !bindings)) {
-+		error = -ENOMEM;
-+		goto out_alloc;
-+	}
-+	batch->schema_version = state->schema_version;
-+	batch->model_version = state->model_version;
-+	batch->prediction_generation = state->generation;
-+	batch->timestamp_ns = state->timestamp_ns;
-+	batch->horizon_ns = state->horizon_ns;
-+	batch->expiry_ns = expiry_ns;
-+	batch->nr_entries = state->nr_predictions;
-+	for (i = 0; i < state->nr_predictions; i++) {
-+		const struct parp_predict_entry_v1 *source =
-+			&state->predictions[i];
-+
-+		if (source->reserved ||
-+		    source->flags & ~PARP_PREDICT_ENTRY_FOREGROUND) {
-+			error = -EINVAL;
-+			goto out_alloc;
-+		}
-+		batch->entries[i].app_id = source->app_id;
-+		batch->entries[i].use_score_q15 = source->score_q15;
-+		batch->entries[i].rank = source->rank;
-+		batch->entries[i].foreground =
-+			!!(source->flags & PARP_PREDICT_ENTRY_FOREGROUND);
-+		batch->entries[i].valid = true;
-+	}
-+	for (i = 0; i < state->nr_bindings; i++) {
-+		const struct parp_predict_binding_v1 *source =
-+			&state->bindings[i];
-+
-+		if (source->reserved ||
-+		    source->flags != PARP_PREDICT_BINDING_ACTIVE) {
-+			error = -EINVAL;
-+			goto out_alloc;
-+		}
-+		bindings[i] = (struct parp_binding) {
-+			.domain_id = source->domain_id,
-+			.app_id = source->app_id,
-+			.bind_generation = state->generation,
-+			.updated_ns = state->timestamp_ns,
-+			.expires_ns = expiry_ns,
-+			.epoch_id = source->epoch_id,
-+			.model_version = state->model_version,
-+			.active = true,
-+		};
-+	}
-+	error = parp_snapshot_replace_state(batch, bindings,
-+					    state->nr_bindings);
-+out_alloc:
-+	kfree(bindings);
-+	kfree(batch);
-+out_state:
-+	kfree(state);
-+	return error;
-+}
-+
-+/* lzx-note: ABI v2 adds one future-working-set estimate to the same atomic
-+ * prediction and binding publication used by v1. */
-+static int parp_predict_set_state_v2(void __user *argp)
-+{
-+	struct parp_predict_state_v2 *state;
-+	struct parp_app_prior_batch *batch;
-+	struct parp_binding *bindings;
-+	u64 expiry_ns;
-+	unsigned int i;
-+	int error;
-+
-+	state = memdup_user(argp, sizeof(*state));
-+	if (IS_ERR(state))
-+		return PTR_ERR(state);
-+	error = parp_predict_validate_header_v2(state);
-+	if (error)
-+		goto out_state;
-+	if (check_add_overflow(state->timestamp_ns, state->ttl_ns, &expiry_ns)) {
-+		error = -EOVERFLOW;
-+		goto out_state;
-+	}
-+
-+	batch = kzalloc(sizeof(*batch), GFP_KERNEL);
-+	bindings = kcalloc(state->nr_bindings, sizeof(*bindings), GFP_KERNEL);
-+	if (!batch || (state->nr_bindings && !bindings)) {
-+		error = -ENOMEM;
-+		goto out_alloc;
-+	}
-+	batch->schema_version = state->schema_version;
-+	batch->model_version = state->model_version;
-+	batch->prediction_generation = state->generation;
-+	batch->flags = state->flags & PARP_PREDICT_STATE_WORKINGSET_VALID ?
-+		PARP_APP_PRIOR_BATCH_WORKINGSET_VALID : 0;
-+	batch->timestamp_ns = state->timestamp_ns;
-+	batch->horizon_ns = state->horizon_ns;
-+	batch->expiry_ns = expiry_ns;
-+	batch->policy_domain_id = state->policy_domain_id;
-+	batch->predicted_workingset_bytes =
-+		state->predicted_workingset_bytes;
-+	batch->predicted_resident_bytes = state->predicted_resident_bytes;
-+	batch->workingset_confidence_q15 =
-+		state->workingset_confidence_q15;
-+	batch->workingset_estimator_version =
-+		state->workingset_estimator_version;
-+	batch->nr_entries = state->nr_predictions;
-+	for (i = 0; i < state->nr_predictions; i++) {
-+		const struct parp_predict_entry_v1 *source =
-+			&state->predictions[i];
-+
-+		if (source->reserved ||
-+		    source->flags & ~PARP_PREDICT_ENTRY_FOREGROUND) {
-+			error = -EINVAL;
-+			goto out_alloc;
-+		}
-+		batch->entries[i].app_id = source->app_id;
-+		batch->entries[i].use_score_q15 = source->score_q15;
-+		batch->entries[i].rank = source->rank;
-+		batch->entries[i].foreground =
-+			!!(source->flags & PARP_PREDICT_ENTRY_FOREGROUND);
-+		batch->entries[i].valid = true;
-+	}
-+	for (i = 0; i < state->nr_bindings; i++) {
-+		const struct parp_predict_binding_v1 *source =
-+			&state->bindings[i];
-+
-+		if (source->reserved ||
-+		    source->flags != PARP_PREDICT_BINDING_ACTIVE) {
-+			error = -EINVAL;
-+			goto out_alloc;
-+		}
-+		bindings[i] = (struct parp_binding) {
-+			.domain_id = source->domain_id,
-+			.app_id = source->app_id,
-+			.bind_generation = state->generation,
-+			.updated_ns = state->timestamp_ns,
-+			.expires_ns = expiry_ns,
-+			.epoch_id = source->epoch_id,
-+			.model_version = state->model_version,
-+			.active = true,
-+		};
-+	}
-+	error = parp_snapshot_replace_state(batch, bindings,
-+					    state->nr_bindings);
-+out_alloc:
-+	kfree(bindings);
-+	kfree(batch);
-+out_state:
-+	kfree(state);
-+	return error;
-+}
-+
-+static int parp_predict_get_state(void __user *argp)
-+{
-+	const struct parp_snapshot *snapshot;
-+	struct parp_predict_state_v1 *state;
-+	unsigned int i;
-+	int error = 0;
-+
-+	state = kzalloc(sizeof(*state), GFP_KERNEL);
-+	if (!state)
-+		return -ENOMEM;
-+	state->abi_version = PARP_PREDICT_ABI_VERSION;
-+	state->struct_size = sizeof(*state);
-+
-+	snapshot = parp_snapshot_acquire();
-+	if (snapshot) {
-+		state->schema_version = snapshot->prediction_schema_version;
-+		state->model_version = snapshot->prediction_model_version;
-+		state->generation = snapshot->prediction_generation;
-+		state->timestamp_ns = snapshot->prediction_timestamp_ns;
-+		state->horizon_ns = snapshot->prediction_horizon_ns;
-+		if (snapshot->prediction_expiry_ns >
-+		    snapshot->prediction_timestamp_ns)
-+			state->ttl_ns = snapshot->prediction_expiry_ns -
-+				snapshot->prediction_timestamp_ns;
-+		state->nr_predictions = min_t(u32, snapshot->nr_priors,
-+						 PARP_PREDICT_MAX_APPS);
-+		state->nr_bindings = min_t(u32, snapshot->nr_bindings,
-+					      PARP_PREDICT_MAX_BINDINGS);
-+		for (i = 0; i < state->nr_predictions; i++) {
-+			state->predictions[i].app_id = snapshot->priors[i].app_id;
-+			state->predictions[i].score_q15 =
-+				snapshot->priors[i].use_score_q15;
-+			state->predictions[i].rank = snapshot->priors[i].rank;
-+			if (snapshot->priors[i].foreground)
-+				state->predictions[i].flags =
-+					PARP_PREDICT_ENTRY_FOREGROUND;
-+		}
-+		for (i = 0; i < state->nr_bindings; i++) {
-+			state->bindings[i].domain_id =
-+				snapshot->bindings[i].domain_id;
-+			state->bindings[i].app_id = snapshot->bindings[i].app_id;
-+			state->bindings[i].epoch_id = snapshot->bindings[i].epoch_id;
-+			if (snapshot->bindings[i].active)
-+				state->bindings[i].flags =
-+					PARP_PREDICT_BINDING_ACTIVE;
-+		}
-+	}
-+	parp_snapshot_release();
-+
-+	if (copy_to_user(argp, state, sizeof(*state)))
-+		error = -EFAULT;
-+	kfree(state);
-+	return error;
-+}
-+
-+static int parp_predict_get_state_v2(void __user *argp)
-+{
-+	const struct parp_snapshot *snapshot;
-+	struct parp_predict_state_v2 *state;
-+	unsigned int i;
-+	int error = 0;
-+
-+	state = kzalloc(sizeof(*state), GFP_KERNEL);
-+	if (!state)
-+		return -ENOMEM;
-+	state->abi_version = PARP_PREDICT_ABI_VERSION_V2;
-+	state->struct_size = sizeof(*state);
-+
-+	snapshot = parp_snapshot_acquire();
-+	if (snapshot) {
-+		state->schema_version = snapshot->prediction_schema_version;
-+		state->model_version = snapshot->prediction_model_version;
-+		state->generation = snapshot->prediction_generation;
-+		state->timestamp_ns = snapshot->prediction_timestamp_ns;
-+		state->horizon_ns = snapshot->prediction_horizon_ns;
-+		if (snapshot->prediction_expiry_ns >
-+		    snapshot->prediction_timestamp_ns)
-+			state->ttl_ns = snapshot->prediction_expiry_ns -
-+				snapshot->prediction_timestamp_ns;
-+		if (snapshot->workingset_valid) {
-+			state->flags |= PARP_PREDICT_STATE_WORKINGSET_VALID;
-+			state->policy_domain_id =
-+				snapshot->prediction_policy_domain_id;
-+			state->predicted_workingset_bytes =
-+				snapshot->predicted_workingset_bytes;
-+			state->predicted_resident_bytes =
-+				snapshot->predicted_resident_bytes;
-+			state->workingset_confidence_q15 =
-+				snapshot->workingset_confidence_q15;
-+			state->workingset_estimator_version =
-+				snapshot->workingset_estimator_version;
-+		}
-+		state->nr_predictions = min_t(u32, snapshot->nr_priors,
-+						 PARP_PREDICT_MAX_APPS);
-+		state->nr_bindings = min_t(u32, snapshot->nr_bindings,
-+					      PARP_PREDICT_MAX_BINDINGS);
-+		for (i = 0; i < state->nr_predictions; i++) {
-+			state->predictions[i].app_id = snapshot->priors[i].app_id;
-+			state->predictions[i].score_q15 =
-+				snapshot->priors[i].use_score_q15;
-+			state->predictions[i].rank = snapshot->priors[i].rank;
-+			if (snapshot->priors[i].foreground)
-+				state->predictions[i].flags =
-+					PARP_PREDICT_ENTRY_FOREGROUND;
-+		}
-+		for (i = 0; i < state->nr_bindings; i++) {
-+			state->bindings[i].domain_id =
-+				snapshot->bindings[i].domain_id;
-+			state->bindings[i].app_id = snapshot->bindings[i].app_id;
-+			state->bindings[i].epoch_id = snapshot->bindings[i].epoch_id;
-+			if (snapshot->bindings[i].active)
-+				state->bindings[i].flags =
-+					PARP_PREDICT_BINDING_ACTIVE;
-+		}
-+	}
-+	parp_snapshot_release();
-+
-+	if (copy_to_user(argp, state, sizeof(*state)))
-+		error = -EFAULT;
-+	kfree(state);
-+	return error;
-+} /* lzx-note */
-+
-+static long parp_predict_ioctl(struct file *file, unsigned int cmd,
-+			       unsigned long arg)
-+{
-+	void __user *argp = (void __user *)arg;
-+
-+	switch (cmd) {
-+	case PARP_PREDICT_SET_STATE:
-+		return parp_predict_set_state(argp);
-+	case PARP_PREDICT_GET_STATE:
-+		return parp_predict_get_state(argp);
-+	case PARP_PREDICT_SET_STATE_V2:
-+		return parp_predict_set_state_v2(argp);
-+	case PARP_PREDICT_GET_STATE_V2:
-+		return parp_predict_get_state_v2(argp);
-+	default:
-+		return -ENOTTY;
-+	}
-+}
-+
-+static const struct file_operations parp_predict_fops = {
-+	.owner = THIS_MODULE,
-+	.open = nonseekable_open,
-+	.unlocked_ioctl = parp_predict_ioctl,
-+	.compat_ioctl = compat_ptr_ioctl,
-+	.llseek = noop_llseek,
-+};
-+
-+static struct miscdevice parp_predict_device = {
-+	.minor = MISC_DYNAMIC_MINOR,
-+	.name = "myfs",
-+	.fops = &parp_predict_fops,
-+	.mode = 0660,
-+};
-+
-+static int __init parp_predict_dev_init(void)
-+{
-+	int error = misc_register(&parp_predict_device);
-+
-+	if (error)
-+		pr_err("PARP: failed to register /dev/myfs: %d\n", error);
-+	else
-+		pr_info("PARP: /dev/myfs prediction interface ABI v%u/v%u ready\n",
-+			PARP_PREDICT_ABI_VERSION,
-+			PARP_PREDICT_ABI_VERSION_V2); /* lzx-note */
-+	return error;
-+}
-+device_initcall(parp_predict_dev_init); /* lzx-note: misc class must exist first. */
 diff --git a/mm/parp/control/genl.c b/mm/parp/control/genl.c
 new file mode 100644
 index 000000000..40504ecfb
@@ -13385,10 +12554,10 @@ index 000000000..12b3d683c
 +}
 diff --git a/mm/parp/core/watermark.c b/mm/parp/core/watermark.c
 new file mode 100644
-index 000000000..780285363
+index 000000000..cb8e5bd52
 --- /dev/null
 +++ b/mm/parp/core/watermark.c
-@@ -0,0 +1,1256 @@
+@@ -0,0 +1,1379 @@
 +// SPDX-License-Identifier: GPL-2.0
 +/*
 + * Per-memcg secondary watermarks and EWMA arrival prediction.
@@ -13436,6 +12605,9 @@ index 000000000..780285363
 +static int sysctl_tier2_wss_strengthen_enabled __read_mostly; /* lzx-note */
 +#endif
 +static int parp_tier2_one = 1;
++#ifdef CONFIG_PARP_RECLAIM_COLD_AGGRESSIVE /* lzx-note */
++static int parp_tier2_seven = 7; /* lzx-note */
++#endif /* CONFIG_PARP_RECLAIM_COLD_AGGRESSIVE */ /* lzx-note */
 +static int parp_tier2_thousand = 1000;
 +static int parp_tier2_hundred = 100;
 +
@@ -13458,6 +12630,20 @@ index 000000000..780285363
 +	atomic64_t score_bins[8];
 +} parp_reclaim_bin_stats; /* lzx-note */
 +#endif /* CONFIG_PARP_RECLAIM_BIN_SCORE */ /* lzx-note */
++
++#ifdef CONFIG_PARP_RECLAIM_COLD_AGGRESSIVE /* lzx-note */
++static int sysctl_parp_reclaim_cold_aggressive_enabled __read_mostly;
++static int sysctl_parp_reclaim_cold_bin_max __read_mostly = 2;
++static struct { /* lzx-note */
++	atomic64_t passes;
++	atomic64_t scanned;
++	atomic64_t reclaimed;
++	atomic64_t priority_boost_total;
++	atomic64_t writepage_promotions;
++	atomic64_t swappiness_promotions;
++	atomic64_t bin_passes[8];
++} parp_reclaim_cold_stats; /* lzx-note */
++#endif /* CONFIG_PARP_RECLAIM_COLD_AGGRESSIVE */ /* lzx-note */
 +
 +static const struct ctl_table parp_tier2_sysctls[] = {
 +	{
@@ -13498,6 +12684,26 @@ index 000000000..780285363
 +		.extra2 = &parp_tier2_one,
 +	}, /* lzx-note */
 +#endif /* CONFIG_PARP_RECLAIM_BIN_SCORE */ /* lzx-note */
++#ifdef CONFIG_PARP_RECLAIM_COLD_AGGRESSIVE /* lzx-note */
++	{
++		.procname = "parp_reclaim_cold_aggressive_enabled",
++		.data = &sysctl_parp_reclaim_cold_aggressive_enabled,
++		.maxlen = sizeof(sysctl_parp_reclaim_cold_aggressive_enabled),
++		.mode = 0644,
++		.proc_handler = proc_dointvec_minmax,
++		.extra1 = SYSCTL_ZERO,
++		.extra2 = &parp_tier2_one,
++	}, /* lzx-note */
++	{
++		.procname = "parp_reclaim_cold_bin_max",
++		.data = &sysctl_parp_reclaim_cold_bin_max,
++		.maxlen = sizeof(sysctl_parp_reclaim_cold_bin_max),
++		.mode = 0644,
++		.proc_handler = proc_dointvec_minmax,
++		.extra1 = SYSCTL_ZERO,
++		.extra2 = &parp_tier2_seven,
++	}, /* lzx-note */
++#endif /* CONFIG_PARP_RECLAIM_COLD_AGGRESSIVE */ /* lzx-note */
 +#ifdef CONFIG_PARP_TIER2_WSS_PREDICT
 +	{
 +		.procname = "tier2_wss_predict_enabled",
@@ -13598,7 +12804,8 @@ index 000000000..780285363
 +} /* lzx-note */
 +
 +bool parp_tier2_reclaim_bin_score(struct mem_cgroup *memcg,
-+				  u32 *score_q15) /* lzx-note */
++				  u32 *score_q15,
++				  bool *prediction_backed) /* lzx-note */
 +{
 +	struct mem_cgroup *policy_memcg;
 +	struct parp_tier2_memcg *state;
@@ -13609,6 +12816,9 @@ index 000000000..780285363
 +	u64 headroom;
 +	u32 score = 0;
 +	bool have_signal = false;
++
++	if (prediction_backed)
++		*prediction_backed = false;
 +
 +	if (!memcg || !score_q15 || mem_cgroup_is_root(memcg) ||
 +	    !parp_tier2_reclaim_bin_apply_enabled())
@@ -13631,6 +12841,8 @@ index 000000000..780285363
 +							 app.app_rank,
 +							 app.foreground);
 +		have_signal = true;
++		if (prediction_backed)
++			*prediction_backed = true;
 +		atomic64_inc(&parp_reclaim_bin_stats.context_hits);
 +		atomic64_inc(&parp_reclaim_bin_stats.rank_scores);
 +	}
@@ -13716,6 +12928,86 @@ index 000000000..780285363
 +			&parp_reclaim_bin_stats.score_bins[bin]);
 +} /* lzx-note */
 +#endif /* CONFIG_PARP_RECLAIM_BIN_SCORE */ /* lzx-note */
++
++#ifdef CONFIG_PARP_RECLAIM_COLD_AGGRESSIVE /* lzx-note */
++bool parp_tier2_reclaim_cold_aggressive_apply_enabled(void) /* lzx-note */
++{
++	return parp_tier2_reclaim_bin_apply_enabled() &&
++	       READ_ONCE(sysctl_parp_reclaim_cold_aggressive_enabled);
++} /* lzx-note */
++
++/*
++ * Lower prediction bins get exponentially more pages from the first visit.
++ * Swappiness stays below ANON_ONLY so cold clean/dirty file pages remain
++ * eligible alongside anonymous pages. lzx-note
++ */
++bool parp_tier2_reclaim_cold_pressure(unsigned int bin,
++				       u8 *priority_boost,
++				       u16 *swappiness) /* lzx-note */
++{
++	unsigned int max_bin;
++
++	if (!priority_boost || !swappiness ||
++	    !parp_tier2_reclaim_cold_aggressive_apply_enabled())
++		return false;
++
++	max_bin = READ_ONCE(sysctl_parp_reclaim_cold_bin_max);
++	if (bin > min_t(unsigned int, max_bin, 7))
++		return false;
++
++	if (!bin) {
++		*priority_boost = 3;
++		*swappiness = 140;
++	} else if (bin == 1) {
++		*priority_boost = 2;
++		*swappiness = 120;
++	} else {
++		*priority_boost = 1;
++		*swappiness = 100;
++	}
++	return true;
++} /* lzx-note */
++
++void parp_tier2_reclaim_cold_note(unsigned int bin, u8 priority_boost,
++				  bool writepage_promoted,
++				  bool swappiness_promoted,
++				  unsigned long scanned,
++				  unsigned long reclaimed) /* lzx-note */
++{
++	atomic64_inc(&parp_reclaim_cold_stats.passes);
++	atomic64_add(scanned, &parp_reclaim_cold_stats.scanned);
++	atomic64_add(reclaimed, &parp_reclaim_cold_stats.reclaimed);
++	atomic64_add(priority_boost,
++		     &parp_reclaim_cold_stats.priority_boost_total);
++	if (writepage_promoted)
++		atomic64_inc(&parp_reclaim_cold_stats.writepage_promotions);
++	if (swappiness_promoted)
++		atomic64_inc(&parp_reclaim_cold_stats.swappiness_promotions);
++	if (bin < ARRAY_SIZE(parp_reclaim_cold_stats.bin_passes))
++		atomic64_inc(&parp_reclaim_cold_stats.bin_passes[bin]);
++} /* lzx-note */
++
++void parp_tier2_reclaim_cold_stats_snapshot(
++		struct parp_reclaim_cold_stats *stats) /* lzx-note */
++{
++	int bin;
++
++	if (!stats)
++		return;
++	stats->passes = atomic64_read(&parp_reclaim_cold_stats.passes);
++	stats->scanned = atomic64_read(&parp_reclaim_cold_stats.scanned);
++	stats->reclaimed = atomic64_read(&parp_reclaim_cold_stats.reclaimed);
++	stats->priority_boost_total = atomic64_read(
++		&parp_reclaim_cold_stats.priority_boost_total);
++	stats->writepage_promotions = atomic64_read(
++		&parp_reclaim_cold_stats.writepage_promotions);
++	stats->swappiness_promotions = atomic64_read(
++		&parp_reclaim_cold_stats.swappiness_promotions);
++	for (bin = 0; bin < ARRAY_SIZE(stats->bin_passes); bin++)
++		stats->bin_passes[bin] = atomic64_read(
++			&parp_reclaim_cold_stats.bin_passes[bin]);
++} /* lzx-note */
++#endif /* CONFIG_PARP_RECLAIM_COLD_AGGRESSIVE */ /* lzx-note */
 +
 +u64 parp_tier2_scaled_wmark(u64 limit_bytes, u32 scale, u64 floor)
 +{
@@ -17227,7 +16519,7 @@ index b74ebe865..ea64d6401 100644
  
  /**
 diff --git a/mm/vmscan.c b/mm/vmscan.c
-index 674999999..780e4d153 100644
+index 674999999..5e8afc567 100644
 --- a/mm/vmscan.c
 +++ b/mm/vmscan.c
 @@ -58,6 +58,8 @@
@@ -17239,7 +16531,32 @@ index 674999999..780e4d153 100644
  
  #include <asm/tlbflush.h>
  #include <asm/div64.h>
-@@ -1288,6 +1290,8 @@ static unsigned int shrink_folio_list(struct list_head *folio_list,
+@@ -156,6 +158,13 @@ struct scan_control {
+ 	/* Scan (total_size >> priority) pages at once */
+ 	s8 priority;
+ 
++#ifdef CONFIG_PARP_RECLAIM_COLD_AGGRESSIVE /* lzx-note */
++	/* Zero means native; otherwise use value minus one for this memcg. */
++	u16 parp_swappiness_override; /* lzx-note */
++	/* Writeback-disabled root pass may visit prediction-cold memcgs only. */
++	bool parp_cold_only; /* lzx-note */
++#endif /* CONFIG_PARP_RECLAIM_COLD_AGGRESSIVE */ /* lzx-note */
++
+ 	/* The highest zone to isolate folios for reclaim from */
+ 	s8 reclaim_idx;
+ 
+@@ -244,6 +253,10 @@ static bool writeback_throttling_sane(struct scan_control *sc)
+ 
+ static int sc_swappiness(struct scan_control *sc, struct mem_cgroup *memcg)
+ {
++#ifdef CONFIG_PARP_RECLAIM_COLD_AGGRESSIVE /* lzx-note */
++	if (sc->parp_swappiness_override)
++		return sc->parp_swappiness_override - 1; /* lzx-note */
++#endif /* CONFIG_PARP_RECLAIM_COLD_AGGRESSIVE */ /* lzx-note */
+ 	if (sc->proactive && sc->proactive_swappiness)
+ 		return *sc->proactive_swappiness;
+ 	return mem_cgroup_swappiness(memcg);
+@@ -1288,6 +1301,8 @@ static unsigned int shrink_folio_list(struct list_head *folio_list,
  		 */
  		if (do_demote_pass &&
  		    (thp_migration_supported() || !folio_test_large(folio))) {
@@ -17248,7 +16565,7 @@ index 674999999..780e4d153 100644
  			list_add(&folio->lru, &demote_folios);
  			folio_unlock(folio);
  			continue;
-@@ -1518,6 +1522,8 @@ static unsigned int shrink_folio_list(struct list_head *folio_list,
+@@ -1518,6 +1533,8 @@ static unsigned int shrink_folio_list(struct list_head *folio_list,
  			if (!filemap_release_folio(folio, sc->gfp_mask))
  				goto activate_locked;
  			if (!mapping && folio_ref_count(folio) == 1) {
@@ -17257,7 +16574,7 @@ index 674999999..780e4d153 100644
  				folio_unlock(folio);
  				if (folio_put_testzero(folio))
  					goto free_it;
-@@ -1553,6 +1559,8 @@ static unsigned int shrink_folio_list(struct list_head *folio_list,
+@@ -1553,6 +1570,8 @@ static unsigned int shrink_folio_list(struct list_head *folio_list,
  							 sc->target_mem_cgroup))
  			goto keep_locked;
  
@@ -17266,7 +16583,7 @@ index 674999999..780e4d153 100644
  		folio_unlock(folio);
  free_it:
  		/*
-@@ -1579,6 +1587,8 @@ static unsigned int shrink_folio_list(struct list_head *folio_list,
+@@ -1579,6 +1598,8 @@ static unsigned int shrink_folio_list(struct list_head *folio_list,
  			nr_pages = 1;
  		}
  activate_locked:
@@ -17275,7 +16592,7 @@ index 674999999..780e4d153 100644
  		/* Not a candidate for swapping, so reclaim swap space. */
  		if (folio_test_swapcache(folio) &&
  		    (mem_cgroup_swap_full(folio) || folio_test_mlocked(folio)))
-@@ -1593,6 +1603,7 @@ static unsigned int shrink_folio_list(struct list_head *folio_list,
+@@ -1593,6 +1614,7 @@ static unsigned int shrink_folio_list(struct list_head *folio_list,
  keep_locked:
  		folio_unlock(folio);
  keep:
@@ -17283,7 +16600,7 @@ index 674999999..780e4d153 100644
  		list_add(&folio->lru, &ret_folios);
  		VM_BUG_ON_FOLIO(folio_test_lru(folio) ||
  				folio_test_unevictable(folio), folio);
-@@ -3280,7 +3291,8 @@ static int folio_update_gen(struct folio *folio, int gen)
+@@ -3280,7 +3302,8 @@ static int folio_update_gen(struct folio *folio, int gen)
  }
  
  /* protect pages accessed multiple times through file descriptors */
@@ -17293,7 +16610,7 @@ index 674999999..780e4d153 100644
  {
  	int type = folio_is_file_lru(folio);
  	struct lru_gen_folio *lrugen = &lruvec->lrugen;
-@@ -3288,6 +3300,7 @@ static int folio_inc_gen(struct lruvec *lruvec, struct folio *folio, bool reclai
+@@ -3288,6 +3311,7 @@ static int folio_inc_gen(struct lruvec *lruvec, struct folio *folio, bool reclai
  	unsigned long new_flags, old_flags = READ_ONCE(folio->flags);
  
  	VM_WARN_ON_ONCE_FOLIO(!(old_flags & LRU_GEN_MASK), folio);
@@ -17301,7 +16618,7 @@ index 674999999..780e4d153 100644
  
  	do {
  		new_gen = ((old_flags & LRU_GEN_MASK) >> LRU_GEN_PGOFF) - 1;
-@@ -3305,10 +3318,37 @@ static int folio_inc_gen(struct lruvec *lruvec, struct folio *folio, bool reclai
+@@ -3305,10 +3329,37 @@ static int folio_inc_gen(struct lruvec *lruvec, struct folio *folio, bool reclai
  	} while (!try_cmpxchg(&folio->flags, &old_flags, new_flags));
  
  	lru_gen_update_size(lruvec, folio, old_gen, new_gen);
@@ -17339,7 +16656,7 @@ index 674999999..780e4d153 100644
  static void update_batch_size(struct lru_gen_mm_walk *walk, struct folio *folio,
  			      int old_gen, int new_gen)
  {
-@@ -3495,12 +3535,16 @@ static bool suitable_to_scan(int total, int young)
+@@ -3495,12 +3546,16 @@ static bool suitable_to_scan(int total, int young)
  }
  
  static void walk_update_folio(struct lru_gen_mm_walk *walk, struct folio *folio,
@@ -17357,7 +16674,7 @@ index 674999999..780e4d153 100644
  
  	if (dirty && !folio_test_dirty(folio) &&
  	    !(folio_test_anon(folio) && folio_test_swapbacked(folio) &&
-@@ -3509,8 +3553,11 @@ static void walk_update_folio(struct lru_gen_mm_walk *walk, struct folio *folio,
+@@ -3509,8 +3564,11 @@ static void walk_update_folio(struct lru_gen_mm_walk *walk, struct folio *folio,
  
  	if (walk) {
  		old_gen = folio_update_gen(folio, new_gen);
@@ -17370,7 +16687,7 @@ index 674999999..780e4d153 100644
  	} else if (lru_gen_set_refs(folio)) {
  		old_gen = folio_lru_gen(folio);
  		if (old_gen >= 0 && old_gen != new_gen)
-@@ -3572,7 +3619,7 @@ static bool walk_pte_range(pmd_t *pmd, unsigned long start, unsigned long end,
+@@ -3572,7 +3630,7 @@ static bool walk_pte_range(pmd_t *pmd, unsigned long start, unsigned long end,
  			continue;
  
  		if (last != folio) {
@@ -17379,7 +16696,7 @@ index 674999999..780e4d153 100644
  
  			last = folio;
  			dirty = false;
-@@ -3585,7 +3632,7 @@ static bool walk_pte_range(pmd_t *pmd, unsigned long start, unsigned long end,
+@@ -3585,7 +3643,7 @@ static bool walk_pte_range(pmd_t *pmd, unsigned long start, unsigned long end,
  		walk->mm_stats[MM_LEAF_YOUNG]++;
  	}
  
@@ -17388,7 +16705,7 @@ index 674999999..780e4d153 100644
  	last = NULL;
  
  	if (i < PTRS_PER_PTE && get_next_vma(PMD_MASK, PAGE_SIZE, args, &start, &end))
-@@ -3663,7 +3710,7 @@ static void walk_pmd_range_locked(pud_t *pud, unsigned long addr, struct vm_area
+@@ -3663,7 +3721,7 @@ static void walk_pmd_range_locked(pud_t *pud, unsigned long addr, struct vm_area
  			goto next;
  
  		if (last != folio) {
@@ -17397,7 +16714,7 @@ index 674999999..780e4d153 100644
  
  			last = folio;
  			dirty = false;
-@@ -3677,7 +3724,7 @@ static void walk_pmd_range_locked(pud_t *pud, unsigned long addr, struct vm_area
+@@ -3677,7 +3735,7 @@ static void walk_pmd_range_locked(pud_t *pud, unsigned long addr, struct vm_area
  		i = i > MIN_LRU_BATCH ? 0 : find_next_bit(bitmap, MIN_LRU_BATCH, i) + 1;
  	} while (i <= MIN_LRU_BATCH);
  
@@ -17406,7 +16723,7 @@ index 674999999..780e4d153 100644
  
  	arch_leave_lazy_mmu_mode();
  	spin_unlock(ptl);
-@@ -3892,6 +3939,7 @@ static bool inc_min_seq(struct lruvec *lruvec, int type, int swappiness)
+@@ -3892,6 +3950,7 @@ static bool inc_min_seq(struct lruvec *lruvec, int type, int swappiness)
  
  		while (!list_empty(head)) {
  			struct folio *folio = lru_to_folio(head);
@@ -17414,7 +16731,7 @@ index 674999999..780e4d153 100644
  			int refs = folio_lru_refs(folio);
  			bool workingset = folio_test_workingset(folio);
  
-@@ -3900,7 +3948,11 @@ static bool inc_min_seq(struct lruvec *lruvec, int type, int swappiness)
+@@ -3900,7 +3959,11 @@ static bool inc_min_seq(struct lruvec *lruvec, int type, int swappiness)
  			VM_WARN_ON_ONCE_FOLIO(folio_is_file_lru(folio) != type, folio);
  			VM_WARN_ON_ONCE_FOLIO(folio_zonenum(folio) != zone, folio);
  
@@ -17427,7 +16744,7 @@ index 674999999..780e4d153 100644
  			list_move_tail(&folio->lru, &lrugen->folios[new_gen][type][zone]);
  
  			/* don't count the workingset being lazily promoted */
-@@ -4238,6 +4290,7 @@ bool lru_gen_look_around(struct page_vma_mapped_walk *pvmw)
+@@ -4238,6 +4301,7 @@ bool lru_gen_look_around(struct page_vma_mapped_walk *pvmw)
  	unsigned long addr = pvmw->address;
  	struct vm_area_struct *vma = pvmw->vma;
  	struct folio *folio = pfn_folio(pvmw->pfn);
@@ -17435,7 +16752,7 @@ index 674999999..780e4d153 100644
  	struct mem_cgroup *memcg = folio_memcg(folio);
  	struct pglist_data *pgdat = folio_pgdat(folio);
  	struct lruvec *lruvec = mem_cgroup_lruvec(memcg, pgdat);
-@@ -4250,6 +4303,7 @@ bool lru_gen_look_around(struct page_vma_mapped_walk *pvmw)
+@@ -4250,6 +4314,7 @@ bool lru_gen_look_around(struct page_vma_mapped_walk *pvmw)
  
  	if (!ptep_clear_young_notify(vma, addr, pte))
  		return false;
@@ -17443,7 +16760,7 @@ index 674999999..780e4d153 100644
  
  	if (spin_is_contended(pvmw->ptl))
  		return true;
-@@ -4298,7 +4352,7 @@ bool lru_gen_look_around(struct page_vma_mapped_walk *pvmw)
+@@ -4298,7 +4363,7 @@ bool lru_gen_look_around(struct page_vma_mapped_walk *pvmw)
  			continue;
  
  		if (last != folio) {
@@ -17452,7 +16769,7 @@ index 674999999..780e4d153 100644
  
  			last = folio;
  			dirty = false;
-@@ -4310,7 +4364,7 @@ bool lru_gen_look_around(struct page_vma_mapped_walk *pvmw)
+@@ -4310,7 +4375,7 @@ bool lru_gen_look_around(struct page_vma_mapped_walk *pvmw)
  		young++;
  	}
  
@@ -17461,7 +16778,7 @@ index 674999999..780e4d153 100644
  
  	arch_leave_lazy_mmu_mode();
  
-@@ -4332,21 +4386,101 @@ enum {
+@@ -4332,21 +4397,104 @@ enum {
  	MEMCG_LRU_TAIL,
  	MEMCG_LRU_OLD,
  	MEMCG_LRU_YOUNG,
@@ -17479,7 +16796,7 @@ index 674999999..780e4d153 100644
 +	u32 score_q15;
 +
 +	if (!parp_reclaim_bin_apply_enabled() ||
-+	    !parp_tier2_reclaim_bin_score(memcg, &score_q15)) /* lzx-note */
++	    !parp_tier2_reclaim_bin_score(memcg, &score_q15, NULL)) /* lzx-note */
 +		return get_random_u32_below(MEMCG_NR_BINS);
 +
 +	return min_t(unsigned int, score_q15 * MEMCG_NR_BINS >> 15,
@@ -17487,12 +16804,14 @@ index 674999999..780e4d153 100644
 +} /* lzx-note */
 +
 +static bool parp_memcg_reclaim_bin_scored(struct mem_cgroup *memcg,
-+					  unsigned int *bin) /* lzx-note */
++					  unsigned int *bin,
++					  bool *prediction_backed) /* lzx-note */
 +{
 +	u32 score_q15;
 +
 +	if (!bin || !parp_reclaim_bin_apply_enabled() ||
-+	    !parp_tier2_reclaim_bin_score(memcg, &score_q15))
++	    !parp_tier2_reclaim_bin_score(memcg, &score_q15,
++					 prediction_backed))
 +		return false;
 +	*bin = min_t(unsigned int, score_q15 * MEMCG_NR_BINS >> 15,
 +		     MEMCG_NR_BINS - 1);
@@ -17531,7 +16850,8 @@ index 674999999..780e4d153 100644
 +} /* lzx-note */
 +
 +static bool parp_memcg_reclaim_bin_scored(struct mem_cgroup *memcg,
-+					  unsigned int *bin) /* lzx-note */
++					  unsigned int *bin,
++					  bool *prediction_backed) /* lzx-note */
 +{
 +	return false;
 +} /* lzx-note */
@@ -17565,7 +16885,7 @@ index 674999999..780e4d153 100644
  	new = old = lruvec->lrugen.gen;
  
  	/* see the comment on MEMCG_NR_GENS */
-@@ -4358,6 +4492,8 @@ static void lru_gen_rotate_memcg(struct lruvec *lruvec, int op)
+@@ -4358,6 +4506,8 @@ static void lru_gen_rotate_memcg(struct lruvec *lruvec, int op)
  		new = get_memcg_gen(pgdat->memcg_lru.seq);
  	else if (op == MEMCG_LRU_YOUNG)
  		new = get_memcg_gen(pgdat->memcg_lru.seq + 1);
@@ -17574,7 +16894,7 @@ index 674999999..780e4d153 100644
  	else
  		VM_WARN_ON_ONCE(true);
  
-@@ -4366,7 +4502,8 @@ static void lru_gen_rotate_memcg(struct lruvec *lruvec, int op)
+@@ -4366,7 +4516,8 @@ static void lru_gen_rotate_memcg(struct lruvec *lruvec, int op)
  
  	hlist_nulls_del_rcu(&lruvec->lrugen.list);
  
@@ -17584,7 +16904,7 @@ index 674999999..780e4d153 100644
  		hlist_nulls_add_head_rcu(&lruvec->lrugen.list, &pgdat->memcg_lru.fifo[new][bin]);
  	else
  		hlist_nulls_add_tail_rcu(&lruvec->lrugen.list, &pgdat->memcg_lru.fifo[new][bin]);
-@@ -4386,7 +4523,7 @@ void lru_gen_online_memcg(struct mem_cgroup *memcg)
+@@ -4386,7 +4537,7 @@ void lru_gen_online_memcg(struct mem_cgroup *memcg)
  {
  	int gen;
  	int nid;
@@ -17593,7 +16913,7 @@ index 674999999..780e4d153 100644
  
  	for_each_node(nid) {
  		struct pglist_data *pgdat = NODE_DATA(nid);
-@@ -4459,20 +4596,75 @@ void lru_gen_soft_reclaim(struct mem_cgroup *memcg, int nid)
+@@ -4459,20 +4610,75 @@ void lru_gen_soft_reclaim(struct mem_cgroup *memcg, int nid)
   *                          the eviction
   ******************************************************************************/
  
@@ -17674,7 +16994,7 @@ index 674999999..780e4d153 100644
  	VM_WARN_ON_ONCE_FOLIO(gen >= MAX_NR_GENS, folio);
  
  	/* unevictable */
-@@ -4491,13 +4683,142 @@ static bool sort_folio(struct lruvec *lruvec, struct folio *folio, struct scan_c
+@@ -4491,13 +4697,142 @@ static bool sort_folio(struct lruvec *lruvec, struct folio *folio, struct scan_c
  		return true;
  	}
  
@@ -17821,7 +17141,7 @@ index 674999999..780e4d153 100644
  			int hist = lru_hist_from_seq(lrugen->min_seq[type]);
  
  			WRITE_ONCE(lrugen->protected[hist][type][tier],
-@@ -4505,10 +4826,14 @@ static bool sort_folio(struct lruvec *lruvec, struct folio *folio, struct scan_c
+@@ -4505,10 +4840,14 @@ static bool sort_folio(struct lruvec *lruvec, struct folio *folio, struct scan_c
  		}
  		return true;
  	}
@@ -17837,7 +17157,7 @@ index 674999999..780e4d153 100644
  		list_move_tail(&folio->lru, &lrugen->folios[gen][type][zone]);
  		return true;
  	}
-@@ -4523,7 +4848,10 @@ static bool sort_folio(struct lruvec *lruvec, struct folio *folio, struct scan_c
+@@ -4523,7 +4862,10 @@ static bool sort_folio(struct lruvec *lruvec, struct folio *folio, struct scan_c
  
  	/* waiting for writeback */
  	if (writeback || (type == LRU_GEN_FILE && dirty)) {
@@ -17849,7 +17169,7 @@ index 674999999..780e4d153 100644
  		list_move(&folio->lru, &lrugen->folios[gen][type][zone]);
  		return true;
  	}
-@@ -4564,10 +4892,30 @@ static bool isolate_folio(struct lruvec *lruvec, struct folio *folio, struct sca
+@@ -4564,10 +4906,30 @@ static bool isolate_folio(struct lruvec *lruvec, struct folio *folio, struct sca
  	return true;
  }
  
@@ -17881,7 +17201,7 @@ index 674999999..780e4d153 100644
  	int i;
  	int gen;
  	enum vm_event_item item;
-@@ -4579,70 +4927,212 @@ static int scan_folios(unsigned long nr_to_scan, struct lruvec *lruvec,
+@@ -4579,70 +4941,212 @@ static int scan_folios(unsigned long nr_to_scan, struct lruvec *lruvec,
  	struct lru_gen_folio *lrugen = &lruvec->lrugen;
  	struct mem_cgroup *memcg = lruvec_memcg(lruvec);
  
@@ -17962,8 +17282,7 @@ index 674999999..780e4d153 100644
 +			/* 页数统计按 delta 增加；remaining 仍只按 folio 递减。 */
  			scanned += delta;
 +			tier_ctx->batch_scanned_pages += delta; /* #lzx */
- 
--			if (sort_folio(lruvec, folio, sc, tier))
++
 +			/*
 +			 * adapter 先基于页类型、代号和 folio 状态打分，
 +			 * 再把决策写回当前执行结果。后续原生
@@ -17973,7 +17292,8 @@ index 674999999..780e4d153 100644
 +								type, gen);
 +			parp_adapter_apply_decision(&parp_ctx, folio,
 +						   &parp_decision);
-+
+ 
+-			if (sort_folio(lruvec, folio, sc, tier))
 +			/*
 +			 * sort_folio() 先执行 MGLRU 分类，并在普通 tier
 +			 * 保护边界上调用 effective-tier。返回 true 表示
@@ -18102,7 +17422,7 @@ index 674999999..780e4d153 100644
  	 */
  	return isolated || !remaining ? scanned : 0;
  }
-@@ -4688,7 +5178,9 @@ static int get_type_to_scan(struct lruvec *lruvec, int swappiness)
+@@ -4688,7 +5192,9 @@ static int get_type_to_scan(struct lruvec *lruvec, int swappiness)
  
  static int isolate_folios(unsigned long nr_to_scan, struct lruvec *lruvec,
  			  struct scan_control *sc, int swappiness,
@@ -18113,7 +17433,7 @@ index 674999999..780e4d153 100644
  {
  	int i;
  	int type = get_type_to_scan(lruvec, swappiness);
-@@ -4699,7 +5191,8 @@ static int isolate_folios(unsigned long nr_to_scan, struct lruvec *lruvec,
+@@ -4699,7 +5205,8 @@ static int isolate_folios(unsigned long nr_to_scan, struct lruvec *lruvec,
  
  		*type_scanned = type;
  
@@ -18123,7 +17443,7 @@ index 674999999..780e4d153 100644
  		if (scanned)
  			return scanned;
  
-@@ -4709,12 +5202,47 @@ static int isolate_folios(unsigned long nr_to_scan, struct lruvec *lruvec,
+@@ -4709,12 +5216,47 @@ static int isolate_folios(unsigned long nr_to_scan, struct lruvec *lruvec,
  	return 0;
  }
  
@@ -18171,7 +17491,7 @@ index 674999999..780e4d153 100644
  	LIST_HEAD(list);
  	LIST_HEAD(clean);
  	struct folio *folio;
-@@ -4727,23 +5255,30 @@ static int evict_folios(unsigned long nr_to_scan, struct lruvec *lruvec,
+@@ -4727,23 +5269,30 @@ static int evict_folios(unsigned long nr_to_scan, struct lruvec *lruvec,
  	struct mem_cgroup *memcg = lruvec_memcg(lruvec);
  	struct pglist_data *pgdat = lruvec_pgdat(lruvec);
  
@@ -18205,7 +17525,7 @@ index 674999999..780e4d153 100644
  	trace_mm_vmscan_lru_shrink_inactive(pgdat->node_id,
  			scanned, reclaimed, &stat, sc->priority,
  			type ? LRU_INACTIVE_FILE : LRU_INACTIVE_ANON);
-@@ -4769,7 +5304,10 @@ static int evict_folios(unsigned long nr_to_scan, struct lruvec *lruvec,
+@@ -4769,7 +5318,10 @@ static int evict_folios(unsigned long nr_to_scan, struct lruvec *lruvec,
  			set_mask_bits(&folio->flags, LRU_REFS_FLAGS, BIT(PG_active));
  	}
  
@@ -18217,7 +17537,7 @@ index 674999999..780e4d153 100644
  
  	move_folios_to_lru(lruvec, &list);
  
-@@ -4788,7 +5326,9 @@ static int evict_folios(unsigned long nr_to_scan, struct lruvec *lruvec,
+@@ -4788,7 +5340,9 @@ static int evict_folios(unsigned long nr_to_scan, struct lruvec *lruvec,
  	count_memcg_events(memcg, item, reclaimed);
  	__count_vm_events(PGSTEAL_ANON + type, reclaimed);
  
@@ -18228,7 +17548,7 @@ index 674999999..780e4d153 100644
  
  	list_splice_init(&clean, &list);
  
-@@ -4899,10 +5439,15 @@ static bool try_to_shrink_lruvec(struct lruvec *lruvec, struct scan_control *sc)
+@@ -4899,10 +5453,15 @@ static bool try_to_shrink_lruvec(struct lruvec *lruvec, struct scan_control *sc)
  
  	while (true) {
  		int delta;
@@ -18244,7 +17564,100 @@ index 674999999..780e4d153 100644
  
  		delta = evict_folios(nr_to_scan, lruvec, sc, swappiness);
  		if (!delta)
-@@ -4976,13 +5521,15 @@ static void shrink_many(struct pglist_data *pgdat, struct scan_control *sc)
+@@ -4929,6 +5488,92 @@ static bool try_to_shrink_lruvec(struct lruvec *lruvec, struct scan_control *sc)
+ 	return nr_to_scan < 0;
+ }
+ 
++#ifdef CONFIG_PARP_RECLAIM_COLD_AGGRESSIVE /* lzx-note */
++struct parp_cold_reclaim_context { /* lzx-note */
++	bool active;
++	bool writepage_promoted;
++	bool swappiness_promoted;
++	s8 priority;
++	u8 priority_boost;
++	u8 may_writepage;
++	u16 swappiness_override;
++	u16 swappiness;
++	unsigned int bin;
++	unsigned long scanned;
++	unsigned long reclaimed;
++}; /* lzx-note */
++
++static void parp_cold_reclaim_enter(struct mem_cgroup *memcg,
++				    struct scan_control *sc,
++				    unsigned int bin,
++				    struct parp_cold_reclaim_context *ctx) /* lzx-note */
++{
++	u8 priority_boost;
++	u16 swappiness;
++	int native_swappiness;
++
++	memset(ctx, 0, sizeof(*ctx));
++	if (!parp_tier2_reclaim_cold_pressure(bin, &priority_boost,
++					      &swappiness))
++		return;
++
++	ctx->active = true;
++	ctx->bin = bin;
++	ctx->priority = sc->priority;
++	ctx->priority_boost = sc->priority > 0 ?
++		min_t(u8, priority_boost, sc->priority) : 0;
++	ctx->may_writepage = sc->may_writepage;
++	ctx->swappiness_override = sc->parp_swappiness_override;
++	ctx->scanned = sc->nr_scanned;
++	ctx->reclaimed = sc->nr_reclaimed;
++
++	native_swappiness = sc_swappiness(sc, memcg);
++	ctx->swappiness = max_t(u16, native_swappiness, swappiness);
++	ctx->writepage_promoted = !sc->may_writepage;
++	ctx->swappiness_promoted = ctx->swappiness > native_swappiness;
++	sc->priority -= ctx->priority_boost;
++	sc->may_writepage = 1;
++	sc->parp_swappiness_override = ctx->swappiness + 1;
++} /* lzx-note */
++
++static void parp_cold_reclaim_exit(struct scan_control *sc,
++				   struct parp_cold_reclaim_context *ctx) /* lzx-note */
++{
++	unsigned long scanned;
++	unsigned long reclaimed;
++
++	if (!ctx->active)
++		return;
++	scanned = sc->nr_scanned - ctx->scanned;
++	reclaimed = sc->nr_reclaimed - ctx->reclaimed;
++	sc->priority = ctx->priority;
++	sc->may_writepage = ctx->may_writepage;
++	sc->parp_swappiness_override = ctx->swappiness_override;
++	parp_tier2_reclaim_cold_note(ctx->bin, ctx->priority_boost,
++		ctx->writepage_promoted, ctx->swappiness_promoted,
++		scanned, reclaimed);
++} /* lzx-note */
++
++static bool parp_cold_reclaim_skip(struct scan_control *sc,
++				   struct parp_cold_reclaim_context *ctx) /* lzx-note */
++{
++	return sc->parp_cold_only && !ctx->active;
++} /* lzx-note */
++#else /* !CONFIG_PARP_RECLAIM_COLD_AGGRESSIVE */ /* lzx-note */
++struct parp_cold_reclaim_context { }; /* lzx-note */
++static void parp_cold_reclaim_enter(struct mem_cgroup *memcg,
++				    struct scan_control *sc,
++				    unsigned int bin,
++				    struct parp_cold_reclaim_context *ctx) { } /* lzx-note */
++static void parp_cold_reclaim_exit(struct scan_control *sc,
++				   struct parp_cold_reclaim_context *ctx) { } /* lzx-note */
++static bool parp_cold_reclaim_skip(struct scan_control *sc,
++				   struct parp_cold_reclaim_context *ctx)
++{
++	return false;
++} /* lzx-note */
++#endif /* CONFIG_PARP_RECLAIM_COLD_AGGRESSIVE */ /* lzx-note */
++
+ static int shrink_one(struct lruvec *lruvec, struct scan_control *sc)
+ {
+ 	bool success;
+@@ -4976,13 +5621,15 @@ static void shrink_many(struct pglist_data *pgdat, struct scan_control *sc)
  	int gen;
  	int bin;
  	int first_bin;
@@ -18261,16 +17674,19 @@ index 674999999..780e4d153 100644
  restart:
  	op = 0;
  	memcg = NULL;
-@@ -4990,6 +5537,8 @@ static void shrink_many(struct pglist_data *pgdat, struct scan_control *sc)
+@@ -4990,6 +5637,11 @@ static void shrink_many(struct pglist_data *pgdat, struct scan_control *sc)
  	rcu_read_lock();
  
  	hlist_nulls_for_each_entry_rcu(lrugen, pos, &pgdat->memcg_lru.fifo[gen][bin], list) {
 +		unsigned int scored_bin;
++		bool scored; /* lzx-note */
++		bool prediction_backed = false; /* lzx-note */
++		struct parp_cold_reclaim_context cold_ctx; /* lzx-note */
 +
  		if (op) {
  			lru_gen_rotate_memcg(lruvec, op);
  			op = 0;
-@@ -5012,6 +5561,31 @@ static void shrink_many(struct pglist_data *pgdat, struct scan_control *sc)
+@@ -5012,7 +5664,42 @@ static void shrink_many(struct pglist_data *pgdat, struct scan_control *sc)
  
  		rcu_read_unlock();
  
@@ -18279,7 +17695,9 @@ index 674999999..780e4d153 100644
 +		 * lists. Move stale entries before scanning so a newly predicted hot
 +		 * application does not pay one reclaim pass in bin 0. lzx-note
 +		 */
-+		if (parp_memcg_reclaim_bin_scored(memcg, &scored_bin) &&
++		scored = parp_memcg_reclaim_bin_scored(memcg, &scored_bin,
++							 &prediction_backed);
++		if (scored &&
 +		    scored_bin != bin) {
 +			parp_reclaim_bin_note_rebin();
 +			op = MEMCG_LRU_REBIN;
@@ -18299,10 +17717,19 @@ index 674999999..780e4d153 100644
 +			continue;
 +		}
 +
++		parp_cold_reclaim_enter(memcg, sc,
++					prediction_backed ? scored_bin : MEMCG_NR_BINS,
++					&cold_ctx); /* lzx-note */
++		if (parp_cold_reclaim_skip(sc, &cold_ctx)) {
++			rcu_read_lock();
++			continue;
++		} /* lzx-note */
  		op = shrink_one(lruvec, sc);
++		parp_cold_reclaim_exit(sc, &cold_ctx); /* lzx-note */
  
  		rcu_read_lock();
-@@ -5026,6 +5600,11 @@ static void shrink_many(struct pglist_data *pgdat, struct scan_control *sc)
+ 
+@@ -5026,6 +5713,11 @@ static void shrink_many(struct pglist_data *pgdat, struct scan_control *sc)
  		lru_gen_rotate_memcg(lruvec, op);
  
  	mem_cgroup_put(memcg);
@@ -18314,7 +17741,36 @@ index 674999999..780e4d153 100644
  
  	if (!is_a_nulls(pos))
  		return;
-@@ -5203,6 +5782,7 @@ static void lru_gen_change_state(bool enabled)
+@@ -5073,8 +5765,17 @@ static void lru_gen_shrink_node(struct pglist_data *pgdat, struct scan_control *
+ 	 * them is likely futile and can cause high reclaim latency when there
+ 	 * is a large number of memcgs.
+ 	 */
+-	if (!sc->may_writepage || !sc->may_unmap)
++	if (!sc->may_unmap)
++		goto done;
++	if (!sc->may_writepage) {
++#ifdef CONFIG_PARP_RECLAIM_COLD_AGGRESSIVE /* lzx-note */
++		if (!parp_tier2_reclaim_cold_aggressive_apply_enabled())
++			goto done;
++		sc->parp_cold_only = true;
++#else /* !CONFIG_PARP_RECLAIM_COLD_AGGRESSIVE */ /* lzx-note */
+ 		goto done;
++#endif /* CONFIG_PARP_RECLAIM_COLD_AGGRESSIVE */ /* lzx-note */
++	} /* lzx-note */
+ 
+ 	lru_add_drain();
+ 
+@@ -5099,6 +5800,9 @@ static void lru_gen_shrink_node(struct pglist_data *pgdat, struct scan_control *
+ 
+ 	blk_finish_plug(&plug);
+ done:
++#ifdef CONFIG_PARP_RECLAIM_COLD_AGGRESSIVE /* lzx-note */
++	sc->parp_cold_only = false;
++#endif /* CONFIG_PARP_RECLAIM_COLD_AGGRESSIVE */ /* lzx-note */
+ 	if (sc->nr_reclaimed > reclaimed)
+ 		pgdat->kswapd_failures = 0;
+ }
+@@ -5203,6 +5907,7 @@ static void lru_gen_change_state(bool enabled)
  
  	if (enabled == lru_gen_enabled())
  		goto unlock;
@@ -18322,7 +17778,7 @@ index 674999999..780e4d153 100644
  
  	if (enabled)
  		static_branch_enable_cpuslocked(&lru_gen_caps[LRU_GEN_CORE]);
-@@ -5711,6 +6291,9 @@ void lru_gen_init_lruvec(struct lruvec *lruvec)
+@@ -5711,6 +6416,9 @@ void lru_gen_init_lruvec(struct lruvec *lruvec)
  
  	lrugen->max_seq = MIN_NR_GENS + 1;
  	lrugen->enabled = lru_gen_enabled();
@@ -18332,7 +17788,7 @@ index 674999999..780e4d153 100644
  
  	for (i = 0; i <= MIN_NR_GENS + 1; i++)
  		lrugen->timestamps[i] = jiffies;
-@@ -5996,6 +6579,9 @@ static void shrink_node_memcgs(pg_data_t *pgdat, struct scan_control *sc)
+@@ -5996,6 +6704,9 @@ static void shrink_node_memcgs(pg_data_t *pgdat, struct scan_control *sc)
  	};
  	struct mem_cgroup_reclaim_cookie *partial = &reclaim;
  	struct mem_cgroup *memcg;
@@ -18342,7 +17798,7 @@ index 674999999..780e4d153 100644
  
  	/*
  	 * In most cases, direct reclaimers can do partial walks
-@@ -6008,12 +6594,28 @@ static void shrink_node_memcgs(pg_data_t *pgdat, struct scan_control *sc)
+@@ -6008,12 +6719,31 @@ static void shrink_node_memcgs(pg_data_t *pgdat, struct scan_control *sc)
  	 */
  	if (current_is_kswapd() || sc->memcg_full_walk)
  		partial = NULL;
@@ -18358,9 +17814,12 @@ index 674999999..780e4d153 100644
  		unsigned long reclaimed;
  		unsigned long scanned;
 +		unsigned int scored_bin;
++		bool prediction_backed = false; /* lzx-note */
++		struct parp_cold_reclaim_context cold_ctx; /* lzx-note */
 +
 +		if (ordered) {
-+			if (!parp_memcg_reclaim_bin_scored(memcg, &scored_bin))
++			if (!parp_memcg_reclaim_bin_scored(memcg, &scored_bin,
++							 &prediction_backed))
 +				scored_bin = MEMCG_NR_BINS - 1;
 +			if (scored_bin != ordered_bin) {
 +				parp_reclaim_bin_note_subtree(false);
@@ -18371,7 +17830,25 @@ index 674999999..780e4d153 100644
  
  		/*
  		 * This loop can become CPU-bound when target memcgs
-@@ -6060,11 +6662,15 @@ static void shrink_node_memcgs(pg_data_t *pgdat, struct scan_control *sc)
+@@ -6048,7 +6778,17 @@ static void shrink_node_memcgs(pg_data_t *pgdat, struct scan_control *sc)
+ 		reclaimed = sc->nr_reclaimed;
+ 		scanned = sc->nr_scanned;
+ 
++		/*
++		 * memory.max and other targeted cgroup reclaim enter this path rather
++		 * than shrink_many().  Apply the same prediction-backed cold-bin
++		 * pressure here so the controlled experiment and real cgroup pressure
++		 * do not silently bypass the policy. lzx-note
++		 */
++		parp_cold_reclaim_enter(memcg, sc,
++			ordered && prediction_backed ? scored_bin : MEMCG_NR_BINS,
++			&cold_ctx); /* lzx-note */
+ 		shrink_lruvec(lruvec, sc);
++		parp_cold_reclaim_exit(sc, &cold_ctx); /* lzx-note */
+ 
+ 		shrink_slab(sc->gfp_mask, pgdat->node_id, memcg,
+ 			    sc->priority);
+@@ -6060,11 +6800,15 @@ static void shrink_node_memcgs(pg_data_t *pgdat, struct scan_control *sc)
  				   sc->nr_reclaimed - reclaimed);
  
  		/* If partial walks are allowed, bail once goal is reached */
@@ -18602,147 +18079,6 @@ index 000000000..fc94198f5
 +jobs=$(nproc)
 +((jobs > 4)) && jobs=4
 +make -C "$source_tree" O="$build_dir" LOCALVERSION= -j"$jobs" bzImage modules
-diff --git a/tools/parp/build_lzx_kernel.sh b/tools/parp/build_lzx_kernel.sh
-new file mode 100755
-index 000000000..066e565c5
---- /dev/null
-+++ b/tools/parp/build_lzx_kernel.sh
-@@ -0,0 +1,135 @@
-+#!/usr/bin/env bash
-+# Build repeatable Linux 6.17.13 LZX experiment profiles. # lzx-note
-+set -euo pipefail
-+
-+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-+PARP_SRC_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
-+KERNEL_WORK_ROOT="$(cd "$PARP_SRC_ROOT/../.." && pwd)"
-+PROFILE="${1:-all}"
-+BASE_CONFIG="${2:-/boot/config-$(uname -r)}"
-+BUILD_DIR="${3:-$KERNEL_WORK_ROOT/build/linux-6.17.13-parp-lzx-$PROFILE}"
-+JOBS="${JOBS:-$(nproc)}"
-+RECLAIM_BIN_SCORE="${LZX_RECLAIM_BIN_SCORE:-1}"
-+TIER2_WSS_PREDICT="${LZX_TIER2_WSS_PREDICT:-1}" # lzx-note
-+APP_PRIOR_TIER_PROTECT="${LZX_APP_PRIOR_TIER_PROTECT:-1}" # lzx-note
-+NATIVE_SRC_ROOT="${NATIVE_SRC_ROOT:-$KERNEL_WORK_ROOT/src/linux-6.17.13-native}"
-+NATIVE_BASELINE_COMMIT="${NATIVE_BASELINE_COMMIT:-6609c4d49ebe220a5c40d3105c3f0e68f569ba1a}"
-+SRC_ROOT="$PARP_SRC_ROOT"
-+
-+if [[ "$PROFILE" == native ]]; then
-+	SRC_ROOT="$NATIVE_SRC_ROOT"
-+	if [[ ! -x "$SRC_ROOT/scripts/config" ]]; then
-+		echo "native source is missing: $SRC_ROOT" >&2
-+		echo "create it from upstream-v6.17.13-baseline before building" >&2
-+		exit 2
-+	fi
-+	if [[ "$(git -C "$SRC_ROOT" rev-parse HEAD)" != "$NATIVE_BASELINE_COMMIT" ]]; then
-+		echo "native source is not the pinned Linux 6.17.13 baseline" >&2
-+		exit 2
-+	fi
-+	if [[ -n "$(git -C "$SRC_ROOT" status --porcelain --untracked-files=no)" ]]; then
-+		echo "native source has tracked modifications; refusing mixed baseline" >&2
-+		exit 2
-+	fi
-+fi
-+
-+CONFIG_TOOL="$SRC_ROOT/scripts/config"
-+
-+if [[ ! -r "$BASE_CONFIG" ]]; then
-+	echo "base config is not readable: $BASE_CONFIG" >&2
-+	exit 2
-+fi
-+
-+mkdir -p "$BUILD_DIR"
-+cp -- "$BASE_CONFIG" "$BUILD_DIR/.config"
-+
-+case "$PROFILE" in
-+	native)
-+		# This profile is built from the pristine pinned worktree, not from
-+		# PARP sources with runtime switches set to zero. # lzx-note
-+		;;
-+	tier2)
-+		"$CONFIG_TOOL" --file "$BUILD_DIR/.config" \
-+			--enable PARP \
-+			--enable PARP_TIER2 \
-+			--disable PARP_EFFECTIVE_TIER \
-+			--disable PARP_EFFECTIVE_TIER_EXPERIMENTAL_APPLY \
-+			--disable PARP_APP_PRIOR_TIER_PROTECT \
-+			--disable PARP_FRONTIER_SCORE
-+		;;
-+	effective-tier|all)
-+		"$CONFIG_TOOL" --file "$BUILD_DIR/.config" \
-+			--enable PARP \
-+			--enable PARP_EFFECTIVE_TIER \
-+			--disable PARP_FRONTIER_SCORE
-+		if [[ "$APP_PRIOR_TIER_PROTECT" == 1 ]]; then
-+			"$CONFIG_TOOL" --file "$BUILD_DIR/.config" \
-+				--enable PARP_APP_PRIOR_TIER_PROTECT
-+		elif [[ "$APP_PRIOR_TIER_PROTECT" == 0 ]]; then
-+			"$CONFIG_TOOL" --file "$BUILD_DIR/.config" \
-+				--disable PARP_APP_PRIOR_TIER_PROTECT
-+		else
-+			echo "LZX_APP_PRIOR_TIER_PROTECT must be 0 or 1" >&2
-+			exit 2
-+		fi # lzx-note
-+		if [[ "$PROFILE" == all ]]; then
-+			"$CONFIG_TOOL" --file "$BUILD_DIR/.config" --enable PARP_TIER2
-+		else
-+			"$CONFIG_TOOL" --file "$BUILD_DIR/.config" \
-+				--disable PARP_TIER2 \
-+				--disable PARP_RECLAIM_BIN_SCORE
-+		fi
-+		if [[ "${LZX_EXPERIMENTAL_APPLY:-0}" == 1 ]]; then
-+			"$CONFIG_TOOL" --file "$BUILD_DIR/.config" \
-+				--enable PARP_EFFECTIVE_TIER_EXPERIMENTAL_APPLY
-+		else
-+			"$CONFIG_TOOL" --file "$BUILD_DIR/.config" \
-+				--disable PARP_EFFECTIVE_TIER_EXPERIMENTAL_APPLY
-+		fi
-+		;;
-+	*)
-+		echo "profile must be native, tier2, effective-tier, or all" >&2
-+		exit 2
-+		;;
-+esac
-+
-+if [[ "$PROFILE" == tier2 || "$PROFILE" == all ]]; then
-+	if [[ "$TIER2_WSS_PREDICT" == 1 ]]; then
-+		"$CONFIG_TOOL" --file "$BUILD_DIR/.config" \
-+			--enable PARP_MYFS \
-+			--enable PARP_TIER2_WSS_PREDICT
-+	elif [[ "$TIER2_WSS_PREDICT" == 0 ]]; then
-+		"$CONFIG_TOOL" --file "$BUILD_DIR/.config" \
-+			--disable PARP_TIER2_WSS_PREDICT
-+	else
-+		echo "LZX_TIER2_WSS_PREDICT must be 0 or 1" >&2
-+		exit 2
-+	fi # lzx-note
-+	if [[ "$RECLAIM_BIN_SCORE" == 1 ]]; then
-+		"$CONFIG_TOOL" --file "$BUILD_DIR/.config" --enable PARP_RECLAIM_BIN_SCORE
-+	elif [[ "$RECLAIM_BIN_SCORE" == 0 ]]; then
-+		"$CONFIG_TOOL" --file "$BUILD_DIR/.config" --disable PARP_RECLAIM_BIN_SCORE
-+	else
-+		echo "LZX_RECLAIM_BIN_SCORE must be 0 or 1" >&2
-+		exit 2
-+	fi
-+fi
-+
-+if [[ "$PROFILE" != native ]]; then
-+	"$CONFIG_TOOL" --file "$BUILD_DIR/.config" --enable PARP_MYFS # lzx-note
-+fi
-+
-+if [[ -n "${LZX_LOCALVERSION:-}" ]]; then
-+	CONFIG_LOCALVERSION_VALUE="$LZX_LOCALVERSION" # lzx-note
-+elif [[ "$PROFILE" == native ]]; then
-+	CONFIG_LOCALVERSION_VALUE="-native-6.17.13"
-+else
-+	CONFIG_LOCALVERSION_VALUE="-parp-lzx-$PROFILE"
-+fi
-+"$CONFIG_TOOL" --file "$BUILD_DIR/.config" --set-str LOCALVERSION "$CONFIG_LOCALVERSION_VALUE"
-+# Suppress SCM '+' and keep CONFIG_LOCALVERSION from being appended twice. # lzx-note
-+make -C "$SRC_ROOT" O="$BUILD_DIR" LOCALVERSION= olddefconfig
-+make -C "$SRC_ROOT" O="$BUILD_DIR" LOCALVERSION= -j"$JOBS" ${MAKE_TARGETS:-bzImage modules}
-+
-+echo "build complete: $BUILD_DIR"
-+# lzx-note
 diff --git a/tools/parp/check_phase25_architecture.sh b/tools/parp/check_phase25_architecture.sh
 new file mode 100755
 index 000000000..fc8f23290
@@ -18868,9 +18204,6 @@ index 000000000..639b0b542
 +     "proposed": 1000, "applied": 1000, "reason": "PRESSURE_BYPASS"}
 +  ]
 +}
-diff --git a/tools/parp/control/.kunitconfig b/tools/parp/control/.kunitconfig
-new file mode 100644
-index 000000000..e69de29bb
 diff --git a/tools/parp/damon_collect.py b/tools/parp/damon_collect.py
 new file mode 100755
 index 000000000..1d57eebec
@@ -51154,41 +50487,6 @@ index 000000000..d61357677
 +    return APP_BIND.pack(SCHEMA_VERSION, domain_id, app_id, generation,
 +                         updated_ns, expires_ns, epoch_id, model_version,
 +                         active)
-diff --git a/tools/parp/test_prediction_interfaces.sh b/tools/parp/test_prediction_interfaces.sh
-new file mode 100755
-index 000000000..5c95d0dd0
---- /dev/null
-+++ b/tools/parp/test_prediction_interfaces.sh
-@@ -0,0 +1,29 @@
-+#!/usr/bin/env bash
-+set -euo pipefail
-+
-+kernel_root="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/../.." && pwd)"
-+temp_root="$(mktemp -d --tmpdir parp-uapi.XXXXXX)"
-+binary="$temp_root/uapi-layout"
-+trap 'case "$temp_root" in /tmp/parp-uapi.*) rm -rf -- "$temp_root" ;; esac' EXIT
-+
-+# lzx-note: Prediction writes must be exposed only through parp/myfs.
-+make -s -C "$kernel_root" O="$temp_root/build" headers_install \
-+  INSTALL_HDR_PATH="$temp_root/headers"
-+cc -Wall -Wextra -Werror -I"$temp_root/headers/include" \
-+  "$kernel_root/tools/parp/uapi_layout_check.c" -o "$binary"
-+"$binary"
-+
-+debugfs_root="${PARP_DEBUGFS_ROOT:-/sys/kernel/debug/parp}"
-+for legacy in app_prior app_prior_batch app_bind; do
-+  if [[ -e "$debugfs_root/$legacy" ]]; then
-+    echo "FAIL: legacy writable prediction node still exists: $debugfs_root/$legacy" >&2
-+    exit 1
-+  fi
-+done
-+
-+if [[ -e /dev/myfs ]]; then
-+  test -c /dev/myfs
-+  echo "PASS: /dev/myfs is a character device"
-+else
-+  echo "SKIP: /dev/myfs is not present on the running (pre-update) kernel"
-+fi
 diff --git a/tools/parp/tests/test_app_alignment.py b/tools/parp/tests/test_app_alignment.py
 new file mode 100755
 index 000000000..080655812
@@ -51786,49 +51084,6 @@ index 000000000..679c19a66
 +
 +if __name__ == "__main__":
 +    unittest.main()
-diff --git a/tools/parp/uapi_layout_check.c b/tools/parp/uapi_layout_check.c
-new file mode 100644
-index 000000000..800c65fea
---- /dev/null
-+++ b/tools/parp/uapi_layout_check.c
-@@ -0,0 +1,37 @@
-+// SPDX-License-Identifier: GPL-2.0
-+#include <stddef.h>
-+#include <stdio.h>
-+#include <linux/parp_predict.h>
-+
-+/* lzx-note: Compile-time/userspace guard for Python ctypes ABI parity. */
-+_Static_assert(sizeof(struct parp_predict_entry_v1) == 16, "entry ABI drift");
-+_Static_assert(sizeof(struct parp_predict_binding_v1) == 32, "binding ABI drift");
-+_Static_assert(sizeof(struct parp_predict_state_v1) == 2656, "state ABI drift");
-+_Static_assert(offsetof(struct parp_predict_state_v1, predictions) == 96,
-+	       "prediction offset drift");
-+_Static_assert(offsetof(struct parp_predict_state_v1, bindings) == 608,
-+	       "binding offset drift");
-+_Static_assert(sizeof(struct parp_predict_state_v2) == 2656,
-+	       "state v2 ABI drift"); /* lzx-note */
-+_Static_assert(offsetof(struct parp_predict_state_v2, predictions) == 96,
-+	       "v2 prediction offset drift"); /* lzx-note */
-+_Static_assert(offsetof(struct parp_predict_state_v2, bindings) == 608,
-+	       "v2 binding offset drift"); /* lzx-note */
-+
-+int main(void)
-+{
-+	printf("abi_v1=%u abi_v2=%u entry=%zu binding=%zu state_v1=%zu "
-+	       "state_v2=%zu set_v1=0x%lx get_v1=0x%lx set_v2=0x%lx "
-+	       "get_v2=0x%lx\n",
-+	       PARP_PREDICT_ABI_VERSION,
-+	       PARP_PREDICT_ABI_VERSION_V2,
-+	       sizeof(struct parp_predict_entry_v1),
-+	       sizeof(struct parp_predict_binding_v1),
-+	       sizeof(struct parp_predict_state_v1),
-+	       sizeof(struct parp_predict_state_v2),
-+	       (unsigned long)PARP_PREDICT_SET_STATE,
-+	       (unsigned long)PARP_PREDICT_GET_STATE,
-+	       (unsigned long)PARP_PREDICT_SET_STATE_V2,
-+	       (unsigned long)PARP_PREDICT_GET_STATE_V2);
-+	return 0;
-+}
 diff --git a/tools/parp/window_analyze.py b/tools/parp/window_analyze.py
 new file mode 100755
 index 000000000..662924fb2

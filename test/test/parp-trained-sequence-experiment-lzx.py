@@ -459,6 +459,14 @@ def preflight(config: dict[str, Any], policy: str) -> dict[str, Any]:
         checks["bin_switch_available"] = Path(
             "/proc/sys/vm/parp_reclaim_bin_enabled"
         ).is_file()
+        if policy in {"bin_cold_lstm", "bin_workload_lstm"}:
+            checks["cold_pressure_switch_available"] = Path(
+                "/proc/sys/vm/parp_reclaim_cold_aggressive_enabled"
+            ).is_file()  # lzx-note
+        if policy == "bin_workload_lstm":
+            checks["workload_reclaim_switch_available"] = Path(
+                "/proc/sys/vm/parp_reclaim_workload_enabled"
+            ).is_file()  # lzx-note
         checks["parp_kernel_running"] = "parp-lzx" in os.uname().release
     return {
         "status": "READY" if all(checks.values()) else "BLOCKED",

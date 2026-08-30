@@ -603,6 +603,14 @@ class OnlineDurationLSTMRunner:
         )
 
     def _update_segments(self, row: dict[str, Any], sample_time: dt.datetime, raw_fg: str, mapped_fg: str) -> None:
+        # Compositor/helper windows which are outside the LSAPP vocabulary are
+        # not application transitions.  Keeping them as a segment would evict
+        # one real app from the fixed five-step LSTM history and make an
+        # otherwise trained sequence depend on transient desktop timing.
+        # The raw event remains in the lifecycle audit; only model history is
+        # protected from the unmapped token. lzx-note
+        if mapped_fg == "<UNKNOWN>":
+            return
         if self.current_segment is None:
             self.current_segment = {
                 "raw_app": raw_fg,

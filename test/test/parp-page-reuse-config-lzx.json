@@ -1,0 +1,54 @@
+{
+  "schema_version": 1,
+  "description": "Real GUI plus exact file/anonymous page reuse under an LSAPP-trained prediction sequence. lzx-note",
+  "output_root": "/home/lzx/Desktop/PARP/test/outputs/page_reuse",
+  "asset_root": "/home/lzx/Desktop/PARP/test/outputs/real_pc_assets",
+  "slice": "parp-page-reuse.slice",
+  "apps": [
+    "FIREFOX", "THUNDERBIRD", "VLC", "GIMP",
+    "LIBREOFFICE", "EVINCE", "IMAGE_VIEWER", "SOLITAIRE"
+  ],
+  "hot_apps": ["FIREFOX", "THUNDERBIRD", "VLC"],
+  "cold_apps": ["GIMP", "LIBREOFFICE", "EVINCE", "IMAGE_VIEWER", "SOLITAIRE"],
+  "trained_history": ["THUNDERBIRD", "FIREFOX", "THUNDERBIRD", "FIREFOX", "VLC"],
+  "trained_history_vocab": ["Thunderbird", "Firefox", "Thunderbird", "Firefox", "VLC"],
+  "expected_next_vocab": ["Firefox", "Thunderbird"],
+  "current_app": "VLC",
+  "current_vocab": "VLC",
+  "reuse_targets": ["FIREFOX", "THUNDERBIRD"],
+  "reuse_layout": {
+    "FIREFOX": {"file_mib": 256, "anon_mib": 256},
+    "THUNDERBIRD": {"file_mib": 192, "anon_mib": 192},
+    "VLC": {"file_mib": 96, "anon_mib": 96},
+    "GIMP": {"file_mib": 128, "anon_mib": 256},
+    "LIBREOFFICE": {"file_mib": 128, "anon_mib": 256},
+    "EVINCE": {"file_mib": 128, "anon_mib": 256},
+    "IMAGE_VIEWER": {"file_mib": 128, "anon_mib": 256},
+    "SOLITAIRE": {"file_mib": 128, "anon_mib": 256}
+  },
+  "startup_settle_seconds": 8.0,
+  "history_dwell_seconds": 1.5,
+  "prediction_settle_seconds": 1.5,
+  "pressure_mib": 1536,
+  "reclaim_target_mib": 768,
+  "pressure_chunk_mib": 32,
+  "pressure_ramp_interval_seconds": 0.12,
+  "pressure_ramp_timeout_seconds": 240,
+  "pressure_hold_seconds": 900,
+  "memory_swap_max_mib": 2048,
+  "prediction_gate": {
+    "minimum_hot_probability": 0.10,
+    "maximum_cold_probability": 0.01,
+    "minimum_bindings": 8,
+    "timeout_seconds": 20
+  },
+  "safety": {
+    "min_memavailable_mib": 3072,
+    "psi_full_avg10_abort": 0.8,
+    "abort_consecutive_samples": 4,
+    "sample_interval_seconds": 0.20,
+    "max_round_seconds": 1200,
+    "trace_buffer_kb_per_cpu": 8192
+  },
+  "scenarios": ["page_reuse_cold_only"]
+}

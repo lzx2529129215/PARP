@@ -29,7 +29,34 @@ set_events() {
     vmscan/mm_vmscan_memcg_reclaim_end \
     vmscan/mm_vmscan_kswapd_wake \
     vmscan/mm_vmscan_kswapd_sleep \
+    writeback/writeback_start \
+    writeback/writeback_written \
     oom/mark_victim; do # lzx-note
+    if [[ -e "$path/events/$event/enable" ]]; then
+      printf '%s\n' "$value" >"$path/events/$event/enable"
+    fi
+  done
+}
+
+set_reclaim_events() {
+  local value="$1"
+  local event
+  # Real-PC rounds obtain fault counts from cgroup memory.stat.  Recording
+  # every userspace fault creates tens of MiB of unrelated startup trace, so
+  # this mode keeps only reclaim, PARP, and OOM timing events. # lzx-note
+  for event in \
+    parp/parp_effective_tier_decision \
+    parp/parp_effective_tier_access \
+    parp/parp_effective_tier_outcome \
+    vmscan/mm_vmscan_direct_reclaim_begin \
+    vmscan/mm_vmscan_direct_reclaim_end \
+    vmscan/mm_vmscan_memcg_reclaim_begin \
+    vmscan/mm_vmscan_memcg_reclaim_end \
+    vmscan/mm_vmscan_kswapd_wake \
+    vmscan/mm_vmscan_kswapd_sleep \
+    writeback/writeback_start \
+    writeback/writeback_written \
+    oom/mark_victim; do
     if [[ -e "$path/events/$event/enable" ]]; then
       printf '%s\n' "$value" >"$path/events/$event/enable"
     fi
@@ -48,6 +75,11 @@ case "$operation" in
     ;;
   enable)
     set_events 1
+    printf '1\n' >"$path/tracing_on"
+    ;;
+  enable-reclaim)
+    set_events 0
+    set_reclaim_events 1
     printf '1\n' >"$path/tracing_on"
     ;;
   disable)
@@ -91,7 +123,7 @@ case "$operation" in
     fi
     ;;
   *)
-    echo "usage: $0 {setup|enable|disable|filter-pids|stream|stop-stream|stats|cleanup} INSTANCE [ARG]" >&2
+    echo "usage: $0 {setup|enable|enable-reclaim|disable|filter-pids|stream|stop-stream|stats|cleanup} INSTANCE [ARG]" >&2
     exit 2
     ;;
 esac

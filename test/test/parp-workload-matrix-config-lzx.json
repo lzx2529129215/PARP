@@ -1,0 +1,65 @@
+{
+  "schema_version": 1,
+  "description": "Same trained GUI sequence with per-cgroup anonymous, clean-file, dirty-file, and mixed cold working sets. lzx-note",
+  "output_root": "/home/lzx/Desktop/PARP/test/outputs/workload_matrix",
+  "asset_root": "/home/lzx/Desktop/PARP/test/outputs/real_pc_assets",
+  "slice": "parp-workload-matrix.slice",
+  "apps": [
+    "FIREFOX", "THUNDERBIRD", "VLC", "GIMP",
+    "IMAGE_VIEWER", "EVINCE", "LIBREOFFICE", "SOLITAIRE"
+  ],
+  "hot_apps": ["FIREFOX", "THUNDERBIRD", "VLC"],
+  "cold_apps": ["GIMP", "IMAGE_VIEWER", "EVINCE", "LIBREOFFICE", "SOLITAIRE"],
+  "trained_history": ["THUNDERBIRD", "FIREFOX", "THUNDERBIRD", "FIREFOX", "VLC"],
+  "trained_history_vocab": ["Thunderbird", "Firefox", "Thunderbird", "Firefox", "VLC"],
+  "expected_next_vocab": ["Firefox", "Thunderbird"],
+  "current_app": "VLC",
+  "current_vocab": "VLC",
+  "workload_layout": {
+    "FIREFOX": {"file_mib": 64, "anon_mib": 64},
+    "THUNDERBIRD": {"file_mib": 64, "anon_mib": 64},
+    "VLC": {"file_mib": 64, "anon_mib": 64},
+    "GIMP": {"file_mib": 32, "anon_mib": 256},
+    "LIBREOFFICE": {"file_mib": 512, "anon_mib": 32},
+    "EVINCE": {"file_mib": 320, "anon_mib": 32},
+    "IMAGE_VIEWER": {"file_mib": 160, "anon_mib": 160},
+    "SOLITAIRE": {"file_mib": 512, "anon_mib": 32}
+  },
+  "workload_expected_classes": {
+    "GIMP": "ANON_HEAVY",
+    "LIBREOFFICE": "FILE_CLEAN",
+    "EVINCE": "FILE_DIRTY",
+    "IMAGE_VIEWER": "MIXED",
+    "SOLITAIRE": "FILE_CLEAN"
+  },
+  "workload_dirty_apps": ["EVINCE"],
+  "startup_settle_seconds": 8.0,
+  "history_dwell_seconds": 1.5,
+  "prediction_settle_seconds": 1.5,
+  "pressure_mib": 2432,
+  "reclaim_target_mib": 1920,
+  "pressure_chunk_mib": 32,
+  "pressure_ramp_interval_seconds": 0.12,
+  "pressure_ramp_timeout_seconds": 240,
+  "pressure_hold_seconds": 900,
+  "memory_swap_max_mib": 1024,
+  "dirty_writeback_control": {
+    "background_mib": 2048,
+    "limit_mib": 3072
+  },
+  "prediction_gate": {
+    "minimum_hot_probability": 0.08,
+    "maximum_cold_probability": 0.01,
+    "minimum_bindings": 8,
+    "timeout_seconds": 20
+  },
+  "safety": {
+    "min_memavailable_mib": 3072,
+    "psi_full_avg10_abort": 0.8,
+    "abort_consecutive_samples": 4,
+    "sample_interval_seconds": 0.20,
+    "max_round_seconds": 1200,
+    "trace_buffer_kb_per_cpu": 8192
+  },
+  "scenarios": ["workload_matrix_reclaim"]
+}

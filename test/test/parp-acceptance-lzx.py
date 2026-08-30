@@ -47,6 +47,10 @@ TRACE_HELPER = TEST_DIR / "trace-helper-lzx.sh"
 PARP_DEBUGFS = Path("/sys/kernel/debug/parp")
 TIER2_SYSCTL = Path("/proc/sys/vm/tier2_predict_enabled")
 RECLAIM_BIN_SYSCTL = Path("/proc/sys/vm/parp_reclaim_bin_enabled")  # lzx-note
+RECLAIM_COLD_SYSCTL = Path("/proc/sys/vm/parp_reclaim_cold_aggressive_enabled")  # lzx-note
+RECLAIM_COLD_BIN_MAX_SYSCTL = Path("/proc/sys/vm/parp_reclaim_cold_bin_max")  # lzx-note
+RECLAIM_COLD_PROBABILITY_Q15_SYSCTL = Path("/proc/sys/vm/parp_reclaim_cold_probability_q15")  # lzx-note
+RECLAIM_WORKLOAD_SYSCTL = Path("/proc/sys/vm/parp_reclaim_workload_enabled")  # lzx-note
 TIER2_WSS_SYSCTL = Path("/proc/sys/vm/tier2_wss_predict_enabled")  # lzx-note
 TIER2_WSS_STRENGTHEN_SYSCTL = Path("/proc/sys/vm/tier2_wss_strengthen_enabled")  # lzx-note
 MIB = 1024 * 1024
@@ -492,15 +496,25 @@ POLICY_VARIANTS: dict[str, dict[str, int]] = {
     "shadow_train": {"parp_mode": 0, "effective_tier_mode": 1, "tier2_enabled": 0},
     "bin_off": {"parp_mode": 2, "effective_tier_mode": 0, "tier2_enabled": 0},  # lzx-note
     "bin_apply": {"parp_mode": 2, "effective_tier_mode": 0, "tier2_enabled": 0},  # lzx-note
+    "bin_cold_apply": {"parp_mode": 2, "effective_tier_mode": 0, "tier2_enabled": 0},  # lzx-note
+    "bin_workload_apply": {"parp_mode": 2, "effective_tier_mode": 0, "tier2_enabled": 0},  # lzx-note
 }
 
 
 def reclaim_bin_enabled_for_variant(variant: str) -> int:
-    return int(variant in {"tier2_bin", "combined", "bin_apply"})  # lzx-note
+    return int(variant in {"tier2_bin", "combined", "bin_apply", "bin_cold_apply", "bin_workload_apply"})  # lzx-note
+
+
+def reclaim_cold_enabled_for_variant(variant: str) -> int:
+    return int(variant in {"bin_cold_apply", "bin_workload_apply"})  # lzx-note
+
+
+def reclaim_workload_enabled_for_variant(variant: str) -> int:
+    return int(variant == "bin_workload_apply")  # lzx-note
 
 
 def tier2_scope_enabled_for_variant(variant: str) -> int:
-    if variant in {"bin_off", "bin_apply"}:
+    if variant in {"bin_off", "bin_apply", "bin_cold_apply", "bin_workload_apply"}:
         return 1
     return POLICY_VARIANTS[variant]["tier2_enabled"]  # lzx-note
 
@@ -512,6 +526,10 @@ def policy_state(cgroup_path: Path | None = None) -> dict[str, Any]:
         "effective_tier_trace_all_candidates": debugfs_value("effective_tier_trace_all_candidates"),
         "tier2_enabled": optional_text(TIER2_SYSCTL),
         "reclaim_bin_enabled": optional_text(RECLAIM_BIN_SYSCTL),  # lzx-note
+        "reclaim_cold_enabled": optional_text(RECLAIM_COLD_SYSCTL),  # lzx-note
+        "reclaim_cold_bin_max": optional_text(RECLAIM_COLD_BIN_MAX_SYSCTL),  # lzx-note
+        "reclaim_cold_probability_q15": optional_text(RECLAIM_COLD_PROBABILITY_Q15_SYSCTL),  # lzx-note
+        "reclaim_workload_enabled": optional_text(RECLAIM_WORKLOAD_SYSCTL),  # lzx-note
         "tier2_wss_enabled": optional_text(TIER2_WSS_SYSCTL),  # lzx-note
         "tier2_wss_strengthen_enabled": optional_text(TIER2_WSS_STRENGTHEN_SYSCTL),  # lzx-note
         "cgroup_tier2_enabled": optional_text(cgroup_path / "memory.tier2_enabled") if cgroup_path else None,
@@ -519,6 +537,7 @@ def policy_state(cgroup_path: Path | None = None) -> dict[str, Any]:
         "effective_tier_stats": debugfs_value("effective_tier_stats"),
         "effective_tier_config": debugfs_value("effective_tier_config"),
         "reclaim_bin_stats": debugfs_value("reclaim_bin_stats"),  # lzx-note
+        "reclaim_cold_stats": debugfs_value("reclaim_cold_stats"),  # lzx-note
     }
 
 
@@ -555,7 +574,11 @@ def apply_global_policy(variant: str) -> dict[str, Any]:
     privileged_write(TIER2_SYSCTL, 0)
     if RECLAIM_BIN_SYSCTL.is_file():
         privileged_write(RECLAIM_BIN_SYSCTL, 0)  # lzx-note
-    if variant in {"bin_off", "bin_apply"}:
+    if RECLAIM_COLD_SYSCTL.is_file():
+        privileged_write(RECLAIM_COLD_SYSCTL, 0)  # lzx-note
+    if RECLAIM_WORKLOAD_SYSCTL.is_file():
+        privileged_write(RECLAIM_WORKLOAD_SYSCTL, 0)  # lzx-note
+    if variant in {"bin_off", "bin_apply", "bin_cold_apply", "bin_workload_apply"}:
         privileged_write(TIER2_WSS_SYSCTL, 0)
         privileged_write(TIER2_WSS_STRENGTHEN_SYSCTL, 0)  # lzx-note
     privileged_write(
@@ -572,6 +595,23 @@ def apply_global_policy(variant: str) -> dict[str, Any]:
         if not RECLAIM_BIN_SYSCTL.is_file():
             raise RuntimeError("independent reclaim-bin runtime switch is missing")
         privileged_write(RECLAIM_BIN_SYSCTL, 1)  # lzx-note
+    desired_reclaim_cold = reclaim_cold_enabled_for_variant(variant)
+    if desired_reclaim_cold:
+        if not RECLAIM_COLD_SYSCTL.is_file():
+            raise RuntimeError("prediction-cold reclaim runtime switch is missing")
+        # Bin rank protects likely returners; workload-aware cold pressure has
+        # its own calibrated <=1% gate so the ordinal tail cannot turn an
+        # uncertain app into a cold candidate. lzx-note
+        privileged_write(RECLAIM_COLD_BIN_MAX_SYSCTL, 0)
+        if not RECLAIM_COLD_PROBABILITY_Q15_SYSCTL.is_file():
+            raise RuntimeError("calibrated prediction-cold threshold switch is missing")
+        privileged_write(RECLAIM_COLD_PROBABILITY_Q15_SYSCTL, 327)  # ~= 1% Q15 lzx-note
+        privileged_write(RECLAIM_COLD_SYSCTL, 1)  # lzx-note
+    desired_reclaim_workload = reclaim_workload_enabled_for_variant(variant)
+    if desired_reclaim_workload:
+        if not RECLAIM_WORKLOAD_SYSCTL.is_file():
+            raise RuntimeError("workload-aware reclaim runtime switch is missing")
+        privileged_write(RECLAIM_WORKLOAD_SYSCTL, 1)  # lzx-note
     current = policy_state()
     for key in ("parp_mode", "effective_tier_mode", "tier2_enabled"):
         if int(current[key] or -1) != desired[key]:
@@ -582,7 +622,24 @@ def apply_global_policy(variant: str) -> dict[str, Any]:
             "policy state mismatch for reclaim_bin_enabled: "
             f"desired={desired_reclaim_bin} actual={current_reclaim_bin}"
         )  # lzx-note
-    if variant in {"bin_off", "bin_apply"}:
+    current_reclaim_cold = current.get("reclaim_cold_enabled")
+    if current_reclaim_cold is not None and int(current_reclaim_cold or -1) != desired_reclaim_cold:
+        raise RuntimeError(
+            "policy state mismatch for reclaim_cold_enabled: "
+            f"desired={desired_reclaim_cold} actual={current_reclaim_cold}"
+        )  # lzx-note
+    current_reclaim_workload = current.get("reclaim_workload_enabled")
+    if current_reclaim_workload is not None and int(current_reclaim_workload or -1) != desired_reclaim_workload:
+        raise RuntimeError(
+            "policy state mismatch for reclaim_workload_enabled: "
+            f"desired={desired_reclaim_workload} actual={current_reclaim_workload}"
+        )  # lzx-note
+    if desired_reclaim_cold and int(current.get("reclaim_cold_probability_q15") or -1) != 327:
+        raise RuntimeError(
+            "policy state mismatch for reclaim_cold_probability_q15: "
+            f"desired=327 actual={current.get('reclaim_cold_probability_q15')}"
+        )  # lzx-note
+    if variant in {"bin_off", "bin_apply", "bin_cold_apply", "bin_workload_apply"}:
         for key in ("tier2_wss_enabled", "tier2_wss_strengthen_enabled"):
             if int(current.get(key) or -1) != 0:
                 raise RuntimeError(
@@ -623,6 +680,14 @@ def restore_global_policy(original: dict[str, Any]) -> None:
         privileged_write(TIER2_SYSCTL, original["tier2_enabled"])
     if original.get("reclaim_bin_enabled") is not None and RECLAIM_BIN_SYSCTL.is_file():
         privileged_write(RECLAIM_BIN_SYSCTL, original["reclaim_bin_enabled"])  # lzx-note
+    if original.get("reclaim_cold_bin_max") is not None and RECLAIM_COLD_BIN_MAX_SYSCTL.is_file():
+        privileged_write(RECLAIM_COLD_BIN_MAX_SYSCTL, original["reclaim_cold_bin_max"])  # lzx-note
+    if original.get("reclaim_cold_probability_q15") is not None and RECLAIM_COLD_PROBABILITY_Q15_SYSCTL.is_file():
+        privileged_write(RECLAIM_COLD_PROBABILITY_Q15_SYSCTL, original["reclaim_cold_probability_q15"])  # lzx-note
+    if original.get("reclaim_cold_enabled") is not None and RECLAIM_COLD_SYSCTL.is_file():
+        privileged_write(RECLAIM_COLD_SYSCTL, original["reclaim_cold_enabled"])  # lzx-note
+    if original.get("reclaim_workload_enabled") is not None and RECLAIM_WORKLOAD_SYSCTL.is_file():
+        privileged_write(RECLAIM_WORKLOAD_SYSCTL, original["reclaim_workload_enabled"])  # lzx-note
     if original.get("tier2_wss_enabled") is not None and TIER2_WSS_SYSCTL.is_file():
         privileged_write(TIER2_WSS_SYSCTL, original["tier2_wss_enabled"])
     if original.get("tier2_wss_strengthen_enabled") is not None and TIER2_WSS_STRENGTHEN_SYSCTL.is_file():
@@ -783,14 +848,16 @@ def preflight(config: dict[str, Any], profile: str, suite: str, variant: str = "
             except OSError:
                 pass
         reclaim_bin_compiled = "CONFIG_PARP_RECLAIM_BIN_SCORE=y" in config_text
-        if variant in {"tier2_bin", "combined", "bin_off", "bin_apply"}:
+        if variant in {"tier2_bin", "combined", "bin_off", "bin_apply", "bin_cold_apply", "bin_workload_apply"}:
             checks["reclaim_bin_compiled"] = reclaim_bin_compiled  # lzx-note
             checks["reclaim_bin_runtime_switch"] = RECLAIM_BIN_SYSCTL.is_file()  # lzx-note
-        if variant in {"bin_off", "bin_apply"}:
+        if variant in {"bin_off", "bin_apply", "bin_cold_apply", "bin_workload_apply"}:
             checks["wss_runtime_switches"] = (
                 TIER2_WSS_SYSCTL.is_file() and TIER2_WSS_STRENGTHEN_SYSCTL.is_file()
             )  # lzx-note
             checks["reclaim_bin_runtime_switch"] = RECLAIM_BIN_SYSCTL.is_file()  # lzx-note
+        if variant == "bin_workload_apply":
+            checks["reclaim_workload_runtime_switch"] = RECLAIM_WORKLOAD_SYSCTL.is_file()  # lzx-note
         elif variant == "combined_no_reclaim":
             checks["reclaim_bin_compiled_out"] = not reclaim_bin_compiled  # lzx-note
     blocking_checks = preflight_blocking_checks(checks, profile, variant)
@@ -1976,16 +2043,26 @@ def finalize_round(session_dir: Path, suite: str, expected_steps: int, automatio
     if variant in POLICY_VARIANTS:
         desired = POLICY_VARIANTS[variant]
         for phase, state in (("before", policy_before), ("after", policy_after)):
-            for key in ("parp_mode", "effective_tier_mode", "tier2_enabled", "cgroup_tier2_enabled", "reclaim_bin_enabled"):
+            for key in ("parp_mode", "effective_tier_mode", "tier2_enabled", "cgroup_tier2_enabled", "reclaim_bin_enabled", "reclaim_cold_enabled", "reclaim_workload_enabled"):
                 if key == "cgroup_tier2_enabled":
                     expected = tier2_scope_enabled_for_variant(variant)
                 elif key == "reclaim_bin_enabled":
                     expected = reclaim_bin_enabled_for_variant(variant)
+                elif key == "reclaim_cold_enabled":
+                    expected = reclaim_cold_enabled_for_variant(variant)
+                elif key == "reclaim_workload_enabled":
+                    expected = reclaim_workload_enabled_for_variant(variant)
                 else:
                     expected = desired[key]
                 if int(state.get(key) or -1) != expected:
                     invalid_reasons.append(f"policy drift {phase} {key}: expected={expected} actual={state.get(key)}")
-            if variant in {"bin_off", "bin_apply"}:
+            if reclaim_cold_enabled_for_variant(variant):
+                if int(state.get("reclaim_cold_probability_q15") or -1) != 327:
+                    invalid_reasons.append(
+                        "policy drift " + phase + " reclaim_cold_probability_q15: "
+                        f"expected=327 actual={state.get('reclaim_cold_probability_q15')}"
+                    )  # lzx-note
+            if variant in {"bin_off", "bin_apply", "bin_cold_apply", "bin_workload_apply"}:
                 for key in ("tier2_wss_enabled", "tier2_wss_strengthen_enabled"):
                     if int(state.get(key) or -1) != 0:
                         invalid_reasons.append(
