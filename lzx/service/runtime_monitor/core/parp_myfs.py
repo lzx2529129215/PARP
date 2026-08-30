@@ -175,7 +175,13 @@ def _q15(value: Any) -> int | None:
 
 
 class PARPMyfsBridge:
-    """Convert one successful v3 inference into one atomic kernel update."""
+    """把一次成功的 v3 推理转换成一个原子的内核状态更新。
+
+    每个 ioctl 同时携带 App prior、当前前台标记、实时 cgroup/domain 绑定、未来
+    工作集和 cgroup workload hint。这样内核不会观察到“新概率配旧 binding”之类
+    的半更新状态。bridge 不通过 debugfs 发布预测；设备缺失、输入非法、domain
+    归属不唯一或 ABI 不匹配时均 fail-closed，并把结果写入 myfs_events.csv。
+    """
 
     def __init__(
         self,
@@ -193,6 +199,8 @@ class PARPMyfsBridge:
     ) -> None:
         if mode not in MYFS_MODES:
             raise ValueError(f"invalid /dev/myfs mode: {mode}")
+        # Linux ioctl 编号只有 14 bit 表示 payload 大小；v1/v2/v3 还必须等长，
+        # 才能在不改变基础 UAPI 布局边界的前提下按不同 command 自动降级。
         if ctypes.sizeof(PredictStateV1) >= (1 << 14):
             raise RuntimeError("PARP myfs UAPI exceeds Linux ioctl size field")
         if (ctypes.sizeof(PredictStateV2) != ctypes.sizeof(PredictStateV1)
@@ -259,6 +267,9 @@ class PARPMyfsBridge:
         return state_type.from_buffer_copy(buffer)
 
     def _get_state(self) -> PredictStateV1 | PredictStateV2 | PredictStateV3:
+        """按 v3 → v2 → v1 探测内核能力，并记住后续 SET 使用的 ABI。"""
+        # ENOTTY/EINVAL 表示当前 command 不受支持，可以安全尝试旧 ABI；其他错误
+        #（例如权限或设备 I/O）必须交给调用方按真实失败处理。
         try:
             state = self._get_state_with(PredictStateV3, PARP_PREDICT_GET_STATE_V3)
             if (
@@ -297,6 +308,7 @@ class PARPMyfsBridge:
             self.generation = int(state.generation)
 
     def preflight(self) -> dict[str, Any]:
+        """记录设备、权限和已探测 ABI；检查失败只影响下沉，不停止采集。"""
         exists = self.device.exists()
         writable = bool(exists and os.access(self.device, os.R_OK | os.W_OK))
         result = {
@@ -330,7 +342,12 @@ class PARPMyfsBridge:
         return set(self._successful_apps)
 
     def observe_working_sets(self, process_samples: Iterable[Any]) -> None:
-        """Continuously learn GUI plus fixture WSS, independently of events."""
+        """在秒级采样中持续学习 GUI+fixture 工作集，不执行 ioctl。
+
+        事件发生前至少积累若干样本，工作集预测才有成熟度；因此该观测不能只放在
+        稀疏的 APP_SWITCH 时刻。``_bindings`` 在这里用于解析 domain 路径，但真正
+        的概率/binding 发布仍只发生在 ``submit_prediction``。
+        """
         if self.mode == "off" or self.runtime_scope is None:
             return
         app_ids = {
@@ -350,6 +367,7 @@ class PARPMyfsBridge:
         process_samples: Iterable[Any] = (),
         event: dict[str, Any] | None = None,
     ) -> None:
+        """验证并提交一个完整预测批次；任何局部失败都不发布残缺状态。"""
         self._stats["events_received"] += 1
         if self.mode == "off":
             return
@@ -357,18 +375,24 @@ class PARPMyfsBridge:
             return
         self._stats["successful_inferences"] += 1
 
+        # 阶段 1：把模型 float 概率量化为内核 Q15，并把当前前台 App 作为带
+        # ENTRY_FOREGROUND 标记的满分首项。非法/非 runtime-scope 候选直接过滤。
         entries, current_app = self._prediction_entries(feature_row, prediction_result)
         if not entries:
             self._stats["invalid_predictions"] += 1
             self._record(event, prediction_result, current_app, 0, 0, 0,
                          status="DROPPED", error="no valid runtime-scope predictions")
             return
+        # 阶段 2：在事件时刻解析存活 cgroup。domain_id 使用 cgroup 目录 inode；
+        # 同一 domain 若被映射到多个 App 就视为 ambiguous，整个 domain 不提交。
         bindings, successful_apps, ambiguous = self._bindings(process_samples, {row[0] for row in entries})
         self._stats["ambiguous_domains"] += ambiguous
         self._stats["bindings_submitted"] += len(bindings)
         self._stats["alias_bindings_submitted"] += self._last_alias_binding_count
         self.generation += 1
         now_ns = time.monotonic_ns()
+        # 阶段 3：用事件时刻的最新驻留状态再更新一次估计，然后按 App 概率加权
+        # 得到 future/resident/growth；同时读取各 binding 自身的 memory.stat 分类。
         self.workingset_predictor.observe(self._last_binding_paths, now_ns)
         workingset = self.workingset_predictor.predict(
             entries,
@@ -377,6 +401,8 @@ class PARPMyfsBridge:
             foreground_flag=ENTRY_FOREGROUND,
         )
         workload_profiles = self.workload_profiler.sample(self._last_binding_paths)  # lzx-note
+        # 预先构造三种等长 payload。真正 open 设备后只选择已探测 ABI 对应的一个，
+        # 保证一次 ioctl 内的字段来自同一 generation 和同一事件快照。
         state_v1 = self._make_state_v1(entries, bindings, event, now_ns)
         state_v2 = self._make_state_v2(
             entries, bindings, event, now_ns, workingset
@@ -386,6 +412,8 @@ class PARPMyfsBridge:
         )
 
         if self.mode == "dry-run":
+            # dry-run 仍完整执行编码、binding、WSS 和 workload 分类，仅跳过 ioctl，
+            # 因而可用来验证用户态数据链，而不是只做一个设备存在性检查。
             self._stats["dry_runs"] += 1
             self._record(event, prediction_result, current_app, len(entries), len(bindings), ambiguous,
                          status="DRY_RUN", workingset=workingset,
@@ -433,6 +461,8 @@ class PARPMyfsBridge:
                 if error_number == errno.ENOENT:
                     self._stats["missing_device"] += 1
                 if attempt == 0 and error_number in {errno.EALREADY, errno.ESTALE}:
+                    # 另一发布者或服务重启可能让本地 generation 落后。只在明确的
+                    # stale/already 上读取内核 generation 并重试一次，避免无限重放。
                     self._synchronize_generation()
                     self.generation += 1
                     state_v1.generation = self.generation
@@ -452,6 +482,7 @@ class PARPMyfsBridge:
     def _prediction_entries(
         self, feature_row: dict[str, Any], prediction_result: dict[str, Any]
     ) -> tuple[list[tuple[int, int, int, int]], str]:
+        """生成 ``(app_id, score_q15, rank, flags)``，并返回当前 App key。"""
         if self.runtime_scope is None:
             return [], ""
         by_key = {str(app.app_key): app for app in self.runtime_scope.apps}
@@ -475,6 +506,8 @@ class PARPMyfsBridge:
                 if score is None:
                     continue
                 scores[int(app.app_id)] = (app, score)
+        # 模型 v3 已排除当前 App，但这里再次 pop，防止旧模型/畸形输入重复携带；
+        # 当前 App 随后以 rank=1、Q15 满分和 FOREGROUND 标记插入。
         if current is not None:
             scores.pop(int(current.app_id), None)
         ordered = sorted(scores.values(), key=lambda item: (-item[1], int(item[0].app_id)))
@@ -491,11 +524,19 @@ class PARPMyfsBridge:
     def _bindings(
         self, process_samples: Iterable[Any], allowed_app_ids: set[int]
     ) -> tuple[list[tuple[int, int]], set[str], int]:
+        """解析预测 App 的实时 cgroup 绑定并拒绝歧义 domain。
+
+        ``process_samples`` 只覆盖 GUI 进程；配置中的 ``binding_scope_names`` 是
+        fixture 等 binding-only alias，需要从 cgroup 树直接发现。返回值分别是
+        可提交 binding、成功覆盖的 app_key 集合以及被拒绝的歧义 domain 数。
+        """
         if self.runtime_scope is None:
             return [], set(), 0
         by_key = {str(app.app_key): app for app in self.runtime_scope.apps}
         domains: dict[int, dict[int, tuple[str, Path]]] = {}
         alias_domain_ids: set[int] = set()
+        # GUI 路径来自 /proc/<pid>/cgroup，可直接解析目录 inode，无需依赖容易变化的
+        # systemd unit 查询输出。
         for sample in process_samples:
             app = by_key.get(str(getattr(sample, "app_id", "")))
             if app is None or int(app.app_id) not in allowed_app_ids:
@@ -524,6 +565,8 @@ class PARPMyfsBridge:
                 alias_owners[str(scope_name)] = (app_id, str(app.app_key))
         now_ns = time.monotonic_ns()
         if alias_owners and now_ns >= self._alias_scan_after_ns:
+            # 所有 alias 共用一次 rglob，结果缓存 1 秒；避免每个 App 单独递归扫描
+            # 整棵 cgroup 树。alias 只进入 binding/WSS，不进入 GUI 生命周期状态机。
             discovered: dict[str, list[Path]] = {
                 name: [] for name in alias_owners
             }
@@ -555,6 +598,8 @@ class PARPMyfsBridge:
         binding_paths: dict[int, tuple[int, str, Path]] = {}
         for domain_id, owners in sorted(domains.items()):
             if len(owners) != 1:
+                # 一个 inode 同时指向多个 App ID 时，内核无法安全决定归属；宁可少
+                # 提交一个 binding，也不能猜测并污染回收策略。
                 ambiguous += 1
                 continue
             app_id, (app_key, path) = next(iter(owners.items()))
@@ -578,6 +623,7 @@ class PARPMyfsBridge:
         now_ns: int,
         workload_profiles: dict[int, ReclaimWorkloadProfile] | None = None,
     ) -> None:
+        """填充各 ABI 公共头、预测数组和 binding 数组。"""
         state.schema_version = self.schema_version
         state.model_version = self.model_version
         state.generation = self.generation
@@ -586,6 +632,8 @@ class PARPMyfsBridge:
         state.timestamp_ns = now_ns
         state.horizon_ns = self.horizon_ms * 1_000_000
         state.ttl_ns = self.prior_ttl_ms * 1_000_000
+        # timestamp_ns 是本次用户态发布时刻；epoch_id 优先使用触发事件时刻，使
+        # binding 与产生该批预测的 APP_* 边沿能够在内核/审计中关联。
         epoch_id = int((event or {}).get("ts_ns") or state.timestamp_ns)
         for index, (app_id, score, rank, flags) in enumerate(entries):
             state.predictions[index] = PredictEntryV1(app_id, score, rank, flags, 0)
@@ -595,6 +643,8 @@ class PARPMyfsBridge:
                 flags = BINDING_ACTIVE
                 hint = 0
                 if profile is not None and profile.valid:
+                    # workload hint 只有满足最小内存量和置信度门槛才置 VALID；否则
+                    # 保留 active binding，但让内核沿用自己的默认回收策略。
                     flags |= BINDING_WORKLOAD_VALID
                     hint = profile.workload_hint()
                 state.bindings[index] = PredictBindingV3(
@@ -630,6 +680,7 @@ class PARPMyfsBridge:
         state.abi_version = ABI_VERSION_V2
         state.struct_size = ctypes.sizeof(PredictStateV2)
         self._fill_state(state, entries, bindings, event, now_ns)
+        # 无效工作集不会携带半成品数值：保持 flag 清零和相关字段为 0，内核回退。
         if workingset.valid:
             state.flags |= STATE_WORKINGSET_VALID
             state.policy_domain_id = workingset.policy_domain_id
@@ -648,7 +699,7 @@ class PARPMyfsBridge:
         workingset: WorkingSetPrediction,
         workload_profiles: dict[int, ReclaimWorkloadProfile],
     ) -> PredictStateV3:
-        """Publish LSTM, WSS, and cgroup composition in one ioctl.  lzx-note"""
+        """在一个 v3 payload 中发布 LSTM、WSS 与 cgroup 内存组成。"""
         state = PredictStateV3()
         state.abi_version = ABI_VERSION_V3
         state.struct_size = ctypes.sizeof(PredictStateV3)

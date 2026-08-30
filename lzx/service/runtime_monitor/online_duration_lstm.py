@@ -233,12 +233,23 @@ def top_names_any(outputs: list[dict[str, Any]], limit: int = 3) -> str:
 
 
 class OnlineDurationLSTMRunner:
+    """在线 LSTM 的状态维护、触发判定、推理调用和审计输出总入口。
+
+    Predictor 本身只接受张量并返回概率，不知道桌面事件。Runner 负责把 runtime
+    app_key 映射成训练词表名称，维护最近应用段及停留时间，区分事件触发与采样
+    触发，并把同一次调用写入模型 CSV、人工 review CSV 和内存返回值。返回值会
+    直接交给 ``PARPMyfsBridge``，因此其中的 ``app_key``、``runtime_app_id`` 和
+    ``prediction_id`` 也是用户态模型与内核批次之间的关联键。
+    """
+
     def __init__(self, args: argparse.Namespace, model_dir: Path, review_dir: Path) -> None:
         self.args = args
         self.model_type = str(getattr(args, "lstm_model_type", "duration"))
         self.session_id = str(getattr(args, "session_id", model_dir.name))
         self.model_dir = model_dir
         self.review_dir = review_dir
+        # 映射优先级：内置兼容别名 < app_mapping.json < runtime scope。生产服务的
+        # 15 App 映射来自 runtime scope，确保它与 myfs 使用的稳定 App ID 同源。
         configured_map = getattr(args, "app_key_to_vocab_name", {}) or {}
         self.app_name_map = dict(APP_NAME_MAP)
         self.app_name_map.update(_load_app_mapping_aliases(getattr(args, "app_mapping", "")))
@@ -270,6 +281,8 @@ class OnlineDurationLSTMRunner:
         timeline_fields = V3_TIMELINE_FIELDS if self.model_type == "v3" else TIMELINE_FIELDS
         self.timeline_writer = CsvWriter(review_dir / "online_app_predictions_duration_timeline.csv", timeline_fields)
 
+        # 模型加载失败不会阻止常驻采集：predictor 保持 None，之后每次触发都会以
+        # predictor_error 写一条 skipped 审计，而不是让 monitor 启动失败。
         try:
             if self.model_type == "v3":
                 self.predictor = OnlineLSTMNextV3Predictor(
@@ -318,12 +331,22 @@ class OnlineDurationLSTMRunner:
         *,
         trigger_override: str = "",
     ) -> dict[str, Any]:
+        """处理一个统一特征快照，并在满足条件时执行一次在线推理。
+
+        ``trigger_override`` 为空时用于采样兼容路径，由相邻快照变化/TTL 决定是否
+        推理；非空时表示来自原生 APP_* 边沿，直接采用该触发类型。无论最后推理、
+        跳过还是报错，本函数都会返回结构稳定的字典供事件审计和 myfs bridge 使用。
+        """
+        # 阶段 1：将运行时 App key 归一化为训练词表 token。未知桌面/helper 窗口
+        # 映射为 <UNKNOWN>，不会作为一个真实应用段挤占固定长度历史。
         sample_time = parse_time(str(feature_row["timestamp"]))
         raw_fg = str(feature_row.get("foreground_app", ""))
         mapped_fg = self.map_app(raw_fg)
         raw_open_apps = str(feature_row.get("open_apps", ""))
         mapped_opened = self.map_open_apps(raw_open_apps)
 
+        # 阶段 2：更新“连续前台应用段”。只有映射后的 App 变化才结束上一段；
+        # 每段至少记 1 秒，避免事件时间戳几乎相同时向模型输入零时长。
         self._update_segments(feature_row, sample_time, raw_fg, mapped_fg)
         history_segments = self._history_segments(sample_time)
         raw_history = [str(item["raw_app"]) for item in history_segments]
@@ -336,10 +359,14 @@ class OnlineDurationLSTMRunner:
             input_durations = [fmt_duration(value) for value in valid_durations]
             input_mask = ["1"] * len(input_history_apps)
         else:
+            # v3/时长模型需要固定 history_len。左侧不足部分由 <PAD>、0 秒和 mask=0
+            # 补齐；有效历史位 mask=1，模型据此忽略 padding。
             input_history_apps, input_durations, input_mask = padded_history(
                 mapped_history, durations, self.args.history_len
             )
 
+        # 阶段 3：采样模式检查前台/打开集合变化和 TTL；直接事件模式用 override
+        # 覆盖这个结果，避免一个真实 APP_SWITCH 又被 5 秒 cooldown 吞掉。
         trigger_type, skip_reason = self._trigger(feature_row, sample_time, mapped_fg, mapped_opened)
         if trigger_override:
             # Native lifecycle events are already edge-triggered.  Do not
@@ -349,6 +376,8 @@ class OnlineDurationLSTMRunner:
             skip_reason = ""
         if trigger_type == "event_cooldown":
             skip_reason = "event_cooldown"
+        # 即使是直接事件，完全没有有效历史或模型未加载也不能构造可信输入；这些
+        # 情况统一标为 skipped，并明确记录原因。
         if not any(mask == "1" for mask in input_mask):
             skip_reason = "no_valid_history"
         if trigger_type == "":
@@ -395,6 +424,8 @@ class OnlineDurationLSTMRunner:
         bundle: dict[str, Any] = {"probability_source": "unavailable"}
         wall_dt = dt.datetime.now()
         wall_mono = time.perf_counter()
+        # 阶段 4：真正的模型调用。v3 返回单步“下一 App”概率；旧模型返回多个
+        # 时间 horizon。异常被收敛到当前调用的 error 字段，不向上传播到主循环。
         try:
             if self.model_type == "v3":
                 bundle = self.predictor.predict_bundle(
@@ -442,6 +473,8 @@ class OnlineDurationLSTMRunner:
                 # rereading the CSV.  Preserve the same mapping here so
                 # Test4B's event-time controller does not silently default
                 # every candidate to probability 1.0.
+                # Predictor 使用词表名称；下游 bridge/controller 需要 runtime app_key
+                # 和内核稳定 App ID，因此在内存 bundle 与 CSV 两处都补齐映射。
                 normalized = {
                     **output,
                     "app_key": app_key,
@@ -510,6 +543,8 @@ class OnlineDurationLSTMRunner:
         else:
             self.prediction_writer.write_row({**base_prediction, "status": status, "skip_reason": error})
 
+        # 阶段 5：写调用级证据。prediction CSV 是逐候选概率，call trace 是一次
+        # 推理一行，二者通过 feature_window_id/prediction_id 对齐。
         previous_raw = self.previous_row.get("foreground_app", "") if self.previous_row else ""
         previous_mapped = self.map_app(previous_raw) if self.previous_row else ""
         model_row = {
@@ -595,7 +630,7 @@ class OnlineDurationLSTMRunner:
         }
 
     def process_event(self, feature_row: dict[str, Any], event_type: str) -> dict[str, Any]:
-        """Run one prediction directly from a native APP_* event."""
+        """从原生 APP_* 边沿直接触发推理，并把触发来源标准化进审计字段。"""
         normalized = str(event_type).strip().upper() or "APP_EVENT"
         return self.process_sample(
             feature_row,
@@ -603,6 +638,7 @@ class OnlineDurationLSTMRunner:
         )
 
     def _update_segments(self, row: dict[str, Any], sample_time: dt.datetime, raw_fg: str, mapped_fg: str) -> None:
+        """维护连续前台 App 段；段切换时固化上一段的 dwell_s。"""
         # Compositor/helper windows which are outside the LSAPP vocabulary are
         # not application transitions.  Keeping them as a segment would evict
         # one real app from the fixed five-step LSTM history and make an
@@ -652,6 +688,7 @@ class OnlineDurationLSTMRunner:
         mapped_fg: str,
         mapped_opened: list[str],
     ) -> tuple[str, str]:
+        """仅为采样兼容路径判断触发原因；原生事件会在调用方覆盖该结果。"""
         if self.last_prediction_time is None:
             return "initial_prediction", ""
         previous_mapped_fg = self.map_app(self.previous_row.get("foreground_app", "")) if self.previous_row else mapped_fg

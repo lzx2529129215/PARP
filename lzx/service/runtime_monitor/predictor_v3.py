@@ -22,7 +22,12 @@ if str(OPERATION_PREDICTOR_ROOT) not in sys.path:
 
 
 class OnlineLSTMNextV3Predictor:
-    """Predict one masked-softmax probability for every whitelist App."""
+    """为白名单中除当前 App 外的每个候选计算一次 masked-softmax 概率。
+
+    该类是纯模型适配层：负责加载词表/checkpoint、把 Python 列表编码成张量、
+    执行 ``model.eval()`` 推理并还原为带名称的概率行。它不维护桌面历史，也不
+    决定何时触发；这些职责属于 ``OnlineDurationLSTMRunner``。
+    """
 
     def __init__(
         self,
@@ -56,6 +61,8 @@ class OnlineLSTMNextV3Predictor:
             if app not in {"<PAD>", "<UNKNOWN>"}
         ]
 
+        # auto 优先 CUDA，否则 CPU；checkpoint 始终 map 到同一设备，避免加载时
+        # 因训练机器和常驻机器设备不同而失败。
         self.device = (
             torch.device("cuda" if torch.cuda.is_available() else "cpu")
             if device_name == "auto"
@@ -85,6 +92,7 @@ class OnlineLSTMNextV3Predictor:
             dropout=float(ckpt_args.get("dropout", 0.2)),
         ).to(self.device)
         self.model.load_state_dict(checkpoint_data["model_state_dict"])
+        # eval() 关闭 dropout 等训练态行为，使相同输入在常驻推理中保持可复现。
         self.model.eval()
 
     @staticmethod
@@ -109,6 +117,11 @@ class OnlineLSTMNextV3Predictor:
         current_app: str,
         timestamp: str,
     ) -> dict[str, Any]:
+        """编码一次 v3 输入并返回 top-k 与完整候选概率集合。
+
+        完整集合供 ``/dev/myfs`` 构造所有 App prior，top-k 仅用于人类审阅和部分
+        实验消费者。两者来自同一次 logits，不能分别重复推理。
+        """
         import datetime as dt
 
         if not history_apps:
@@ -116,6 +129,8 @@ class OnlineLSTMNextV3Predictor:
         if not (len(history_apps) == len(history_durations) == len(history_mask)):
             raise ValueError("v3 history apps, durations and mask must have equal lengths")
 
+        # history_mask 决定 padding 是否有效；opened_apps 使用 multi-hot；时间特征
+        # 采用归一化小时、星期和周末标志，与训练时输入契约保持一致。
         app_ids = [self.app_vocab.get(app, self.unknown_id) for app in history_apps]
         durations = [max(0.0, float(value)) for value in history_durations]
         masks = [float(value) for value in history_mask]
@@ -136,8 +151,11 @@ class OnlineLSTMNextV3Predictor:
             "current_app": torch.tensor([current_id], dtype=torch.long, device=self.device),
         }
         with torch.no_grad():
+            # no_grad 避免构造反向传播图，降低常驻服务的延迟和内存占用。
             logits = self.model(**batch)[0]
 
+        # 当前 App 不参与“下一 App”候选归一化。softmax 只作用在白名单候选 logits
+        # 上，因此 all_probabilities 的概率和为 1，而不是完整词表概率的截断子集。
         candidate_ids = [app_id for app_id in self.whitelist_ids if app_id != current_id]
         if not candidate_ids:
             return {"top_k_outputs": [], "all_probabilities": [], "probability_source": "unavailable"}
@@ -156,6 +174,8 @@ class OnlineLSTMNextV3Predictor:
                 "raw_logit": float(candidate_logits[position].item()),
                 "probability": probability,
                 "next_use_probability": probability,
+                # fixed 字段是 CSV/实验协议使用的万分比；myfs bridge 会从 float
+                # probability 重新量化为内核 ABI 需要的 Q15(0..32767)。
                 "next_use_probability_fixed": max(0, min(10000, int(round(probability * 10000)))),
                 "probability_source": "softmax_whitelist_masked",
                 "score_mode": "softmax",

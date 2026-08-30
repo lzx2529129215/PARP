@@ -17,7 +17,12 @@ from typing import Any
 
 
 class X11EventCollector:
-    """Listen for X11 window lifecycle, focus and state events."""
+    """监听 X11 窗口生命周期、焦点和属性变化。
+
+    这里输出的是 WINDOW_CREATED、FOCUS_CHANGED 等低层通知，不判断 APP_SWITCH。
+    原因是同一应用可以有多个窗口，且窗口创建时 WM_CLASS/标题可能尚未就绪；
+    高层语义必须交给持有跨事件状态的 ``X11EventState`` 统一判断。
+    """
 
     def __init__(self, callback: Callable[[dict[str, Any]], None], display_name: str | None = None) -> None:
         self.callback = callback
@@ -58,6 +63,7 @@ class X11EventCollector:
         self._wake_r = self._wake_w = -1
 
     def _run(self) -> None:
+        """连接 X11/Xwayland，阻塞等待事件，并在桌面尚未出现时持续重连。"""
         try:
             from Xlib import X, display, error
         except ImportError as exc:
@@ -69,6 +75,8 @@ class X11EventCollector:
         # losing foreground events after the first boot-time connection error.
         while not self._stop.is_set():
             try:
+                # linger 用户服务可能早于图形登录启动。每次重连前重新发现 DISPLAY
+                # 和 XAUTHORITY，避免首次连接失败后永远失去桌面事件。
                 self._discover_display_environment()
                 self._display = display.Display(self.display_name)
                 # Windows can disappear between a native notification and the
@@ -96,7 +104,8 @@ class X11EventCollector:
                 self._display.flush()
                 self._last_connection_error = ""
 
-                # Establish a baseline without manufacturing APP_OPEN events.
+                # 建立当前窗口基线，但不把“服务刚启动时已经存在的窗口”伪造成
+                # APP_OPEN；WINDOW_INITIAL 只填充状态机的已知窗口/应用集合。
                 for window in self._query_children():
                     self._watch_window(window)
                     self._emit("WINDOW_INITIAL", window_id=self._window_id(window))
@@ -104,6 +113,8 @@ class X11EventCollector:
                 self._emit("FOCUS_CHANGED", window_id=self._active_window_id())
 
                 while not self._stop.is_set():
+                    # 同时等待 X socket 和 stop pipe。后者让 stop() 可以立即打断
+                    # 无限期 select，而无需等下一个真实桌面事件。
                     readable, _, _ = select.select(
                         [self._display.fileno(), self._wake_r], [], [], None
                     )
@@ -153,6 +164,7 @@ class X11EventCollector:
                 os.environ["XAUTHORITY"] = str(candidates[0])
 
     def _handle_event(self, event: Any, X: Any, error: Any) -> None:
+        """把 python-xlib 对象压缩成可跨线程传递的无状态字典事件。"""
         event_type = int(getattr(event, "type", -1))
         if event_type == X.PropertyNotify:
             atom_name = self._atom_name(getattr(event, "atom", 0))
@@ -164,6 +176,8 @@ class X11EventCollector:
                 and int(getattr(event_window, "id", 0)) == int(getattr(self._root, "id", -1))
             )
             if is_root and atom_name == "_NET_ACTIVE_WINDOW":
+                # 根窗口的 _NET_ACTIVE_WINDOW 是应用切换主信号。这里只发送窗口 ID，
+                # App/PID/标题由状态机调用 resolver 在事件处理时读取。
                 active_window_id = self._active_window_id()
                 self._emit("FOCUS_CHANGED", window_id=active_window_id, atom=atom_name)
                 # Some toolkits publish the active-window property before
@@ -172,6 +186,8 @@ class X11EventCollector:
                 # foreground polling.
                 self._schedule_focus_recheck(active_window_id)
             elif is_root and atom_name == "_NET_CLIENT_LIST":
+                # 某些窗口管理器的 Create/Destroy 发生在 frame window；EWMH client
+                # list 才是真正应用窗口集合，因此用集合差补齐创建/销毁边沿。
                 self._sync_client_windows(emit_changes=True)
             elif atom_name in {
                 "_NET_WM_STATE", "_NET_WM_NAME", "WM_NAME", "WM_CLASS", "_NET_WM_PID", "WM_STATE",
@@ -232,6 +248,7 @@ class X11EventCollector:
             return []
 
     def _sync_client_windows(self, *, emit_changes: bool) -> None:
+        """同步 EWMH client 集合，并可选择把集合差转成创建/销毁事件。"""
         windows = {int(window.id): window for window in self._query_client_windows()}
         current_ids = set(windows)
         added = current_ids - self._client_window_ids
@@ -249,6 +266,7 @@ class X11EventCollector:
             self._watched_windows.discard(window_id)
 
     def _schedule_focus_recheck(self, window_id: str) -> None:
+        """在属性尚未稳定时做一次事件驱动的延迟重查，而不是周期轮询。"""
         if not window_id:
             return
 
@@ -292,6 +310,7 @@ class X11EventCollector:
             return ""
 
     def _emit(self, event_type: str, **values: Any) -> None:
+        """给原始事件补充统一时间和来源，再交给 monitor 的线程安全队列。"""
         payload = {
             "event_type": event_type,
             "timestamp_ns": time.time_ns(),

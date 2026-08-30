@@ -27,7 +27,13 @@ class TrackedWindow:
 
 
 class X11EventState:
-    """Maintain app/window state without taking periodic X11 snapshots."""
+    """把多个桌面事件源归一化为稳定的 APP_* 状态机。
+
+    ``windows`` 保存窗口到 App/PID/标题/隐藏状态的最新映射；foreground_* 保存
+    当前活动窗口；``_announced_apps`` 与 ``_closed_apps`` 分别用于抑制重复 OPEN
+    和重复 CLOSE。GNOME、X11、cgroup-empty 兜底和秒级 foreground reconcile
+    全部调用同一个 ``handle``，所以跨来源去重规则只有一份。
+    """
 
     def __init__(self, resolver: Callable[[str], WindowState]) -> None:
         self.resolver = resolver
@@ -55,6 +61,12 @@ class X11EventState:
         }
 
     def handle(self, raw: dict[str, Any]) -> list[dict[str, Any]]:
+        """消费一个低层通知，返回零条或多条高层事件。
+
+        返回多条的典型情况是应用切换：先为旧 App 生成 APP_FOCUS_OUT，再生成
+        唯一的 APP_SWITCH，最后为新 App 生成 APP_FOCUS_IN。调用方只对明确列入
+        ``DIRECT_PREDICTION_EVENTS`` 的事件运行 LSTM。
+        """
         kind = str(raw.get("event_type", ""))
         window_id = str(raw.get("window_id", ""))
         if kind == "COLLECTOR_ERROR":
@@ -69,6 +81,7 @@ class X11EventState:
                 }
             ]
         if kind == "WINDOW_INITIAL":
+            # 初始窗口只进入基线，不产生 APP_OPEN，避免服务重启被误记为用户启动 App。
             current = self._remember(window_id)
             if current is not None and _is_known_app(current.app):
                 self._announced_apps.add(current.app)
@@ -96,6 +109,8 @@ class X11EventState:
         if kind.startswith("GNOME_WINDOW_"):
             return self._handle_gnome_event(kind, window_id, raw)  # lzx-note
         if kind in {"WINDOW_CREATED", "WINDOW_MAPPED", "WINDOW_PROPERTY"}:
+            # 窗口刚创建时元数据经常为空，后续 MAP/PROPERTY 第一次解析出已知 App
+            # 时再补发一次 APP_OPEN，并由 _announced_apps 保证只发一次。
             previous = self.windows.get(window_id)
             current = self._remember(window_id)
             result: list[dict[str, Any]] = []
@@ -135,6 +150,7 @@ class X11EventState:
             previous = self.windows.pop(window_id, None)
             if previous is None or not _is_known_app(previous.app):
                 return []
+            # 同一 App 可能有多个窗口；只有最后一个窗口消失才代表 APP_CLOSE。
             if previous.app not in self.open_apps:
                 self._announced_apps.discard(previous.app)
                 self._closed_apps.add(previous.app)
@@ -182,6 +198,7 @@ class X11EventState:
         self, window_id: str, raw: dict[str, Any],
         *, current: TrackedWindow | None = None,
     ) -> list[dict[str, Any]]:
+        """更新前台状态，并在“应用发生变化”时展开标准切换事件组。"""
         previous_app = self.foreground_app
         previous_window = self.foreground_window_id
         previous_since_ns = self.foreground_since_ns
@@ -202,13 +219,18 @@ class X11EventState:
             self._announced_apps.add(current.app)
             self._closed_apps.discard(current.app)
         if not self._foreground_initialized:
+            # 首次焦点只建立服务启动基线。若该窗口此前未知，前面仍可生成 APP_OPEN；
+            # 但不会凭空制造一次从空状态到当前 App 的 APP_SWITCH。
             self._foreground_initialized = True
             return result
         if previous_app == current_app and previous_window == window_id:
+            # GNOME、X11 和轮询校对可能报告同一条边沿；完全相等时直接去重。
             return result
         # A different window of the same application is not an application
         # switch; it remains represented by the native event in the audit log.
         if previous_app == current_app:
+            # 同一 App 内窗口切换不属于模型训练定义中的“应用切换”。窗口原始事件
+            # 仍在 collector 审计链存在，但不污染 LSTM App 历史。
             return result
         if previous_app:
             previous_duration_ms = max(0, int((int(raw.get("timestamp_ns", 0) or 0) - previous_since_ns) / 1_000_000)) if previous_since_ns else 0
@@ -251,6 +273,8 @@ class X11EventState:
         """
         if not _is_known_app(app):
             return []
+        # 自动化强制停止 scope 时，X11 DestroyNotify 可能来不及抵达。cgroup-empty
+        # 是可靠兜底；若原生 CLOSE 已处理，_closed_apps 会抑制这条重复边沿。
         if app in self._closed_apps:
             return []
         matching = [
@@ -271,6 +295,7 @@ class X11EventState:
         return [self._lifecycle("APP_CLOSE", app, window_id, anchor, raw)]
 
     def _remember(self, window_id: str) -> TrackedWindow | None:
+        """按需解析窗口元数据并刷新缓存；短暂读取失败时保留旧状态。"""
         if not window_id:
             return None
         try:

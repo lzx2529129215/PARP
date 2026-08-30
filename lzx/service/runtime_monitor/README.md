@@ -9,6 +9,9 @@
 
 - `events.csv`：原始文件事件日志。
 - `app_events.csv`：应用生命周期与窗口状态事件日志。
+- `model/process_events.csv`：内核实时上报的全系统进程创建、执行与销毁事件。
+- `model/process_event_source.csv`：进程事件源的认证、序列缺口、溢出与重启审计。
+- `model/process_cgroup_routes.csv`：已有 LSTM App ID 进程的 systemd cgroup 迁移审计。
 - `features_1s.csv`：每 1 秒一行的全局窗口、前台应用、应用集合和系统级特征窗口。
 - `app_features_1s.csv`：每 1 秒每个 observed app 一行的应用级文件、I/O、内存和进程特征。
 
@@ -29,7 +32,8 @@
 - 应用级内存状态：优先 cgroup v2，失败时 fallback 到 procfs。
 - 全局内存状态：采集 `/proc/meminfo` 和 `/proc/vmstat`。
 - 前台状态接口：支持 `desktop/x11/manual`；`desktop` 在 GNOME Wayland 上使用 Shell D-Bus 事件，并保留 X11 回退。`lzx-note`
-- 应用生命周期事件：通过 procfs 维护 `app_id -> pid_set`，输出 `APP_START/APP_EXIT/APP_CLOSE`。
+- 全系统进程生命周期：常驻服务通过受限 root helper 订阅 Linux proc connector，实时输出每个进程 leader 的 `PROCESS_START/PROCESS_EXEC/PROCESS_EXIT`；不受目标 App 过滤。
+- 应用聚合生命周期：继续通过 procfs 维护 `app_id -> pid_set`，输出 `APP_START/APP_EXIT/APP_CLOSE`，用于 App 状态机和关闭兜底。
 - 前台切换事件：通过 foreground collector 输出 `APP_SWITCH/APP_FOCUS_IN/APP_FOCUS_OUT`。
 - X11 窗口状态事件：尽量采集 `window_id/window_title/pid`，并通过 `_NET_WM_STATE_HIDDEN` 输出 `APP_MINIMIZE/APP_RESTORE`。
 - 原生 X11 事件驱动：使用 `--direct-x11-events` 监听 `_NET_ACTIVE_WINDOW`、窗口创建/销毁、`_NET_WM_STATE` 和 Map/Unmap 事件；应用事件不再依赖 `--sample-interval` 轮询。内存、进程等特征仍按采样时钟采集。
@@ -133,7 +137,12 @@ bash runtime_monitor/scripts/run_wps_monitor.sh
 - `--path-mode raw|hash|basename`：控制 `events.csv` 中 path 的隐私模式。
 - `--foreground-backend desktop|x11|wayland|manual`：常驻服务默认 `desktop`，组合 GNOME D-Bus 与 X11 回退。
 - `--label WPS_LAUNCH|WPS_OPEN_DOC|WPS_SAVE_DOC|IDLE|OTHER`：给本次采集的 `features_1s.csv` 写入统一 label。
-- `--enable-ebpf`：预留参数；v0 会打印 warning 并继续使用 procfs fallback。
+- `--process-event-source connector`：通过受限 root helper + Linux proc connector 实时采集全系统进程 leader 的 `FORK/EXEC/EXIT`。
+- `--process-event-source procfs`：只用秒级 `/proc` 快照差分采集目标 App 进程，可能遗漏采样间隔内结束的短进程。
+- `--require-process-connector`：认证事件源未就绪或心跳超时时干净结束 session，避免静默产生不完整覆盖。
+- `--process-cgroup-routing systemd`：每个 `PROCESS_START` 都调用常驻服务 `createProcess()`；仅将 runtime scope 中已有 LSTM App ID 的进程迁入 `parp-<app>.slice`。
+- `--process-cgroup-reconcile-interval-s 5`：定期补偿服务启动前已有的进程以及 FORK/EXEC 竞争窗口。
+- `--enable-ebpf`：兼容旧命令的 deprecated alias；现在选择 proc connector，但不会加载 eBPF 程序。
 - `--disable-ebpf`：显式使用 procfs fallback。
 
 ## 输出 Schema
@@ -170,7 +179,35 @@ ts_ns,event_type,app,pid,tgid,window_id,window_title,old_app,new_app,foreground_
 - `APP_MINIMIZE`：X11 窗口进入 `_NET_WM_STATE_HIDDEN`。
 - `APP_RESTORE`：X11 窗口从 `_NET_WM_STATE_HIDDEN` 恢复。
 
-当前实现不依赖 eBPF；后续如果接入 eBPF，可以用 `sched_process_exec` 和 `sched_process_exit` 增强启动/退出事件来源。
+常驻生产服务默认使用 proc connector 实时获取全系统 `FORK/EXEC/EXIT`。只有显式选择 `--process-event-source procfs` 时才退回目标 App 快照差分。该实现不依赖 eBPF；未来 eBPF 仍可用于 path/syscall 级文件事件。
+
+### model/process_events.csv
+
+常驻服务使用 `connector` 时，一条内核事件写一行：
+
+```text
+session_id,ts_ns,timestamp,event_type,app,pid,tgid,comm,cmdline_hash,exe_path,cgroup_unit,cgroup_path,test_slice,in_test_slice,boot_ts_ns,native_event,parent_pid,parent_tgid,exit_code,exit_signal,cpu,source_seq,source_instance_id,source
+```
+
+- `PROCESS_START` 对应内核 `FORK`，包含父进程 PID/TGID。
+- `PROCESS_EXEC` 对应 `EXEC`，用于取得 exec 后的程序名、路径和 cgroup 元数据。
+- `PROCESS_EXIT` 对应 `EXIT`，包含退出码和退出信号。
+- 这里只按 `pid == tgid` 保留进程 leader，不把同一进程的每个线程重复算作新进程。
+- 所有进程都会落盘；只有能命中运行时映射规则的行才填写 `app`。
+
+### model/process_event_source.csv
+
+该文件是“是否真的覆盖完整”的独立证据。`SOURCE_RESTART`、`DELIVERY_GAP`、
+`KERNEL_OVERFLOW`、`ERROR` 或 `SOURCE_STALE` 都表示当前 session 不能视为无缺口；
+生产服务的严格模式会结束当前 session，再由 systemd 重启。
+
+### model/process_cgroup_routes.csv
+
+该文件记录事件驱动的 cgroup 决策。`PROCESS_START` 对每个新进程调用
+`RuntimeMonitorV0.createProcess()`；未命中当前 LSTM runtime scope 固定 App ID 的
+进程原地保留。命中后由异步 worker 请求 user-systemd 创建 transient scope，
+并重新读取 `/proc/<pid>/cgroup`；只有真实路径进入目标 `parp-<app>.slice` 才写
+`MIGRATED`。`PROCESS_EXEC` 会复核最终可执行文件，`RECONCILE` 是低频完整性兜底。
 
 ### features_1s.csv
 
@@ -293,4 +330,4 @@ python3 -m unittest discover -s tests -p 'test_runtime_monitor.py'
 - v0 不做内核修改，不依赖特定 WPS 版本。
 - 所有数据只写本地文件，不上传、不外发。
 - 如果没有权限读取某些 `/proc` 或 cgroup 文件，对应字段置 0 或空，不让程序崩溃。
-- 无 eBPF fallback 可以生成可用趋势特征，但不能替代 syscall 级审计。
+- 文件事件的无 eBPF fallback 可以生成可用趋势特征，但不能替代 syscall 级文件审计；进程创建/执行/退出已使用 proc connector 实时采集。

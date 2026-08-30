@@ -1,0 +1,42 @@
+[Unit]
+Description=PARP system-wide process event source for UID %i
+Documentation=file:///home/lzx/Desktop/PARP/lzx/service/runtime_monitor/README_SERVICE.md
+After=systemd-user-sessions.service
+
+[Service]
+Type=simple
+User=root
+Group=root
+ExecStart=/usr/local/libexec/parp-proc-connector --target-uid %i
+Restart=always
+RestartSec=2
+UMask=0077
+
+# The helper needs CAP_NET_ADMIN only to subscribe to CN_IDX_PROC and
+# DAC_READ_SEARCH for best-effort metadata on system processes.  It cannot
+# mutate cgroups, tracing, BPF, modules, sysctls, devices, or the filesystem.
+CapabilityBoundingSet=CAP_NET_ADMIN CAP_DAC_READ_SEARCH
+AmbientCapabilities=CAP_NET_ADMIN CAP_DAC_READ_SEARCH
+NoNewPrivileges=true
+PrivateTmp=true
+PrivateDevices=true
+ProtectSystem=strict
+# helper 必须看见 /run/user/%i 中由普通用户 monitor 创建的 Unix socket。
+# read-only 仍禁止它修改 /home、/root、/run/user 下的普通文件；向既有
+# AF_UNIX datagram socket 发送消息不需要目录写权限。
+ProtectHome=read-only
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectKernelLogs=true
+ProtectControlGroups=true
+ProtectClock=true
+RestrictNamespaces=true
+RestrictRealtime=true
+RestrictSUIDSGID=true
+LockPersonality=true
+MemoryDenyWriteExecute=true
+RestrictAddressFamilies=AF_NETLINK AF_UNIX
+SystemCallArchitectures=native
+
+[Install]
+WantedBy=multi-user.target

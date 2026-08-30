@@ -3,7 +3,7 @@
 
 Output directory (per session):
   outputs/runtime_monitor/<session_id>/
-  ├── model/     — machine-training data (9 CSVs)
+  ├── model/     — machine-training and event-integrity CSVs
   └── review/    — human-inspection data (7 files)
 
 The service performs no reclaim itself; optional LSTM state is sent atomically
@@ -37,8 +37,9 @@ from collectors.file_events import FileEventCollector
 from collectors.foreground import ForegroundCollector, ForegroundState
 from collectors.memory import read_meminfo, read_vmstat
 from collectors.process import ProcessCollector
+from collectors.process_events import GlobalProcessEventCollector
 from core.app_feature_builder import AppFeatureBuilder
-from core.app_mapper import AppMapper, load_config
+from core.app_mapper import AppMapper, ProcessIdentity, load_config
 from core.app_registry import AppRegistry
 from core.feature_builder import FeatureBuilder
 from core.lifecycle import LifecycleEventBuilder
@@ -59,6 +60,7 @@ from core.online_markov_debugfs_audit import OnlineMarkovDebugfsAuditWriter
 from core.parp_myfs import PARPMyfsBridge  # lzx-note
 from core.dual_workload_markov import DualWorkloadMarkov
 from core.operation_tracker import OperationTracker
+from core.process_cgroup_router import SystemdProcessCgroupRouter
 from core.review_builder import ReviewBuilder
 from core.runtime_scope import RuntimeAppScope, load_runtime_app_scope
 from core.workload_classifier import ClassificationResult, classify_session
@@ -72,6 +74,8 @@ from core.schema import (
     OPERATION_EVENT_FIELDS,
     OPERATION_LABEL_FIELDS,
     PROCESS_EVENT_FIELDS,
+    PROCESS_EVENT_SOURCE_FIELDS,
+    PROCESS_CGROUP_ROUTE_FIELDS,
     DIRECT_APP_EVENT_FIELDS,
 )
 from core.writer import CsvWriter
@@ -82,7 +86,23 @@ from core.x11_event_state import DIRECT_PREDICTION_EVENTS, X11EventState
 
 
 class RuntimeMonitorV0:
+    """常驻服务的总装配器。
+
+    这个类把两条节奏不同的通路放到同一个主线程中协调：
+
+    1. 秒级采样通路：周期性读取 ``/proc``、系统内存、前台窗口等状态，
+       生成训练/审计 CSV，并持续更新工作集估计器。
+    2. 桌面事件通路：GNOME/X11 监听线程只负责投递原始事件；主线程收到
+       pipe 唤醒后完成状态机去重、LSTM 推理和 ``/dev/myfs`` 原子提交。
+
+    除专门的 Test4/Test4B 参数显式开启外，生产启动参数不会让该类直接执行
+    ``memory.reclaim``；正常常驻路径只做观测、推理和内核策略输入提交。
+    """
+
     def __init__(self, args: argparse.Namespace) -> None:
+        # 先解析“监控哪些应用”。runtime scope 不只是进程过滤表，还同时提供
+        # App ID、LSTM 词表名称、GUI scope 与 fixture alias 的统一映射，因此
+        # 后续事件识别、模型输出和内核 binding 都必须复用同一份 scope。
         self.args = args
         self.config = load_config(args.config)
         self.runtime_scope = _load_runtime_scope(args)
@@ -107,7 +127,8 @@ class RuntimeMonitorV0:
         self.session_id = _resolve_session_id(args)
         self.stop_requested = False
 
-        # Directory structure
+        # 每次服务启动使用独立 session 目录。model/ 保存机器可读的逐条证据，
+        # review/ 保存停机阶段汇总出的人工审阅材料；绝不在旧 session 上续写。
         requested_output = Path(args.output_dir)
         self.output_dir = requested_output if requested_output.name == self.session_id else requested_output / self.session_id
         self.output_root = requested_output.parent if requested_output.name == self.session_id else requested_output
@@ -117,7 +138,9 @@ class RuntimeMonitorV0:
         self.review_dir.mkdir(parents=True, exist_ok=True)
         self._last_storage_check_monotonic = float("-inf")
 
-        # Collectors
+        # 采集器分工：ProcessCollector 读取 /proc 并映射 App；ForegroundCollector
+        # 查询当前活动窗口；桌面原生监听器则稍后在 run() 中启动，避免 __init__
+        # 尚未完成时就让后台线程回调不完整的对象。
         self.mapper = AppMapper(self.config, target_app=args.target_app, target_apps=self.target_apps)
         self.process_collector = ProcessCollector(
             mapper=self.mapper,
@@ -127,6 +150,54 @@ class RuntimeMonitorV0:
             target_comm=args.target_comm,
             test_slice=args.test_slice,
         )
+        # 全系统实时进程事件由独立 root helper 订阅 proc connector，再通过带
+        # SCM_CREDENTIALS 的 Unix datagram 交给本用户服务。主 monitor 始终保持
+        # 非特权；procfs 采样仍用于目标 App 特征和 APP_CLOSE 兜底。
+        self.process_event_source = str(args.process_event_source)
+        self.global_process_event_collector: GlobalProcessEventCollector | None = None
+        self._process_event_queue: queue.Queue[dict[str, Any]] = queue.Queue()
+        self._process_event_wake_r = -1
+        self._process_event_wake_w = -1
+        self._process_source_instance_id = ""
+        self._last_process_source_seq = 0
+        self._last_process_delivery_drops = 0
+        self._last_process_kernel_overflows = 0
+        self._process_source_stale = False
+        self.process_connector_active = False
+        runtime_dir = Path(os.environ.get("XDG_RUNTIME_DIR", f"/run/user/{os.getuid()}"))
+        self.process_connector_socket = Path(
+            args.process_connector_socket
+            or runtime_dir / "parp-process-events.sock"
+        )
+        if self.process_event_source == "connector":
+            self._process_event_wake_r, self._process_event_wake_w = os.pipe()
+            os.set_blocking(self._process_event_wake_r, False)
+            os.set_blocking(self._process_event_wake_w, False)
+            self.global_process_event_collector = GlobalProcessEventCollector(
+                self._enqueue_global_process_event,
+                socket_path=self.process_connector_socket,
+            )
+        # cgroup 路由只接受 runtime scope 中 prediction_enabled 的固定 App ID。
+        # 每个 PROCESS_START 都会调用 createProcess；worker 只对成功映射的同 UID
+        # 进程发起 user-systemd transient scope 迁移，不动态创造 App ID。
+        self.process_cgroup_router: SystemdProcessCgroupRouter | None = None
+        self._process_cgroup_route_results: queue.Queue[dict[str, Any]] = queue.Queue()
+        if args.process_cgroup_routing == "systemd":
+            if self.process_event_source != "connector":
+                raise ValueError("process cgroup routing requires the connector event source")
+            if self.runtime_scope is None:
+                raise ValueError("process cgroup routing requires a runtime App scope")
+            route_app_ids = {
+                app.app_key: int(app.app_id)
+                for app in self.runtime_scope.apps
+                if app.prediction_enabled and int(app.app_id) > 0
+            }
+            self.process_cgroup_router = SystemdProcessCgroupRouter(
+                mapper=self.mapper,
+                app_ids=route_app_ids,
+                callback=self._enqueue_process_cgroup_route_result,
+                timeout_s=args.process_cgroup_route_timeout_s,
+            )
         manual_pid = args.target_pid or 0
         self.foreground_collector = ForegroundCollector(
             backend=args.foreground_backend,
@@ -139,6 +210,8 @@ class RuntimeMonitorV0:
             raise ValueError("--direct-x11-events requires the x11 or desktop backend")
         self._direct_event_queue: queue.Queue[dict[str, Any]] = queue.Queue()
         self._direct_event_wake_r, self._direct_event_wake_w = os.pipe()
+        # 监听器线程不能直接跑 LSTM 或写 CSV：这里用“线程安全队列 + 非阻塞 pipe”
+        # 把事件转交主线程。pipe 仅承担 select() 唤醒信号，事件正文始终在 queue 中。
         # _drain_direct_x11_events may run at a scheduled sampling boundary
         # even when no X11 callback has queued an event.  A blocking read here
         # would prevent both the duration limit and SIGINT from being handled.
@@ -155,7 +228,8 @@ class RuntimeMonitorV0:
             )
         self.file_collector = FileEventCollector(path_mode=args.path_mode)
 
-        # Builders
+        # Builder/Registry 将原始采样转换成稳定 schema。Registry 保存跨采样窗口
+        # 的启动、关闭和前后台历史；Builder 只负责从当前快照生成一行/多行特征。
         self.feature_builder = FeatureBuilder(
             label=args.label, session_id=self.session_id, test_slice=args.test_slice,
         )
@@ -181,7 +255,8 @@ class RuntimeMonitorV0:
         # Review builder (generated at session end)
         self.review_builder = ReviewBuilder(self.model_dir, self.review_dir, self.session_id)
 
-        # model/ CSV writers (7 files)
+        # model/ CSV writers。进程事件本体与事件源健康状态分文件保存，避免在
+        # PROCESS_* 业务行中混入 heartbeat、溢出和传输缺口等控制记录。
         self.global_state_writer = CsvWriter(
             self.model_dir / "global_state_1s.csv", GLOBAL_STATE_1S_FIELDS,
         )
@@ -193,6 +268,12 @@ class RuntimeMonitorV0:
         )
         self.process_events_writer = CsvWriter(
             self.model_dir / "process_events.csv", PROCESS_EVENT_FIELDS,
+        )
+        self.process_event_source_writer = CsvWriter(
+            self.model_dir / "process_event_source.csv", PROCESS_EVENT_SOURCE_FIELDS,
+        )
+        self.process_cgroup_route_writer = CsvWriter(
+            self.model_dir / "process_cgroup_routes.csv", PROCESS_CGROUP_ROUTE_FIELDS,
         )
         self.app_lifecycle_writer = CsvWriter(
             self.model_dir / "app_lifecycle_events.csv", APP_LIFECYCLE_EVENT_FIELDS,
@@ -206,6 +287,8 @@ class RuntimeMonitorV0:
         self.foreground_debug_writer = CsvWriter(
             self.model_dir / "foreground_debug.csv", FOREGROUND_DEBUG_FIELDS,
         )
+        # 生产 runner 使用 v3 LSTM。PARPMyfsBridge 与模型解耦：即使设备缺失，
+        # LSTM 和事件采集仍可继续，bridge 只把失败记录为 fail-closed 审计行。
         self.online_lstm = OnlineDurationLSTMRunner(args, self.model_dir, self.review_dir) if args.enable_online_lstm else None
         self.parp_bridge = None
         if args.enable_parp_myfs or args.enable_parp_bridge:
@@ -421,6 +504,15 @@ class RuntimeMonitorV0:
     # ------------------------------------------------------------------
 
     def run(self) -> int:
+        """运行常驻事件循环，并保证所有退出路径都完整收尾。
+
+        ``time.monotonic()`` 用于调度，避免系统时间校准导致采样周期跳变；CSV 中
+        的业务时间仍由 ``time.time_ns()`` 产生。启用直接桌面事件后，主线程在
+        ``select()`` 中同时等待“下一个采样点”和“事件 pipe 可读”，所以应用切换
+        无需等待一秒采样边界即可进入 LSTM。
+        """
+        # systemd 的 KillSignal=SIGINT 与普通 SIGTERM 都只设置退出标记；资源关闭、
+        # review 生成和 bridge summary 必须统一在 finally 中执行。
         signal.signal(signal.SIGINT, self._request_stop)
         signal.signal(signal.SIGTERM, self._request_stop)
         start = time.monotonic()
@@ -470,6 +562,60 @@ class RuntimeMonitorV0:
             self.parp_bridge.startup_bindings()
         else:
             print("  PARP bridge: disabled")
+        if self.process_cgroup_router is not None:
+            try:
+                self.process_cgroup_router.start()
+                queued = self.process_cgroup_router.reconcile_if_due(
+                    self.args.process_cgroup_reconcile_interval_s,
+                    force=True,
+                )
+                print(
+                    "  process cgroup routing: systemd READY "
+                    f"apps={','.join(self.process_cgroup_router.apps)} "
+                    f"startup_reconcile={queued}"
+                )
+            except Exception as exc:
+                self._write_process_cgroup_route_result({
+                    "timestamp_ns": time.time_ns(),
+                    "status": "ROUTER_START_FAILED",
+                    "detail": str(exc),
+                })
+                print(f"warning: process cgroup router failed: {exc}", file=sys.stderr)
+                failed_router = self.process_cgroup_router
+                self.process_cgroup_router = None
+                if failed_router is not None:
+                    failed_router.stop()
+                if self.args.require_process_cgroup_routing:
+                    self.stop_requested = True
+        else:
+            print("  process cgroup routing: disabled")
+        if self.global_process_event_collector is not None:
+            process_start_error = ""
+            try:
+                self.global_process_event_collector.start()
+                self.process_connector_active = self.global_process_event_collector.wait_ready(
+                    self.args.process_connector_ready_timeout_s
+                )
+            except Exception as exc:
+                self.process_connector_active = False
+                process_start_error = str(exc)
+                self._write_process_source_status("START_FAILED", str(exc))
+            if self.process_connector_active:
+                print("  system-wide process events: proc connector READY")
+                print(f"  process event socket: {self.process_connector_socket}")
+                self._drain_global_process_events()
+            elif self.global_process_event_collector is not None:
+                detail = process_start_error or (
+                    "no authenticated helper heartbeat within "
+                    f"{self.args.process_connector_ready_timeout_s:.1f}s"
+                )
+                if not process_start_error:
+                    self._write_process_source_status("STARTUP_TIMEOUT", detail)
+                print(f"warning: process connector {detail}", file=sys.stderr)
+                if self.args.require_process_connector:
+                    self.stop_requested = True
+        else:
+            print("  system-wide process events: disabled (procfs target-app fallback)")
         if self.direct_x11_events:
             self._start_direct_x11_events()
             print("  native desktop app events: enabled")
@@ -491,27 +637,48 @@ class RuntimeMonitorV0:
         try:
             while not self.stop_requested:
                 now = time.monotonic()
+                # duration=86400 是常驻服务的每日 session 边界。正常 break 后
+                # systemd Restart=always 会创建新的 session，而不是结束常驻能力。
                 if self.args.duration and now - start >= self.args.duration:
                     break
                 if now < next_tick:
                     timeout = next_tick - now
-                    if self.direct_x11_events:
+                    wake_fds = []
+                    if self.direct_x11_events and self._direct_event_wake_r >= 0:
+                        wake_fds.append(self._direct_event_wake_r)
+                    if self.global_process_event_collector is not None and self._process_event_wake_r >= 0:
+                        wake_fds.append(self._process_event_wake_r)
+                    if wake_fds:
                         try:
+                            # 任一 pipe 可读就提前处理事件；若超时则自然落到采样。
+                            # InterruptedError 常见于信号打断，下一轮会检查 stop 标记。
                             readable, _, _ = select.select(
-                                [self._direct_event_wake_r], [], [], timeout
+                                wake_fds, [], [], timeout
                             )
                         except InterruptedError:
                             continue
-                        if readable:
+                        if self._direct_event_wake_r in readable:
                             self._drain_direct_x11_events()
+                        if self._process_event_wake_r in readable:
+                            self._drain_global_process_events()
                     else:
                         time.sleep(min(0.1, timeout))
                     continue
                 if self.direct_x11_events:
+                    # 在采样前再次排空队列，确保恰好抵达边界的事件先更新前台状态，
+                    # 随后的 feature_row 才不会记录到旧的 foreground App。
                     self._drain_direct_x11_events()
+                if self.global_process_event_collector is not None:
+                    self._drain_global_process_events()
                 self.sample_once()
+                # 使用累加的绝对 deadline，而不是 now + interval，避免一次较慢采样
+                # 把后续全部采样点永久向后漂移。
                 next_tick += self.args.sample_interval
         finally:
+            # 收尾顺序很重要：先阻止新事件进入并排空已有事件，再关 CSV；随后停止
+            # sidecar/在线采样器并生成派生汇总，最后关闭 myfs/memory 审计和 review。
+            self._stop_global_process_events()
+            self._drain_global_process_events()
             self._stop_direct_x11_events()
             if self.direct_x11_events:
                 self._drain_direct_x11_events()
@@ -558,11 +725,25 @@ class RuntimeMonitorV0:
         return 0
 
     def sample_once(self) -> None:
+        """执行一次秒级观测，不把采样时钟误当成桌面事件。
+
+        生产配置启用了 ``direct_x11_events``，因此本函数主要负责连续观测和 CSV
+        特征构建；LSTM 由 ``_handle_direct_x11_event`` 触发。仅在关闭直接事件模式
+        的兼容运行中，函数末尾才会调用 ``online_lstm.process_sample``。
+        """
+        # 某些实验策略需要定期刷新 cgroup inode 绑定。生产 runner 未启用该策略，
+        # 此调用会快速返回，不会触碰 debugfs。
         self._maybe_refresh_mglru_app_bindings()
+        self._maybe_check_process_event_source()
+        if self.process_cgroup_router is not None:
+            self.process_cgroup_router.reconcile_if_due(
+                self.args.process_cgroup_reconcile_interval_s
+            )
         window_start_ns = time.time_ns()
         window_end_ns = window_start_ns + int(self.args.sample_interval * 1_000_000_000)
 
-        # 1. Collect raw data
+        # 阶段 1：采集原始数据。ProcessCollector 会扫描 /proc，但只返回能映射到
+        # runtime scope 中目标 App 的 PID；后续组件共享这份一致的进程快照。
         samples = self.process_collector.sample()
         if self.parp_bridge is not None:
             try:
@@ -575,6 +756,7 @@ class RuntimeMonitorV0:
                 print(f"warning: PARP working-set sample failed: {exc}", file=sys.stderr)
         if self.memory_shadow is not None:
             self.memory_shadow.sample_if_due(samples, window_start_ns)
+        # 文件计数只在内存中按采样窗口聚合，用来构造 App 特征；不会落盘原始路径。
         file_events = self.file_collector.poll(samples)  # in-memory only, not written to disk
 
         meminfo = read_meminfo()
@@ -586,6 +768,8 @@ class RuntimeMonitorV0:
             # X11EventState equality checks suppress duplicates when the
             # native notification already arrived or arrives later. lzx-note
             sampled_foreground = self.foreground_collector.sample()
+            # 原生事件是低延迟主路径，轮询结果只是每秒校对。校对同样经过
+            # X11EventState，故迟到的原生事件会被窗口/App 相等判断自然去重。
             self._reconcile_direct_foreground(sampled_foreground, window_start_ns)
             foreground = self._current_foreground_state()
         else:
@@ -620,18 +804,24 @@ class RuntimeMonitorV0:
                 print(f"warning: Test4B ballast tick failed: {exc}", file=sys.stderr)
         feature_window_id = self.feature_builder.feature_window_id
 
-        # 2. Foreground debug CSV
+        # 阶段 2：无论前台解析成功与否都写 debug 行，保留窗口属性、映射来源和
+        # 失败原因，方便区分“用户没有目标 App 在前台”和“采集器失效”。
         self.foreground_debug_writer.write_row(
             self.foreground_collector.debug_row(self.session_id, feature_window_id)
         )
 
         windows = [] if self.direct_x11_events else self.foreground_collector.sample_windows()
 
-        # 3. Lifecycle events → three event streams
+        # 阶段 3：从进程快照推导生命周期。直接事件模式下，前台/窗口事件由
+        # GNOME/X11 状态机负责，避免与采样推导重复；这里只保留进程事件，以及
+        # cgroup 已空时的 APP_CLOSE 兜底。
         lifecycle_events = self.lifecycle_builder.build_all(
             samples=samples, foreground=foreground, windows=windows,
         )
-        self.process_events_writer.write_rows(lifecycle_events.process_events)
+        # connector READY 后，PROCESS_START/EXIT 由内核实时事件提供，不能再写轮询
+        # 差分造成重复；procfs builder 仍继续维护目标 App 生命周期和关闭兜底。
+        if not self.process_connector_active:
+            self.process_events_writer.write_rows(lifecycle_events.process_events)
         if not self.direct_x11_events:
             self.foreground_events_writer.write_rows(lifecycle_events.foreground_events)
             self.app_lifecycle_writer.write_rows(lifecycle_events.app_lifecycle)
@@ -650,11 +840,13 @@ class RuntimeMonitorV0:
                         "source": "procfs-cgroup",
                     })
 
-        # 4. App registry update
+        # 阶段 4：Registry 合并当前 PID、前台和历史，形成 open_apps、最近切换及
+        # 停留时间。history_window=64 约束的是这些 CSV 字段，不是 LSTM 的 5 段输入。
         self.app_registry.update(samples=samples, foreground=foreground)
         registry_summary = self.app_registry.summary()
 
-        # 5. Operation tracking
+        # 阶段 5：把自动化 trace 中的操作标签对齐到当前采样窗口；常驻服务没有
+        # trace 时返回空上下文，不影响基础采集。
         self.operation_tracker.refresh()
         op_context = self.operation_tracker.get_current(window_start_ns, window_end_ns)
         new_ops = self.operation_tracker.pop_new_operation_events(
@@ -668,7 +860,7 @@ class RuntimeMonitorV0:
         for app_id in self.app_registry.observed_apps:
             op_app_map[app_id] = dict(op_context)
 
-        # 6. App features → app_state_1s.csv
+        # 阶段 6：按 App 输出一行局部特征，例如 RSS、fault、I/O、前台标记和操作标签。
         app_feature_rows = self.app_feature_builder.build_rows(
             feature_window_id=feature_window_id,
             window_start_ns=window_start_ns,
@@ -681,7 +873,8 @@ class RuntimeMonitorV0:
         )
         self.app_state_writer.write_rows(app_feature_rows)
 
-        # 7. Global features → global_state_1s.csv
+        # 阶段 7：输出全局特征，包括 meminfo/vmstat、当前前台、打开 App 集合及
+        # test slice 限额。该行也是非直接事件兼容模式下的 LSTM 输入快照。
         test_mem = _read_test_slice_memory(self.args.test_slice)
         feature_row = self.feature_builder.build(
             foreground=foreground,
@@ -712,6 +905,8 @@ class RuntimeMonitorV0:
             )
         self._maybe_write_mglru_current_app(feature_row)
         if self.online_lstm is not None and not self.direct_x11_events:
+            # 兼容路径：没有原生事件监听时才比较相邻采样并触发预测。生产服务
+            # direct_x11_events=True，因此不会在这里制造延迟或重复的 LSTM 调用。
             prediction_result = self.online_lstm.process_sample(feature_row)
             self._maybe_write_mglru_predictions(prediction_result)
             if self.parp_bridge is not None:
@@ -771,10 +966,303 @@ class RuntimeMonitorV0:
             self.stop_requested = True
 
     # ------------------------------------------------------------------
+    # System-wide process event path
+    # ------------------------------------------------------------------
+
+    def _enqueue_global_process_event(self, event: dict[str, Any]) -> None:
+        """由凭据校验线程入队；CSV 和 App 映射仍只在 monitor 主线程执行。"""
+        self._process_event_queue.put(event)
+        try:
+            os.write(self._process_event_wake_w, b"p")
+        except OSError:
+            pass
+
+    def _stop_global_process_events(self) -> None:
+        collector = self.global_process_event_collector
+        self.global_process_event_collector = None
+        if collector is not None:
+            collector.stop()
+        router = self.process_cgroup_router
+        self.process_cgroup_router = None
+        if router is not None:
+            router.stop()
+        for fd_name in ("_process_event_wake_r", "_process_event_wake_w"):
+            fd = getattr(self, fd_name, -1)
+            if fd >= 0:
+                try:
+                    os.close(fd)
+                except OSError:
+                    pass
+                setattr(self, fd_name, -1)
+
+    def _drain_global_process_events(self) -> None:
+        if self._process_event_wake_r >= 0:
+            try:
+                os.read(self._process_event_wake_r, 65536)
+            except (BlockingIOError, OSError):
+                pass
+        while True:
+            try:
+                event = self._process_event_queue.get_nowait()
+            except queue.Empty:
+                break
+            self._handle_global_process_event(event)
+        while True:
+            try:
+                result = self._process_cgroup_route_results.get_nowait()
+            except queue.Empty:
+                return
+            self._write_process_cgroup_route_result(result)
+
+    def _enqueue_process_cgroup_route_result(self, result: dict[str, Any]) -> None:
+        """由 systemd 路由 worker 回传；CSV 仍由 monitor 主线程串行写入。"""
+        self._process_cgroup_route_results.put(result)
+        try:
+            os.write(self._process_event_wake_w, b"c")
+        except OSError:
+            pass
+
+    def _write_process_cgroup_route_result(self, result: dict[str, Any]) -> None:
+        ts_ns = int(result.get("timestamp_ns", 0) or time.time_ns())
+        self.process_cgroup_route_writer.write_row({
+            "session_id": self.session_id,
+            "ts_ns": ts_ns,
+            "timestamp": dt.datetime.fromtimestamp(
+                ts_ns / 1_000_000_000
+            ).isoformat(timespec="milliseconds"),
+            "requested_ts_ns": result.get("requested_timestamp_ns", ""),
+            "event_type": result.get("event_type", ""),
+            "source_seq": result.get("source_seq", ""),
+            "app": result.get("app", ""),
+            "app_id": result.get("app_id", ""),
+            "pid": result.get("pid", ""),
+            "comm": result.get("comm", ""),
+            "exe_path": result.get("exe_path", ""),
+            "old_cgroup": result.get("old_cgroup", ""),
+            "target_slice": result.get("target_slice", ""),
+            "target_scope": result.get("target_scope", ""),
+            "new_cgroup": result.get("new_cgroup", ""),
+            "status": result.get("status", ""),
+            "detail": result.get("detail", ""),
+            "latency_us": result.get("latency_us", ""),
+            "source": "user-systemd",
+        })
+
+    def _write_process_source_status(
+        self,
+        status: str,
+        detail: str = "",
+        event: dict[str, Any] | None = None,
+    ) -> None:
+        values = event or {}
+        ts_ns = int(values.get("timestamp_ns", 0) or time.time_ns())
+        self.process_event_source_writer.write_row({
+            "session_id": self.session_id,
+            "ts_ns": ts_ns,
+            "timestamp": dt.datetime.fromtimestamp(ts_ns / 1_000_000_000).isoformat(
+                timespec="milliseconds"
+            ),
+            "status": status,
+            "detail": detail or str(values.get("detail", "")),
+            "source_seq": values.get("source_seq", self._last_process_source_seq),
+            "delivery_drops": values.get("delivery_drops", ""),
+            "kernel_overflows": values.get("kernel_overflows", ""),
+            "helper_pid": values.get("helper_pid", ""),
+            "source_instance_id": values.get(
+                "source_instance_id", self._process_source_instance_id
+            ),
+            "socket_path": str(self.process_connector_socket),
+            "source": "proc-connector",
+        })
+
+    def createProcess(
+        self,
+        event: dict[str, Any],
+        identity: ProcessIdentity,
+    ) -> None:
+        """处理每一个内核 PROCESS_START，并决定是否提交 cgroup 迁移。
+
+        “每个进程都执行”指每个 FORK 都经过统一判断，并不表示每个进程都要
+        调用 systemd 迁移。一次独立启动的根进程迁入 ``parp-<app>.slice`` 下的
+        transient scope 后，随后 fork 的后代会直接继承父进程的 cgroup。router
+        在真正操作前会重新读取 /proc；如果发现新进程已经继承目标 slice，就以
+        ``ALREADY_ROUTED`` 结束，不创建第二个 scope。
+
+        不能只监听“整个 App 的第一个进程”：同一 App 可能由 GNOME 再次独立
+        启动，也可能由 D-Bus/portal/systemd 创建没有父子关系的新进程树；此外，
+        主进程完成异步迁移前已经 fork 的子进程仍会留在旧 cgroup。因此所有
+        PROCESS_START 都必须进入本入口，真正需要迁移的只是尚未归组的进程树根
+        和上述竞争遗漏进程。
+
+        是否属于目标 App，由 router 使用当前 LSTM runtime scope 的 AppMapper
+        和固定 App ID 决定。未知 App、没有 prediction_enabled App ID、其他 UID
+        或已经位于目标 slice 的进程都不会被错误迁移，也不会动态创建 App ID。
+
+        FORK 时看到的 identity 可能仍继承父进程名称，因此 PROCESS_EXEC 到达后
+        ``_handle_global_process_event`` 会再次提交复核。真正的 systemd D-Bus
+        操作在 worker 中异步进行，不能阻塞全系统进程事件接收。
+        """
+        router = self.process_cgroup_router
+        if router is not None:
+            router.submit_created_process(event, identity)
+
+    def _handle_global_process_event(self, event: dict[str, Any]) -> None:
+        """校验序列连续性，并把 helper 事件转换成现有 process CSV schema。"""
+        instance_id = str(event.get("source_instance_id", ""))
+        instance_changed = bool(
+            instance_id and instance_id != self._process_source_instance_id
+        )
+        if instance_changed:
+            if self._process_source_instance_id:
+                self._write_process_source_status(
+                    "SOURCE_RESTART",
+                    f"helper instance changed from {self._process_source_instance_id} to {instance_id}",
+                    event,
+                )
+                if self.args.require_process_connector:
+                    # helper 重启期间可能存在无法量化的订阅空窗；严格模式切分
+                    # session，使这段边界不会被误认为一条连续事件流。
+                    self.stop_requested = True
+            self._process_source_instance_id = instance_id
+            self._last_process_source_seq = 0
+            self._last_process_delivery_drops = 0
+            self._last_process_kernel_overflows = 0
+
+        kind = str(event.get("kind", ""))
+        if kind == "SOURCE_STATUS":
+            status = str(event.get("status", "UNKNOWN"))
+            delivery_drops = int(event.get("delivery_drops", 0) or 0)
+            kernel_overflows = int(event.get("kernel_overflows", 0) or 0)
+            counters_changed = (
+                delivery_drops != self._last_process_delivery_drops
+                or kernel_overflows != self._last_process_kernel_overflows
+            )
+            if instance_changed or status != "READY" or counters_changed:
+                self._write_process_source_status(status, event=event)
+            self._last_process_delivery_drops = delivery_drops
+            self._last_process_kernel_overflows = kernel_overflows
+            # STARTING 不能证明内核已接受订阅；OVERFLOW/ERROR 则已经破坏完整性。
+            # 只有 READY 才关闭 procfs fallback，避免无效 helper 让进程事件断流。
+            self.process_connector_active = status == "READY"
+            if status in {"KERNEL_OVERFLOW", "ERROR"} and self.args.require_process_connector:
+                self.stop_requested = True
+            if self._process_source_stale and self.process_connector_active:
+                self._write_process_source_status("RECOVERED", event=event)
+                self._process_source_stale = False
+            return
+        if kind != "PROCESS_EVENT":
+            self._write_process_source_status(
+                "REJECTED", f"unknown helper payload kind: {kind}", event
+            )
+            return
+
+        source_seq = int(event.get("source_seq", 0) or 0)
+        if source_seq <= 0:
+            self._write_process_source_status("REJECTED", "missing source_seq", event)
+            return
+        if source_seq > self._last_process_source_seq + 1:
+            missing = source_seq - self._last_process_source_seq - 1
+            self._write_process_source_status(
+                "DELIVERY_GAP",
+                f"missed {missing} process event datagram(s)",
+                event,
+            )
+        elif source_seq <= self._last_process_source_seq:
+            self._write_process_source_status(
+                "DUPLICATE", f"non-increasing source_seq={source_seq}", event
+            )
+            return
+        self._last_process_source_seq = source_seq
+        self.process_connector_active = True
+
+        event_type = str(event.get("event_type", ""))
+        if event_type not in {"PROCESS_START", "PROCESS_EXEC", "PROCESS_EXIT"}:
+            self._write_process_source_status(
+                "REJECTED", f"invalid event_type={event_type}", event
+            )
+            return
+        pid = int(event.get("pid", 0) or 0)
+        tgid = int(event.get("tgid", pid) or pid)
+        identity = ProcessIdentity(
+            pid=pid,
+            tgid=tgid,
+            comm=str(event.get("comm", "")),
+            exe_path=str(event.get("exe_path", "")),
+            cgroup_path=str(event.get("cgroup_path", "")),
+            start_time=str(event.get("start_time", "")),
+            cmdline_hash=str(event.get("cmdline_hash", "")),
+        )
+        app = self.mapper.map_process(identity)
+        if event_type == "PROCESS_START":
+            # 用户要求的常驻 createProcess 主路径：每个 FORK 都必须经过这里，
+            # 不能只在秒级 /proc 采样或前台切换时才判断 cgroup 归属。后代进程
+            # 即使已经继承正确 cgroup 也会经过检查，但 router 会快速跳过迁移。
+            self.createProcess(event, identity)
+        elif event_type == "PROCESS_EXEC" and self.process_cgroup_router is not None:
+            # exec 后 comm/exe 才是最终程序身份；再次校验可覆盖 GNOME launcher、
+            # shell wrapper 以及 FORK 到 worker 执行之间发生的身份变化。
+            self.process_cgroup_router.submit_exec_process(event, identity)
+        ts_ns = int(event.get("timestamp_ns", 0) or time.time_ns())
+        cgroup_path = identity.cgroup_path
+        in_test_slice = bool(
+            self.args.test_slice
+            and (
+                f"/{self.args.test_slice}/" in cgroup_path
+                or cgroup_path.endswith(f"/{self.args.test_slice}")
+            )
+        )
+        self.process_events_writer.write_row({
+            "session_id": self.session_id,
+            "ts_ns": ts_ns,
+            "timestamp": dt.datetime.fromtimestamp(ts_ns / 1_000_000_000).isoformat(
+                timespec="milliseconds"
+            ),
+            "event_type": event_type,
+            "app": app,
+            "pid": pid,
+            "tgid": tgid,
+            "comm": identity.comm,
+            "cmdline_hash": identity.cmdline_hash,
+            "exe_path": identity.exe_path,
+            "cgroup_unit": str(event.get("cgroup_unit", "")),
+            "cgroup_path": cgroup_path,
+            "test_slice": self.args.test_slice,
+            "in_test_slice": "1" if in_test_slice else "0",
+            "boot_ts_ns": event.get("boot_timestamp_ns", ""),
+            "native_event": event.get("native_event", ""),
+            "parent_pid": event.get("parent_pid", ""),
+            "parent_tgid": event.get("parent_tgid", ""),
+            "exit_code": event.get("exit_code", ""),
+            "exit_signal": event.get("exit_signal", ""),
+            "cpu": event.get("cpu", ""),
+            "source_seq": source_seq,
+            "source_instance_id": instance_id,
+            "source": "proc-connector",
+        })
+
+    def _maybe_check_process_event_source(self) -> None:
+        collector = self.global_process_event_collector
+        if collector is None:
+            return
+        stale = collector.is_stale(self.args.process_connector_stale_timeout_s)
+        if stale and not self._process_source_stale:
+            self._process_source_stale = True
+            self.process_connector_active = False
+            self._write_process_source_status(
+                "SOURCE_STALE",
+                "authenticated helper heartbeat/event stream timed out",
+            )
+            if self.args.require_process_connector:
+                # A clean session rotation makes the coverage gap explicit and
+                # lets systemd retry after the root helper recovers.
+                self.stop_requested = True
+
+    # ------------------------------------------------------------------
     # Native X11 event path
     # ------------------------------------------------------------------
 
     def _start_direct_x11_events(self) -> None:
+        """启动桌面事件生产者；desktop 模式优先 GNOME，并保留 X11 回退。"""
         collectors: list[Any] = [X11EventCollector(self._enqueue_direct_x11_event)]
         if self.args.foreground_backend == "desktop":
             collectors.insert(0, GnomeEventCollector(
@@ -800,6 +1288,7 @@ class RuntimeMonitorV0:
                 setattr(self, fd_name, -1)
 
     def _enqueue_direct_x11_event(self, event: dict[str, Any]) -> None:
+        """供监听线程调用：入队原始事件并唤醒主线程，不在此处处理业务。"""
         self._direct_event_queue.put(event)
         try:
             os.write(self._direct_event_wake_w, b"e")
@@ -807,6 +1296,9 @@ class RuntimeMonitorV0:
             pass
 
     def _drain_direct_x11_events(self) -> None:
+        """由主线程排空 pipe 和事件队列，串行执行状态机、推理及 CSV 写入。"""
+        # pipe 中字节数与事件数不要求一一对应；一次 read 只需清除“有工作”状态，
+        # 事件完整性由下方 Queue.get_nowait() 保证。
         if self._direct_event_wake_r >= 0:
             try:
                 os.read(self._direct_event_wake_r, 65536)
@@ -820,6 +1312,14 @@ class RuntimeMonitorV0:
             self._handle_direct_x11_event(event)
 
     def _handle_direct_x11_event(self, raw_event: dict[str, Any]) -> None:
+        """把一个原始桌面通知推进到高层事件、LSTM 和内核提交。
+
+        一个原始 focus 变化可能展开为 FOCUS_OUT、APP_SWITCH、FOCUS_IN 三条高层
+        事件，但只有 ``DIRECT_PREDICTION_EVENTS`` 中的业务边沿会触发推理。状态机
+        同时负责按 App/窗口去重，保证 GNOME、X11 和秒级校对可以安全共存。
+        """
+        # 第一步：状态机解析原生事件。返回列表可能为空（重复/未知窗口），也可能
+        # 包含多条具有一致时间戳的高层 APP_* 事件。
         high_level_events = self._direct_event_state.handle(raw_event)
         for event in high_level_events:
             event_type = str(event.get("event_type", ""))
@@ -830,6 +1330,8 @@ class RuntimeMonitorV0:
             event["event_id"] = event_id
 
             if self.memory_shadow is not None:
+                # 先让 shadow 结束上一预测 episode，再开始本事件的新预测；这样
+                # “实际下一 App”来自真实 APP_SWITCH，而不是采样时钟推断。
                 self.memory_shadow.observe_event(event)
 
             if event_type.startswith("APP_FOCUS") or event_type in {
@@ -866,10 +1368,14 @@ class RuntimeMonitorV0:
                     "app_history": "",
                     "duration_history_ms": "",
                 }
+                # 直接事件已经给出了明确触发类型，process_event 会绕过采样模式的
+                # TTL/cooldown 判定，但仍执行 App 映射、历史更新和输入合法性检查。
                 prediction_result = self.online_lstm.process_event(feature_row, event_type)
                 self._maybe_write_mglru_predictions(prediction_result)
                 if self.parp_bridge is not None:
                     try:
+                        # 在事件时刻重新采一次进程/cgroup，确保概率、前台标记和
+                        # binding 属于同一个原子批次，而不是复用最多早一秒的快照。
                         self.parp_bridge.submit_prediction(
                             feature_row, prediction_result,
                             process_samples=self.process_collector.sample(),
@@ -949,6 +1455,8 @@ class RuntimeMonitorV0:
                     print(f"warning: Test4B ballast lifecycle handling failed: {exc}", file=sys.stderr)
 
             if self._direct_event_writer is not None:
+                # direct_app_events.csv 是事件链总审计：即使没有触发模型，也记录
+                # not_requested；触发时则关联唯一 prediction_id 和推理状态。
                 self._direct_event_writer.write_row({
                     **event,
                     "prediction_triggered": "1" if prediction_result.get("inference_executed") else "0",
@@ -972,7 +1480,12 @@ class RuntimeMonitorV0:
     def _reconcile_direct_foreground(
         self, sampled: ForegroundState, timestamp_ns: int
     ) -> None:
-        """Synthesize only native foreground edges missed by event collectors."""
+        """只补偿原生监听遗漏的前台边沿。
+
+        校对事件不会绕过状态机：它被包装为 ``POLL_FOREGROUND_RECHECK`` 后重新进入
+        ``_handle_direct_x11_event``。如果 App 和 window_id 已一致就直接返回；如果
+        迟到的 X11 事件稍后到达，也会因状态已经更新而被去重。
+        """
         app = str(sampled.foreground_app or "").strip()
         window_id = str(sampled.window_id or "").strip()
         if app in {"", "UNKNOWN"} or not window_id:
@@ -1003,6 +1516,8 @@ class RuntimeMonitorV0:
         self.app_state_writer.close()
         self.foreground_events_writer.close()
         self.process_events_writer.close()
+        self.process_event_source_writer.close()
+        self.process_cgroup_route_writer.close()
         self.app_lifecycle_writer.close()
         self.operation_tracker.refresh()
         self.operation_events_writer.write_rows(self.operation_tracker.pop_new_operation_events("", ""))
@@ -1595,8 +2110,61 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--target-pid", type=int)
     parser.add_argument("--target-comm")
     parser.add_argument("--duration", type=float, default=0.0)
-    parser.add_argument("--enable-ebpf", action="store_true", help="Reserved.")
+    parser.add_argument(
+        "--enable-ebpf",
+        action="store_true",
+        help="Deprecated compatibility alias for --process-event-source connector; the implementation uses proc connector, not eBPF.",
+    )
     parser.add_argument("--disable-ebpf", action="store_true", help="Use procfs polling fallback.")
+    parser.add_argument(
+        "--process-event-source",
+        choices=["procfs", "connector"],
+        default="procfs",
+        help="Process lifecycle source: target-app /proc snapshots or system-wide kernel proc connector.",
+    )
+    parser.add_argument(
+        "--process-connector-socket",
+        default="",
+        help="Unix datagram socket fed by the privileged proc connector helper.",
+    )
+    parser.add_argument(
+        "--process-connector-ready-timeout-s",
+        type=float,
+        default=10.0,
+    )
+    parser.add_argument(
+        "--process-connector-stale-timeout-s",
+        type=float,
+        default=10.0,
+    )
+    parser.add_argument(
+        "--require-process-connector",
+        action="store_true",
+        help="Cleanly stop/rotate if the authenticated system-wide source is unavailable or stale.",
+    )
+    parser.add_argument(
+        "--process-cgroup-routing",
+        choices=["off", "systemd"],
+        default="off",
+        help="Route newly created processes with existing LSTM App IDs into per-App user-systemd slices.",
+    )
+    parser.add_argument(
+        "--process-cgroup-route-timeout-s",
+        type=float,
+        default=2.0,
+        help="Timeout for one user-systemd transient-scope migration request.",
+    )
+    parser.add_argument(
+        "--process-cgroup-reconcile-interval-s",
+        type=float,
+        default=5.0,
+        help="Safety-net interval for repairing pre-existing or raced App processes.",
+    )
+    parser.add_argument(
+        "--require-process-cgroup-routing",
+        action="store_true",
+        help="Fail startup if the systemd cgroup routing worker cannot start.",
+    )
     parser.add_argument("--foreground-backend", choices=["desktop", "x11", "wayland", "manual"], default="desktop")
     parser.add_argument(
         "--direct-x11-events",
@@ -1917,7 +2485,38 @@ def main(argv: list[str] | None = None) -> int:
         )
         return 2
     if args.enable_ebpf:
-        print("warning: --enable-ebpf is reserved; v0 uses procfs polling fallback.", file=sys.stderr)
+        if args.disable_ebpf:
+            print("error: --enable-ebpf and --disable-ebpf are mutually exclusive", file=sys.stderr)
+            return 2
+        print(
+            "warning: --enable-ebpf is a deprecated alias; selecting the proc connector source (no eBPF program is loaded).",
+            file=sys.stderr,
+        )
+        args.process_event_source = "connector"
+    if args.disable_ebpf and args.process_event_source == "connector":
+        print(
+            "error: --disable-ebpf conflicts with --process-event-source connector",
+            file=sys.stderr,
+        )
+        return 2
+    if args.require_process_connector and args.process_event_source != "connector":
+        print(
+            "error: --require-process-connector requires --process-event-source connector",
+            file=sys.stderr,
+        )
+        return 2
+    if args.process_cgroup_routing != "off" and args.process_event_source != "connector":
+        print(
+            "error: process cgroup routing requires --process-event-source connector",
+            file=sys.stderr,
+        )
+        return 2
+    if args.require_process_cgroup_routing and args.process_cgroup_routing == "off":
+        print(
+            "error: --require-process-cgroup-routing requires --process-cgroup-routing systemd",
+            file=sys.stderr,
+        )
+        return 2
     if args.foreground_backend == "wayland":
         print("warning: Wayland foreground collection is not reliable in v0; using manual fallback.", file=sys.stderr)
         args.foreground_backend = "manual"

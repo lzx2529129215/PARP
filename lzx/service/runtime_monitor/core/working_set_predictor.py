@@ -91,7 +91,12 @@ def _read_memory_stat(path: Path) -> dict[str, int]:
 
 
 class WorkingSetPredictor:
-    """Maintain bounded online WSS estimates and produce one aggregate batch."""
+    """维护有界的在线工作集估计，并为一次预测批次生成聚合结果。
+
+    状态按稳定 App ID 聚合，因此 GUI scope 与 fixture alias 可以是不同 cgroup，
+    但会贡献给同一 App 的 observed/resident。估计器只读 ``memory.stat`` 和 Tier2
+    控制文件，不修改 cgroup；最终结果由 ``PARPMyfsBridge`` 随概率一起提交。
+    """
 
     def __init__(self, *, output_dir: Path) -> None:
         self.states: dict[int, AppWorkingSet] = {}
@@ -110,13 +115,16 @@ class WorkingSetPredictor:
         bindings: dict[int, tuple[int, str, Path]],
         timestamp_ns: int,
     ) -> None:
-        """Aggregate GUI and fixture domains that share the same App ID."""
+        """聚合同一 App ID 的 GUI/fixture domain，并更新 EWMA 与衰减峰值。"""
         totals: dict[int, dict[str, Any]] = {}
         policy_paths: set[Path] = set()
         for _domain_id, (app_id, app_key, path) in bindings.items():
             stat = _read_memory_stat(path)
             if not stat and not (path / "memory.current").exists():
                 continue
+            # resident 表示当前真正驻留的 anon+file；observed 则是保守工作集代理：
+            # 全部 anon + active file + 最多 1/8 inactive file，避免把可丢弃冷文件
+            # 缓存全部当作未来必需工作集。
             anon = stat.get("anon", 0)
             file_bytes = stat.get("file", 0)
             active_file = min(file_bytes, stat.get("active_file", 0))
@@ -143,6 +151,8 @@ class WorkingSetPredictor:
 
         self.live_app_ids = set(totals)
         self.binding_domains = len(bindings)
+        # 只有所有 binding 最终指向唯一启用 memory.tier2_enabled 的祖先，才允许
+        # 把工作集标成 valid；多 policy domain 时无法安全选择内核决策目标。
         self.policy_path = next(iter(policy_paths)) if len(policy_paths) == 1 else None
         for app_id, values in totals.items():
             observed = int(values["observed"])
@@ -153,6 +163,8 @@ class WorkingSetPredictor:
             state.samples += 1
             state.observed_bytes = observed
             state.resident_bytes = int(values["resident"])
+            # EWMA 跟随长期水平，decaying peak 保存近期高水位并以 31/32 缓慢衰减；
+            # estimate 取当前、EWMA、峰值最大者，减少一次冷采样造成的低估。
             state.ema_bytes = observed if state.ema_bytes <= 0 else (
                 state.ema_bytes * 7 + observed
             ) // 8
@@ -168,6 +180,7 @@ class WorkingSetPredictor:
         timestamp_ns: int,
         foreground_flag: int,
     ) -> WorkingSetPrediction:
+        """用 Q15 App 概率加权工作集，并计算覆盖率、成熟度和集中度置信度。"""
         rows = list(entries)
         policy_domain_id = 0
         if self.policy_path is not None:
@@ -187,6 +200,8 @@ class WorkingSetPredictor:
             state = self.states.get(int(app_id))
             is_foreground = bool(flags & foreground_flag)
             if is_foreground:
+                # 当前前台 App 必然纳入本批近未来工作集，权重固定为 1；其他 App
+                # 使用 LSTM Q15 概率，且只把仍存活部分计入 resident。
                 weight = Q15_ONE
             else:
                 weight = max(0, min(Q15_ONE, int(score_q15)))
@@ -223,6 +238,8 @@ class WorkingSetPredictor:
         reason = ""
         confidence = 0
         if candidate_total > 0 and candidate_known > 0:
+            # coverage：有工作集历史的候选概率占比；maturity：至少 4 个样本逐步
+            # 达到满值；concentration：top3 概率质量。三者相乘，任一不足就降置信度。
             coverage = min(Q15_ONE, candidate_known * Q15_ONE // candidate_total)
             maturity = min(
                 Q15_ONE, maturity_weighted // max(1, candidate_known)
@@ -239,6 +256,8 @@ class WorkingSetPredictor:
         elif confidence <= 0:
             reason = "ZERO_CONFIDENCE"
 
+        # reason 非空意味着内核不能可靠采用该工作集；此时所有 payload 数值清零，
+        # 但 CSV 仍保留逐 App 中间量用于诊断。
         valid = not reason
         action, limit = self._action_hint(future, min(future, resident), confidence)
         result = WorkingSetPrediction(
@@ -272,6 +291,7 @@ class WorkingSetPredictor:
         return result
 
     def _action_hint(self, future: int, resident: int, confidence: int) -> tuple[str, int]:
+        """相对唯一 Tier2 policy 限额给出解释性提示；提示本身不写任何控制文件。"""
         if self.policy_path is None:
             return "FALLBACK", 0
         try:

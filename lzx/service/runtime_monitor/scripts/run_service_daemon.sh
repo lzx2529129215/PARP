@@ -21,6 +21,13 @@ checkpoint="${PARP_SERVICE_LSTM_CHECKPOINT:-$PARP_OPERATION_PREDICTOR_ROOT/outpu
 myfs_device="${PARP_SERVICE_MYFS_DEVICE:-/dev/myfs}"
 myfs_mode="${PARP_SERVICE_MYFS_MODE:-apply}"
 myfs_enabled="${PARP_SERVICE_ENABLE_MYFS:-1}" # lzx-note
+process_event_source="${PARP_SERVICE_PROCESS_EVENT_SOURCE:-connector}"
+process_connector_socket="${PARP_SERVICE_PROCESS_CONNECTOR_SOCKET:-/run/user/$(id -u)/parp-process-events.sock}"
+process_connector_ready_timeout="${PARP_SERVICE_PROCESS_CONNECTOR_READY_TIMEOUT:-10}"
+process_connector_stale_timeout="${PARP_SERVICE_PROCESS_CONNECTOR_STALE_TIMEOUT:-10}"
+process_cgroup_routing="${PARP_SERVICE_PROCESS_CGROUP_ROUTING:-systemd}"
+process_cgroup_route_timeout="${PARP_SERVICE_PROCESS_CGROUP_ROUTE_TIMEOUT:-2}"
+process_cgroup_reconcile_interval="${PARP_SERVICE_PROCESS_CGROUP_RECONCILE_INTERVAL:-5}"
 
 mkdir -p "$PARP_SERVICE_OUTPUT_ROOT"
 # lzx-note: Rotate resident collection into daily sessions and remove only
@@ -53,9 +60,44 @@ monitor_args=(
   --lstm-checkpoint "$checkpoint"
   --score-mode softmax
   --path-mode hash
-  --disable-ebpf
   --label SERVICE_BOOT
 )
+
+case "$process_event_source" in
+  connector)
+    monitor_args+=(
+      --process-event-source connector
+      --process-connector-socket "$process_connector_socket"
+      --process-connector-ready-timeout-s "$process_connector_ready_timeout"
+      --process-connector-stale-timeout-s "$process_connector_stale_timeout"
+      --require-process-connector
+    )
+    case "$process_cgroup_routing" in
+      systemd)
+        monitor_args+=(
+          --process-cgroup-routing systemd
+          --process-cgroup-route-timeout-s "$process_cgroup_route_timeout"
+          --process-cgroup-reconcile-interval-s "$process_cgroup_reconcile_interval"
+          --require-process-cgroup-routing
+        )
+        ;;
+      off)
+        monitor_args+=(--process-cgroup-routing off)
+        ;;
+      *)
+        echo "invalid PARP_SERVICE_PROCESS_CGROUP_ROUTING=$process_cgroup_routing (expected systemd or off)" >&2
+        exit 2
+        ;;
+    esac
+    ;;
+  procfs)
+    monitor_args+=(--process-event-source procfs --disable-ebpf --process-cgroup-routing off)
+    ;;
+  *)
+    echo "invalid PARP_SERVICE_PROCESS_EVENT_SOURCE=$process_event_source (expected connector or procfs)" >&2
+    exit 2
+    ;;
+esac
 
 # Keep collection and online LSTM inference resident for a Native comparison,
 # while deliberately removing only the kernel prediction sink.  The default

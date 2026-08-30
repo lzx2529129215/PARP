@@ -78,7 +78,12 @@ def _read_memory_stat(path: Path) -> dict[str, int]:
 
 
 def classify_memory_stat(domain_id: int, values: dict[str, int]) -> ReclaimWorkloadProfile:
-    """Classify resident composition, not transient fault activity.  lzx-note"""
+    """按驻留内存组成分类，而不是按瞬时 fault 活动分类。
+
+    分类结果编码进 v3 binding 的 workload_hint：类别决定建议 swappiness，只有明确
+    的脏文件负载才允许 writepage。小于 8 MiB 或置信度不足的 cgroup 返回无效
+    profile，bridge 仍提交 active binding，但不会设置 WORKLOAD_VALID。
+    """
     anon = max(0, int(values.get("anon", 0)))
     file_bytes = max(0, int(values.get("file", 0)))
     dirty = min(file_bytes, max(0, int(values.get("file_dirty", 0))))
@@ -92,6 +97,8 @@ def classify_memory_stat(domain_id: int, values: dict[str, int]) -> ReclaimWorkl
     anon_ratio = anon / total
     file_ratio = file_bytes / total
     dirty_ratio = dirty / file_bytes if file_bytes else 0.0
+    # FILE_DIRTY 优先判断，因为“文件占比不高但脏页已经很多”的混合 cgroup 仍需
+    # 更保守的 swappiness 和受控 writepage；之后才按 65% 阈值区分 anon/file。
     if dirty >= MIN_DIRTY_BYTES and dirty_ratio >= 0.25:
         # Crossing the explicit dirty-byte and dirty-ratio gates is already a
         # decisive classification.  A cgroup whose anon/file composition is
@@ -134,11 +141,13 @@ def classify_memory_stat(domain_id: int, values: dict[str, int]) -> ReclaimWorkl
 
 
 class CgroupReclaimWorkloadProfiler:
-    """Read only live cgroup state at the same event as LSTM inference.  lzx-note"""
+    """在 LSTM 事件时刻只读每个实时 binding 的 memory.stat 并分类。"""
 
     def sample(
         self, binding_paths: dict[int, tuple[int, str, Path]],
     ) -> dict[int, ReclaimWorkloadProfile]:
+        # 不缓存 profile：anon/file/dirty 组成可能快速变化，必须与本次预测/binding
+        # 使用同一事件时刻的视图；读取失败会自然得到 invalid profile。
         profiles: dict[int, ReclaimWorkloadProfile] = {}
         for domain_id, _binding in binding_paths.items():
             path = _binding[2]

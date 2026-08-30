@@ -125,6 +125,12 @@ def read_identity(pid: int) -> ProcessIdentity | None:
 
 
 class ProcessCollector:
+    """从 /proc 构造目标应用进程快照，供同一采样周期的所有组件共享。
+
+    先读取进程 identity 并通过 AppMapper 匹配 runtime app_key，再读取 I/O、RSS、
+    fault 等计数。进程可能在任意一步退出，底层读取函数均以空值表示该次竞态，
+    不会让一次短命进程终止常驻服务。
+    """
     def __init__(
         self,
         mapper: AppMapper,
@@ -149,7 +155,10 @@ class ProcessCollector:
         return f"/{self.test_slice}/" in cgroup_path or cgroup_path.endswith(f"/{self.test_slice}")
 
     def sample(self) -> list[ProcessSample]:
+        """扫描候选 PID，只返回目标 App（以及可选 test slice）中的完整样本。"""
         samples: list[ProcessSample] = []
+        # 生产服务未指定 target_pid，因此每秒枚举 /proc；尽早用轻量 identity/App
+        # 映射过滤，再为命中进程读取较多的 io/status/stat 文件。
         pids = [self.target_pid] if self.target_pid else self._all_pids()
         for pid in pids:
             if not pid:
@@ -165,7 +174,8 @@ class ProcessCollector:
             if app_id not in self.target_apps:
                 continue
             in_slice = self.pid_in_test_slice(pid)
-            # When test_slice is active, only collect processes within it
+            # test_slice 只用于专项实验隔离；常驻 service scope 的 slice 为空，允许
+            # 跨 slice 观察匹配 GUI App。fixture alias 不从这里进入生命周期统计。
             if self.test_slice and not in_slice:
                 continue
             samples.append(

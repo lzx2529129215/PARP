@@ -63,6 +63,12 @@ DEFAULT_WINDOW_KEYWORDS = {
 
 
 class ForegroundCollector:
+    """解析当前活动窗口，并把窗口元数据映射为 runtime app_key。
+
+    在生产 direct-event 模式中，``sample`` 只承担每秒权威校对；低延迟切换来自
+    GNOME/X11 监听器。``resolve_window``/``resolve_desktop_event`` 则供事件状态机
+    复用同一套关键词，避免采样路径和事件路径把同一窗口映射成不同 App。
+    """
     def __init__(
         self,
         backend: str = "manual",
@@ -82,6 +88,7 @@ class ForegroundCollector:
             _configure_x11_env()
 
     def sample(self) -> ForegroundState:
+        """返回当前前台快照，并按 App+window_id 维护连续前台时长。"""
         previous_app = self._last_state.foreground_app
         if self.backend in {"x11", "desktop"}:
             state, debug = self._sample_x11(previous_app)
@@ -111,11 +118,10 @@ class ForegroundCollector:
         return self._sample_x11_windows()
 
     def resolve_window(self, window_id: str) -> WindowState:
-        """Resolve one X11 window when a native event names it.
+        """在原生事件给出 window_id 时解析一次 X11 窗口。
 
-        This is metadata lookup at event time, not an active-window poll.  It
-        is intentionally public so the native event collector can share the
-        existing application mapping rules.
+        这是事件时刻的元数据查询，不是活动窗口轮询。方法保持公开，是为了让
+        原生事件状态机与周期采样共享既有的 15 App 映射规则。
         """
         if self.backend not in {"x11", "desktop"} or not window_id:
             return WindowState(window_id=window_id, source="x11-event")

@@ -1,6 +1,10 @@
 # PARP Runtime Monitor 常驻服务
 
-`parp-runtime-monitor.service` 是 PARP 的常驻用户态服务。它随用户 systemd manager 启动；安装脚本启用 linger，因此无需先登录桌面。服务持续采集 15 个 LSAPP 对齐应用的进程、内存、PageFault、swap 和系统级指标，同时监听 `APP_SWITCH/APP_OPEN/APP_CLOSE/APP_MINIMIZE`，在每个事件上调用 LSAPP-expanded v3 LSTM，并通过一次 `/dev/myfs` ioctl 原子提交“应用概率 + 当前前台标记 + 运行中应用 cgroup 绑定 + 未来工作集 + cgroup 工作负载画像”。预测链不再写 `app_prior/app_bind` debugfs。`lzx-note`
+`parp-runtime-monitor.service` 是 PARP 的常驻用户态服务。它随用户 systemd manager 启动；安装脚本启用 linger，因此无需先登录桌面。服务通过一个最小化、受 systemd 沙箱限制的 root helper 订阅 Linux proc connector，实时接收全系统进程 leader 的 `FORK/EXEC/EXIT`，主 monitor 本身仍以普通用户运行。它持续采集 15 个 LSAPP 对齐应用的内存、PageFault、swap 和系统级指标，同时监听 `APP_SWITCH/APP_OPEN/APP_CLOSE/APP_MINIMIZE`，在每个事件上调用 LSAPP-expanded v3 LSTM，并通过一次 `/dev/myfs` ioctl 原子提交“应用概率 + 当前前台标记 + 运行中应用 cgroup 绑定 + 未来工作集 + cgroup 工作负载画像”。预测链不再写 `app_prior/app_bind` debugfs。`lzx-note`
+
+全系统进程事件不使用 eBPF，也不修改 tracefs。`parp-process-events@<uid>.service` 只持有订阅 `CN_IDX_PROC` 所需的 `CAP_NET_ADMIN` 和穿越用户私有 runtime 目录、尽力读取进程元数据所需的 `CAP_DAC_READ_SEARCH`，再向 `/run/user/<uid>/parp-process-events.sock` 发送 Unix datagram。socket 位于用户独占的 `0700` runtime 目录；用户服务还通过 `SCM_CREDENTIALS` 强制验证发送者 uid=0。helper instance、连续 `source_seq`、发送丢失、netlink overflow 和心跳超时都会写入独立审计，覆盖缺口不会静默发生。
+
+每一条内核 `PROCESS_START/FORK` 都会进入常驻服务的 `RuntimeMonitorV0.createProcess()`。该入口用当前 `runtime_app_scope.service.json` 的同一套 AppMapper，只对 `prediction_enabled=true` 且已有固定 LSTM `app_id` 的进程提交迁移；未知进程不会创建新 ID。迁移由普通用户服务异步调用 user-systemd `StartTransientUnit(PIDs=[pid])`，目标结构为 `parp-<app>.slice/parp-route-<app>-p<pid>-s<starttime>.scope`。`PROCESS_EXEC` 会按最终 `comm/exe` 再复核一次；启动时及默认每 5 秒还会校对已有进程，覆盖 FORK/EXEC 调度竞争。root connector helper 仍不写 cgroup。
 
 原生 X11/GNOME 事件是低延迟主路径；每个采样周期还会用实际活动窗口校对一次前台状态，只补偿原生监听遗漏的切换。补偿事件与迟到的原生事件经过同一状态机按 App/窗口去重，并继续沿 LSTM → `/dev/myfs` 路径提交。`lzx-note`
 
@@ -24,6 +28,8 @@ bash lzx/service/runtime_monitor/scripts/install_service.sh
 ```bash
 systemctl --user status parp-runtime-monitor.service
 journalctl --user -u parp-runtime-monitor.service -f
+sudo systemctl status "parp-process-events@$(id -u).service"
+sudo journalctl -u "parp-process-events@$(id -u).service" -f
 ```
 
 每次服务启动创建独立目录：
@@ -48,10 +54,20 @@ lzx/service/outputs/runtime_monitor/service_<boot-id>_<timestamp>/
 - `PARP_SERVICE_MYFS_DEVICE`：默认 `/dev/myfs`。
 - `PARP_SERVICE_MYFS_MODE`：默认 `apply`；可设为 `dry-run` 只验证编码和事件链。
 - `PARP_SERVICE_ENABLE_MYFS`：默认 `1`。设为 `0` 时服务仍执行桌面事件监听、内存画像和在线 LSTM 推理，但不打开或写入 `/dev/myfs`；仅用于与独立 Linux Native 内核进行同服务开销的配对基线，正常 PARP 启动必须保持 `1`。`lzx-note`
+- `PARP_SERVICE_PROCESS_EVENT_SOURCE`：默认 `connector`，实时记录全系统进程 `FORK/EXEC/EXIT`；可设为 `procfs` 恢复只覆盖目标 App 的秒级快照差分。
+- `PARP_SERVICE_PROCESS_CONNECTOR_SOCKET`：默认 `/run/user/<uid>/parp-process-events.sock`。
+- `PARP_SERVICE_PROCESS_CONNECTOR_READY_TIMEOUT`：默认 `10` 秒；启动期收不到经过 root 凭据认证的 heartbeat 时干净退出并由 systemd 重试。
+- `PARP_SERVICE_PROCESS_CONNECTOR_STALE_TIMEOUT`：默认 `10` 秒；运行中事件源心跳超时时结束当前 session，避免把有覆盖缺口的 CSV 伪装成完整采集。
+- `PARP_SERVICE_PROCESS_CGROUP_ROUTING`：默认 `systemd`。对已有 LSTM App ID 的新进程执行 user-systemd cgroup 路由；设为 `off` 可只观察、不迁移。
+- `PARP_SERVICE_PROCESS_CGROUP_ROUTE_TIMEOUT`：单次 transient-scope 请求超时，默认 `2` 秒。请求在独立 worker 中执行，不阻塞全系统事件接收。
+- `PARP_SERVICE_PROCESS_CGROUP_RECONCILE_INTERVAL`：已有进程与竞争窗口的兜底校对周期，默认 `5` 秒。
 
 每个 session 的关键证据：
 
 - `model/direct_app_events.csv`：前台切换、启动、关闭、最小化等事件。
+- `model/process_events.csv`：全系统进程 leader 的 `PROCESS_START(FORK)`、`PROCESS_EXEC`、`PROCESS_EXIT`；目标 App 会额外填充 `app`，其他系统进程保留空映射但不会被过滤。
+- `model/process_event_source.csv`：root helper 实例、启动/恢复状态、source sequence 缺口、Unix datagram 丢失、netlink overflow 和心跳超时。
+- `model/process_cgroup_routes.csv`：每次已有 LSTM App ID 进程的原 cgroup、目标 slice/scope、迁移后 cgroup、状态和耗时；`MIGRATED` 才表示已观察到真实 membership 改变。
 - `model/online_lstm_duration_call_trace.csv`：每次事件进入 LSTM 的调用状态。
 - `model/online_lstm_predictions.csv`：v3 应用间概率。
 - `parp/myfs_events.csv`：每次原子 ioctl 的 generation、预测数、绑定数、工作负载分类、有效画像数及 errno。
