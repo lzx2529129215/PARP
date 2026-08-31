@@ -1,0 +1,170 @@
+{
+  "scenario_count": 8,
+  "window_count": 32,
+  "prediction_sample_count": 24,
+  "classification_accuracy": 96.88,
+  "rule_trend_prediction_accuracy": 70.83,
+  "second_order_markov_prediction_accuracy": 91.67,
+  "results": [
+    {
+      "name": "持续稳定热点",
+      "expected_states": [
+        "STABLE_HOT",
+        "STABLE_HOT",
+        "STABLE_HOT",
+        "STABLE_HOT"
+      ],
+      "actual_states": [
+        "STABLE_HOT",
+        "STABLE_HOT",
+        "STABLE_HOT",
+        "STABLE_HOT"
+      ],
+      "classification_correct": 4,
+      "classification_total": 4,
+      "rule_trend_correct": 3,
+      "markov_correct": 3,
+      "prediction_total": 3
+    },
+    {
+      "name": "顺序流式读取",
+      "expected_states": [
+        "STREAMING",
+        "STREAMING",
+        "STREAMING",
+        "STREAMING"
+      ],
+      "actual_states": [
+        "STREAMING",
+        "STREAMING",
+        "STREAMING",
+        "STREAMING"
+      ],
+      "classification_correct": 4,
+      "classification_total": 4,
+      "rule_trend_correct": 3,
+      "markov_correct": 3,
+      "prediction_total": 3
+    },
+    {
+      "name": "突发工作集扩张",
+      "expected_states": [
+        "BURST_EXPANSION",
+        "BURST_EXPANSION",
+        "BURST_EXPANSION",
+        "BURST_EXPANSION"
+      ],
+      "actual_states": [
+        "BURST_EXPANSION",
+        "BURST_EXPANSION",
+        "BURST_EXPANSION",
+        "BURST_EXPANSION"
+      ],
+      "classification_correct": 4,
+      "classification_total": 4,
+      "rule_trend_correct": 0,
+      "markov_correct": 3,
+      "prediction_total": 3
+    },
+    {
+      "name": "低价值冷态",
+      "expected_states": [
+        "LOW_VALUE_COLD",
+        "LOW_VALUE_COLD",
+        "LOW_VALUE_COLD",
+        "LOW_VALUE_COLD"
+      ],
+      "actual_states": [
+        "LOW_VALUE_COLD",
+        "LOW_VALUE_COLD",
+        "LOW_VALUE_COLD",
+        "LOW_VALUE_COLD"
+      ],
+      "classification_correct": 4,
+      "classification_total": 4,
+      "rule_trend_correct": 3,
+      "markov_correct": 3,
+      "prediction_total": 3
+    },
+    {
+      "name": "多热点轮换",
+      "expected_states": [
+        "MULTI_HOTSPOT",
+        "MULTI_HOTSPOT",
+        "MULTI_HOTSPOT",
+        "MULTI_HOTSPOT"
+      ],
+      "actual_states": [
+        "MULTI_HOTSPOT",
+        "MULTI_HOTSPOT",
+        "MULTI_HOTSPOT",
+        "MULTI_HOTSPOT"
+      ],
+      "classification_correct": 4,
+      "classification_total": 4,
+      "rule_trend_correct": 3,
+      "markov_correct": 3,
+      "prediction_total": 3
+    },
+    {
+      "name": "随机离散访问",
+      "expected_states": [
+        "UNKNOWN",
+        "UNKNOWN",
+        "UNKNOWN",
+        "UNKNOWN"
+      ],
+      "actual_states": [
+        "UNKNOWN",
+        "UNKNOWN",
+        "UNKNOWN",
+        "UNKNOWN"
+      ],
+      "classification_correct": 4,
+      "classification_total": 4,
+      "rule_trend_correct": 3,
+      "markov_correct": 3,
+      "prediction_total": 3
+    },
+    {
+      "name": "内存压力场景",
+      "expected_states": [
+        "MIXED",
+        "MIXED",
+        "MIXED",
+        "MIXED"
+      ],
+      "actual_states": [
+        "MIXED",
+        "MIXED",
+        "MIXED",
+        "MIXED"
+      ],
+      "classification_correct": 4,
+      "classification_total": 4,
+      "rule_trend_correct": 0,
+      "markov_correct": 3,
+      "prediction_total": 3
+    },
+    {
+      "name": "扩张后进入稳定热点",
+      "expected_states": [
+        "BURST_EXPANSION",
+        "BURST_EXPANSION",
+        "STABLE_HOT",
+        "STABLE_HOT"
+      ],
+      "actual_states": [
+        "BURST_EXPANSION",
+        "BURST_EXPANSION",
+        "BURST_EXPANSION",
+        "STABLE_HOT"
+      ],
+      "classification_correct": 3,
+      "classification_total": 4,
+      "rule_trend_correct": 2,
+      "markov_correct": 1,
+      "prediction_total": 3
+    }
+  ]
+}

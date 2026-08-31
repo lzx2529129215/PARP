@@ -1,0 +1,19 @@
+{
+  "interface": "parp-snapshot-adapter-v1",
+  "mode": "NATIVE",
+  "prediction_seq": 3,
+  "ttl_ms": 5000,
+  "app_or_scope": {
+    "scope_type": "cgroup",
+    "scope_id": "demo-cgroup"
+  },
+  "protection_hint": "native",
+  "reclaim_hint": "native",
+  "preclean_hint": "defer_to_kernel_policy",
+  "compression_hint": "observe_only",
+  "migration_hint": "observe_only",
+  "confidence_q15": 24575,
+  "probability_q15": 24575,
+  "q15_max": 32767,
+  "apply": false
+}

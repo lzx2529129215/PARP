@@ -1,0 +1,66 @@
+# 更贴近实际的 Workload 场景回测报告
+
+- 场景数量：8
+- 观测窗口数量：32
+- 预测样本数量：24
+- 状态判断准确率：96.88%
+- 规则趋势预测准确率：70.83%
+- 二阶 Markov 预测准确率：91.67%
+
+## 场景明细
+
+### 持续稳定热点
+- 期望状态：STABLE_HOT, STABLE_HOT, STABLE_HOT, STABLE_HOT
+- 实际状态：STABLE_HOT, STABLE_HOT, STABLE_HOT, STABLE_HOT
+- 判断：4/4
+- 规则预测：3/3
+- Markov 预测：3/3
+
+### 顺序流式读取
+- 期望状态：STREAMING, STREAMING, STREAMING, STREAMING
+- 实际状态：STREAMING, STREAMING, STREAMING, STREAMING
+- 判断：4/4
+- 规则预测：3/3
+- Markov 预测：3/3
+
+### 突发工作集扩张
+- 期望状态：BURST_EXPANSION, BURST_EXPANSION, BURST_EXPANSION, BURST_EXPANSION
+- 实际状态：BURST_EXPANSION, BURST_EXPANSION, BURST_EXPANSION, BURST_EXPANSION
+- 判断：4/4
+- 规则预测：0/3
+- Markov 预测：3/3
+
+### 低价值冷态
+- 期望状态：LOW_VALUE_COLD, LOW_VALUE_COLD, LOW_VALUE_COLD, LOW_VALUE_COLD
+- 实际状态：LOW_VALUE_COLD, LOW_VALUE_COLD, LOW_VALUE_COLD, LOW_VALUE_COLD
+- 判断：4/4
+- 规则预测：3/3
+- Markov 预测：3/3
+
+### 多热点轮换
+- 期望状态：MULTI_HOTSPOT, MULTI_HOTSPOT, MULTI_HOTSPOT, MULTI_HOTSPOT
+- 实际状态：MULTI_HOTSPOT, MULTI_HOTSPOT, MULTI_HOTSPOT, MULTI_HOTSPOT
+- 判断：4/4
+- 规则预测：3/3
+- Markov 预测：3/3
+
+### 随机离散访问
+- 期望状态：UNKNOWN, UNKNOWN, UNKNOWN, UNKNOWN
+- 实际状态：UNKNOWN, UNKNOWN, UNKNOWN, UNKNOWN
+- 判断：4/4
+- 规则预测：3/3
+- Markov 预测：3/3
+
+### 内存压力场景
+- 期望状态：MIXED, MIXED, MIXED, MIXED
+- 实际状态：MIXED, MIXED, MIXED, MIXED
+- 判断：4/4
+- 规则预测：0/3
+- Markov 预测：3/3
+
+### 扩张后进入稳定热点
+- 期望状态：BURST_EXPANSION, BURST_EXPANSION, STABLE_HOT, STABLE_HOT
+- 实际状态：BURST_EXPANSION, BURST_EXPANSION, BURST_EXPANSION, STABLE_HOT
+- 判断：3/4
+- 规则预测：2/3
+- Markov 预测：1/3

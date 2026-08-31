@@ -26,10 +26,10 @@ class WorkloadPredictor:
         self.ttl_ms = ttl_ms
         self.model_version = model_version
         self._seq = 0
-        self._transitions: dict[tuple[str, str], Counter[str]] = defaultdict(Counter)
+        self._transitions: dict[str, Counter[str]] = defaultdict(Counter)
 
     def observe_transition(self, previous: WorkloadState, current: WorkloadState) -> None:
-        self._transitions[(previous.dominant, current.dominant)][current.dominant] += 1
+        self._transitions[previous.dominant][current.dominant] += 1
 
     def predict_rule_trend(self, current: WorkloadState) -> WorkloadState:
         next_state = current
@@ -41,15 +41,13 @@ class WorkloadPredictor:
         return Prediction(current, next_state, current.confidence_q15, self.horizon_ms, self.ttl_ms, self._seq, self.model_version, "rule_trend")
 
     def predict_markov(self, history: Iterable[WorkloadState], current: WorkloadState) -> Prediction:
-        states = list(history)
-        previous = states[-2].dominant if len(states) >= 2 else current.dominant
-        counts = self._transitions.get((previous, current.dominant), Counter())
+        counts = self._transitions.get(current.dominant, Counter())
         if counts:
             target, count = counts.most_common(1)[0]
             probability = count / max(1, sum(counts.values()))
         else:
             target = current.dominant
-            probability = 1.0 if len(states) < 2 else 0.5
+            probability = 0.5
         next_state = current if target == current.dominant else WorkloadState("UNKNOWN", "UNKNOWN", "UNKNOWN", "UNKNOWN", target, q15(0.5), "markov-dominant-only")
         self._seq += 1
         return Prediction(current, next_state, q15(probability), self.horizon_ms, self.ttl_ms, self._seq, self.model_version, "second_order_markov")

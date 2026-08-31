@@ -83,8 +83,12 @@ def classify(features: FeatureVector, threshold: float = 0.55) -> WorkloadState:
     hotspot_mode = "SHIFTING_HOTSPOT" if hotspot["hotspot_shift_rate"] >= 0.8 else "MULTI_HOTSPOT" if hotspot["hotspot_count"] >= 3 and hotspot["hotspot_jaccard"] >= 0.55 else "SINGLE_HOTSPOT" if hotspot["hotspot_jaccard"] >= 0.75 or hotspot["hotspot_concentration"] >= 0.6 else "UNKNOWN"
     emergency = pressure["psi"] >= 0.2 or pressure["direct_reclaim"] > 0 or pressure["refault_rate"] > 0
     expanding = wss["wss_slope_pages_per_sec"] > 0 or pressure["allocation_rate_pages_per_sec"] > 0
-    phase_mode = "EMERGENCY" if emergency else "EXPANDING" if expanding else "STREAMING" if access_order == "SEQUENTIAL" and reuse_mode == "ONE_SHOT" else "COLD" if sum(pressure.values()) == 0 and wss["wss_pages"] == 0 else "STABLE"
-    if phase_mode == "EMERGENCY":
+    pressure_load = sum(value for key, value in pressure.items() if key != "foreground")
+    phase_mode = "EMERGENCY" if emergency else "EXPANDING" if expanding else "STREAMING" if access_order == "SEQUENTIAL" and reuse_mode == "ONE_SHOT" else "COLD" if pressure_load == 0 and wss["wss_pages"] == 0 else "STABLE"
+    no_order_evidence = not quality["has_region_order"] and wss["wss_pages"] == 0
+    if no_order_evidence and sum(pressure.values()) == 0:
+        dominant = "UNKNOWN"
+    elif phase_mode == "EMERGENCY":
         dominant = "MIXED"
     elif phase_mode == "COLD":
         dominant = "LOW_VALUE_COLD"
