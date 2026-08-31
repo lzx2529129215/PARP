@@ -32,6 +32,7 @@ def _safe_ratio(numerator: float, denominator: float) -> float:
 
 @dataclass(frozen=True)
 class Observation:
+    # 访问序列压力信号
     scope_type: str
     scope_id: str
     window_start_ns: int
@@ -53,6 +54,7 @@ class Observation:
 
 @dataclass(frozen=True)
 class FeatureVector:
+    # 把“原始观测数据”变成“可推断的内存行为特征”。
     scope: dict[str, Any]
     access: dict[str, float]
     reuse: dict[str, float]

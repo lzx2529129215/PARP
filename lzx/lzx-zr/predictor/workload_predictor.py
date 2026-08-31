@@ -42,10 +42,14 @@ class WorkloadPredictor:
 
     def predict_markov(self, history: Iterable[WorkloadState], current: WorkloadState) -> Prediction:
         states = list(history)
-        previous = states[-2].dominant if len(states) >= 2 else "UNKNOWN"
+        previous = states[-2].dominant if len(states) >= 2 else current.dominant
         counts = self._transitions.get((previous, current.dominant), Counter())
-        target, count = counts.most_common(1)[0] if counts else (current.dominant, 0)
+        if counts:
+            target, count = counts.most_common(1)[0]
+            probability = count / max(1, sum(counts.values()))
+        else:
+            target = current.dominant
+            probability = 1.0 if len(states) < 2 else 0.5
         next_state = current if target == current.dominant else WorkloadState("UNKNOWN", "UNKNOWN", "UNKNOWN", "UNKNOWN", target, q15(0.5), "markov-dominant-only")
-        probability = count / max(1, sum(counts.values())) if counts else 0.5
         self._seq += 1
         return Prediction(current, next_state, q15(probability), self.horizon_ms, self.ttl_ms, self._seq, self.model_version, "second_order_markov")

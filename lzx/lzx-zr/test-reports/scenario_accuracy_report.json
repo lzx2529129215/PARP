@@ -1,0 +1,104 @@
+{
+  "scenario_count": 6,
+  "classification_accuracy": 16.67,
+  "rule_trend_prediction_accuracy": 0.0,
+  "second_order_markov_prediction_accuracy": 0.0,
+  "results": [
+    {
+      "name": "stable_hot",
+      "expected_dominant": "STABLE_HOT",
+      "actual_dominant": "MULTI_HOTSPOT",
+      "classification_correct": false,
+      "rule_trend_correct": false,
+      "second_order_markov_correct": false,
+      "expected_next": {
+        "rule_trend": "STABLE_HOT",
+        "second_order_markov": "STABLE_HOT"
+      },
+      "actual_next": {
+        "rule_trend": "MULTI_HOTSPOT",
+        "second_order_markov": "MULTI_HOTSPOT"
+      }
+    },
+    {
+      "name": "burst_expansion",
+      "expected_dominant": "BURST_EXPANSION",
+      "actual_dominant": "BURST_EXPANSION",
+      "classification_correct": true,
+      "rule_trend_correct": false,
+      "second_order_markov_correct": false,
+      "expected_next": {
+        "rule_trend": "STABLE_HOT",
+        "second_order_markov": "BURST_EXPANSION"
+      },
+      "actual_next": {
+        "rule_trend": "STABLE_HOT",
+        "second_order_markov": "BURST_EXPANSION"
+      }
+    },
+    {
+      "name": "streaming",
+      "expected_dominant": "STREAMING",
+      "actual_dominant": "MULTI_HOTSPOT",
+      "classification_correct": false,
+      "rule_trend_correct": false,
+      "second_order_markov_correct": false,
+      "expected_next": {
+        "rule_trend": "STREAMING",
+        "second_order_markov": "STREAMING"
+      },
+      "actual_next": {
+        "rule_trend": "MULTI_HOTSPOT",
+        "second_order_markov": "MULTI_HOTSPOT"
+      }
+    },
+    {
+      "name": "random_unknown",
+      "expected_dominant": "UNKNOWN",
+      "actual_dominant": "MULTI_HOTSPOT",
+      "classification_correct": false,
+      "rule_trend_correct": false,
+      "second_order_markov_correct": false,
+      "expected_next": {
+        "rule_trend": "UNKNOWN",
+        "second_order_markov": "UNKNOWN"
+      },
+      "actual_next": {
+        "rule_trend": "MULTI_HOTSPOT",
+        "second_order_markov": "MULTI_HOTSPOT"
+      }
+    },
+    {
+      "name": "cold",
+      "expected_dominant": "LOW_VALUE_COLD",
+      "actual_dominant": "UNKNOWN",
+      "classification_correct": false,
+      "rule_trend_correct": false,
+      "second_order_markov_correct": false,
+      "expected_next": {
+        "rule_trend": "LOW_VALUE_COLD",
+        "second_order_markov": "LOW_VALUE_COLD"
+      },
+      "actual_next": {
+        "rule_trend": "UNKNOWN",
+        "second_order_markov": "UNKNOWN"
+      }
+    },
+    {
+      "name": "multi_hotspot",
+      "expected_dominant": "MULTI_HOTSPOT",
+      "actual_dominant": "BURST_EXPANSION",
+      "classification_correct": false,
+      "rule_trend_correct": false,
+      "second_order_markov_correct": false,
+      "expected_next": {
+        "rule_trend": "MULTI_HOTSPOT",
+        "second_order_markov": "MULTI_HOTSPOT"
+      },
+      "actual_next": {
+        "rule_trend": "STABLE_HOT",
+        "second_order_markov": "BURST_EXPANSION"
+      }
+    }
+  ]
+}
