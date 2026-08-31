@@ -191,7 +191,12 @@ def map_app(raw_app: str | None) -> str:
 
 
 def map_open_apps(raw_open_apps: str) -> list[str]:
-    return dedupe_keep_order([map_app(app) for app in split_apps(raw_open_apps)])
+    # DESKTOP 等运行时可观测但未进入训练词表的状态会映射为 <UNKNOWN>；它们
+    # 保留在 raw_open_apps 审计中，但不能污染模型的 opened-app multi-hot。
+    return dedupe_keep_order([
+        mapped for mapped in (map_app(app) for app in split_apps(raw_open_apps))
+        if mapped != "<UNKNOWN>"
+    ])
 
 
 def padded_history(apps: list[str], durations: list[float], history_len: int) -> tuple[list[str], list[str], list[str]]:
@@ -715,7 +720,13 @@ class OnlineDurationLSTMRunner:
         return self.app_name_map.get(raw, "<UNKNOWN>")
 
     def map_open_apps(self, raw_open_apps: str) -> list[str]:
-        return dedupe_keep_order([self.map_app(app) for app in split_apps(raw_open_apps)])
+        return dedupe_keep_order([
+            mapped
+            for mapped in (
+                self.map_app(app) for app in split_apps(raw_open_apps)
+            )
+            if mapped != "<UNKNOWN>"
+        ])
 
 
 def _load_app_mapping_aliases(path_value: str | Path | None) -> dict[str, str]:

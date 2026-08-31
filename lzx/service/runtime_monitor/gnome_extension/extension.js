@@ -120,6 +120,10 @@ class RuntimeAppMonitorExtension {
     _handleFocusChanged() {
         const window = global.display.focus_window;
         if (!this._isAppWindow(window)) {
+            // GNOME 在用户显示桌面、关闭最后一个窗口或把所有窗口最小化后，
+            // focus_window 通常为 null。它是一个真实前台状态，不能简单丢弃，
+            // 否则常驻服务会一直保留上一个 App 或退化为 UNKNOWN。
+            this._emitDesktopFocus();
             return;
         }
         this._trackWindow(window);
@@ -129,6 +133,24 @@ class RuntimeAppMonitorExtension {
         }
         this._lastFocusId = focusId;
         this._emitWindowEvent("Switched", window);
+    }
+
+    _emitDesktopFocus() {
+        const focusId = "desktop";
+        if (focusId === this._lastFocusId) {
+            return;
+        }
+        this._lastFocusId = focusId;
+        this._emitPayload({
+            event_type: "Switched",
+            timestamp_ms: Date.now(),
+            window_id: focusId,
+            title: "Desktop",
+            wm_class: "gnome-shell",
+            gtk_app_id: "org.gnome.Shell",
+            pid: 0,
+            is_minimized: false
+        });
     }
 
     _emitWindowEvent(eventType, window) {
@@ -146,6 +168,10 @@ class RuntimeAppMonitorExtension {
             is_minimized: this._safeBool(window, "minimized")
         };
 
+        this._emitPayload(payload);
+    }
+
+    _emitPayload(payload) {
         Gio.DBus.session.emit_signal(
             null,
             OBJECT_PATH,

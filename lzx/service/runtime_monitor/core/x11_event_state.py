@@ -31,8 +31,8 @@ class X11EventState:
 
     ``windows`` 保存窗口到 App/PID/标题/隐藏状态的最新映射；foreground_* 保存
     当前活动窗口；``_announced_apps`` 与 ``_closed_apps`` 分别用于抑制重复 OPEN
-    和重复 CLOSE。GNOME、X11、cgroup-empty 兜底和秒级 foreground reconcile
-    全部调用同一个 ``handle``，所以跨来源去重规则只有一份。
+    和重复 CLOSE。GNOME、X11 与 cgroup-empty 兜底全部调用同一个 ``handle``，
+    所以跨来源去重规则只有一份；采样时钟不参与前台事件判断。
     """
 
     def __init__(self, resolver: Callable[[str], WindowState]) -> None:
@@ -88,24 +88,6 @@ class X11EventState:
             return []
         if kind == "CGROUP_APP_EMPTY":
             return self._close_from_cgroup(str(raw.get("app", "")), raw)
-        if kind == "POLL_FOREGROUND_RECHECK":
-            # Some compositors do not deliver every _NET_ACTIVE_WINDOW/
-            # FocusIn edge to the long-running X11 connection.  The resident
-            # monitor therefore reconciles the event state with its normal
-            # active-window sample once per sampling period.  Feed that
-            # observation through the same state machine so a late native
-            # event is naturally de-duplicated. lzx-note
-            app = str(raw.get("app", "") or "UNKNOWN")
-            if not window_id or not _is_known_app(app):
-                return []
-            current = TrackedWindow(
-                app=app,
-                pid=int(raw.get("pid", 0) or 0),
-                title=str(raw.get("title", "") or ""),
-                hidden=bool(raw.get("hidden", False)),
-            )
-            self.windows[window_id] = current
-            return self._focus_changed(window_id, raw, current=current)
         if kind.startswith("GNOME_WINDOW_"):
             return self._handle_gnome_event(kind, window_id, raw)  # lzx-note
         if kind in {"WINDOW_CREATED", "WINDOW_MAPPED", "WINDOW_PROPERTY"}:
@@ -224,7 +206,7 @@ class X11EventState:
             self._foreground_initialized = True
             return result
         if previous_app == current_app and previous_window == window_id:
-            # GNOME、X11 和轮询校对可能报告同一条边沿；完全相等时直接去重。
+            # GNOME 与 X11 可能报告同一条边沿；完全相等时直接去重。
             return result
         # A different window of the same application is not an application
         # switch; it remains represented by the native event in the audit log.

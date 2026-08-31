@@ -100,19 +100,33 @@ class AppMapper:
     def _matches_rules(proc: ProcessIdentity, text: str, rules: Any) -> bool:
         keywords = rules.get("keywords", []) if isinstance(rules, dict) else []
         exclude_keywords = rules.get("exclude_keywords", []) if isinstance(rules, dict) else []
+        cgroup_units = rules.get("cgroup_units", []) if isinstance(rules, dict) else []
+        cgroup_components = {
+            item for item in str(proc.cgroup_path or "").split("/") if item
+        }
+        # cgroup unit 使用完整组件精确匹配，不能用 substring；否则
+        # automation-fixture-vlc.scope.backup 也会被错误识别为 VLC。
+        if any(str(unit) in cgroup_components for unit in cgroup_units):
+            return True
         for keyword in exclude_keywords:
             if _norm(keyword) in text:
                 return False
         for keyword in keywords:
             normalized = _norm(keyword)
-            # lzx-note: Short executable names such as sol/eog/vlc must be
-            # exact tokens; substring matching maps "sol" to systemd-resolved.
-            if len(normalized) <= 3 and "/" not in normalized:
-                exe_name = Path(proc.exe_path).name.lower()
-                path_parts = {part for part in proc.exe_path.lower().split("/") if part}
-                if normalized == proc.comm.lower() or normalized == exe_name or normalized in path_parts:
+            if not normalized:
+                continue
+            # Process keywords describe executable identities, not arbitrary
+            # substrings.  Substring matching made LibreOffice's "soffice"
+            # match WPS's "wpsoffice", silently assigning WPS page events to
+            # the wrong application.  Keep path-qualified rules as explicit
+            # path fragments, while bare names must match comm/basename/path
+            # components exactly (also protecting short names such as "sol").
+            if "/" in normalized:
+                if normalized in proc.exe_path.lower():
                     return True
                 continue
-            if normalized in text:
+            exe_name = Path(proc.exe_path).name.lower()
+            path_parts = {part for part in proc.exe_path.lower().split("/") if part}
+            if normalized == proc.comm.lower() or normalized == exe_name or normalized in path_parts:
                 return True
         return False

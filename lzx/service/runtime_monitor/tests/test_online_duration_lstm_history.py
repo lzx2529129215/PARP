@@ -14,6 +14,15 @@ from runtime_monitor.online_duration_lstm import OnlineDurationLSTMRunner
 
 
 class OnlineDurationLSTMHistoryTest(unittest.TestCase):
+    def test_runtime_desktop_does_not_pollute_model_opened_apps(self) -> None:
+        runner = OnlineDurationLSTMRunner.__new__(OnlineDurationLSTMRunner)
+        runner.app_name_map = {"FIREFOX": "Firefox"}
+
+        self.assertEqual(
+            runner.map_open_apps("FIREFOX|DESKTOP|UNKNOWN"),
+            ["Firefox"],
+        )
+
     def test_unmapped_transient_does_not_replace_known_segment(self) -> None:
         runner = OnlineDurationLSTMRunner.__new__(OnlineDurationLSTMRunner)
         started = dt.datetime(2026, 8, 30, 13, 0, 0)

@@ -40,6 +40,18 @@ class ForegroundMappingTests(unittest.TestCase):
             "EVINCE",
         )
 
+    def test_gnome_shell_surface_maps_to_desktop_runtime_app(self) -> None:
+        keywords = {
+            "FIREFOX": ["firefox", "epiphany"],
+            "DESKTOP": ["gnome-shell", "org.gnome.Shell"],
+        }
+        self.assertEqual(
+            _map_foreground_app(
+                ["gnome-shell", "Gnome-shell"], "Desktop", 0, keywords,
+            ),
+            "DESKTOP",
+        )
+
 
 if __name__ == "__main__":
     unittest.main()

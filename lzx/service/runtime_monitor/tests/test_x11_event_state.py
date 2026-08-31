@@ -13,20 +13,18 @@ from core.x11_event_state import X11EventState
 
 
 class X11EventStateTests(unittest.TestCase):
-    def test_poll_reconcile_recovers_missed_switch_and_deduplicates_late_event(self) -> None:
+    def test_event_recheck_deduplicates_same_focus_edge(self) -> None:
         windows = {
             "0x1": WindowState(window_id="0x1", app="FIREFOX", pid=10),
             "0x2": WindowState(window_id="0x2", app="LIBREOFFICE", pid=20),
         }
         state = X11EventState(lambda window_id: windows[window_id])
-        base = {"event_type": "POLL_FOREGROUND_RECHECK", "timestamp_ns": 1_000_000_000,
-                "window_id": "0x1", "app": "FIREFOX", "pid": 10,
-                "source": "x11-poll-reconcile"}
+        base = {"event_type": "FOCUS_CHANGED", "timestamp_ns": 1_000_000_000,
+                "window_id": "0x1", "source": "x11-event"}
         state.handle(base)
 
         recovered = state.handle({
             **base, "timestamp_ns": 2_000_000_000, "window_id": "0x2",
-            "app": "LIBREOFFICE", "pid": 20,
         })
         self.assertEqual(
             [row["event_type"] for row in recovered],
@@ -34,15 +32,11 @@ class X11EventStateTests(unittest.TestCase):
         )
         self.assertEqual(
             next(row for row in recovered if row["event_type"] == "APP_SWITCH")["source"],
-            "x11-poll-reconcile",
+            "x11-event",
         )
 
         self.assertEqual(state.handle({
-            **base, "timestamp_ns": 2_100_000_000, "window_id": "0x2",
-            "app": "LIBREOFFICE", "pid": 20,
-        }), [])
-        self.assertEqual(state.handle({
-            "event_type": "FOCUS_CHANGED", "timestamp_ns": 2_200_000_000,
+            "event_type": "FOCUS_RECHECK", "timestamp_ns": 2_100_000_000,
             "window_id": "0x2", "source": "x11-event",
         }), [])
 
@@ -139,6 +133,17 @@ class X11EventStateTests(unittest.TestCase):
         )
         minimized = state.handle(event("GNOME_WINDOW_MINIMIZED", "g2", "VLC", 5, True))
         self.assertEqual([row["event_type"] for row in minimized], ["APP_MINIMIZE"])
+        desktop = state.handle(event(
+            "GNOME_WINDOW_SWITCHED", "desktop", "DESKTOP", 6,
+        ))
+        self.assertEqual(
+            [row["event_type"] for row in desktop],
+            ["APP_OPEN", "APP_FOCUS_OUT", "APP_SWITCH", "APP_FOCUS_IN"],
+        )
+        self.assertEqual(
+            next(row for row in desktop if row["event_type"] == "APP_SWITCH")["app"],
+            "DESKTOP",
+        )
         closed = state.handle(event("GNOME_WINDOW_CLOSED", "g2", "VLC", 6, True))
         self.assertEqual([row["event_type"] for row in closed], ["APP_CLOSE"])
         self.assertTrue(all(row["source"] == "gnome-shell-dbus" for row in switched))

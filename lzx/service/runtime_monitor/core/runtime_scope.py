@@ -65,6 +65,16 @@ class RuntimeAppScope:
     def window_keywords(self) -> dict[str, list[str]]:
         return {app.app_key: list(app.window_keywords) for app in self.apps}
 
+    @property
+    def fixture_scope_to_app_key(self) -> dict[str, str]:
+        """返回 fixture cgroup 组件到固定 App ID 的精确映射。"""
+        return {
+            scope_name: app.app_key
+            for app in self.apps
+            for scope_name in app.binding_scope_names
+            if scope_name
+        }
+
     def as_process_mapper_config(self, base_config: dict[str, Any]) -> dict[str, Any]:
         merged = dict(base_config)
         existing_apps = base_config.get("apps", {})
@@ -73,11 +83,12 @@ class RuntimeAppScope:
             previous = apps_config.get(app.app_key, {})
             exclude_keywords = previous.get("exclude_keywords", []) if isinstance(previous, dict) else []
             apps_config[app.app_key] = {
-                # binding_scope_names are intentionally excluded: fixtures
-                # share an App ID only in /dev/myfs and must not create GUI
-                # APP_OPEN/APP_CLOSE or foreground state. lzx-note
+                # fixture 使用通用 ballast 可执行文件，comm/exe 本身无法表达它
+                # 代表哪个 App；必须按完整 cgroup 路径组件识别。AppProcessIndex
+                # 另外保存 role=fixture，保证该映射不会污染 GUI 生命周期。
                 "keywords": list(app.process_keywords),
                 "exclude_keywords": list(exclude_keywords),
+                "cgroup_units": list(app.binding_scope_names),
             }
         merged["apps"] = apps_config
         return merged

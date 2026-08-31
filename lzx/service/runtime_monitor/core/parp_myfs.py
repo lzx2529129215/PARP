@@ -219,8 +219,6 @@ class PARPMyfsBridge:
         self.kernel_abi_version = 0
         self._last_alias_binding_count = 0
         self._last_binding_paths: dict[int, tuple[int, str, Path]] = {}
-        self._alias_paths: dict[str, tuple[Path, ...]] = {}
-        self._alias_scan_after_ns = 0
         self._successful_apps: set[str] = set()
         self._closed = False
         self._stats: dict[str, int] = {
@@ -526,17 +524,17 @@ class PARPMyfsBridge:
     ) -> tuple[list[tuple[int, int]], set[str], int]:
         """解析预测 App 的实时 cgroup 绑定并拒绝歧义 domain。
 
-        ``process_samples`` 只覆盖 GUI 进程；配置中的 ``binding_scope_names`` 是
-        fixture 等 binding-only alias，需要从 cgroup 树直接发现。返回值分别是
-        可提交 binding、成功覆盖的 app_key 集合以及被拒绝的歧义 domain 数。
+        ``process_samples`` 来自统一 AppProcessIndex，同时覆盖 role=gui 与
+        role=fixture。``binding_scope_names`` 已在 create/exec 边沿完成 App 映射和
+        cgroup 迁移，不再由这里扫描 cgroup 树发现。返回值分别是可提交 binding、
+        成功覆盖的 app_key 集合以及被拒绝的歧义 domain 数。
         """
         if self.runtime_scope is None:
             return [], set(), 0
         by_key = {str(app.app_key): app for app in self.runtime_scope.apps}
         domains: dict[int, dict[int, tuple[str, Path]]] = {}
-        alias_domain_ids: set[int] = set()
-        # GUI 路径来自 /proc/<pid>/cgroup，可直接解析目录 inode，无需依赖容易变化的
-        # systemd unit 查询输出。
+        # GUI/fixture 路径都来自对应索引 PID 的 /proc/<pid>/cgroup，可直接解析
+        # 目录 inode，无需 systemd unit 查询或 Path.rglob 全树扫描。
         for sample in process_samples:
             app = by_key.get(str(getattr(sample, "app_id", "")))
             if app is None or int(app.app_id) not in allowed_app_ids:
@@ -552,45 +550,9 @@ class PARPMyfsBridge:
             domains.setdefault(domain_id, {})[int(app.app_id)] = (
                 str(app.app_key), path
             )
-        # Fixture scopes are binding-only aliases. Resolve their live cgroup
-        # directories directly so their large synthetic working sets receive
-        # the same App ID without entering GUI process/lifecycle accounting.
-        # lzx-note
-        alias_owners: dict[str, tuple[int, str]] = {}
-        for app in self.runtime_scope.apps:
-            app_id = int(getattr(app, "app_id", 0) or 0)
-            if app_id not in allowed_app_ids:
-                continue
-            for scope_name in getattr(app, "binding_scope_names", ()):
-                alias_owners[str(scope_name)] = (app_id, str(app.app_key))
-        now_ns = time.monotonic_ns()
-        if alias_owners and now_ns >= self._alias_scan_after_ns:
-            # 所有 alias 共用一次 rglob，结果缓存 1 秒；避免每个 App 单独递归扫描
-            # 整棵 cgroup 树。alias 只进入 binding/WSS，不进入 GUI 生命周期状态机。
-            discovered: dict[str, list[Path]] = {
-                name: [] for name in alias_owners
-            }
-            try:
-                for path in self.cgroup_root.rglob("*"):
-                    if path.name in discovered:
-                        discovered[path.name].append(path)
-            except OSError:
-                pass
-            self._alias_paths = {
-                name: tuple(paths) for name, paths in discovered.items()
-            }
-            self._alias_scan_after_ns = now_ns + 1_000_000_000
-            self._stats["alias_tree_scans"] += 1
-        for scope_name, (app_id, app_key) in alias_owners.items():
-            # One cgroup-tree walk discovers every fixture alias.  Continuous
-            # WSS sampling must not perform one recursive walk per app. lzx-note
-            for path in self._alias_paths.get(scope_name, ()):
-                try:
-                    domain_id = int(path.stat().st_ino)
-                except OSError:
-                    continue
-                domains.setdefault(domain_id, {})[app_id] = (app_key, path)
-                alias_domain_ids.add(domain_id)
+        # fixture 不再靠每秒 rglob 整棵 cgroup 树发现。它的 START/EXEC 已由
+        # AppProcessIndex 识别为 role=fixture 并迁入对应 App slice，因此会像
+        # 普通 GUI PID 一样出现在 process_samples 中，走上面的同一条绑定路径。
         result: list[tuple[int, int]] = []
         apps: set[str] = set()
         ambiguous = 0
@@ -606,8 +568,6 @@ class PARPMyfsBridge:
             result.append((domain_id, app_id))
             binding_paths[domain_id] = (app_id, app_key, path)
             apps.add(app_key)
-            if domain_id in alias_domain_ids:
-                submitted_aliases += 1
             if len(result) == MAX_BINDINGS:
                 break
         self._last_alias_binding_count = submitted_aliases

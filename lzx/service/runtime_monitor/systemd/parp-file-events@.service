@@ -1,0 +1,45 @@
+[Unit]
+Description=PARP eBPF file syscall event source for UID %i
+Documentation=file:///home/lzx/Desktop/PARP/lzx/service/runtime_monitor/README_SERVICE.md
+After=systemd-user-sessions.service
+
+[Service]
+Type=simple
+User=root
+Group=root
+ExecStart=/usr/local/libexec/parp-ebpf-file-events --target-uid %i --bpf-source /usr/local/libexec/parp-file-events.bpf.c
+Restart=always
+RestartSec=2
+UMask=0077
+# Three 1024-page per-CPU perf rings require about 24 MiB on the two-vCPU
+# collection VM.  Keep the allowance explicit and bounded instead of changing
+# the machine-wide perf_event_mlock_kb sysctl.
+LimitMEMLOCK=64M
+
+# monitor 自身始终无特权；只有此 helper 能加载/附着 BPF tracepoint，并读取
+# 目标 UID 的 /proc/<pid>/{cwd,fd} 以把 fd 参数解析为文件路径。
+CapabilityBoundingSet=CAP_BPF CAP_PERFMON CAP_SYS_ADMIN CAP_DAC_READ_SEARCH
+AmbientCapabilities=CAP_BPF CAP_PERFMON CAP_SYS_ADMIN CAP_DAC_READ_SEARCH
+NoNewPrivileges=true
+PrivateTmp=true
+PrivateDevices=true
+ProtectSystem=strict
+ProtectHome=read-only
+ProtectKernelTunables=true
+# BCC 必须读取 /lib/modules/<release>/{build,source} 编译 tracepoint。保持
+# ProtectSystem=strict 且不授予 CAP_SYS_MODULE，helper 仍无法写入或加载模块。
+ProtectKernelModules=false
+ProtectKernelLogs=true
+ProtectControlGroups=true
+ProtectClock=true
+RestrictNamespaces=true
+RestrictRealtime=true
+RestrictSUIDSGID=true
+LockPersonality=true
+# BCC/LLVM 加载阶段需要可执行内存；BPF 程序仍受 verifier 与能力边界约束。
+MemoryDenyWriteExecute=false
+RestrictAddressFamilies=AF_UNIX
+SystemCallArchitectures=native
+
+[Install]
+WantedBy=multi-user.target

@@ -8,6 +8,7 @@ RUNTIME_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(RUNTIME_ROOT))
 
 from core.app_mapper import AppMapper, ProcessIdentity
+from core.app_process_index import AppProcessIndex
 from core.runtime_scope import load_runtime_app_scope
 from collectors.cgroup import _exact_cgroup_paths
 from collectors.process import ProcessSample
@@ -19,10 +20,51 @@ class ResidentServiceScopeTest(unittest.TestCase):
         path = Path(__file__).resolve().parents[2] / "configs" / "runtime" / "runtime_app_scope.service.json"
         data = json.loads(path.read_text(encoding="utf-8"))
         self.assertEqual(data["slice"], "")
-        self.assertEqual(len(data["apps"]), 15)
+        self.assertEqual(len(data["apps"]), 16)
         self.assertIn("lzx-note", data["implementation_note"])
 
-    def test_fixture_scope_alias_is_binding_only(self) -> None:
+        desktop = next(app for app in data["apps"] if app["app_key"] == "DESKTOP")
+        self.assertEqual(desktop["app_id"], 16)
+        self.assertEqual(desktop["vocab_name"], "Desktop")
+        self.assertFalse(desktop["prediction_enabled"])
+        self.assertFalse(desktop["workload_enabled"])
+        self.assertEqual(desktop["scope_name"], "")
+        self.assertIn("gnome-shell", desktop["window_keywords"])
+
+    def test_desktop_is_mappable_without_entering_lstm_vocab_or_cgroup_routing(self) -> None:
+        path = Path(__file__).resolve().parents[2] / "configs" / "runtime" / "runtime_app_scope.service.json"
+        vocab = (
+            Path(__file__).resolve().parents[3]
+            / "tool/operation_predictor/data/vocab/lsapp_expanded/app_vocab_duration.json"
+        )
+        scope = load_runtime_app_scope(path, vocab)
+        desktop = next(app for app in scope.apps if app.app_key == "DESKTOP")
+        mapper = AppMapper(
+            scope.as_process_mapper_config({}),
+            target_app="FIREFOX",
+            target_apps=scope.target_apps,
+        )
+
+        self.assertEqual(
+            mapper.map_process(ProcessIdentity(
+                pid=10, tgid=10, comm="gnome-shell", exe_path="/usr/bin/gnome-shell",
+            )),
+            "DESKTOP",
+        )
+        self.assertNotIn("DESKTOP", scope.prediction_apps)
+        self.assertNotIn(16, scope.prediction_enabled_app_ids)
+        self.assertFalse(any("DESKTOP" in warning for warning in scope.vocab_warnings))
+
+    def test_gnome_extension_emits_desktop_when_no_app_window_has_focus(self) -> None:
+        extension = (
+            Path(__file__).resolve().parents[1]
+            / "gnome_extension/extension.js"
+        ).read_text(encoding="utf-8")
+        self.assertIn("this._emitDesktopFocus();", extension)
+        self.assertIn('window_id: focusId', extension)
+        self.assertIn('wm_class: "gnome-shell"', extension)
+
+    def test_fixture_scope_alias_maps_to_app_with_separate_fixture_role(self) -> None:
         path = Path(__file__).resolve().parents[2] / "configs" / "runtime" / "runtime_app_scope.service.json"
         scope = load_runtime_app_scope(path)
         firefox = next(app for app in scope.apps if app.app_key == "FIREFOX")
@@ -45,7 +87,18 @@ class ResidentServiceScopeTest(unittest.TestCase):
                 "automation-fixture-firefox.scope"
             ),
         )
-        self.assertEqual(mapper.map_process(fixture), "")
+        self.assertEqual(mapper.map_process(fixture), "FIREFOX")
+        # AppMapper 只回答“属于哪个固定 App”；GUI/fixture 角色由统一索引保存，
+        # 从而 fixture 可以进入 App cgroup，但不会制造 APP_OPEN/APP_CLOSE。
+        index = AppProcessIndex(
+            mapper,
+            scope.target_apps,
+            fixture_scope_to_app=scope.fixture_scope_to_app_key,
+        )
+        change = index.process_exec(fixture, source_seq=1)
+        self.assertEqual((change.current_app, change.current_role), ("FIREFOX", "fixture"))
+        self.assertEqual(index.pids_for_app("FIREFOX", role="fixture"), {10})
+        self.assertEqual(index.pids_for_app("FIREFOX", role="gui"), set())
 
     def test_solitaire_short_name_does_not_match_systemd_resolved(self) -> None:
         # lzx-note: Resident discovery must not contaminate Solitaire metrics.

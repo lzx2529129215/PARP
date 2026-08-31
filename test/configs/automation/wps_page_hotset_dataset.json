@@ -1,0 +1,84 @@
+{
+  "description": "Read-only WPS Writer/Spreadsheet/Presentation/PDF cycles for file-page hot-set snapshot collection.",
+  "variables": {
+    "WPS_HOTSET_ROUNDS": "1",
+    "WPS_WORD_SMALL": "${PROJECT_ROOT}/samples/wps/word_0040_fixture.docx",
+    "WPS_WORD_LARGE": "${PROJECT_ROOT}/samples/wps/word_200m.docx",
+    "WPS_SHEET": "${PROJECT_ROOT}/samples/wps/spreadsheet_0060.xlsx",
+    "WPS_PRESENTATION": "${PROJECT_ROOT}/samples/wps/presentation_200m.pptx",
+    "WPS_PDF": "${PROJECT_ROOT}/samples/wps/document_0070.pdf"
+  },
+  "actions": [
+    {"type": "assert_file", "path": "${WPS_WORD_SMALL}", "label": "WPS_HOTSET_REQUIRE_WORD_SMALL"},
+    {"type": "assert_file", "path": "${WPS_WORD_LARGE}", "label": "WPS_HOTSET_REQUIRE_WORD_LARGE"},
+    {"type": "assert_file", "path": "${WPS_SHEET}", "label": "WPS_HOTSET_REQUIRE_SHEET"},
+    {"type": "assert_file", "path": "${WPS_PRESENTATION}", "label": "WPS_HOTSET_REQUIRE_PRESENTATION"},
+    {"type": "assert_file", "path": "${WPS_PDF}", "label": "WPS_HOTSET_REQUIRE_PDF"},
+
+    {
+      "type": "repeat",
+      "times": "${WPS_HOTSET_ROUNDS}",
+      "actions": [
+        {"type": "launch", "name": "wps_hotset_word_small", "scope_name": "wps-hotset-word-small", "command": "wps ${WPS_WORD_SMALL}", "app_key": "WPS", "label": "WPS_HOTSET_WORD_SMALL_LAUNCH"},
+        {"type": "wait_window", "name": "wps", "class": "wps|wpsoffice", "timeout": 30, "app_key": "WPS", "label": "WPS_HOTSET_WORD_SMALL_WAIT"},
+        {"type": "focus", "name": "wps", "class": "wps|wpsoffice", "app_key": "WPS", "label": "WPS_HOTSET_WORD_SMALL_FOCUS"},
+        {"type": "window_state", "name": "wps", "class": "wps|wpsoffice", "state": "maximize", "app_key": "WPS", "label": "WPS_HOTSET_WORD_SMALL_MAXIMIZE"},
+        {"type": "key", "name": "wps", "key": "ctrl+End", "app_key": "WPS", "label": "WPS_HOTSET_WORD_SMALL_END"},
+        {"type": "wait", "seconds": 0.7, "label": "WPS_HOTSET_WORD_SMALL_END_DWELL"},
+        {"type": "key", "name": "wps", "key": "ctrl+Home", "app_key": "WPS", "label": "WPS_HOTSET_WORD_SMALL_HOME"},
+        {"type": "wait", "seconds": 0.7, "label": "WPS_HOTSET_WORD_SMALL_HOME_DWELL"},
+        {"type": "key", "name": "wps", "key": "Page_Down", "repeat": 2, "interval": 0.15, "app_key": "WPS", "label": "WPS_HOTSET_WORD_SMALL_PAGE"},
+        {"type": "wait", "seconds": 0.6, "label": "WPS_HOTSET_WORD_SMALL_PAGE_DWELL"},
+        {"type": "close", "name": "wps_hotset_word_small", "class": "wps|wpsoffice", "process_names": ["wpsoffice", "wps", "wpp", "et", "wpspdf"], "path_contains": ["/opt/kingsoft/wps-office"], "wait_after_window_close": 0.5, "force_after_seconds": 0.5, "app_key": "WPS", "label": "WPS_HOTSET_WORD_SMALL_CLOSE"},
+
+        {"type": "launch", "name": "wps_hotset_word_large", "scope_name": "wps-hotset-word-large", "command": "wps ${WPS_WORD_LARGE}", "app_key": "WPS", "label": "WPS_HOTSET_WORD_LARGE_LAUNCH"},
+        {"type": "wait_window", "name": "wps", "class": "wps|wpsoffice", "timeout": 30, "app_key": "WPS", "label": "WPS_HOTSET_WORD_LARGE_WAIT"},
+        {"type": "focus", "name": "wps", "class": "wps|wpsoffice", "app_key": "WPS", "label": "WPS_HOTSET_WORD_LARGE_FOCUS"},
+        {"type": "window_state", "name": "wps", "class": "wps|wpsoffice", "state": "maximize", "app_key": "WPS", "label": "WPS_HOTSET_WORD_LARGE_MAXIMIZE"},
+        {"type": "key", "name": "wps", "key": "ctrl+End", "app_key": "WPS", "label": "WPS_HOTSET_WORD_LARGE_END"},
+        {"type": "wait", "seconds": 0.7, "label": "WPS_HOTSET_WORD_LARGE_END_DWELL"},
+        {"type": "key", "name": "wps", "key": "ctrl+Home", "app_key": "WPS", "label": "WPS_HOTSET_WORD_LARGE_HOME"},
+        {"type": "wait", "seconds": 0.7, "label": "WPS_HOTSET_WORD_LARGE_HOME_DWELL"},
+        {"type": "key", "name": "wps", "key": "Page_Down", "repeat": 3, "interval": 0.15, "app_key": "WPS", "label": "WPS_HOTSET_WORD_LARGE_PAGE"},
+        {"type": "wait", "seconds": 0.6, "label": "WPS_HOTSET_WORD_LARGE_PAGE_DWELL"},
+        {"type": "close", "name": "wps_hotset_word_large", "class": "wps|wpsoffice", "process_names": ["wpsoffice", "wps", "wpp", "et", "wpspdf"], "path_contains": ["/opt/kingsoft/wps-office"], "wait_after_window_close": 0.5, "force_after_seconds": 0.5, "app_key": "WPS", "label": "WPS_HOTSET_WORD_LARGE_CLOSE"},
+
+        {"type": "launch", "name": "wps_hotset_sheet", "scope_name": "wps-hotset-sheet", "command": "et ${WPS_SHEET}", "app_key": "WPS", "label": "WPS_HOTSET_SHEET_LAUNCH"},
+        {"type": "wait_window", "name": "wps", "class": "et|wpsoffice", "timeout": 30, "app_key": "WPS", "label": "WPS_HOTSET_SHEET_WAIT"},
+        {"type": "focus", "name": "wps", "class": "et|wpsoffice", "app_key": "WPS", "label": "WPS_HOTSET_SHEET_FOCUS"},
+        {"type": "window_state", "name": "wps", "class": "et|wpsoffice", "state": "maximize", "app_key": "WPS", "label": "WPS_HOTSET_SHEET_MAXIMIZE"},
+        {"type": "goto_cell", "name": "wps", "reference": "A1", "app_key": "WPS", "label": "WPS_HOTSET_SHEET_A1"},
+        {"type": "wait", "seconds": 0.7, "label": "WPS_HOTSET_SHEET_A1_DWELL"},
+        {"type": "key", "name": "wps", "key": "ctrl+End", "app_key": "WPS", "label": "WPS_HOTSET_SHEET_END"},
+        {"type": "wait", "seconds": 0.7, "label": "WPS_HOTSET_SHEET_END_DWELL"},
+        {"type": "key", "name": "wps", "key": "ctrl+Home", "app_key": "WPS", "label": "WPS_HOTSET_SHEET_HOME"},
+        {"type": "wait", "seconds": 0.6, "label": "WPS_HOTSET_SHEET_HOME_DWELL"},
+        {"type": "close", "name": "wps_hotset_sheet", "class": "et|wpsoffice", "process_names": ["wpsoffice", "wps", "wpp", "et", "wpspdf"], "path_contains": ["/opt/kingsoft/wps-office"], "wait_after_window_close": 0.5, "force_after_seconds": 0.5, "app_key": "WPS", "label": "WPS_HOTSET_SHEET_CLOSE"},
+
+        {"type": "launch", "name": "wps_hotset_presentation", "scope_name": "wps-hotset-presentation", "command": "wpp ${WPS_PRESENTATION}", "app_key": "WPS", "label": "WPS_HOTSET_PRESENTATION_LAUNCH"},
+        {"type": "wait_window", "name": "wps", "class": "wpp|wpsoffice", "timeout": 30, "app_key": "WPS", "label": "WPS_HOTSET_PRESENTATION_WAIT"},
+        {"type": "focus", "name": "wps", "class": "wpp|wpsoffice", "app_key": "WPS", "label": "WPS_HOTSET_PRESENTATION_FOCUS"},
+        {"type": "window_state", "name": "wps", "class": "wpp|wpsoffice", "state": "maximize", "app_key": "WPS", "label": "WPS_HOTSET_PRESENTATION_MAXIMIZE"},
+        {"type": "key", "name": "wps", "key": "End", "app_key": "WPS", "label": "WPS_HOTSET_PRESENTATION_END"},
+        {"type": "wait", "seconds": 0.7, "label": "WPS_HOTSET_PRESENTATION_END_DWELL"},
+        {"type": "key", "name": "wps", "key": "Home", "app_key": "WPS", "label": "WPS_HOTSET_PRESENTATION_HOME"},
+        {"type": "wait", "seconds": 0.7, "label": "WPS_HOTSET_PRESENTATION_HOME_DWELL"},
+        {"type": "key", "name": "wps", "key": "Page_Down", "repeat": 2, "interval": 0.15, "app_key": "WPS", "label": "WPS_HOTSET_PRESENTATION_PAGE"},
+        {"type": "wait", "seconds": 0.6, "label": "WPS_HOTSET_PRESENTATION_PAGE_DWELL"},
+        {"type": "close", "name": "wps_hotset_presentation", "class": "wpp|wpsoffice", "process_names": ["wpsoffice", "wps", "wpp", "et", "wpspdf"], "path_contains": ["/opt/kingsoft/wps-office"], "wait_after_window_close": 0.5, "force_after_seconds": 0.5, "app_key": "WPS", "label": "WPS_HOTSET_PRESENTATION_CLOSE"},
+
+        {"type": "launch", "name": "wps_hotset_pdf", "scope_name": "wps-hotset-pdf", "command": "wpspdf ${WPS_PDF}", "app_key": "WPS", "label": "WPS_HOTSET_PDF_LAUNCH"},
+        {"type": "wait_window", "name": "wps", "class": "wpspdf|wpsoffice", "timeout": 30, "app_key": "WPS", "label": "WPS_HOTSET_PDF_WAIT"},
+        {"type": "focus", "name": "wps", "class": "wpspdf|wpsoffice", "app_key": "WPS", "label": "WPS_HOTSET_PDF_FOCUS"},
+        {"type": "window_state", "name": "wps", "class": "wpspdf|wpsoffice", "state": "maximize", "app_key": "WPS", "label": "WPS_HOTSET_PDF_MAXIMIZE"},
+        {"type": "key", "name": "wps", "key": "ctrl+End", "app_key": "WPS", "label": "WPS_HOTSET_PDF_END"},
+        {"type": "wait", "seconds": 0.7, "label": "WPS_HOTSET_PDF_END_DWELL"},
+        {"type": "key", "name": "wps", "key": "ctrl+Home", "app_key": "WPS", "label": "WPS_HOTSET_PDF_HOME"},
+        {"type": "wait", "seconds": 0.7, "label": "WPS_HOTSET_PDF_HOME_DWELL"},
+        {"type": "key", "name": "wps", "key": "Page_Down", "repeat": 3, "interval": 0.15, "app_key": "WPS", "label": "WPS_HOTSET_PDF_PAGE"},
+        {"type": "wait", "seconds": 0.6, "label": "WPS_HOTSET_PDF_PAGE_DWELL"},
+        {"type": "close", "name": "wps_hotset_pdf", "class": "wpspdf|wpsoffice", "process_names": ["wpsoffice", "wps", "wpp", "et", "wpspdf"], "path_contains": ["/opt/kingsoft/wps-office"], "wait_after_window_close": 0.5, "force_after_seconds": 0.5, "app_key": "WPS", "label": "WPS_HOTSET_PDF_CLOSE"}
+      ]
+    }
+  ]
+}

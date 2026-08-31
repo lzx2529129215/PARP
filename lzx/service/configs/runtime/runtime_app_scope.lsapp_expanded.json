@@ -111,6 +111,13 @@
       "workload_enabled": true, "prediction_enabled": true,
       "window_keywords": ["aisleriot", "solitaire", "klondike", "纸牌"],
       "process_keywords": ["sol", "aisleriot"]
+    },
+    {
+      "app_key": "DESKTOP", "app_id": 16, "vocab_name": "Desktop",
+      "scope_name": "", "unit_name": "", "binding_scope_names": [],
+      "workload_enabled": false, "prediction_enabled": false,
+      "window_keywords": ["gnome-shell", "Gnome-shell", "org.gnome.Shell"],
+      "process_keywords": ["gnome-shell"]
     }
   ]
 }

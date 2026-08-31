@@ -39,6 +39,12 @@ class X11EventCollector:
         # (such as Openbox), where the client can be below a frame window.
         self._client_window_ids: set[int] = set()
         self._last_connection_error = ""  # lzx-note
+        # 每一次 _NET_ACTIVE_WINDOW 变化都会使上一轮延迟复查失效。X11/工具包
+        # 可能在 150 ms 内连续发布“旧窗口 -> 空窗口 -> 新窗口”；如果不做代次
+        # 校验，旧窗口的 Timer 会在新状态建立后重新发出 FOCUS_RECHECK，把前台
+        # 状态错误地倒退回旧应用。
+        self._focus_generation = 0
+        self._focus_generation_lock = threading.Lock()
 
     def start(self) -> None:
         if self._thread is not None:
@@ -48,6 +54,9 @@ class X11EventCollector:
 
     def stop(self) -> None:
         self._stop.set()
+        # 先使尚未执行的延迟复查全部过期，再唤醒并结束 X11 监听线程。这样服务
+        # 停止/重启时不会有旧 Timer 向已经关闭的 monitor 队列补发事件。
+        self._invalidate_focus_recheck()
         try:
             os.write(self._wake_w, b"x")
         except OSError:
@@ -266,17 +275,36 @@ class X11EventCollector:
             self._watched_windows.discard(window_id)
 
     def _schedule_focus_recheck(self, window_id: str) -> None:
-        """在属性尚未稳定时做一次事件驱动的延迟重查，而不是周期轮询。"""
+        """在属性尚未稳定时做一次事件驱动的延迟重查，而不是周期轮询。
+
+        即使 ``window_id`` 为空也必须推进 generation：空活动窗口经常表示焦点
+        已离开某个 Xwayland 窗口，此时上一窗口的复查必须取消。空窗口本身由
+        monitor 的 GNOME/X11 仲裁逻辑处理，这里不立即把它解释成 UNKNOWN。
+        """
+        with self._focus_generation_lock:
+            self._focus_generation += 1
+            generation = self._focus_generation
         if not window_id:
             return
 
         def recheck() -> None:
-            if not self._stop.is_set():
-                self._emit("FOCUS_RECHECK", window_id=window_id, trigger="_NET_ACTIVE_WINDOW")
+            with self._focus_generation_lock:
+                is_current = generation == self._focus_generation
+            if not self._stop.is_set() and is_current:
+                self._emit(
+                    "FOCUS_RECHECK",
+                    window_id=window_id,
+                    trigger="_NET_ACTIVE_WINDOW",
+                )
 
         timer = threading.Timer(0.15, recheck)
         timer.daemon = True
         timer.start()
+
+    def _invalidate_focus_recheck(self) -> None:
+        """使已经创建、但尚未执行的焦点复查 Timer 全部失效。"""
+        with self._focus_generation_lock:
+            self._focus_generation += 1
 
     def _active_window_id(self) -> str:
         if self._root is None or not self._atoms:

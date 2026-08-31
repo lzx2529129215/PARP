@@ -7,6 +7,7 @@ import os
 import time
 from dataclasses import dataclass
 from pathlib import Path
+from collections.abc import Iterable
 from typing import Any
 
 from core.app_mapper import AppMapper, ProcessIdentity
@@ -154,30 +155,61 @@ class ProcessCollector:
         cgroup_path = _read_cgroup_path(pid)
         return f"/{self.test_slice}/" in cgroup_path or cgroup_path.endswith(f"/{self.test_slice}")
 
-    def sample(self) -> list[ProcessSample]:
-        """扫描候选 PID，只返回目标 App（以及可选 test slice）中的完整样本。"""
-        samples: list[ProcessSample] = []
-        # 生产服务未指定 target_pid，因此每秒枚举 /proc；尽早用轻量 identity/App
-        # 映射过滤，再为命中进程读取较多的 io/status/stat 文件。
+    def discover_identities(self) -> list[ProcessIdentity]:
+        """启动/异常恢复时一次性发现当前存活的目标 App 进程。
+
+        常驻 steady-state 不调用本方法；平时的 App↔PID 关系由 AppProcessIndex
+        消费内核 START/EXEC/EXIT 事件维护。
+        """
+        identities: list[ProcessIdentity] = []
         pids = [self.target_pid] if self.target_pid else self._all_pids()
         for pid in pids:
-            if not pid:
-                continue
-            identity = read_identity(pid)
-            if identity is None:
-                continue
-            app_id = self.mapper.map_process(identity)
-            if self.target_comm and self.target_comm not in identity.comm.lower():
-                continue
+            identity = self._accepted_identity(pid)
+            if identity is not None:
+                identities.append(identity)
+        return identities
+
+    def sample(
+        self,
+        pids: Iterable[int] | None = None,
+        *,
+        app_by_pid: dict[int, str] | None = None,
+    ) -> list[ProcessSample]:
+        """读取指定 PID 的目标 App 资源；``None`` 仅保留兼容的全量发现模式。
+
+        生产 monitor 始终传入 AppProcessIndex 的 PID 列表，包括空列表。因此每秒
+        采样不再枚举整个 /proc；只有启动基线或 connector 缺口恢复才全量发现。
+        """
+        samples: list[ProcessSample] = []
+        candidates: Iterable[int]
+        if pids is None:
+            candidates = [self.target_pid] if self.target_pid else self._all_pids()
+        else:
+            candidates = sorted({int(pid) for pid in pids if int(pid) > 0})
+        for pid in candidates:
+            explicit_app = str((app_by_pid or {}).get(int(pid), ""))
+            if explicit_app in self.target_apps:
+                # START/EXEC 已经建立归属时以事件索引为权威。迁移后的通用
+                # fixture/worker 即使 exe 名不含 App，也必须继续被定向采样。
+                identity = read_identity(int(pid))
+                if identity is None:
+                    continue
+                if self.target_comm and self.target_comm not in identity.comm.lower():
+                    continue
+                if self.test_slice and not self.pid_in_test_slice(int(pid)):
+                    continue
+                app_id = explicit_app
+            else:
+                identity = self._accepted_identity(pid)
+                if identity is None:
+                    continue
+                app_id = self.mapper.map_process(identity)
+            # --target-pid 是单 PID 调试兼容模式：调用者已经明确指定该 PID
+            # 属于 target_app，所以即使它不是 runtime scope 中的真实 GUI 可执行
+            # 文件，也要与旧版全量 sample() 保持相同的归类语义。
             if self.target_pid and not app_id:
                 app_id = self.target_app
-            if app_id not in self.target_apps:
-                continue
             in_slice = self.pid_in_test_slice(pid)
-            # test_slice 只用于专项实验隔离；常驻 service scope 的 slice 为空，允许
-            # 跨 slice 观察匹配 GUI App。fixture alias 不从这里进入生命周期统计。
-            if self.test_slice and not in_slice:
-                continue
             samples.append(
                 ProcessSample(
                     identity=identity,
@@ -189,6 +221,25 @@ class ProcessCollector:
                 )
             )
         return samples
+
+    def _accepted_identity(self, pid: int | None) -> ProcessIdentity | None:
+        if not pid:
+            return None
+        identity = read_identity(int(pid))
+        if identity is None:
+            return None
+        app_id = self.mapper.map_process(identity)
+        if self.target_comm and self.target_comm not in identity.comm.lower():
+            return None
+        if self.target_pid and not app_id:
+            app_id = self.target_app
+        if app_id not in self.target_apps:
+            return None
+        # test_slice 只用于专项实验隔离；常驻 service scope 的 slice 为空，允许
+        # 跨 slice 观察匹配 GUI App。fixture alias 不进入 GUI 进程索引。
+        if self.test_slice and not self.pid_in_test_slice(int(pid)):
+            return None
+        return identity
 
     @staticmethod
     def _all_pids() -> list[int]:

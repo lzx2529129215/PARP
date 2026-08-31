@@ -35,6 +35,72 @@ def make_fake_process(
 
 
 class ProcessCgroupRouterTests(unittest.TestCase):
+    def test_fixture_alias_is_routed_by_create_event_with_fixture_role(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            proc_root = Path(tmp) / "proc"
+            proc_root.mkdir()
+            proc = make_fake_process(
+                proc_root,
+                pid=246,
+                comm="python3",
+                exe_path="/usr/bin/python3",
+                cgroup_path="/test.slice/automation-fixture-firefox.scope",
+            )
+            mapper = AppMapper(
+                {"apps": {"FIREFOX": {
+                    "keywords": ["firefox"],
+                    "cgroup_units": ["automation-fixture-firefox.scope"],
+                }}},
+                target_apps=["FIREFOX"],
+            )
+            commands: list[list[str]] = []
+            results: list[dict[str, object]] = []
+            ready = threading.Event()
+
+            def callback(result: dict[str, object]) -> None:
+                results.append(result)
+                ready.set()
+
+            def runner(command: list[str], **_kwargs: object) -> subprocess.CompletedProcess[str]:
+                commands.append(command)
+                (proc / "cgroup").write_text(
+                    "0::/user.slice/parp-firefox.slice/"
+                    "parp-route-firefox-fixture-p246-s12345.scope\n",
+                    encoding="utf-8",
+                )
+                return subprocess.CompletedProcess(command, 0, "ok", "")
+
+            router = SystemdProcessCgroupRouter(
+                mapper=mapper,
+                app_ids={"FIREFOX": 1},
+                fixture_scope_to_app={
+                    "automation-fixture-firefox.scope": "FIREFOX"
+                },
+                callback=callback,
+                proc_root=proc_root,
+                expected_uid=os.getuid(),
+                command_runner=runner,
+            )
+            router.start()
+            try:
+                identity = ProcessIdentity(
+                    pid=246,
+                    tgid=246,
+                    comm="python3",
+                    exe_path="/usr/bin/python3",
+                    cgroup_path="/test.slice/automation-fixture-firefox.scope",
+                    start_time="12345",
+                )
+                self.assertTrue(router.submit_created_process(
+                    {"event_type": "PROCESS_START", "source_seq": 1}, identity,
+                    app="FIREFOX", role="fixture",
+                ))
+                self.assertTrue(ready.wait(1.0))
+            finally:
+                router.stop()
+            self.assertEqual(results[0]["status"], "MIGRATED")
+            self.assertIn("parp-route-firefox-fixture-p246-s12345.scope", commands[0])
+
     def test_routes_only_existing_lstm_app_id(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             proc_root = Path(tmp) / "proc"
@@ -163,31 +229,6 @@ class ProcessCgroupRouterTests(unittest.TestCase):
             self.assertEqual(results[0]["status"], "PID_REUSED")
             self.assertEqual(results[0]["target_slice"], "parp-vlc.slice")
             self.assertEqual(commands, [])
-
-    def test_reconcile_skips_process_already_under_app_slice(self) -> None:
-        with tempfile.TemporaryDirectory() as tmp:
-            proc_root = Path(tmp) / "proc"
-            proc_root.mkdir()
-            make_fake_process(
-                proc_root,
-                pid=456,
-                comm="vlc",
-                exe_path="/usr/bin/vlc",
-                cgroup_path="/parp.slice/parp-vlc.slice/existing.scope",
-            )
-            mapper = AppMapper(
-                {"apps": {"VLC": {"keywords": ["vlc"]}}},
-                target_apps=["VLC"],
-            )
-            router = SystemdProcessCgroupRouter(
-                mapper=mapper,
-                app_ids={"VLC": 3},
-                callback=lambda _result: None,
-                proc_root=proc_root,
-                expected_uid=os.getuid(),
-                command_runner=lambda *_args, **_kwargs: subprocess.CompletedProcess([], 0),
-            )
-            self.assertEqual(router.reconcile_if_due(5.0, force=True), 0)
 
     def test_created_child_inherits_app_scope_without_second_migration(self) -> None:
         """子进程已继承 App scope 时仍接受检查，但不得再次调用 systemd。"""

@@ -11,7 +11,7 @@ import threading
 import time
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Callable, Iterable
+from typing import Any, Callable
 
 try:
     from core.app_mapper import AppMapper, ProcessIdentity
@@ -29,6 +29,7 @@ class ProcessRouteTarget:
     app: str
     app_id: int
     target_slice: str
+    role: str = "gui"
 
 
 @dataclass(frozen=True)
@@ -41,6 +42,7 @@ class _RouteRequest:
     expected_app_id: int
     expected_start_time: str
     expected_target_slice: str
+    expected_role: str = "gui"
 
 
 @dataclass(frozen=True)
@@ -165,6 +167,7 @@ class SystemdProcessCgroupRouter:
         timeout_s: float = 2.0,
         queue_capacity: int = 4096,
         command_runner: Callable[..., subprocess.CompletedProcess[str]] | None = None,
+        fixture_scope_to_app: dict[str, str] | None = None,
     ) -> None:
         normalized_ids = {
             str(app).strip().upper(): int(app_id)
@@ -181,6 +184,11 @@ class SystemdProcessCgroupRouter:
         self.busctl = str(busctl)
         self.timeout_s = max(0.1, float(timeout_s))
         self.command_runner = command_runner or subprocess.run
+        self.fixture_scope_to_app = {
+            str(scope): str(app).strip().upper()
+            for scope, app in (fixture_scope_to_app or {}).items()
+            if str(scope) and str(app).strip().upper() in self.app_ids
+        }
         self._queue: queue.Queue[_RouteRequest | None] = queue.Queue(
             maxsize=max(1, int(queue_capacity))
         )
@@ -188,11 +196,14 @@ class SystemdProcessCgroupRouter:
         self._pending_lock = threading.Lock()
         self._thread: threading.Thread | None = None
         self._stop = threading.Event()
-        self._last_reconcile_monotonic = float("-inf")
 
     @property
     def apps(self) -> list[str]:
         return sorted(self.app_ids)
+
+    @property
+    def started(self) -> bool:
+        return self._thread is not None and self._thread.is_alive()
 
     def start(self) -> None:
         if self._thread is not None:
@@ -223,16 +234,46 @@ class SystemdProcessCgroupRouter:
         app_id = int(self.app_ids.get(app, 0) or 0)
         if not app or app_id <= 0:
             return None
+        components = {
+            item for item in str(identity.cgroup_path or "").split("/") if item
+        }
+        role = "gui"
+        if any(
+            scope in components and fixture_app == app
+            for scope, fixture_app in self.fixture_scope_to_app.items()
+        ):
+            role = "fixture"
+        elif any(
+            component.startswith(f"parp-route-{_app_slug(app)}-fixture-")
+            for component in components
+        ):
+            role = "fixture"
         return ProcessRouteTarget(
             app=app,
             app_id=app_id,
             target_slice=f"parp-{_app_slug(app)}.slice",
+            role=role,
+        )
+
+    def _target_for_known_app(self, app: str, role: str) -> ProcessRouteTarget | None:
+        normalized = str(app).strip().upper()
+        app_id = int(self.app_ids.get(normalized, 0) or 0)
+        if app_id <= 0:
+            return None
+        return ProcessRouteTarget(
+            app=normalized,
+            app_id=app_id,
+            target_slice=f"parp-{_app_slug(normalized)}.slice",
+            role="fixture" if role == "fixture" else "gui",
         )
 
     def submit_created_process(
         self,
         event: dict[str, Any],
         identity: ProcessIdentity,
+        *,
+        app: str = "",
+        role: str = "gui",
     ) -> bool:
         """接收每次 createProcess 判断，并按需把迁移检查放入 worker 队列。
 
@@ -240,7 +281,7 @@ class SystemdProcessCgroupRouter:
         是否已经通过父进程继承目标 cgroup，要在 worker 中重新读取实时 /proc
         后决定；事件携带的 cgroup 可能已经因并发迁移而过时。
         """
-        target = self.target_for_identity(identity)
+        target = self._target_for_known_app(app, role) if app else self.target_for_identity(identity)
         if target is None:
             return False
         return self._enqueue(_RouteRequest(
@@ -252,15 +293,19 @@ class SystemdProcessCgroupRouter:
             expected_app_id=target.app_id,
             expected_start_time=str(identity.start_time),
             expected_target_slice=target.target_slice,
+            expected_role=target.role,
         ))
 
     def submit_exec_process(
         self,
         event: dict[str, Any],
         identity: ProcessIdentity,
+        *,
+        app: str = "",
+        role: str = "gui",
     ) -> bool:
         """EXEC 后按最终 comm/exe 复核，覆盖 launcher、脚本包装器等情况。"""
-        target = self.target_for_identity(identity)
+        target = self._target_for_known_app(app, role) if app else self.target_for_identity(identity)
         if target is None:
             return False
         return self._enqueue(_RouteRequest(
@@ -272,51 +317,14 @@ class SystemdProcessCgroupRouter:
             expected_app_id=target.app_id,
             expected_start_time=str(identity.start_time),
             expected_target_slice=target.target_slice,
+            expected_role=target.role,
         ))
-
-    def reconcile_if_due(self, interval_s: float, *, force: bool = False) -> int:
-        """周期性修复启动前已有进程以及 FORK/迁移并发窗口中的遗漏。
-
-        扫描时先做两层过滤：未知 App 不处理；已经处于目标 App slice 的进程
-        说明已由父进程继承或先前已经迁移，也不入队。只有仍在外部 cgroup 的
-        已知 App 进程才进入修复队列。
-        """
-        now = time.monotonic()
-        if not force and now - self._last_reconcile_monotonic < max(1.0, interval_s):
-            return 0
-        self._last_reconcile_monotonic = now
-        queued = 0
-        try:
-            entries: Iterable[Path] = self.proc_root.iterdir()
-        except OSError:
-            return 0
-        for entry in entries:
-            if not entry.name.isdigit():
-                continue
-            snapshot = _read_snapshot(self.proc_root, int(entry.name))
-            if snapshot is None or snapshot.owner_uid != self.expected_uid:
-                continue
-            target = self.target_for_identity(snapshot.identity())
-            if target is None or _inside_slice(snapshot.cgroup_path, target.target_slice):
-                continue
-            if self._enqueue(_RouteRequest(
-                pid=snapshot.pid,
-                event_type="RECONCILE",
-                source_seq=0,
-                requested_ts_ns=time.time_ns(),
-                expected_app=target.app,
-                expected_app_id=target.app_id,
-                expected_start_time=snapshot.start_time,
-                expected_target_slice=target.target_slice,
-            )):
-                queued += 1
-        return queued
 
     def _enqueue(self, request: _RouteRequest) -> bool:
         if request.pid <= 0 or self._stop.is_set():
             return False
         with self._pending_lock:
-            # 同一 PID 的 FORK、紧随其后的 EXEC 和周期校对可能同时到达。
+            # 同一 PID 的 FORK、紧随其后的 EXEC 和离散索引重建可能同时到达。
             # pending 去重保证任一时刻最多只有一个 worker 操作该进程；worker
             # 会读取最新 comm/exe/cgroup，所以不会依赖已经过时的事件快照。
             if request.pid in self._pending:
@@ -380,10 +388,19 @@ class SystemdProcessCgroupRouter:
                 latency_start_ns=start_ns,
             )
         target = self.target_for_identity(snapshot.identity())
+        if target is None and _inside_slice(
+            snapshot.cgroup_path, request.expected_target_slice
+        ):
+            # 迁移后的通用 fixture/worker 可能无法再靠 exe 识别；队列请求中的
+            # 固定 App ID 与目标 slice 仍可证明它没有离开原归属。
+            target = self._target_for_known_app(
+                request.expected_app, request.expected_role
+            )
         if (
             target is None
             or target.app != request.expected_app
             or target.app_id != request.expected_app_id
+            or target.role != request.expected_role
         ):
             return self._result(
                 request,
@@ -427,8 +444,9 @@ class SystemdProcessCgroupRouter:
         # 已经 fork、因而仍留在旧 GNOME/systemd scope 的竞争遗漏进程。为它创建
         # 独立 leaf scope，但所有这类 scope 都挂在同一个 parp-<app>.slice 下，
         # 所以 App 级资源统计/控制仍可统一作用于父 slice。
+        role_marker = "fixture-" if target.role == "fixture" else ""
         scope_name = (
-            f"parp-route-{_app_slug(target.app)}-p{snapshot.pid}-"
+            f"parp-route-{_app_slug(target.app)}-{role_marker}p{snapshot.pid}-"
             f"s{snapshot.start_time}.scope"
         )
         command = self._start_transient_scope_command(scope_name, target, snapshot.pid)
@@ -508,8 +526,8 @@ class SystemdProcessCgroupRouter:
         pid: int,
     ) -> list[str]:
         # PIDs 属性只迁移当前进程（包含它的所有线程），不会回溯搬运已经存在的
-        # 子进程；这也是 createProcess 必须检查每个 FORK、reconcile 必须兜底的
-        # 原因。迁移完成以后新创建的后代则会自然继承该 transient scope。
+        # 子进程；这也是 createProcess 必须检查每个 FORK 的原因。迁移完成以后
+        # 新创建的后代会自然继承；迁移前的竞争遗漏由对应 START/EXEC 事件处理。
         return [
             self.busctl,
             "--user",

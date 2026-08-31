@@ -27,7 +27,11 @@ process_connector_ready_timeout="${PARP_SERVICE_PROCESS_CONNECTOR_READY_TIMEOUT:
 process_connector_stale_timeout="${PARP_SERVICE_PROCESS_CONNECTOR_STALE_TIMEOUT:-10}"
 process_cgroup_routing="${PARP_SERVICE_PROCESS_CGROUP_ROUTING:-systemd}"
 process_cgroup_route_timeout="${PARP_SERVICE_PROCESS_CGROUP_ROUTE_TIMEOUT:-2}"
-process_cgroup_reconcile_interval="${PARP_SERVICE_PROCESS_CGROUP_RECONCILE_INTERVAL:-5}"
+file_event_source="${PARP_SERVICE_FILE_EVENT_SOURCE:-ebpf}"
+file_event_socket="${PARP_SERVICE_FILE_EVENT_SOCKET:-/run/user/$(id -u)/parp-file-events.sock}"
+file_event_control_socket="${PARP_SERVICE_FILE_EVENT_CONTROL_SOCKET:-/run/parp-file-events-$(id -u).sock}"
+file_event_ready_timeout="${PARP_SERVICE_FILE_EVENT_READY_TIMEOUT:-15}"
+file_event_stale_timeout="${PARP_SERVICE_FILE_EVENT_STALE_TIMEOUT:-10}"
 
 mkdir -p "$PARP_SERVICE_OUTPUT_ROOT"
 # lzx-note: Rotate resident collection into daily sessions and remove only
@@ -77,7 +81,6 @@ case "$process_event_source" in
         monitor_args+=(
           --process-cgroup-routing systemd
           --process-cgroup-route-timeout-s "$process_cgroup_route_timeout"
-          --process-cgroup-reconcile-interval-s "$process_cgroup_reconcile_interval"
           --require-process-cgroup-routing
         )
         ;;
@@ -95,6 +98,26 @@ case "$process_event_source" in
     ;;
   *)
     echo "invalid PARP_SERVICE_PROCESS_EVENT_SOURCE=$process_event_source (expected connector or procfs)" >&2
+    exit 2
+    ;;
+esac
+
+case "$file_event_source" in
+  ebpf)
+    monitor_args+=(
+      --file-event-source ebpf
+      --file-event-socket "$file_event_socket"
+      --file-event-control-socket "$file_event_control_socket"
+      --file-event-ready-timeout-s "$file_event_ready_timeout"
+      --file-event-stale-timeout-s "$file_event_stale_timeout"
+      --require-ebpf-file-events
+    )
+    ;;
+  off)
+    monitor_args+=(--file-event-source off)
+    ;;
+  *)
+    echo "invalid PARP_SERVICE_FILE_EVENT_SOURCE=$file_event_source (expected ebpf or off)" >&2
     exit 2
     ;;
 esac

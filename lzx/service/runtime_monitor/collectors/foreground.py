@@ -2,12 +2,13 @@
 
 from __future__ import annotations
 
-import subprocess
-import time
 import os
+import threading
+import time
 from dataclasses import dataclass
 import datetime as dt
 from pathlib import Path
+from typing import Any
 
 
 @dataclass
@@ -55,6 +56,151 @@ class ForegroundDebugState:
     error: str = ""
 
 
+@dataclass
+class X11WindowProperties:
+    """一次进程内 X11 属性读取的稳定结果。
+
+    该结构只保存普通 Python 类型，避免把 python-xlib 的 Window、Atom 或 array
+    对象泄漏到业务层。窗口在读取期间被销毁时，reader 返回 ``None``，调用方按
+    一次事件时刻的元数据缺失处理，不会启动外部命令重试。
+    """
+
+    window_id: str
+    wm_classes: list[str]
+    net_wm_name: str
+    wm_name: str
+    pid: int
+    is_hidden: bool
+    is_normal_window: bool
+
+
+class _X11PropertyReader:
+    """通过一个可重连的 python-xlib 连接读取根窗口和客户端属性。
+
+    X11EventCollector 负责阻塞等待事件；本类只在事件需要解析窗口元数据时执行
+    X11 请求。连接在进程内长期复用，因此不会像 xprop/xdotool 那样为每次查询
+    fork/exec 新进程。连接断开后下一次读取会自动重新发现 DISPLAY/XAUTHORITY。
+    """
+
+    def __init__(self, display_name: str | None = None) -> None:
+        self.display_name = display_name
+        self._display: Any | None = None
+        self._root: Any | None = None
+        self._x: Any | None = None
+        self._atoms: dict[str, int] = {}
+        self._lock = threading.RLock()
+        self.last_error = ""
+
+    def close(self) -> None:
+        """关闭持久 X11 连接；重复调用安全。"""
+        with self._lock:
+            self._reset_connection()
+
+    def active_window_id(self) -> str:
+        """读取根窗口的 _NET_ACTIVE_WINDOW，不产生子进程。"""
+        with self._lock:
+            try:
+                self._ensure_connection()
+                prop = self._property(self._root, "_NET_ACTIVE_WINDOW")
+                value = _first_int_property_value(prop)
+                self.last_error = ""
+                return _format_x11_window_id(value)
+            except Exception as exc:
+                self._record_connection_error(exc)
+                return ""
+
+    def client_window_ids(self, *, stacking: bool = False) -> list[str]:
+        """读取 EWMH 客户端列表；stacking=True 时保持从底到顶的顺序。"""
+        with self._lock:
+            try:
+                self._ensure_connection()
+                name = "_NET_CLIENT_LIST_STACKING" if stacking else "_NET_CLIENT_LIST"
+                prop = self._property(self._root, name)
+                values = [] if prop is None else [int(value) for value in prop.value]
+                self.last_error = ""
+                return [_format_x11_window_id(value) for value in values if value]
+            except Exception as exc:
+                self._record_connection_error(exc)
+                return []
+
+    def window_properties(self, window_id: str) -> X11WindowProperties | None:
+        """在当前连接上读取一个窗口映射 App 所需的全部 EWMH/ICCCM 属性。"""
+        with self._lock:
+            try:
+                self._ensure_connection()
+                numeric_id = int(str(window_id), 0)
+                window = self._display.create_resource_object("window", numeric_id)
+                # get_attributes 是一个同步请求，可在窗口已销毁时尽早得到 BadWindow。
+                window.get_attributes()
+                wm_classes = _decode_wm_class(self._property(window, "WM_CLASS"))
+                net_wm_name = _decode_text_property(
+                    self._property(window, "_NET_WM_NAME")
+                )
+                wm_name = _decode_text_property(self._property(window, "WM_NAME"))
+                pid = _first_int_property_value(self._property(window, "_NET_WM_PID"))
+                state_values = _int_property_values(self._property(window, "_NET_WM_STATE"))
+                type_values = _int_property_values(
+                    self._property(window, "_NET_WM_WINDOW_TYPE")
+                )
+                hidden_atom = self._atom("_NET_WM_STATE_HIDDEN")
+                normal_atom = self._atom("_NET_WM_WINDOW_TYPE_NORMAL")
+                self.last_error = ""
+                return X11WindowProperties(
+                    window_id=_format_x11_window_id(numeric_id),
+                    wm_classes=wm_classes,
+                    net_wm_name=net_wm_name,
+                    wm_name=wm_name,
+                    pid=pid,
+                    is_hidden=hidden_atom in state_values,
+                    # 缺失窗口类型时保持旧实现的宽容策略；无 PID 的辅助窗口仍会
+                    # 在 ForegroundCollector 中被排除。
+                    is_normal_window=not type_values or normal_atom in type_values,
+                )
+            except Exception as exc:
+                self._record_connection_error(exc)
+                return None
+
+    def _ensure_connection(self) -> None:
+        if self._display is not None and self._root is not None:
+            return
+        _configure_x11_env()
+        from Xlib import X, display
+
+        self._x = X
+        self._display = display.Display(self.display_name)
+        # 窗口可能在通知与属性读取之间消失；同步请求仍会由上层 try/except 兜底。
+        self._display.set_error_handler(lambda *_args: None)
+        self._root = self._display.screen().root
+        self._atoms.clear()
+
+    def _atom(self, name: str) -> int:
+        atom = self._atoms.get(name)
+        if atom is None:
+            atom = int(self._display.intern_atom(name, only_if_exists=False))
+            self._atoms[name] = atom
+        return atom
+
+    def _property(self, window: Any, name: str) -> Any | None:
+        return window.get_full_property(self._atom(name), self._x.AnyPropertyType)
+
+    def _record_connection_error(self, exc: Exception) -> None:
+        self.last_error = f"python-xlib {type(exc).__name__}: {exc}"
+        # BadWindow 之外的连接错误无法可靠区分；关闭后让下一条真实事件重连。
+        self._reset_connection()
+
+    def _reset_connection(self) -> None:
+        display_connection = self._display
+        self._display = None
+        self._root = None
+        self._x = None
+        self._atoms.clear()
+        if display_connection is not None:
+            try:
+                display_connection.close()
+            except Exception:
+                pass
+
+
 DEFAULT_WINDOW_KEYWORDS = {
     "WPS": ["wps", "wpsoffice", "kingsoft"],
     "QQ": ["linuxqq", "tencent", "腾讯", "qq"],
@@ -65,9 +211,9 @@ DEFAULT_WINDOW_KEYWORDS = {
 class ForegroundCollector:
     """解析当前活动窗口，并把窗口元数据映射为 runtime app_key。
 
-    在生产 direct-event 模式中，``sample`` 只承担每秒权威校对；低延迟切换来自
-    GNOME/X11 监听器。``resolve_window``/``resolve_desktop_event`` 则供事件状态机
-    复用同一套关键词，避免采样路径和事件路径把同一窗口映射成不同 App。
+    生产 direct-event 模式不再调用 ``sample``：前台切换和最小化完全来自
+    GNOME/X11 常驻监听器。``resolve_window`` 在事件到达时通过持久 python-xlib
+    连接读取属性；``resolve_desktop_event`` 处理 GNOME 已随信号携带的元数据。
     """
     def __init__(
         self,
@@ -75,6 +221,7 @@ class ForegroundCollector:
         manual_app: str = "",
         manual_pid: int = 0,
         app_window_keywords: dict[str, list[str]] | None = None,
+        x11_reader: _X11PropertyReader | None = None,
     ) -> None:
         self.backend = backend
         self.manual_app = manual_app
@@ -86,6 +233,11 @@ class ForegroundCollector:
         self.last_debug = ForegroundDebugState()
         if backend in {"x11", "desktop"}:  # lzx-note
             _configure_x11_env()
+        self._x11_reader = x11_reader or _X11PropertyReader()
+
+    def close(self) -> None:
+        """释放进程内 X11 属性连接；手动 backend 下该调用同样安全。"""
+        self._x11_reader.close()
 
     def sample(self) -> ForegroundState:
         """返回当前前台快照，并按 App+window_id 维护连续前台时长。"""
@@ -120,9 +272,23 @@ class ForegroundCollector:
     def resolve_window(self, window_id: str) -> WindowState:
         """在原生事件给出 window_id 时解析一次 X11 窗口。
 
-        这是事件时刻的元数据查询，不是活动窗口轮询。方法保持公开，是为了让
-        原生事件状态机与周期采样共享既有的 15 App 映射规则。
+        这是事件时刻的进程内 X11 属性读取，不是活动窗口轮询，也不会 fork/exec
+        xprop 或 xdotool。方法保持公开，以便状态机复用同一套 App 映射规则。
         """
+        if str(window_id).lower() == "desktop":
+            # ``desktop`` 是 monitor 在 GNOME 没有及时给出焦点信号时，为 X11
+            # “活动窗口为空”生成的语义窗口 ID。它不是一个真实 X11 resource，
+            # 因而不能传给 int(window_id, 0)/python-xlib；直接返回运行时 DESKTOP
+            # App，PID=0 表示这个状态属于 Shell，而不是某个用户进程。
+            app = "DESKTOP" if "DESKTOP" in self.app_window_keywords else "UNKNOWN"
+            return WindowState(
+                window_id="desktop",
+                app=app,
+                pid=0,
+                window_title="Desktop",
+                is_hidden=False,
+                source="x11-event",
+            )
         if self.backend not in {"x11", "desktop"} or not window_id:
             return WindowState(window_id=window_id, source="x11-event")
         window = self._read_x11_window(window_id)
@@ -145,7 +311,7 @@ class ForegroundCollector:
             str(payload.get("wm_class", "") or ""),
             str(payload.get("gtk_app_id", "") or ""),
         ]
-        return WindowState(
+        window = WindowState(
             window_id=str(payload.get("window_id", "") or ""),
             app=_map_foreground_app(classes, title, pid, self.app_window_keywords),
             pid=pid,
@@ -153,12 +319,28 @@ class ForegroundCollector:
             is_hidden=bool(payload.get("is_minimized", False)),
             source="gnome-shell-dbus",
         )
+        now_ns = time.time_ns()
+        self.last_debug = ForegroundDebugState(
+            ts_ns=now_ns,
+            timestamp=dt.datetime.fromtimestamp(
+                now_ns / 1_000_000_000
+            ).strftime("%Y-%m-%d %H:%M:%S"),
+            chosen_window_id=window.window_id,
+            wm_class="|".join(item for item in classes if item),
+            net_wm_pid=str(pid) if pid else "",
+            pid_comm=_read_proc_text(pid, "comm").strip() if pid else "",
+            pid_cmdline=(
+                _read_proc_text(pid, "cmdline").replace("\x00", " ").strip()
+                if pid else ""
+            ),
+            mapped_app=window.app,
+            foreground_app=window.app,
+            window_title=window.window_title,
+        )
+        return window
 
     def _is_active_window(self, window_id: str) -> bool:
-        active = _run_text(["xprop", "-root", "_NET_ACTIVE_WINDOW"])
-        if active.returncode != 0:
-            return False
-        return _same_x11_window_id(window_id, _parse_active_window_from_xprop(active.stdout))
+        return _same_x11_window_id(window_id, self._x11_reader.active_window_id())
 
     def _sample_x11(self, previous_app: str) -> tuple[ForegroundState, ForegroundDebugState]:
         ts_ns = time.time_ns()
@@ -169,19 +351,13 @@ class ForegroundCollector:
         )
         errors: list[str] = []
 
-        xdotool_active = _run_text(["xdotool", "getactivewindow"])
-        if xdotool_active.returncode == 0:
-            debug.active_window_id_xdotool = xdotool_active.stdout.strip()
-        else:
-            errors.append(f"xdotool_getactivewindow={xdotool_active.stderr.strip()}")
+        # 字段名为兼容既有 CSV schema 保留；值已由 python-xlib 直接读取根窗口
+        # _NET_ACTIVE_WINDOW，不再来自 xprop 命令。
+        debug.active_window_id_xprop_root = self._x11_reader.active_window_id()
+        if not debug.active_window_id_xprop_root and self._x11_reader.last_error:
+            errors.append(self._x11_reader.last_error)
 
-        xprop_root = _run_text(["xprop", "-root", "_NET_ACTIVE_WINDOW"])
-        if xprop_root.returncode == 0:
-            debug.active_window_id_xprop_root = _parse_active_window_from_xprop(xprop_root.stdout)
-        else:
-            errors.append(f"xprop_root_active={xprop_root.stderr.strip()}")
-
-        chosen = debug.active_window_id_xprop_root or debug.active_window_id_xdotool
+        chosen = debug.active_window_id_xprop_root
         if not chosen or chosen == "0x0":
             stacking_window = self._top_stacking_window()
             if stacking_window.window_id and stacking_window.app != "UNKNOWN":
@@ -245,19 +421,7 @@ class ForegroundCollector:
         )
 
     def _sample_x11_windows(self) -> list[WindowState]:
-        try:
-            clients = subprocess.run(
-                ["xprop", "-root", "_NET_CLIENT_LIST"],
-                text=True,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.DEVNULL,
-                check=False,
-            ).stdout
-        except OSError:
-            return []
-        if "#" not in clients:
-            return []
-        window_ids = [item.strip() for item in clients.split("#", 1)[-1].split(",") if item.strip()]
+        window_ids = self._x11_reader.client_window_ids()
         windows: list[WindowState] = []
         for window_id in window_ids:
             window = self._read_x11_window(window_id)
@@ -266,10 +430,7 @@ class ForegroundCollector:
         return windows
 
     def _top_stacking_window(self) -> WindowState:
-        result = _run_text(["xprop", "-root", "_NET_CLIENT_LIST_STACKING"])
-        if result.returncode != 0 or "#" not in result.stdout:
-            return WindowState()
-        window_ids = [item.strip() for item in result.stdout.split("#", 1)[-1].split(",") if item.strip()]
+        window_ids = self._x11_reader.client_window_ids(stacking=True)
         for window_id in reversed(window_ids):
             debug = ForegroundDebugState(chosen_window_id=window_id)
             window = self._read_x11_window_debug(window_id, debug)
@@ -278,105 +439,55 @@ class ForegroundCollector:
         return WindowState()
 
     def _read_x11_window(self, window_id: str) -> WindowState:
-        debug = ForegroundDebugState(chosen_window_id=window_id)
-        return self._read_x11_window_debug(window_id, debug)
+        now_ns = time.time_ns()
+        debug = ForegroundDebugState(
+            ts_ns=now_ns,
+            timestamp=dt.datetime.fromtimestamp(
+                now_ns / 1_000_000_000
+            ).strftime("%Y-%m-%d %H:%M:%S"),
+            chosen_window_id=window_id,
+            previous_foreground_app=self._last_state.foreground_app,
+        )
+        window = self._read_x11_window_debug(window_id, debug)
+        debug.mapped_app = window.app or "UNKNOWN"
+        debug.foreground_app = debug.mapped_app
+        debug.window_title = window.window_title
+        # 直接事件模式没有秒级 foreground sample；保留最近一次事件解析信息，
+        # 让既有 foreground_debug.csv 仍能反映窗口映射状态。
+        self.last_debug = debug
+        return window
 
     def _read_x11_window_debug(self, window_id: str, debug: ForegroundDebugState) -> WindowState:
-        title = ""
-        pid = 0
-        errors: list[str] = []
-        try:
-            pid_text = subprocess.run(
-                ["xdotool", "getwindowpid", window_id],
-                text=True,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.DEVNULL,
-                check=False,
-            ).stdout.strip()
-            if pid_text:
-                debug.xdotool_pid = pid_text
-                pid = int(pid_text)
-        except (OSError, ValueError):
-            pid = 0
-        try:
-            title = subprocess.run(
-                ["xdotool", "getwindowname", window_id],
-                text=True,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.DEVNULL,
-                check=False,
-            ).stdout.strip()
-            debug.xdotool_window_name = title
-        except OSError:
-            title = ""
-        try:
-            props = subprocess.run(
-                [
-                    "xprop", "-id", window_id, "WM_CLASS", "_NET_WM_NAME", "WM_NAME",
-                    "_NET_WM_PID", "_NET_WM_STATE", "_NET_WM_WINDOW_TYPE",
-                ],
-                text=True,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
-                check=False,
-            )
-        except OSError:
-            debug.error = "xprop_id_failed"
-            return WindowState()
-        if props.returncode != 0:
-            errors.append(f"xprop_id={props.stderr.strip()}")
-        props_text = props.stdout
-        app = ""
-        is_hidden = False
-        wm_class_values: list[str] = []
-        net_wm_name = ""
-        wm_name = ""
-        is_normal_window = True
-        for line in props_text.splitlines():
-            if line.startswith("_NET_WM_NAME"):
-                net_wm_name = _clean_xprop_value(line)
-                debug.xprop_net_wm_name = net_wm_name
-            elif line.startswith("WM_NAME"):
-                wm_name = _clean_xprop_value(line)
-                debug.xprop_wm_name = wm_name
-            elif line.startswith("_NET_WM_PID") and not pid:
-                debug.net_wm_pid = line.split("=", 1)[-1].strip()
-                try:
-                    pid = int(debug.net_wm_pid)
-                except ValueError:
-                    pid = 0
-            elif line.startswith("WM_CLASS"):
-                wm_class_values = [part.strip().strip('"') for part in line.split("=", 1)[-1].split(",")]
-                debug.wm_class = "|".join(wm_class_values)
-            elif line.startswith("_NET_WM_STATE"):
-                is_hidden = "_NET_WM_STATE_HIDDEN" in line
-            elif line.startswith("_NET_WM_WINDOW_TYPE"):
-                is_normal_window = "_NET_WM_WINDOW_TYPE_NORMAL" in line
-        if not debug.net_wm_pid:
-            for line in props_text.splitlines():
-                if line.startswith("_NET_WM_PID"):
-                    debug.net_wm_pid = line.split("=", 1)[-1].strip()
-                    break
-        title = title or net_wm_name or wm_name
+        props = self._x11_reader.window_properties(window_id)
+        if props is None:
+            debug.error = self._x11_reader.last_error or "x11_window_unavailable"
+            return WindowState(window_id=window_id, source="x11")
+
+        pid = props.pid
+        wm_class_values = props.wm_classes
+        title = props.net_wm_name or props.wm_name
+        debug.xprop_net_wm_name = props.net_wm_name
+        debug.xprop_wm_name = props.wm_name
+        debug.wm_class = "|".join(wm_class_values)
+        debug.net_wm_pid = str(pid) if pid else ""
         if pid:
             debug.pid_comm = _read_proc_text(pid, "comm").strip()
             debug.pid_cmdline = _read_proc_text(pid, "cmdline").replace("\x00", " ").strip()
-        if not is_normal_window or not pid:
+        if not props.is_normal_window or not pid:
             return WindowState(
                 window_id=window_id,
                 pid=pid,
                 window_title=title,
-                is_hidden=is_hidden,
+                is_hidden=props.is_hidden,
                 source="x11",
             )
         app = _map_foreground_app(wm_class_values, title, pid, self.app_window_keywords)
-        debug.error = "; ".join(errors)
         return WindowState(
             window_id=window_id,
             app=app,
             pid=pid,
             window_title=title,
-            is_hidden=is_hidden,
+            is_hidden=props.is_hidden,
             source="x11",
         )
 
@@ -438,20 +549,64 @@ def _map_foreground_app(
     return "UNKNOWN"
 
 
-def _run_text(command: list[str]) -> subprocess.CompletedProcess[str]:
+def _int_property_values(prop: Any | None) -> list[int]:
+    """把 python-xlib property 的数组值转换为普通整数列表。"""
+    if prop is None:
+        return []
     try:
-        return subprocess.run(command, text=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=False)
-    except OSError as exc:
-        return subprocess.CompletedProcess(command, 127, "", str(exc))
+        return [int(value) for value in prop.value]
+    except (TypeError, ValueError):
+        return []
 
 
-def _parse_active_window_from_xprop(output: str) -> str:
-    if "#" in output:
-        value = output.split("#", 1)[-1].strip().split()[0]
-        return value.rstrip(",")
-    if "window id" in output.lower():
-        return output.rsplit(" ", 1)[-1].strip()
-    return ""
+def _first_int_property_value(prop: Any | None) -> int:
+    values = _int_property_values(prop)
+    return values[0] if values else 0
+
+
+def _property_bytes(prop: Any | None) -> bytes:
+    if prop is None:
+        return b""
+    value = prop.value
+    if isinstance(value, bytes):
+        return value
+    if isinstance(value, str):
+        return value.encode("utf-8", errors="replace")
+    try:
+        return value.tobytes()
+    except AttributeError:
+        try:
+            return bytes(value)
+        except (TypeError, ValueError):
+            return b""
+
+
+def _decode_x11_bytes(value: bytes) -> str:
+    try:
+        return value.decode("utf-8")
+    except UnicodeDecodeError:
+        # 传统 WM_NAME/WM_CLASS 可能仍使用 Latin-1，而 _NET_WM_NAME 通常是 UTF-8。
+        return value.decode("latin-1", errors="replace")
+
+
+def _decode_text_property(prop: Any | None) -> str:
+    raw = _property_bytes(prop)
+    return _decode_x11_bytes(raw.split(b"\x00", 1)[0]).strip() if raw else ""
+
+
+def _decode_wm_class(prop: Any | None) -> list[str]:
+    raw = _property_bytes(prop)
+    if not raw:
+        return []
+    return [
+        _decode_x11_bytes(part).strip()
+        for part in raw.split(b"\x00")
+        if part.strip()
+    ]
+
+
+def _format_x11_window_id(window_id: int) -> str:
+    return f"0x{int(window_id):x}" if int(window_id) else ""
 
 
 def _same_x11_window_id(left: str, right: str) -> bool:
@@ -459,15 +614,6 @@ def _same_x11_window_id(left: str, right: str) -> bool:
         return int(str(left), 0) == int(str(right), 0)
     except ValueError:
         return str(left).lower() == str(right).lower()
-
-
-def _clean_xprop_value(line: str) -> str:
-    if "=" not in line:
-        return ""
-    value = line.split("=", 1)[-1].strip()
-    if value.startswith('"') and value.endswith('"'):
-        return value[1:-1]
-    return value.strip('"')
 
 
 def _configure_x11_env() -> None:

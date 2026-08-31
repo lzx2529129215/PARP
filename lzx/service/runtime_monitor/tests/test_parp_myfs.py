@@ -145,7 +145,7 @@ class PARPMyfsTests(unittest.TestCase):
         finally:
             bridge.close()
 
-    def test_live_fixture_scope_is_added_as_binding_only_alias(self) -> None:
+    def test_fixture_scope_is_not_discovered_by_periodic_tree_scan(self) -> None:
         cgroup_root = self.root / "cgroup"
         fixture = cgroup_root / "test.slice" / "automation-fixture-firefox.scope"
         fixture.mkdir(parents=True)
@@ -156,10 +156,13 @@ class PARPMyfsTests(unittest.TestCase):
         )
         try:
             bindings, apps, ambiguous = bridge._bindings([], {1, 3})
-            self.assertEqual(bindings, [(fixture.stat().st_ino, 1)])
-            self.assertEqual(apps, {"FIREFOX"})
+            # 没有 create/exec 事件提供的 process sample 时，即使 cgroup 目录
+            # 已存在，也不能靠 rglob 定时“发现” fixture。
+            self.assertEqual(bindings, [])
+            self.assertEqual(apps, set())
             self.assertEqual(ambiguous, 0)
-            self.assertEqual(bridge._last_alias_binding_count, 1)
+            self.assertEqual(bridge._last_alias_binding_count, 0)
+            self.assertEqual(bridge._stats["alias_tree_scans"], 0)
         finally:
             bridge.close()
 

@@ -8,6 +8,8 @@ import struct
 import tempfile
 import time
 import unittest
+from contextlib import redirect_stdout
+from io import StringIO
 from unittest.mock import Mock
 from pathlib import Path
 
@@ -154,6 +156,112 @@ class ProcessConnectorClientTests(unittest.TestCase):
 
 
 class RuntimeMonitorProcessEventTests(unittest.TestCase):
+    def test_first_helper_watermark_is_not_a_false_delivery_gap(self) -> None:
+        """helper 跨 monitor 重启累计的 seq/drop 只用于建立新 session 水位。"""
+        with tempfile.TemporaryDirectory() as tmp:
+            args = parse_args([
+                "--config", str(ROOT / "config.yaml"),
+                "--app-scope-config", "",
+                "--target-app", "WPS",
+                "--output-dir", tmp,
+                "--session-id", "initial-helper-watermark",
+                "--foreground-backend", "manual",
+            ])
+            monitor = RuntimeMonitorV0(args)
+            source = {
+                "protocol_version": 1,
+                "source": "proc-connector",
+                "source_instance_id": "long-lived-helper",
+                "timestamp_ns": time.time_ns(),
+            }
+            try:
+                monitor._handle_global_process_event({
+                    **source,
+                    "kind": "SOURCE_STATUS",
+                    "status": "READY",
+                    "source_seq": 50000,
+                    "delivery_drops": 123,
+                    "kernel_overflows": 0,
+                })
+                monitor._handle_global_process_event({
+                    **source,
+                    "kind": "PROCESS_EVENT",
+                    "event_type": "PROCESS_EXEC",
+                    "native_event": "EXEC",
+                    "source_seq": 50001,
+                    "pid": 611,
+                    "tgid": 611,
+                    "comm": "not-in-lstm",
+                    "exe_path": "/usr/bin/not-in-lstm",
+                })
+            finally:
+                monitor._close_writers()
+
+            model = Path(tmp) / "initial-helper-watermark" / "model"
+            with (model / "process_event_source.csv").open(
+                encoding="utf-8", newline=""
+            ) as f:
+                statuses = list(csv.DictReader(f))
+            self.assertNotIn("DELIVERY_GAP", [row["status"] for row in statuses])
+            self.assertEqual(monitor._last_process_source_seq, 50001)
+            self.assertEqual(monitor._last_process_delivery_drops, 123)
+
+    def test_every_valid_exec_reaches_exe_process_and_updates_index(self) -> None:
+        """每条 EXEC 都进入 exeProcess；只有已定义 App 写即时日志。"""
+        with tempfile.TemporaryDirectory() as tmp:
+            args = parse_args([
+                "--config", str(ROOT / "config.yaml"),
+                "--app-scope-config", "",
+                "--target-app", "WPS",
+                "--output-dir", tmp,
+                "--session-id", "all-execs-submit",
+                "--foreground-backend", "manual",
+            ])
+            monitor = RuntimeMonitorV0(args)
+            exe_process = Mock(wraps=monitor.exeProcess)
+            monitor.exeProcess = exe_process
+            base = {
+                "protocol_version": 1,
+                "source": "proc-connector",
+                "source_instance_id": "instance-all-execs",
+                "kind": "PROCESS_EVENT",
+                "timestamp_ns": time.time_ns(),
+                "event_type": "PROCESS_EXEC",
+                "native_event": "EXEC",
+                "cgroup_path": "/user.slice/session.scope",
+            }
+            trigger_log = StringIO()
+            with redirect_stdout(trigger_log):
+                try:
+                    monitor._handle_global_process_event({
+                        **base,
+                        "source_seq": 1,
+                        "pid": 601,
+                        "tgid": 601,
+                        "comm": "wps",
+                        "exe_path": "/usr/bin/wps",
+                        "start_time": "10",
+                    })
+                    monitor._handle_global_process_event({
+                        **base,
+                        "source_seq": 2,
+                        "pid": 602,
+                        "tgid": 602,
+                        "comm": "not-in-lstm",
+                        "exe_path": "/usr/bin/not-in-lstm",
+                        "start_time": "20",
+                    })
+                finally:
+                    monitor._close_writers()
+
+            self.assertEqual(exe_process.call_count, 2)
+            self.assertEqual(monitor.app_process_index.pids_for_app("WPS"), {601})
+            self.assertEqual(
+                trigger_log.getvalue().count('"handler":"exeProcess"'), 1
+            )
+            self.assertIn('"pid":601', trigger_log.getvalue())
+            self.assertNotIn('"pid":602', trigger_log.getvalue())
+
     def test_every_valid_start_reaches_create_process(self) -> None:
         """每条通过序列校验的创建事件都必须进入 createProcess。"""
         with tempfile.TemporaryDirectory() as tmp:
@@ -185,18 +293,20 @@ class RuntimeMonitorProcessEventTests(unittest.TestCase):
                 (702, "not-in-lstm", "/usr/bin/not-in-lstm"),
                 (703, "vlc", "/usr/bin/vlc"),
             ]
-            try:
-                for source_seq, (pid, comm, exe_path) in enumerate(processes, 1):
-                    monitor._handle_global_process_event({
-                        **base,
-                        "source_seq": source_seq,
-                        "pid": pid,
-                        "tgid": pid,
-                        "comm": comm,
-                        "exe_path": exe_path,
-                    })
-            finally:
-                monitor._close_writers()
+            trigger_log = StringIO()
+            with redirect_stdout(trigger_log):
+                try:
+                    for source_seq, (pid, comm, exe_path) in enumerate(processes, 1):
+                        monitor._handle_global_process_event({
+                            **base,
+                            "source_seq": source_seq,
+                            "pid": pid,
+                            "tgid": pid,
+                            "comm": comm,
+                            "exe_path": exe_path,
+                        })
+                finally:
+                    monitor._close_writers()
 
             self.assertEqual(create_process.call_count, 3)
             handled_pids = [
@@ -204,6 +314,91 @@ class RuntimeMonitorProcessEventTests(unittest.TestCase):
                 for call in create_process.call_args_list
             ]
             self.assertEqual(handled_pids, [701, 702, 703])
+            # 三个事件全部进入 createProcess，但当前 target_apps 只有 WPS，
+            # 因而 stdout 只输出一条已定义 App ID 的即时日志。
+            self.assertEqual(
+                trigger_log.getvalue().count('"handler":"createProcess"'), 1
+            )
+            self.assertIn('"app":"WPS"', trigger_log.getvalue())
+            self.assertIn('"pid":701', trigger_log.getvalue())
+            self.assertNotIn('"pid":702', trigger_log.getvalue())
+            self.assertNotIn('"pid":703', trigger_log.getvalue())
+            model = Path(tmp) / "all-starts-submit" / "model"
+            with (model / "process_events.csv").open(
+                encoding="utf-8", newline=""
+            ) as f:
+                rows = list(csv.DictReader(f))
+            self.assertEqual(len(rows), 3)
+
+    def test_every_valid_exit_reaches_destroy_process(self) -> None:
+        """每条通过序列校验的销毁事件都必须进入 destroyProcess。"""
+        with tempfile.TemporaryDirectory() as tmp:
+            args = parse_args([
+                "--config", str(ROOT / "config.yaml"),
+                "--app-scope-config", "",
+                "--target-app", "WPS",
+                "--output-dir", tmp,
+                "--session-id", "all-exits-destroy",
+                "--foreground-backend", "manual",
+            ])
+            monitor = RuntimeMonitorV0(args)
+            destroy_process = Mock(wraps=monitor.destroyProcess)
+            monitor.destroyProcess = destroy_process
+            base = {
+                "protocol_version": 1,
+                "source": "proc-connector",
+                "source_instance_id": "instance-all-exits",
+                "kind": "PROCESS_EVENT",
+                "timestamp_ns": time.time_ns(),
+                "event_type": "PROCESS_EXIT",
+                "native_event": "EXIT",
+                "cgroup_path": "/user.slice/session.scope",
+                "exit_code": 0,
+                "exit_signal": 0,
+            }
+            processes = [
+                (801, "wps", "/usr/bin/wps"),
+                (802, "not-in-lstm", "/usr/bin/not-in-lstm"),
+                (803, "vlc", "/usr/bin/vlc"),
+            ]
+            trigger_log = StringIO()
+            with redirect_stdout(trigger_log):
+                try:
+                    for source_seq, (pid, comm, exe_path) in enumerate(processes, 1):
+                        monitor._handle_global_process_event({
+                            **base,
+                            "source_seq": source_seq,
+                            "pid": pid,
+                            "tgid": pid,
+                            "comm": comm,
+                            "exe_path": exe_path,
+                        })
+                finally:
+                    monitor._close_writers()
+
+            self.assertEqual(destroy_process.call_count, 3)
+            destroyed_pids = [
+                call.args[1].pid
+                for call in destroy_process.call_args_list
+            ]
+            self.assertEqual(destroyed_pids, [801, 802, 803])
+            self.assertEqual(
+                trigger_log.getvalue().count('"handler":"destroyProcess"'), 1
+            )
+            self.assertIn('"app":"WPS"', trigger_log.getvalue())
+            self.assertIn('"pid":801', trigger_log.getvalue())
+            self.assertNotIn('"pid":802', trigger_log.getvalue())
+            self.assertNotIn('"pid":803', trigger_log.getvalue())
+            model = Path(tmp) / "all-exits-destroy" / "model"
+            with (model / "process_events.csv").open(
+                encoding="utf-8", newline=""
+            ) as f:
+                rows = list(csv.DictReader(f))
+            self.assertEqual(len(rows), 3)
+            self.assertEqual(
+                [row["event_type"] for row in rows],
+                ["PROCESS_EXIT", "PROCESS_EXIT", "PROCESS_EXIT"],
+            )
 
     def test_every_unmapped_start_still_calls_create_process(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -233,10 +428,13 @@ class RuntimeMonitorProcessEventTests(unittest.TestCase):
                 "exe_path": "/usr/bin/not-in-lstm",
                 "cgroup_path": "/user.slice/session.scope",
             }
-            monitor._handle_global_process_event(event)
-            monitor._close_writers()
+            trigger_log = StringIO()
+            with redirect_stdout(trigger_log):
+                monitor._handle_global_process_event(event)
+                monitor._close_writers()
 
             create_process.assert_called_once()
+            self.assertEqual(trigger_log.getvalue(), "")
             identity = create_process.call_args.args[1]
             self.assertEqual(identity.pid, 654)
             model = Path(tmp) / "unmapped-create" / "model"
