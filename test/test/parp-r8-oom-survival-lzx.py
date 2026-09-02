@@ -328,12 +328,12 @@ def _r8_specs(run_dir: Path, pressure_mib: int, seed: int) -> dict[str, Any]:
     ]
     pressure_command = [
         *browser_environment, "epiphany-browser", "--private-instance",
-        f"--profile={run_dir / 'firefox-pressure-profile'}", "--new-window",
+        f"--profile={run_dir / 'firefox-pressure-profile'}",
         pressure_uri,
     ]
     workset_command = [
         *browser_environment, "epiphany-browser", "--private-instance",
-        f"--profile={run_dir / 'firefox-profile'}", "--new-window",
+        f"--profile={run_dir / 'firefox-profile'}",
         (fixture / "local-page.html").as_uri(),
     ]
     dual_browser_script = (
@@ -394,11 +394,18 @@ def _switch(spec: Any, label: str) -> list[dict[str, Any]]:
     if spec.key == "FIREFOX":
         # WebKit/Epiphany creates small transient helper windows.  They must
         # never satisfy the Firefox foreground contract used to build the
-        # deterministic LSTM history.
+        # deterministic LSTM history.  R8 also runs its workset and pressure
+        # pages as distinct private browser instances in one application
+        # scope; filter by profile so title/class enumeration order cannot
+        # direct workset input to the allocator page (or vice versa).
         window_contract.update({
             "minimum_foreground_width": 700,
             "minimum_foreground_height": 500,
             "dismiss_small_transient": True,
+            "pid_cmdline_contains": (
+                "firefox-pressure-profile"
+                if "PARP R8" in spec.window_title else "/firefox-profile"
+            ),
         })
     return [
         {"type": "switch", **window_contract, "label": f"{label}_SWITCH_{spec.key}"},
@@ -572,7 +579,8 @@ def generate_scenario(
         actions.extend(_switch(pressure_firefox, "R8_PRESSURE"))
         actions.extend([
             {"type": "wait_window_title", "name": firefox.name, "app_key": "FIREFOX", "class": firefox.window_class,
-             "title": "PARP R8", "expected_title": f"PARP R8 READY 0/{burst_mib} MiB",
+             "title": "PARP R8", "pid_cmdline_contains": "firefox-pressure-profile",
+             "expected_title": f"PARP R8 READY 0/{burst_mib} MiB",
              "timeout": float(r8["pressure_navigation_timeout_seconds"]), "poll_seconds": 0.02,
              "label": "R8_PRESSURE_READY_FIREFOX"},
             {"type": "trace_marker", "event_type": "R8_PRESSURE_START", "status": "running", "label": "R8_PRESSURE_START"},
@@ -582,9 +590,11 @@ def generate_scenario(
             prefix = f"R8_PRESSURE_CHUNK_{chunk_index:03d}"
             actions.extend([
                 {"type": "click_window", "name": firefox.name, "app_key": "FIREFOX", "class": firefox.window_class,
-                 "title": "PARP R8", "x_ratio": 0.5, "y_ratio": 0.5, "label": f"{prefix}_REQUEST_FIREFOX"},
+                 "title": "PARP R8", "pid_cmdline_contains": "firefox-pressure-profile",
+                 "x_ratio": 0.5, "y_ratio": 0.5, "label": f"{prefix}_REQUEST_FIREFOX"},
                 {"type": "wait_window_title", "name": firefox.name, "app_key": "FIREFOX", "class": firefox.window_class,
-                 "title": "PARP R8", "expected_title": f"PARP R8 ALLOCATED {completed}/{burst_mib} MiB",
+                 "title": "PARP R8", "pid_cmdline_contains": "firefox-pressure-profile",
+                 "expected_title": f"PARP R8 ALLOCATED {completed}/{burst_mib} MiB",
                  "timeout": float(r8["pressure_chunk_timeout_seconds"]), "poll_seconds": 0.01,
                  "label": f"{prefix}_READY_FIREFOX"},
             ])

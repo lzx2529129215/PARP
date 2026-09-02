@@ -109,6 +109,18 @@ class R8OOMSurvivalTests(unittest.TestCase):
         self.assertNotIn("R8_PRESSURE_NAVIGATE_ADDRESS", labels)
         self.assertNotIn("R8_PRESSURE_NAVIGATE_URI", labels)
         self.assertNotIn("R8_PRESSURE_NAVIGATE_OPEN", labels)
+        trained_firefox = next(
+            action for action in native["actions"]
+            if action.get("label") == "R8_TRAINED_02_SWITCH_FIREFOX"
+        )
+        self.assertEqual(trained_firefox["pid_cmdline_contains"], "/firefox-profile")
+        pressure_switch = next(
+            action for action in native["actions"]
+            if action.get("label") == "R8_PRESSURE_SWITCH_FIREFOX"
+        )
+        self.assertEqual(
+            pressure_switch["pid_cmdline_contains"], "firefox-pressure-profile"
+        )
         ready = [action for action in native["actions"] if "R8_PRESSURE_CHUNK_" in str(action.get("label", "")) and "_READY_" in str(action.get("label", ""))]
         self.assertEqual(len(ready), 8)
         self.assertEqual(native_plan["sha256"], bin_plan["sha256"])
