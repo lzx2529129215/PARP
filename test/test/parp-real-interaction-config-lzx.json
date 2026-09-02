@@ -1,0 +1,93 @@
+{
+  "schema_version": 1,
+  "description": "R1-R7 application-native GUI working-set, serial reuse, fairness and misprediction validation; no synthetic app fixture or allocator. lzx-note",
+  "output_root": "/home/lzx/Desktop/PARP/test/outputs/real_interaction",
+  "asset_root": "/home/lzx/Desktop/PARP/test/outputs/real_pc_assets",
+  "slice": "parp-real-interaction.slice",
+  "apps": [
+    "FIREFOX", "THUNDERBIRD", "VLC", "GIMP",
+    "LIBREOFFICE", "EVINCE", "IMAGE_VIEWER", "SOLITAIRE"
+  ],
+  "hot_apps": ["FIREFOX", "THUNDERBIRD", "VLC"],
+  "cold_apps": ["GIMP", "LIBREOFFICE", "EVINCE", "IMAGE_VIEWER", "SOLITAIRE"],
+  "trained_history": ["THUNDERBIRD", "FIREFOX", "THUNDERBIRD", "FIREFOX", "VLC"],
+  "trained_history_vocab": ["Thunderbird", "Firefox", "Thunderbird", "Firefox", "VLC"],
+  "expected_next_vocab": ["Firefox", "Thunderbird"],
+  "current_app": "VLC",
+  "current_vocab": "VLC",
+  "startup_settle_seconds": 10.0,
+  "history_dwell_seconds": 1.5,
+  "prediction_settle_seconds": 1.5,
+  "pressure_mode": "app_native_reclaim",
+  "pressure_mib": 512,
+  "reclaim_target_mib": 256,
+  "pressure_chunk_mib": 32,
+  "pressure_ramp_interval_seconds": 0.0,
+  "pressure_ramp_timeout_seconds": 180,
+  "pressure_hold_seconds": 600,
+  "post_pressure_settle_seconds": 0.0,
+  "memory_swap_max_mib": 1024,
+  "app_native": {
+    "minimum_total_working_set_mib": 768,
+    "minimum_cold_file_dirty_mib": 0,
+    "minimum_cold_costly_reclaim_mib": 384,
+    "minimum_reclaim_achieved_ratio": 0.50,
+    "settle_timeout_seconds": 8.0
+  },
+  "serial_reuse": {
+    "allocation_mib": 384,
+    "chunk_mib": 16,
+    "reclaim_target_mib": 512,
+    "reclaim_swappiness": "max",
+    "minimum_native_major_faults": 256,
+    "setup_timeout_seconds": 90,
+    "step_timeout_seconds": 30,
+    "poll_seconds": 0.01
+  },
+  "fairness_misprediction": {
+    "participants": ["FIREFOX", "THUNDERBIRD", "VLC", "GIMP"],
+    "unexpected_reuse_app": "GIMP",
+    "maximum_unexpected_probability": 0.01,
+    "reclaim_target_mib": 512,
+    "reclaim_swappiness": "max",
+    "minimum_unexpected_reclaimed_mib": 32,
+    "minimum_native_unexpected_faults": 128
+  },
+  "dirty_writeback_control": {
+    "background_mib": 4096,
+    "limit_mib": 6144
+  },
+  "reclaim_writeback_gate": {
+    "laptop_mode": 600
+  },
+  "workload_expected_classes": {
+    "GIMP": "ANY",
+    "LIBREOFFICE": "ANY"
+  },
+  "require_writepage_promotion": false,
+  "workload_profile_miss_budget": 100000,
+  "unexpected_workload_pass_budget": 100000,
+  "prediction_gate": {
+    "minimum_hot_probability": 0.08,
+    "maximum_cold_probability": 0.01,
+    "minimum_bindings": 8,
+    "timeout_seconds": 25
+  },
+  "safety": {
+    "min_memavailable_mib": 2048,
+    "psi_full_avg10_abort": 1.5,
+    "abort_consecutive_samples": 4,
+    "sample_interval_seconds": 0.20,
+    "max_round_seconds": 1800,
+    "trace_buffer_kb_per_cpu": 8192
+  },
+  "scenarios": [
+    "r1_app_cold_retire",
+    "r2_app_predicted_return",
+    "r3_app_source_distribution",
+    "r4_app_dirty_substitution",
+    "r5_app_writeback_gate",
+    "r6_app_serial_major_reuse",
+    "r7_app_fairness_misprediction"
+  ]
+}

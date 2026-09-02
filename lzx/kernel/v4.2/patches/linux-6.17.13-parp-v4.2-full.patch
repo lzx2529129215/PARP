@@ -1,5 +1,5 @@
 diff --git a/Documentation/admin-guide/mm/index.rst b/Documentation/admin-guide/mm/index.rst
-index ebc83ca20..34ca316a1 100644
+index ebc83ca20fdcd570f8ae413e1cc7faa3205fe0a2..34ca316a15e65281289e405f32d216b75be56c6f 100644
 --- a/Documentation/admin-guide/mm/index.rst
 +++ b/Documentation/admin-guide/mm/index.rst
 @@ -36,6 +36,9 @@ the Linux memory management.
@@ -12,9 +12,149 @@ index ebc83ca20..34ca316a1 100644
     shrinker_debugfs
     slab
     soft-dirty
+diff --git a/Documentation/admin-guide/mm/parp-experiments.rst b/Documentation/admin-guide/mm/parp-experiments.rst
+new file mode 100644
+index 0000000000000000000000000000000000000000..5864fbc64dac1cc4b1df3b55a703129aa91b08c3
+--- /dev/null
++++ b/Documentation/admin-guide/mm/parp-experiments.rst
+@@ -0,0 +1,83 @@
++===========================
++LZX PARP experiment switches
++===========================
++
++The build-time switches for the LZX memory-reclaim experiments are grouped
++under ``Memory Management -> LZX PARP memory optimization experiments``.
++All treatment switches default to ``n`` so a new baseline config does not
++silently enable an optimization.
++
++``CONFIG_PARP``
++  Builds the common prediction, control and observation framework.
++
++``CONFIG_PARP_TIER2``
++  Builds the per-cgroup secondary-watermark predictor, bounded proactive
++  reclaim and its cgroup controls.
++
++``CONFIG_PARP_RECLAIM_BIN_SCORE``
++  Builds prediction/headroom-based MGLRU memcg-bin placement and ordered
++  scanning. It depends on ``CONFIG_PARP_TIER2`` and affects reclaim only in
++  PARP APPLY mode with ``vm.parp_reclaim_bin_enabled=1`` and a target cgroup
++  marked by ``memory.tier2_enabled=1``.  Tier2 proactive reclaim may remain
++  globally off for a bin-only ablation.  .. lzx-note
++
++``CONFIG_PARP_RECLAIM_COLD_AGGRESSIVE``
++  Compile the independently switchable prediction-cold first-pass pressure
++  policy.  It depends on reclaim-bin scoring and defaults to ``n``.  .. lzx-note
++
++``CONFIG_PARP_EFFECTIVE_TIER``
++  Builds effective-tier scoring. Its runtime mode is OFF by default.
++
++``CONFIG_PARP_EFFECTIVE_TIER_EXPERIMENTAL_APPLY``
++  Makes the effective-tier Apply modes available. It does not enable an Apply
++  mode at boot.
++
++``CONFIG_PARP_FRONTIER_SCORE`` and ``CONFIG_PARP_DAMON_ALIGNMENT``
++  Build the older frontier observation experiment and DAMON alignment
++  evidence path respectively.
++
++The delivery baseline is a separate, pristine Linux 6.17.13 source worktree
++at tag ``v6.17.13`` (commit ``6609c4d49ebe``).  Do not call the PARP image
++"Native" merely because its runtime switches are zero.  The build helper's
++``native`` profile refuses to build unless that pinned source is clean.
++
++Compare the pristine Native image with the APPLY image using the same machine,
++kernel config apart from PARP/local-version symbols, scenario, random seed and
++collection procedure.  Runtime-OFF remains a useful additional ablation for
++measuring the APPLY binary's dormant instrumentation overhead:
++
++================  ===============================================
++Treatment         Runtime state
++================  ===============================================
++Native baseline   pristine Linux 6.17.13 image; no PARP code or symbols
++Runtime-OFF       PARP disabled; Tier2 0; effective tier 0
++Bin APPLY         PARP APPLY; bin ordering 1; cold pressure 0; Tier2 reclaim 0
++Bin+cold APPLY    Bin APPLY plus prediction-cold first-pass pressure 1
++Tier2 APPLY       PARP APPLY; global and target Tier2 1; effective tier 0
++Effective APPLY   PARP APPLY; Tier2 0; effective tier Apply mode
++Combined APPLY    PARP APPLY; Tier2 1; effective tier Apply mode
++================  ===============================================
++
++For a compile-time reclaim-bin ablation, keep ``CONFIG_PARP_TIER2=y`` and
++build otherwise matched APPLY images with
++``CONFIG_PARP_RECLAIM_BIN_SCORE=n/y``.  The ``n`` image preserves native
++random memcg-bin placement and starting-bin selection.
++
++Before accepting a reclaim-bin APPLY round, capture
++``/sys/kernel/debug/parp/reclaim_bin_stats`` before and after the workload.
++The delta of ``scored`` must be positive.  When applications run in child
++systemd scopes below the enabled test slice, ``inherited_hits`` must also grow.
++This prevents a compiled but dormant scorer from being reported as APPLY.
++
++When ``CONFIG_PARP_RECLAIM_COLD_AGGRESSIVE=y`` is additionally enabled,
++``vm.parp_reclaim_cold_aggressive_enabled=1`` enables the bounded cold-pressure
++ablation and ``vm.parp_reclaim_workload_enabled=1`` makes a fresh V3
++``/dev/myfs`` per-cgroup profile choose its anon/file balance.  The
++``vm.parp_reclaim_cold_probability_q15`` threshold (default 327, approximately
++1%) is deliberately independent of ``vm.parp_reclaim_cold_bin_max``: ordinal
++rank bins preserve the reclaim walk, whereas workload-aware pressure is only
++safe for a calibrated low-probability LSTM candidate.  Thus a low-probability
++tail app is not excluded merely because it receives a nonzero ordinal rank.
++Missing, stale, or malformed V3 context remains fail-closed.  lzx-note
++
++.. lzx-note: pristine Native baseline and build/runtime switch contract.
+diff --git a/Documentation/admin-guide/mm/parp-myfs.rst b/Documentation/admin-guide/mm/parp-myfs.rst
+new file mode 100644
+index 0000000000000000000000000000000000000000..5efa83466e348a266455c234ef69de7d16e9435c
+--- /dev/null
++++ b/Documentation/admin-guide/mm/parp-myfs.rst
+@@ -0,0 +1,45 @@
++.. SPDX-License-Identifier: GPL-2.0
++
++PARP ``/dev/myfs`` prediction interface
++=========================================
++
++``CONFIG_PARP_MYFS`` creates the ``myfs`` misc character device.  It is the
++only supported userspace interface for application LSTM priors and cgroup
++bindings; PARP does not create the former writable ``app_prior``,
++``app_prior_batch`` or ``app_bind`` debugfs files.  Read-only debugfs counters
++remain available for experiment diagnosis.  ``lzx-note``
++
++The version-1, version-2 and version-3 ABIs are declared in
++``include/uapi/linux/parp_predict.h``.  The
++``PARP_PREDICT_SET_STATE`` ioctl accepts a fixed-size, pointer-free structure
++containing up to 32 predictions and 64 cgroup bindings.  One ioctl validates
++the complete message and performs one RCU publication, so reclaim cannot see
++new probabilities paired with old ownership metadata.
++
++ABI v2 preserves the v1 total size and prediction/binding array offsets, but
++assigns the former reserved header bytes to one confidence-qualified future
++working-set estimate and its exact Tier2 policy cgroup inode.  It uses separate
++SET/GET ioctl numbers; userspace probes v2 first and falls back to v1 on an old
++kernel.  Thus working-set-aware Tier2 can be upgraded without breaking the
++existing application-prior path.  .. lzx-note
++
++ABI v3 keeps the v2 total size and every pre-existing array offset.  Its
++per-binding reserved word is now a confidence-qualified workload hint for
++that exact cgroup inode: anonymous-heavy, clean-file, dirty-file, or mixed.
++The hint carries the requested swappiness (0--200) and only the dirty-file
++class may request writeback.  The service therefore can distinguish a GUI
++scope from its fixture/worker scope even when they share one application ID.
++The kernel uses it only behind ``vm.parp_reclaim_workload_enabled=1`` and only
++with a fresh LSTM binding; a missing, expired, malformed or low-confidence
++hint fails closed to non-workload reclaim.  Userspace probes v3, then v2, then
++v1.  ``lzx-note``
++
++All timestamps use ``CLOCK_MONOTONIC`` nanoseconds.  Generations must increase,
++scores use unsigned Q15, ranks and application IDs must be unique, and every
++binding must refer to an application in the same prediction batch.  Invalid,
++expired, duplicate or stale updates fail without changing the active snapshot.
++
++The matching GET ioctl returns the current generation and state for service
++restart synchronization and diagnostics.  The recommended udev rule applies
++``TAG+=\"uaccess\"`` to give the active desktop user access without making the
++device world-writable.
 diff --git a/Documentation/admin-guide/mm/parp-tier2.rst b/Documentation/admin-guide/mm/parp-tier2.rst
 new file mode 100644
-index 000000000..f932566c7
+index 0000000000000000000000000000000000000000..f932566c7678a22bb554ff7d65c730871c79c96e
 --- /dev/null
 +++ b/Documentation/admin-guide/mm/parp-tier2.rst
 @@ -0,0 +1,268 @@
@@ -288,7 +428,7 @@ index 000000000..f932566c7
 +.. lzx-note: independent build and APPLY-only runtime gating.
 diff --git a/docs/parp_effective_tier_implementation.md b/docs/parp_effective_tier_implementation.md
 new file mode 100644
-index 000000000..1ac6572ae
+index 0000000000000000000000000000000000000000..1ac6572aed6516f16f715aa74d90a4ea1809730f
 --- /dev/null
 +++ b/docs/parp_effective_tier_implementation.md
 @@ -0,0 +1,439 @@
@@ -733,7 +873,7 @@ index 000000000..1ac6572ae
 +   procedure does not claim paired live confidence intervals.
 diff --git a/docs/parp_effective_tier_live_shadow_audit-lzx.md b/docs/parp_effective_tier_live_shadow_audit-lzx.md
 new file mode 100644
-index 000000000..662db52af
+index 0000000000000000000000000000000000000000..662db52afe04eb45356b0ea0ebb86fe6cebf79d6
 --- /dev/null
 +++ b/docs/parp_effective_tier_live_shadow_audit-lzx.md
 @@ -0,0 +1,81 @@
@@ -820,7 +960,7 @@ index 000000000..662db52af
 +unavailable target kernel, cgroup scope, or recoverable boot path.
 diff --git a/docs/parp_effective_tier_pairwise_ranking.md b/docs/parp_effective_tier_pairwise_ranking.md
 new file mode 100644
-index 000000000..2d946b9b8
+index 0000000000000000000000000000000000000000..2d946b9b8d317c8889dd7f8e0be9e2c9914c006e
 --- /dev/null
 +++ b/docs/parp_effective_tier_pairwise_ranking.md
 @@ -0,0 +1,514 @@
@@ -1340,7 +1480,7 @@ index 000000000..2d946b9b8
 +`PARP_EFFECTIVE_TIER_LIVE_AUTH_REQUIRED`
 diff --git a/docs/parp_effective_tier_ranking_redirect_audit.md b/docs/parp_effective_tier_ranking_redirect_audit.md
 new file mode 100644
-index 000000000..f105f92fc
+index 0000000000000000000000000000000000000000..f105f92fc7d1b4dd05a80bdc967dd7e9ae116893
 --- /dev/null
 +++ b/docs/parp_effective_tier_ranking_redirect_audit.md
 @@ -0,0 +1,158 @@
@@ -1504,7 +1644,7 @@ index 000000000..f105f92fc
 +`PARP_EFFECTIVE_TIER_RANKING_REDIRECT_AUDIT_COMPLETE`
 diff --git a/docs/parp_effective_tier_source_audit.md b/docs/parp_effective_tier_source_audit.md
 new file mode 100644
-index 000000000..7fa577fa7
+index 0000000000000000000000000000000000000000..7fa577fa79a0704bbfbad1d7656310db3d857258
 --- /dev/null
 +++ b/docs/parp_effective_tier_source_audit.md
 @@ -0,0 +1,275 @@
@@ -1785,7 +1925,7 @@ index 000000000..7fa577fa7
 +  锁持有时延设置门禁。
 diff --git a/docs/parp_frontier_linear_score_audit.md b/docs/parp_frontier_linear_score_audit.md
 new file mode 100644
-index 000000000..f8095c349
+index 0000000000000000000000000000000000000000..f8095c34995790cb3a08378ca51846a7fed53bc5
 --- /dev/null
 +++ b/docs/parp_frontier_linear_score_audit.md
 @@ -0,0 +1,159 @@
@@ -1950,7 +2090,7 @@ index 000000000..f8095c349
 +   explicit authorization.
 diff --git a/docs/parp_frontier_linear_score_implementation.md b/docs/parp_frontier_linear_score_implementation.md
 new file mode 100644
-index 000000000..a5bdc49e7
+index 0000000000000000000000000000000000000000..a5bdc49e7fc2ce75317135647305ae13a56d5f0d
 --- /dev/null
 +++ b/docs/parp_frontier_linear_score_implementation.md
 @@ -0,0 +1,345 @@
@@ -2301,7 +2441,7 @@ index 000000000..a5bdc49e7
 +`FINAL_REPORT.md` record the final report commit HEAD.
 diff --git a/docs/superpowers/plans/2026-08-02-parp-kernel-page-prediction.md b/docs/superpowers/plans/2026-08-02-parp-kernel-page-prediction.md
 new file mode 100644
-index 000000000..4e0c62427
+index 0000000000000000000000000000000000000000..4e0c62427ba4bded889be42d4cc9416d0a0358e3
 --- /dev/null
 +++ b/docs/superpowers/plans/2026-08-02-parp-kernel-page-prediction.md
 @@ -0,0 +1,47 @@
@@ -2354,7 +2494,7 @@ index 000000000..4e0c62427
 +- No push/reset/clean and no mutation of frozen worktrees/raw.
 diff --git a/docs/superpowers/plans/2026-08-02-parp-page-segment-prediction.md b/docs/superpowers/plans/2026-08-02-parp-page-segment-prediction.md
 new file mode 100644
-index 000000000..c78f38ccc
+index 0000000000000000000000000000000000000000..c78f38ccce121676cb60480bc21e1f5a854f1f5d
 --- /dev/null
 +++ b/docs/superpowers/plans/2026-08-02-parp-page-segment-prediction.md
 @@ -0,0 +1,25 @@
@@ -2385,7 +2525,7 @@ index 000000000..c78f38ccc
 +    `PARP_PHASE27_KERNEL_TRACE_EXTENSION_REBUILD_REQUIRED`.
 diff --git a/docs/superpowers/plans/2026-08-03-parp-app-specific-reclaim-plan.md b/docs/superpowers/plans/2026-08-03-parp-app-specific-reclaim-plan.md
 new file mode 100644
-index 000000000..43a5fbe75
+index 0000000000000000000000000000000000000000..43a5fbe7531487fea0cd54365827c5bd97f8983e
 --- /dev/null
 +++ b/docs/superpowers/plans/2026-08-03-parp-app-specific-reclaim-plan.md
 @@ -0,0 +1,59 @@
@@ -2450,7 +2590,7 @@ index 000000000..43a5fbe75
 +status; offline proxy evidence is labeled as such.
 diff --git a/docs/superpowers/plans/2026-08-03-parp-candidate-selector-v2-plan.md b/docs/superpowers/plans/2026-08-03-parp-candidate-selector-v2-plan.md
 new file mode 100644
-index 000000000..f2ae8b70a
+index 0000000000000000000000000000000000000000..f2ae8b70a4e99deb09302648a300257b9cb5ebd2
 --- /dev/null
 +++ b/docs/superpowers/plans/2026-08-03-parp-candidate-selector-v2-plan.md
 @@ -0,0 +1,16 @@
@@ -2472,7 +2612,7 @@ index 000000000..f2ae8b70a
 +is not met. No runtime collection is part of this plan.
 diff --git a/docs/superpowers/plans/2026-08-03-parp-phase28b-offline-modeling.md b/docs/superpowers/plans/2026-08-03-parp-phase28b-offline-modeling.md
 new file mode 100644
-index 000000000..9b6ef3405
+index 0000000000000000000000000000000000000000..9b6ef3405ebaba07cd44875f8a359e7d26132f7c
 --- /dev/null
 +++ b/docs/superpowers/plans/2026-08-03-parp-phase28b-offline-modeling.md
 @@ -0,0 +1,17 @@
@@ -2495,7 +2635,7 @@ index 000000000..9b6ef3405
 +   measured gates without changing thresholds to force success.
 diff --git a/docs/superpowers/plans/2026-08-03-parp-workload-expert-plan.md b/docs/superpowers/plans/2026-08-03-parp-workload-expert-plan.md
 new file mode 100644
-index 000000000..3209d61d8
+index 0000000000000000000000000000000000000000..3209d61d8a72afc97a0185b6b06029483da2525f
 --- /dev/null
 +++ b/docs/superpowers/plans/2026-08-03-parp-workload-expert-plan.md
 @@ -0,0 +1,31 @@
@@ -2532,7 +2672,7 @@ index 000000000..3209d61d8
 +
 diff --git a/docs/superpowers/plans/2026-08-04-parp-candidate-selector-v21-plan.md b/docs/superpowers/plans/2026-08-04-parp-candidate-selector-v21-plan.md
 new file mode 100644
-index 000000000..faa10a587
+index 0000000000000000000000000000000000000000..faa10a5874ea34bb3e787af29d4765134e795410
 --- /dev/null
 +++ b/docs/superpowers/plans/2026-08-04-parp-candidate-selector-v21-plan.md
 @@ -0,0 +1,10 @@
@@ -2548,7 +2688,7 @@ index 000000000..faa10a587
 +8. Recompute before/after hashes, write the eight required handoff tables and final report, and make local commits only.
 diff --git a/docs/superpowers/specs/2026-08-02-parp-kernel-page-prediction-design.md b/docs/superpowers/specs/2026-08-02-parp-kernel-page-prediction-design.md
 new file mode 100644
-index 000000000..93fdfeb34
+index 0000000000000000000000000000000000000000..93fdfeb348fda81e37bb5f9c558e579e02400e0a
 --- /dev/null
 +++ b/docs/superpowers/specs/2026-08-02-parp-kernel-page-prediction-design.md
 @@ -0,0 +1,112 @@
@@ -2666,7 +2806,7 @@ index 000000000..93fdfeb34
 +one test memcg, Protect-only, budgeted, TTL-limited, watched, and reversible.
 diff --git a/docs/superpowers/specs/2026-08-02-parp-page-segment-prediction-design.md b/docs/superpowers/specs/2026-08-02-parp-page-segment-prediction-design.md
 new file mode 100644
-index 000000000..dc41ed03f
+index 0000000000000000000000000000000000000000..dc41ed03f9ff9dd48cff64da672c7e338d994085
 --- /dev/null
 +++ b/docs/superpowers/specs/2026-08-02-parp-page-segment-prediction-design.md
 @@ -0,0 +1,115 @@
@@ -2787,7 +2927,7 @@ index 000000000..dc41ed03f
 +never mixed with future WPS training data.
 diff --git a/docs/superpowers/specs/2026-08-03-parp-app-specific-reclaim-design.md b/docs/superpowers/specs/2026-08-03-parp-app-specific-reclaim-design.md
 new file mode 100644
-index 000000000..ee1c11698
+index 0000000000000000000000000000000000000000..ee1c11698c1410c9632934eac543ab5d21f1d8af
 --- /dev/null
 +++ b/docs/superpowers/specs/2026-08-03-parp-app-specific-reclaim-design.md
 @@ -0,0 +1,94 @@
@@ -2887,7 +3027,7 @@ index 000000000..ee1c11698
 +raw region rows exist.
 diff --git a/docs/superpowers/specs/2026-08-03-parp-candidate-selector-v2-design.md b/docs/superpowers/specs/2026-08-03-parp-candidate-selector-v2-design.md
 new file mode 100644
-index 000000000..39d7404dd
+index 0000000000000000000000000000000000000000..39d7404ddce52a589e3240ce90f91cfae2d93135
 --- /dev/null
 +++ b/docs/superpowers/specs/2026-08-03-parp-candidate-selector-v2-design.md
 @@ -0,0 +1,71 @@
@@ -2964,7 +3104,7 @@ index 000000000..39d7404dd
 +`...OFFLINE_SELECTOR_PIPELINE_COMPLETE_LIMITED` is used.
 diff --git a/docs/superpowers/specs/2026-08-03-parp-phase28b-offline-modeling-design.md b/docs/superpowers/specs/2026-08-03-parp-phase28b-offline-modeling-design.md
 new file mode 100644
-index 000000000..ea1f44bb5
+index 0000000000000000000000000000000000000000..ea1f44bb5d30e4c9c19be75350f066564fd707b3
 --- /dev/null
 +++ b/docs/superpowers/specs/2026-08-03-parp-phase28b-offline-modeling-design.md
 @@ -0,0 +1,22 @@
@@ -2992,7 +3132,7 @@ index 000000000..ea1f44bb5
 +
 diff --git a/docs/superpowers/specs/2026-08-03-parp-workload-expert-design.md b/docs/superpowers/specs/2026-08-03-parp-workload-expert-design.md
 new file mode 100644
-index 000000000..09b50eafa
+index 0000000000000000000000000000000000000000..09b50eafa72107b095da4eb3c856104dcd19011d
 --- /dev/null
 +++ b/docs/superpowers/specs/2026-08-03-parp-workload-expert-design.md
 @@ -0,0 +1,99 @@
@@ -3097,7 +3237,7 @@ index 000000000..09b50eafa
 +
 diff --git a/docs/superpowers/specs/2026-08-04-parp-candidate-selector-v21-design.md b/docs/superpowers/specs/2026-08-04-parp-candidate-selector-v21-design.md
 new file mode 100644
-index 000000000..7aa5ae93e
+index 0000000000000000000000000000000000000000..7aa5ae93e08130d0ccb40c8b93a58b1cf055e158
 --- /dev/null
 +++ b/docs/superpowers/specs/2026-08-04-parp-candidate-selector-v21-design.md
 @@ -0,0 +1,27 @@
@@ -3129,7 +3269,7 @@ index 000000000..7aa5ae93e
 +
 +The report distinguishes support-insufficient, realism-gated, oracle-gated, limited, validated, and collection-authorization-required states. A validated state describes offline proxy reconstruction only; it never claims real kernel refault or latency improvement.
 diff --git a/fs/proc/task_mmu.c b/fs/proc/task_mmu.c
-index b26ae556b..dd85f888f 100644
+index b26ae556b4463eeb06d089f59e7bf203384f1348..dd85f888f3f22f7c4d613d958f2f57d3444782d0 100644
 --- a/fs/proc/task_mmu.c
 +++ b/fs/proc/task_mmu.c
 @@ -1598,6 +1598,7 @@ static int clear_refs_pte_range(pmd_t *pmd, unsigned long addr,
@@ -3166,7 +3306,7 @@ index b26ae556b..dd85f888f 100644
  		folio_clear_referenced(folio);
  	}
 diff --git a/include/linux/memcontrol.h b/include/linux/memcontrol.h
-index d3ebc9b73..30229c94a 100644
+index d3ebc9b73c6fb3add025f86fb8783b1528cca1ae..30229c94ac25cf7ae415201c4f152a3f40b01e84 100644
 --- a/include/linux/memcontrol.h
 +++ b/include/linux/memcontrol.h
 @@ -17,6 +17,7 @@
@@ -3190,7 +3330,7 @@ index d3ebc9b73..30229c94a 100644
  	unsigned long zswap_max;
  
 diff --git a/include/linux/mm_inline.h b/include/linux/mm_inline.h
-index 89b518ff0..fb6226896 100644
+index 89b518ff097e6bbd720a76f88adb94421c571cae..fb62268969cd16954a8ef0e7a5364ba7dccc6c12 100644
 --- a/include/linux/mm_inline.h
 +++ b/include/linux/mm_inline.h
 @@ -271,6 +271,7 @@ static inline bool lru_gen_add_folio(struct lruvec *lruvec, struct folio *folio,
@@ -3202,7 +3342,7 @@ index 89b518ff0..fb6226896 100644
  	if (reclaiming)
  		list_add_tail(&folio->lru, &lrugen->folios[gen][type][zone]);
 diff --git a/include/linux/mmzone.h b/include/linux/mmzone.h
-index 0c5da9141..599652c22 100644
+index 0c5da9141983b795018c0aa2457b065507416564..599652c22f7db68af3692e8c2cdebe93e5dac373 100644
 --- a/include/linux/mmzone.h
 +++ b/include/linux/mmzone.h
 @@ -492,6 +492,33 @@ struct lru_gen_folio {
@@ -3241,7 +3381,7 @@ index 0c5da9141..599652c22 100644
  	/* the memcg generation this lru_gen_folio belongs to */
 diff --git a/include/linux/parp.h b/include/linux/parp.h
 new file mode 100644
-index 000000000..35df6f635
+index 0000000000000000000000000000000000000000..35df6f6355d91ae07d83a92a63ded411c66b4494
 --- /dev/null
 +++ b/include/linux/parp.h
 @@ -0,0 +1,911 @@
@@ -4158,10 +4298,10 @@ index 000000000..35df6f635
 +#endif
 diff --git a/include/linux/parp_tier2.h b/include/linux/parp_tier2.h
 new file mode 100644
-index 000000000..4656824f7
+index 0000000000000000000000000000000000000000..d0ccf05959fb3d8f8bd0233204354382ec686807
 --- /dev/null
 +++ b/include/linux/parp_tier2.h
-@@ -0,0 +1,175 @@
+@@ -0,0 +1,184 @@
 +/* SPDX-License-Identifier: GPL-2.0 */
 +#ifndef _LINUX_PARP_TIER2_H
 +#define _LINUX_PARP_TIER2_H
@@ -4206,6 +4346,13 @@ index 000000000..4656824f7
 +	u64 priority_boost_total;
 +	u64 writepage_promotions;
 +	u64 swappiness_promotions;
++	u64 swappiness_demotions; /* lzx-note */
++	u64 workload_profile_hits; /* lzx-note */
++	u64 workload_profile_misses; /* lzx-note */
++	u64 anon_heavy_passes; /* lzx-note */
++	u64 file_clean_passes; /* lzx-note */
++	u64 file_dirty_passes; /* lzx-note */
++	u64 mixed_passes; /* lzx-note */
 +	u64 bin_passes[8];
 +}; /* lzx-note */
 +
@@ -4296,12 +4443,14 @@ index 000000000..4656824f7
 +
 +#ifdef CONFIG_PARP_RECLAIM_COLD_AGGRESSIVE /* lzx-note */
 +bool parp_tier2_reclaim_cold_aggressive_apply_enabled(void); /* lzx-note */
-+bool parp_tier2_reclaim_cold_pressure(unsigned int bin,
-+				       u8 *priority_boost,
-+				       u16 *swappiness); /* lzx-note */
++bool parp_tier2_reclaim_workload_apply_enabled(void); /* lzx-note */
++bool parp_tier2_reclaim_cold_pressure(struct mem_cgroup *memcg,
++				       unsigned int bin, u8 *priority_boost,
++				       u16 *swappiness, bool *allow_writepage,
++				       u8 *workload_class); /* lzx-note */
 +void parp_tier2_reclaim_cold_note(unsigned int bin, u8 priority_boost,
 +				  bool writepage_promoted,
-+				  bool swappiness_promoted,
++				  int swappiness_delta, u8 workload_class,
 +				  unsigned long scanned,
 +				  unsigned long reclaimed); /* lzx-note */
 +void parp_tier2_reclaim_cold_stats_snapshot(
@@ -4338,7 +4487,7 @@ index 000000000..4656824f7
 +
 +#endif /* _LINUX_PARP_TIER2_H */
 diff --git a/include/linux/swap.h b/include/linux/swap.h
-index 7012a0f75..cb36ab8cb 100644
+index 7012a0f758d84a9954267c72ad28df7be1f6cad1..cb36ab8cbf71c7bdb1b52b21a1c0cd302969f877 100644
 --- a/include/linux/swap.h
 +++ b/include/linux/swap.h
 @@ -13,6 +13,7 @@
@@ -4360,7 +4509,7 @@ index 7012a0f75..cb36ab8cb 100644
  {
 diff --git a/include/trace/events/parp.h b/include/trace/events/parp.h
 new file mode 100644
-index 000000000..01f12d67c
+index 0000000000000000000000000000000000000000..01f12d67c486a690bcd9bd787dd45473ecf90788
 --- /dev/null
 +++ b/include/trace/events/parp.h
 @@ -0,0 +1,889 @@
@@ -5253,8 +5402,174 @@ index 000000000..01f12d67c
 +
 +#endif
 +#include <trace/define_trace.h>
+diff --git a/include/uapi/linux/parp_predict.h b/include/uapi/linux/parp_predict.h
+new file mode 100644
+index 0000000000000000000000000000000000000000..42029026108680ed1b65f29c4469062f78b66a13
+--- /dev/null
++++ b/include/uapi/linux/parp_predict.h
+@@ -0,0 +1,160 @@
++/* SPDX-License-Identifier: GPL-2.0 WITH Linux-syscall-note */
++#ifndef _UAPI_LINUX_PARP_PREDICT_H
++#define _UAPI_LINUX_PARP_PREDICT_H
++
++#include <linux/ioctl.h>
++#include <linux/types.h>
++
++/* lzx-note: Versioned, pointer-free ABI for the /dev/myfs prediction sink. */
++#define PARP_PREDICT_ABI_VERSION	1U
++#define PARP_PREDICT_ABI_VERSION_V2	2U /* lzx-note */
++#define PARP_PREDICT_ABI_VERSION_V3	3U /* lzx-note */
++#define PARP_PREDICT_MAX_APPS	32U
++#define PARP_PREDICT_MAX_BINDINGS	64U
++
++#define PARP_PREDICT_ENTRY_FOREGROUND	(1U << 0)
++#define PARP_PREDICT_BINDING_ACTIVE	(1U << 0)
++#define PARP_PREDICT_BINDING_WORKLOAD_VALID	(1U << 1) /* lzx-note */
++#define PARP_PREDICT_STATE_WORKINGSET_VALID	(1U << 0) /* lzx-note */
++
++/*
++ * Per-cgroup workload hints are deliberately separate from the per-app LSTM
++ * score: one app may have a GUI scope plus a fixture/worker scope with very
++ * different anonymous/file composition.  lzx-note
++ */
++enum parp_predict_workload_class {
++	PARP_PREDICT_WORKLOAD_NONE = 0,
++	PARP_PREDICT_WORKLOAD_ANON_HEAVY = 1,
++	PARP_PREDICT_WORKLOAD_FILE_CLEAN = 2,
++	PARP_PREDICT_WORKLOAD_FILE_DIRTY = 3,
++	PARP_PREDICT_WORKLOAD_MIXED = 4,
++}; /* lzx-note */
++
++#define PARP_PREDICT_WORKLOAD_CLASS_MASK	0x0fULL
++#define PARP_PREDICT_WORKLOAD_SWAPPINESS_SHIFT	8U
++#define PARP_PREDICT_WORKLOAD_SWAPPINESS_MASK	0xffULL
++#define PARP_PREDICT_WORKLOAD_CONFIDENCE_SHIFT	16U
++#define PARP_PREDICT_WORKLOAD_CONFIDENCE_MASK	0xffULL
++#define PARP_PREDICT_WORKLOAD_ALLOW_WRITEPAGE	(1ULL << 24)
++
++struct parp_predict_entry_v1 {
++	__u32 app_id;
++	__u16 score_q15;
++	__u16 rank;
++	__u32 flags;
++	__u32 reserved;
++};
++
++struct parp_predict_binding_v1 {
++	__u64 domain_id;
++	__u32 app_id;
++	__u32 flags;
++	__u64 epoch_id;
++	__u64 reserved;
++};
++
++/* ABI v3 reuses the former reserved word without changing any array offset. */
++struct parp_predict_binding_v3 { /* lzx-note */
++	__u64 domain_id;
++	__u32 app_id;
++	__u32 flags;
++	__u64 epoch_id;
++	__u64 workload_hint;
++}; /* lzx-note */
++
++/*
++ * SET_STATE replaces predictions and bindings in one RCU publication.  All
++ * time values use CLOCK_MONOTONIC nanoseconds.  ttl_ns is relative to
++ * timestamp_ns; generation must increase for every accepted update.
++ */
++struct parp_predict_state_v1 {
++	__u32 abi_version;
++	__u32 struct_size;
++	__u32 schema_version;
++	__u32 model_version;
++	__u32 generation;
++	__u32 nr_predictions;
++	__u32 nr_bindings;
++	__u32 flags;
++	__u64 timestamp_ns;
++	__u64 horizon_ns;
++	__u64 ttl_ns;
++	__u64 reserved[5];
++	struct parp_predict_entry_v1 predictions[PARP_PREDICT_MAX_APPS];
++	struct parp_predict_binding_v1 bindings[PARP_PREDICT_MAX_BINDINGS];
++};
++
++/*
++ * ABI v2 keeps the v1 array offsets and total size.  It gives the five v1
++ * reserved words explicit working-set semantics, so old kernels can still be
++ * used through the separate v1 ioctl while new kernels receive an auditable
++ * future-working-set estimate.  predicted_resident_bytes is the portion of
++ * predicted_workingset_bytes already resident; their difference is the
++ * expected near-horizon allocation demand. lzx-note
++ */
++struct parp_predict_state_v2 {
++	__u32 abi_version;
++	__u32 struct_size;
++	__u32 schema_version;
++	__u32 model_version;
++	__u32 generation;
++	__u32 nr_predictions;
++	__u32 nr_bindings;
++	__u32 flags;
++	__u64 timestamp_ns;
++	__u64 horizon_ns;
++	__u64 ttl_ns;
++	__u64 policy_domain_id;
++	__u64 predicted_workingset_bytes;
++	__u64 predicted_resident_bytes;
++	__u16 workingset_confidence_q15;
++	__u16 workingset_estimator_version;
++	__u32 reserved32;
++	__u64 reserved64;
++	struct parp_predict_entry_v1 predictions[PARP_PREDICT_MAX_APPS];
++	struct parp_predict_binding_v1 bindings[PARP_PREDICT_MAX_BINDINGS];
++};
++
++/*
++ * ABI v3 retains the v2 working-set fields and adds only per-binding workload
++ * semantics.  Its binary size and all v1/v2 array offsets are unchanged.
++ * lzx-note
++ */
++struct parp_predict_state_v3 { /* lzx-note */
++	__u32 abi_version;
++	__u32 struct_size;
++	__u32 schema_version;
++	__u32 model_version;
++	__u32 generation;
++	__u32 nr_predictions;
++	__u32 nr_bindings;
++	__u32 flags;
++	__u64 timestamp_ns;
++	__u64 horizon_ns;
++	__u64 ttl_ns;
++	__u64 policy_domain_id;
++	__u64 predicted_workingset_bytes;
++	__u64 predicted_resident_bytes;
++	__u16 workingset_confidence_q15;
++	__u16 workingset_estimator_version;
++	__u32 reserved32;
++	__u64 reserved64;
++	struct parp_predict_entry_v1 predictions[PARP_PREDICT_MAX_APPS];
++	struct parp_predict_binding_v3 bindings[PARP_PREDICT_MAX_BINDINGS];
++}; /* lzx-note */
++
++#define PARP_PREDICT_IOC_MAGIC	0xb7
++#define PARP_PREDICT_SET_STATE	_IOW(PARP_PREDICT_IOC_MAGIC, 1, \
++				     struct parp_predict_state_v1)
++#define PARP_PREDICT_GET_STATE	_IOR(PARP_PREDICT_IOC_MAGIC, 2, \
++				     struct parp_predict_state_v1)
++#define PARP_PREDICT_SET_STATE_V2	_IOW(PARP_PREDICT_IOC_MAGIC, 3, \
++				     struct parp_predict_state_v2) /* lzx-note */
++#define PARP_PREDICT_GET_STATE_V2	_IOR(PARP_PREDICT_IOC_MAGIC, 4, \
++				     struct parp_predict_state_v2) /* lzx-note */
++#define PARP_PREDICT_SET_STATE_V3	_IOW(PARP_PREDICT_IOC_MAGIC, 5, \
++				     struct parp_predict_state_v3) /* lzx-note */
++#define PARP_PREDICT_GET_STATE_V3	_IOR(PARP_PREDICT_IOC_MAGIC, 6, \
++				     struct parp_predict_state_v3) /* lzx-note */
++
++#endif /* _UAPI_LINUX_PARP_PREDICT_H */
 diff --git a/kernel/trace/trace_events.c b/kernel/trace/trace_events.c
-index e00da4182..8b2ae5774 100644
+index e00da4182deb784cb0b0a41244930061af3fb2af..8b2ae57742266812b5f0fa1b965f8da2c0cf46c0 100644
 --- a/kernel/trace/trace_events.c
 +++ b/kernel/trace/trace_events.c
 @@ -494,7 +494,8 @@ static void test_event_printk(struct trace_event_call *call)
@@ -5300,7 +5615,7 @@ index e00da4182..8b2ae5774 100644
  				       i - start_arg,
  				       &dereference_flags, arg, call);
 diff --git a/mm/Kconfig b/mm/Kconfig
-index e443fe8cd..0d734c412 100644
+index e443fe8cd6cf256ca20b8a58b95d18b6f5448f47..0d734c412fe841bf567a556ca0ad616bfbe02bd0 100644
 --- a/mm/Kconfig
 +++ b/mm/Kconfig
 @@ -1383,5 +1383,6 @@ config PT_RECLAIM
@@ -5311,7 +5626,7 @@ index e443fe8cd..0d734c412 100644
  
  endmenu
 diff --git a/mm/Makefile b/mm/Makefile
-index ef54aa615..b2e046c9b 100644
+index ef54aa615d9da7c637c5707a322369ecdcb98319..b2e046c9b267ca1b1e4fe1a796d74024bab16000 100644
 --- a/mm/Makefile
 +++ b/mm/Makefile
 @@ -133,6 +133,7 @@ obj-$(CONFIG_IDLE_PAGE_TRACKING) += page_idle.o
@@ -5323,7 +5638,7 @@ index ef54aa615..b2e046c9b 100644
  obj-$(CONFIG_PERCPU_STATS) += percpu-stats.o
  obj-$(CONFIG_ZONE_DEVICE) += memremap.o
 diff --git a/mm/damon/core.c b/mm/damon/core.c
-index 533c1c2d7..5f47c694f 100644
+index 533c1c2d72f27c71eb783f05fea3dedc134f2bd6..5f47c694fb3048899e285852aa9a71e320b55505 100644
 --- a/mm/damon/core.c
 +++ b/mm/damon/core.c
 @@ -11,6 +11,7 @@
@@ -5343,7 +5658,7 @@ index 533c1c2d7..5f47c694f 100644
  			damon_warn_fix_nr_accesses_corruption(r);
  			r->last_nr_accesses = r->nr_accesses;
 diff --git a/mm/damon/ops-common.c b/mm/damon/ops-common.c
-index 99321ff5c..7e2ebaedd 100644
+index 99321ff5cb92a7bd4559eb5b8c982de61c23f2b2..7e2ebaeddd365cccc5e16c4cc584087691466f81 100644
 --- a/mm/damon/ops-common.c
 +++ b/mm/damon/ops-common.c
 @@ -41,7 +41,8 @@ struct folio *damon_get_folio(unsigned long pfn)
@@ -5460,7 +5775,7 @@ index 99321ff5c..7e2ebaedd 100644
  	if (need_lock)
  		folio_unlock(folio);
 diff --git a/mm/damon/paddr.c b/mm/damon/paddr.c
-index 53a55c511..4ce265f0b 100644
+index 53a55c5114fbef93c69de5a218014b050e2a1a27..4ce265f0b45d885ef0e6ec5715c45e7724e6f854 100644
 --- a/mm/damon/paddr.c
 +++ b/mm/damon/paddr.c
 @@ -203,7 +203,8 @@ static inline unsigned long damon_pa_mark_accessed_or_deactivate(
@@ -5474,7 +5789,7 @@ index 53a55c511..4ce265f0b 100644
  			folio_deactivate(folio);
  		applied += folio_nr_pages(folio);
 diff --git a/mm/filemap.c b/mm/filemap.c
-index bef514b60..077453cbe 100644
+index bef514b60e0b2bcf4938b68090f35dcc8d00945a..077453cbe1caa7a7d866330555ea9a11e4de1236 100644
 --- a/mm/filemap.c
 +++ b/mm/filemap.c
 @@ -2738,7 +2738,7 @@ ssize_t filemap_read(struct kiocb *iocb, struct iov_iter *iter,
@@ -5524,7 +5839,7 @@ index bef514b60..077453cbe 100644
  			total_spliced += n;
  			*ppos += n;
 diff --git a/mm/gup.c b/mm/gup.c
-index 0bc4d140f..20facb9a8 100644
+index 0bc4d140fc07fb28d9b1841aa09010c16a374f5b..20facb9a8796ef4b23a99f4a990992ae237fbd28 100644
 --- a/mm/gup.c
 +++ b/mm/gup.c
 @@ -897,7 +897,7 @@ static struct page *follow_page_pte(struct vm_area_struct *vma,
@@ -5537,7 +5852,7 @@ index 0bc4d140f..20facb9a8 100644
  out:
  	pte_unmap_unlock(ptep, ptl);
 diff --git a/mm/huge_memory.c b/mm/huge_memory.c
-index 5d63ee72c..aa5bb9020 100644
+index 5d63ee72c1f69001e34f8e882c5b54c8acbf1824..aa5bb9020a389208be8f39369992f89e3e06b917 100644
 --- a/mm/huge_memory.c
 +++ b/mm/huge_memory.c
 @@ -2154,6 +2154,9 @@ bool madvise_free_huge_pmd(struct mmu_gather *tlb, struct vm_area_struct *vma,
@@ -5601,7 +5916,7 @@ index 5d63ee72c..aa5bb9020 100644
  				folio_mark_dirty(folio);
  			if (!folio_test_referenced(folio) && pmd_young(old_pmd))
 diff --git a/mm/ksm.c b/mm/ksm.c
-index 16d41e268..249844796 100644
+index 16d41e2681ea8c4dbcb214b2c9edb6f17fe3bd59..249844796d54a7e1f2c405b58a4d4569afd75961 100644
 --- a/mm/ksm.c
 +++ b/mm/ksm.c
 @@ -1492,7 +1492,8 @@ static int try_to_merge_one_page(struct vm_area_struct *vma,
@@ -5615,7 +5930,7 @@ index 16d41e268..249844796 100644
  			 * Page reclaim just frees a clean folio with no dirty
  			 * ptes: make sure that the ksm page would be swapped.
 diff --git a/mm/madvise.c b/mm/madvise.c
-index 35ed4ab0d..e9ce87957 100644
+index 35ed4ab0d7c53b94db11eb12e57d8b1b59134656..e9ce879574b39221e6d06398836c21e069ee921e 100644
 --- a/mm/madvise.c
 +++ b/mm/madvise.c
 @@ -420,6 +420,8 @@ static int madvise_cold_or_pageout_pte_range(pmd_t *pmd,
@@ -5647,7 +5962,7 @@ index 35ed4ab0d..e9ce87957 100644
  			tlb_remove_tlb_entries(tlb, pte, nr, addr);
  		}
 diff --git a/mm/memcontrol-v1.c b/mm/memcontrol-v1.c
-index 4b9473130..3f98b87b0 100644
+index 4b94731305b9f967eb738cd33e4b3f6fae486708..3f98b87b0f6f0793bb740e70fe7e9cbb270ea719 100644
 --- a/mm/memcontrol-v1.c
 +++ b/mm/memcontrol-v1.c
 @@ -2132,6 +2132,52 @@ struct cftype mem_cgroup_legacy_files[] = {
@@ -5704,7 +6019,7 @@ index 4b9473130..3f98b87b0 100644
  };
  
 diff --git a/mm/memcontrol.c b/mm/memcontrol.c
-index 2b9cc91ee..c65b0d9b8 100644
+index 2b9cc91eea1165df76cec1189d0ca8c8b5ba7a17..c65b0d9b8da5b01f5033cc9d661a891d0dc8b02a 100644
 --- a/mm/memcontrol.c
 +++ b/mm/memcontrol.c
 @@ -2494,10 +2494,18 @@ static int try_charge_memcg(struct mem_cgroup *memcg, gfp_t gfp_mask,
@@ -5820,7 +6135,7 @@ index 2b9cc91ee..c65b0d9b8 100644
  };
  
 diff --git a/mm/memory.c b/mm/memory.c
-index 75f3b66be..beb85dfe2 100644
+index 75f3b66be1d38bb7b7c4721d21bf3a1f422e697f..beb85dfe27b8f4cbd602fa1485930f8c4ed08bbb 100644
 --- a/mm/memory.c
 +++ b/mm/memory.c
 @@ -1506,11 +1506,21 @@ static __always_inline void zap_present_folio_ptes(struct mmu_gather *tlb,
@@ -5849,7 +6164,7 @@ index 75f3b66be..beb85dfe2 100644
  	}
  	/* Checking a single PTE in a batch is sufficient. */
 diff --git a/mm/page_alloc.c b/mm/page_alloc.c
-index 09241bb76..c53bc5348 100644
+index 09241bb7663e039a8758abaae8cee0a95830cf70..c53bc53482a113a9d0ee8b6e01a339add8af4341 100644
 --- a/mm/page_alloc.c
 +++ b/mm/page_alloc.c
 @@ -55,6 +55,7 @@
@@ -5869,7 +6184,7 @@ index 09241bb76..c53bc5348 100644
  
  static void prep_new_page(struct page *page, unsigned int order, gfp_t gfp_flags,
 diff --git a/mm/page_ext.c b/mm/page_ext.c
-index d7396a897..3f0f32fb6 100644
+index d7396a8970e5e3d4174c6cfa3a4d267d14a9cdcc..3f0f32fb6548a9bbcce66f557077e518b1427928 100644
 --- a/mm/page_ext.c
 +++ b/mm/page_ext.c
 @@ -11,6 +11,7 @@
@@ -5894,7 +6209,7 @@ index d7396a897..3f0f32fb6 100644
  	&page_owner_ops,
  #endif
 diff --git a/mm/page_idle.c b/mm/page_idle.c
-index a82b340dc..cce826079 100644
+index a82b340dc20447e760889b588cf71288525a7275..cce826079d8bb9d79d19b2ad79d2af33fdcffeac 100644
 --- a/mm/page_idle.c
 +++ b/mm/page_idle.c
 @@ -12,6 +12,7 @@
@@ -5915,10 +6230,10 @@ index a82b340dc..cce826079 100644
  		 * We cleared the referenced bit in a mapping to this page. To
 diff --git a/mm/parp/Kconfig b/mm/parp/Kconfig
 new file mode 100644
-index 000000000..d2350ef89
+index 0000000000000000000000000000000000000000..968a52579d0f3b6e792c34a382042495b0eddd48
 --- /dev/null
 +++ b/mm/parp/Kconfig
-@@ -0,0 +1,143 @@
+@@ -0,0 +1,150 @@
 +# SPDX-License-Identifier: GPL-2.0
 +menu "LZX PARP memory optimization experiments" # lzx-note
 +
@@ -5995,11 +6310,18 @@ index 000000000..d2350ef89
 +	default n
 +	help
 +	  Build a bounded per-memcg pressure policy on top of reclaim-bin ordering.
-+	  Prediction-cold bins receive a probability-dependent priority boost,
-+	  balanced anonymous/file pressure, and dirty-page writeback permission on
-+	  their first visit. The original scan_control values are restored before
-+	  scanning the next memcg, so predicted-hot and unrelated workloads retain
-+	  native pressure. The independent
++	  Prediction-cold bins receive a probability-dependent priority boost and
++	  bounded first-visit pressure. With vm.parp_reclaim_workload_enabled=0,
++	  the historical balanced anonymous/file policy is retained. With that
++	  additional runtime switch enabled, a fresh, valid /dev/myfs per-cgroup
++	  workload profile selects the anon/file balance and only a dirty-file
++	  profile may grant writeback permission. Workload-aware cold pressure is
++	  gated by vm.parp_reclaim_cold_probability_q15 (default ~=1%) rather than
++	  ordinal rank alone, so a low-probability tail candidate is not excluded
++	  merely by its rank band. Missing or stale profile data fails closed to
++	  bin-only reclaim. The original scan_control values are
++	  restored before scanning the next memcg, so predicted-hot and unrelated
++	  workloads retain native pressure. The independent
 +	  vm.parp_reclaim_cold_aggressive_enabled switch defaults to zero and permits
 +	  exact bin-only versus bin-plus-pressure ablation. # lzx-note
 +
@@ -6064,7 +6386,7 @@ index 000000000..d2350ef89
 +endmenu # lzx-note
 diff --git a/mm/parp/Makefile b/mm/parp/Makefile
 new file mode 100644
-index 000000000..308242f90
+index 0000000000000000000000000000000000000000..308242f90b99057e76a0e0cb044921988e999b35
 --- /dev/null
 +++ b/mm/parp/Makefile
 @@ -0,0 +1,18 @@
@@ -6088,7 +6410,7 @@ index 000000000..308242f90
 +obj-$(CONFIG_PARP_KUNIT_TEST) += tests/parp_test.o
 diff --git a/mm/parp/adapter/adapter.h b/mm/parp/adapter/adapter.h
 new file mode 100644
-index 000000000..0d5fc5059
+index 0000000000000000000000000000000000000000..0d5fc5059cc63a5a2660c01d3df87f3926f81599
 --- /dev/null
 +++ b/mm/parp/adapter/adapter.h
 @@ -0,0 +1,19 @@
@@ -6113,7 +6435,7 @@ index 000000000..0d5fc5059
 +#endif
 diff --git a/mm/parp/adapter/anon_adapter.c b/mm/parp/adapter/anon_adapter.c
 new file mode 100644
-index 000000000..6dbacfbbb
+index 0000000000000000000000000000000000000000..6dbacfbbbdb2f1482535c435365c4c536aa3ef0a
 --- /dev/null
 +++ b/mm/parp/adapter/anon_adapter.c
 @@ -0,0 +1,27 @@
@@ -6146,7 +6468,7 @@ index 000000000..6dbacfbbb
 +}
 diff --git a/mm/parp/adapter/damon_adapter.c b/mm/parp/adapter/damon_adapter.c
 new file mode 100644
-index 000000000..d135cff08
+index 0000000000000000000000000000000000000000..d135cff08af728d1c75a9859fff8db19d387d7db
 --- /dev/null
 +++ b/mm/parp/adapter/damon_adapter.c
 @@ -0,0 +1,435 @@
@@ -6587,7 +6909,7 @@ index 000000000..d135cff08
 +}
 diff --git a/mm/parp/adapter/feedback_adapter.c b/mm/parp/adapter/feedback_adapter.c
 new file mode 100644
-index 000000000..fd1b436d0
+index 0000000000000000000000000000000000000000..fd1b436d0df6926bd10d2e5152b36404fe6202cd
 --- /dev/null
 +++ b/mm/parp/adapter/feedback_adapter.c
 @@ -0,0 +1,3 @@
@@ -6596,7 +6918,7 @@ index 000000000..fd1b436d0
 +/* Existing workingset signals are consumed asynchronously without a hook. */
 diff --git a/mm/parp/adapter/file_adapter.c b/mm/parp/adapter/file_adapter.c
 new file mode 100644
-index 000000000..b348c42c2
+index 0000000000000000000000000000000000000000..b348c42c2740a310be98c93c1f6cf5c3e86fedb9
 --- /dev/null
 +++ b/mm/parp/adapter/file_adapter.c
 @@ -0,0 +1,77 @@
@@ -6679,7 +7001,7 @@ index 000000000..b348c42c2
 +}
 diff --git a/mm/parp/adapter/memcg_adapter.c b/mm/parp/adapter/memcg_adapter.c
 new file mode 100644
-index 000000000..13777b09d
+index 0000000000000000000000000000000000000000..13777b09d36cabc55a2c9ac882e340a0246ee909
 --- /dev/null
 +++ b/mm/parp/adapter/memcg_adapter.c
 @@ -0,0 +1,12 @@
@@ -6697,7 +7019,7 @@ index 000000000..13777b09d
 +}
 diff --git a/mm/parp/adapter/mglru_adapter.c b/mm/parp/adapter/mglru_adapter.c
 new file mode 100644
-index 000000000..1a11efb7c
+index 0000000000000000000000000000000000000000..1a11efb7cd47d4436a341c0a1aff99eca965c9f3
 --- /dev/null
 +++ b/mm/parp/adapter/mglru_adapter.c
 @@ -0,0 +1,96 @@
@@ -6799,7 +7121,7 @@ index 000000000..1a11efb7c
 +}
 diff --git a/mm/parp/adapter/scan_budget_adapter.c b/mm/parp/adapter/scan_budget_adapter.c
 new file mode 100644
-index 000000000..4abf513f1
+index 0000000000000000000000000000000000000000..4abf513f14688614a285983bb8b666ed186c82c9
 --- /dev/null
 +++ b/mm/parp/adapter/scan_budget_adapter.c
 @@ -0,0 +1,107 @@
@@ -6912,10 +7234,10 @@ index 000000000..4abf513f1
 +}
 diff --git a/mm/parp/control/debugfs.c b/mm/parp/control/debugfs.c
 new file mode 100644
-index 000000000..a174d2e3a
+index 0000000000000000000000000000000000000000..7ee736eac370eb68e5c604bb9eb7a6111c613bcd
 --- /dev/null
 +++ b/mm/parp/control/debugfs.c
-@@ -0,0 +1,670 @@
+@@ -0,0 +1,677 @@
 +// SPDX-License-Identifier: GPL-2.0
 +#include <linux/debugfs.h>
 +#include <linux/fs.h>
@@ -7123,18 +7445,25 @@ index 000000000..a174d2e3a
 +
 +	parp_tier2_reclaim_cold_stats_snapshot(&stats);
 +	seq_printf(m,
-+		   "compiled 1\napply_enabled %u\n"
++		   "compiled 1\napply_enabled %u\nworkload_enabled %u\n"
 +		   "passes %llu\nscanned %llu\nreclaimed %llu\n"
 +		   "priority_boost_total %llu\nwritepage_promotions %llu\n"
-+		   "swappiness_promotions %llu\n"
++		   "swappiness_promotions %llu\nswappiness_demotions %llu\n"
++		   "workload_profile_hits %llu\nworkload_profile_misses %llu\n"
++		   "anon_heavy_passes %llu\nfile_clean_passes %llu\n"
++		   "file_dirty_passes %llu\nmixed_passes %llu\n"
 +		   "bin_0_passes %llu\nbin_1_passes %llu\n"
 +		   "bin_2_passes %llu\nbin_3_passes %llu\n"
 +		   "bin_4_passes %llu\nbin_5_passes %llu\n"
 +		   "bin_6_passes %llu\nbin_7_passes %llu\n",
 +		   parp_tier2_reclaim_cold_aggressive_apply_enabled(),
++		   parp_tier2_reclaim_workload_apply_enabled(),
 +		   stats.passes, stats.scanned, stats.reclaimed,
 +		   stats.priority_boost_total, stats.writepage_promotions,
-+		   stats.swappiness_promotions,
++		   stats.swappiness_promotions, stats.swappiness_demotions,
++		   stats.workload_profile_hits, stats.workload_profile_misses,
++		   stats.anon_heavy_passes, stats.file_clean_passes,
++		   stats.file_dirty_passes, stats.mixed_passes,
 +		   stats.bin_passes[0], stats.bin_passes[1],
 +		   stats.bin_passes[2], stats.bin_passes[3],
 +		   stats.bin_passes[4], stats.bin_passes[5],
@@ -7586,9 +7915,680 @@ index 000000000..a174d2e3a
 +	return 0;
 +}
 +subsys_initcall(parp_init);
+diff --git a/mm/parp/control/dev.c b/mm/parp/control/dev.c
+new file mode 100644
+index 0000000000000000000000000000000000000000..cae7bc1dc4b093774fe49ff7daa361b13c1fb855
+--- /dev/null
++++ b/mm/parp/control/dev.c
+@@ -0,0 +1,665 @@
++// SPDX-License-Identifier: GPL-2.0
++#include <linux/compat.h>
++#include <linux/fs.h>
++#include <linux/init.h>
++#include <linux/miscdevice.h>
++#include <linux/module.h>
++#include <linux/overflow.h>
++#include <linux/parp_predict.h>
++#include <linux/slab.h>
++#include <linux/uaccess.h>
++
++#include "../internal.h"
++
++static int parp_predict_validate_header(const struct parp_predict_state_v1 *state)
++{
++	unsigned int i;
++
++	if (state->abi_version != PARP_PREDICT_ABI_VERSION ||
++	    state->struct_size != sizeof(*state) || state->flags ||
++	    state->schema_version != PARP_APP_PRIOR_BATCH_SCHEMA ||
++	    !state->model_version || !state->generation ||
++	    !state->nr_predictions ||
++	    state->nr_predictions > PARP_PREDICT_MAX_APPS ||
++	    state->nr_bindings > PARP_PREDICT_MAX_BINDINGS ||
++	    !state->timestamp_ns || !state->horizon_ns || !state->ttl_ns)
++		return -EINVAL;
++	for (i = 0; i < ARRAY_SIZE(state->reserved); i++)
++		if (state->reserved[i])
++			return -EINVAL;
++	if (state->ttl_ns > PARP_APP_PRIOR_MAX_TTL_NS ||
++	    state->horizon_ns > PARP_APP_PRIOR_MAX_HORIZON_NS)
++		return -ERANGE;
++	return 0;
++}
++
++static int parp_predict_validate_header_v2(
++		const struct parp_predict_state_v2 *state)
++{
++	if (state->abi_version != PARP_PREDICT_ABI_VERSION_V2 ||
++	    state->struct_size != sizeof(*state) ||
++	    state->flags & ~PARP_PREDICT_STATE_WORKINGSET_VALID ||
++	    state->schema_version != PARP_APP_PRIOR_BATCH_SCHEMA ||
++	    !state->model_version || !state->generation ||
++	    !state->nr_predictions ||
++	    state->nr_predictions > PARP_PREDICT_MAX_APPS ||
++	    state->nr_bindings > PARP_PREDICT_MAX_BINDINGS ||
++	    !state->timestamp_ns || !state->horizon_ns || !state->ttl_ns ||
++	    state->reserved32 || state->reserved64)
++		return -EINVAL;
++	if (state->ttl_ns > PARP_APP_PRIOR_MAX_TTL_NS ||
++	    state->horizon_ns > PARP_APP_PRIOR_MAX_HORIZON_NS)
++		return -ERANGE;
++	if (state->flags & PARP_PREDICT_STATE_WORKINGSET_VALID) {
++		if (!state->policy_domain_id ||
++		    !state->predicted_workingset_bytes ||
++		    state->predicted_resident_bytes >
++			state->predicted_workingset_bytes ||
++		    !state->workingset_confidence_q15 ||
++		    state->workingset_confidence_q15 > PARP_Q15_ONE ||
++		    !state->workingset_estimator_version)
++			return -EINVAL;
++	} else if (state->policy_domain_id ||
++		   state->predicted_workingset_bytes ||
++		   state->predicted_resident_bytes ||
++		   state->workingset_confidence_q15 ||
++		   state->workingset_estimator_version) {
++		return -EINVAL;
++	}
++	return 0;
++} /* lzx-note */
++
++static int parp_predict_validate_header_v3(
++		const struct parp_predict_state_v3 *state) /* lzx-note */
++{
++	if (state->abi_version != PARP_PREDICT_ABI_VERSION_V3 ||
++	    state->struct_size != sizeof(*state) ||
++	    state->flags & ~PARP_PREDICT_STATE_WORKINGSET_VALID ||
++	    state->schema_version != PARP_APP_PRIOR_BATCH_SCHEMA ||
++	    !state->model_version || !state->generation ||
++	    !state->nr_predictions ||
++	    state->nr_predictions > PARP_PREDICT_MAX_APPS ||
++	    state->nr_bindings > PARP_PREDICT_MAX_BINDINGS ||
++	    !state->timestamp_ns || !state->horizon_ns || !state->ttl_ns ||
++	    state->reserved32 || state->reserved64)
++		return -EINVAL;
++	if (state->ttl_ns > PARP_APP_PRIOR_MAX_TTL_NS ||
++	    state->horizon_ns > PARP_APP_PRIOR_MAX_HORIZON_NS)
++		return -ERANGE;
++	if (state->flags & PARP_PREDICT_STATE_WORKINGSET_VALID) {
++		if (!state->policy_domain_id ||
++		    !state->predicted_workingset_bytes ||
++		    state->predicted_resident_bytes >
++			state->predicted_workingset_bytes ||
++		    !state->workingset_confidence_q15 ||
++		    state->workingset_confidence_q15 > PARP_Q15_ONE ||
++		    !state->workingset_estimator_version)
++			return -EINVAL;
++	} else if (state->policy_domain_id ||
++		   state->predicted_workingset_bytes ||
++		   state->predicted_resident_bytes ||
++		   state->workingset_confidence_q15 ||
++		   state->workingset_estimator_version) {
++		return -EINVAL;
++	}
++	return 0;
++} /* lzx-note */
++
++static int parp_predict_decode_workload_hint(u64 hint,
++					     struct parp_binding *binding) /* lzx-note */
++{
++	u64 allowed = PARP_PREDICT_WORKLOAD_CLASS_MASK |
++		(PARP_PREDICT_WORKLOAD_SWAPPINESS_MASK <<
++		 PARP_PREDICT_WORKLOAD_SWAPPINESS_SHIFT) |
++		(PARP_PREDICT_WORKLOAD_CONFIDENCE_MASK <<
++		 PARP_PREDICT_WORKLOAD_CONFIDENCE_SHIFT) |
++		PARP_PREDICT_WORKLOAD_ALLOW_WRITEPAGE;
++	u8 workload_class = hint & PARP_PREDICT_WORKLOAD_CLASS_MASK;
++	u16 swappiness = (hint >> PARP_PREDICT_WORKLOAD_SWAPPINESS_SHIFT) &
++		PARP_PREDICT_WORKLOAD_SWAPPINESS_MASK;
++	u16 confidence_q8 = (hint >> PARP_PREDICT_WORKLOAD_CONFIDENCE_SHIFT) &
++		PARP_PREDICT_WORKLOAD_CONFIDENCE_MASK;
++	bool allow_writepage = hint & PARP_PREDICT_WORKLOAD_ALLOW_WRITEPAGE;
++
++	if (!binding || hint & ~allowed ||
++	    workload_class == PARP_PREDICT_WORKLOAD_NONE ||
++	    workload_class > PARP_PREDICT_WORKLOAD_MIXED ||
++	    swappiness > 200 || !confidence_q8 ||
++	    (allow_writepage &&
++	     workload_class != PARP_PREDICT_WORKLOAD_FILE_DIRTY))
++		return -EINVAL;
++
++	binding->workload_class = workload_class;
++	binding->workload_swappiness = swappiness;
++	binding->workload_confidence_q15 =
++		div_u64((u64)confidence_q8 * PARP_Q15_ONE, 255);
++	binding->workload_allow_writepage = allow_writepage;
++	binding->workload_valid = true;
++	return 0;
++} /* lzx-note */
++
++/* lzx-note: Translate the stable UAPI into the internal immutable snapshot. */
++static int parp_predict_set_state(void __user *argp)
++{
++	struct parp_predict_state_v1 *state;
++	struct parp_app_prior_batch *batch;
++	struct parp_binding *bindings;
++	u64 expiry_ns;
++	unsigned int i;
++	int error;
++
++	state = memdup_user(argp, sizeof(*state));
++	if (IS_ERR(state))
++		return PTR_ERR(state);
++	error = parp_predict_validate_header(state);
++	if (error)
++		goto out_state;
++	if (check_add_overflow(state->timestamp_ns, state->ttl_ns, &expiry_ns)) {
++		error = -EOVERFLOW;
++		goto out_state;
++	}
++
++	batch = kzalloc(sizeof(*batch), GFP_KERNEL);
++	bindings = kcalloc(state->nr_bindings, sizeof(*bindings), GFP_KERNEL);
++	if (!batch || (state->nr_bindings && !bindings)) {
++		error = -ENOMEM;
++		goto out_alloc;
++	}
++	batch->schema_version = state->schema_version;
++	batch->model_version = state->model_version;
++	batch->prediction_generation = state->generation;
++	batch->timestamp_ns = state->timestamp_ns;
++	batch->horizon_ns = state->horizon_ns;
++	batch->expiry_ns = expiry_ns;
++	batch->nr_entries = state->nr_predictions;
++	for (i = 0; i < state->nr_predictions; i++) {
++		const struct parp_predict_entry_v1 *source =
++			&state->predictions[i];
++
++		if (source->reserved ||
++		    source->flags & ~PARP_PREDICT_ENTRY_FOREGROUND) {
++			error = -EINVAL;
++			goto out_alloc;
++		}
++		batch->entries[i].app_id = source->app_id;
++		batch->entries[i].use_score_q15 = source->score_q15;
++		batch->entries[i].rank = source->rank;
++		batch->entries[i].foreground =
++			!!(source->flags & PARP_PREDICT_ENTRY_FOREGROUND);
++		batch->entries[i].valid = true;
++	}
++	for (i = 0; i < state->nr_bindings; i++) {
++		const struct parp_predict_binding_v1 *source =
++			&state->bindings[i];
++
++		if (source->reserved ||
++		    source->flags != PARP_PREDICT_BINDING_ACTIVE) {
++			error = -EINVAL;
++			goto out_alloc;
++		}
++		bindings[i] = (struct parp_binding) {
++			.domain_id = source->domain_id,
++			.app_id = source->app_id,
++			.bind_generation = state->generation,
++			.updated_ns = state->timestamp_ns,
++			.expires_ns = expiry_ns,
++			.epoch_id = source->epoch_id,
++			.model_version = state->model_version,
++			.active = true,
++		};
++	}
++	error = parp_snapshot_replace_state(batch, bindings,
++					    state->nr_bindings);
++out_alloc:
++	kfree(bindings);
++	kfree(batch);
++out_state:
++	kfree(state);
++	return error;
++}
++
++/* lzx-note: ABI v2 adds one future-working-set estimate to the same atomic
++ * prediction and binding publication used by v1. */
++static int parp_predict_set_state_v2(void __user *argp)
++{
++	struct parp_predict_state_v2 *state;
++	struct parp_app_prior_batch *batch;
++	struct parp_binding *bindings;
++	u64 expiry_ns;
++	unsigned int i;
++	int error;
++
++	state = memdup_user(argp, sizeof(*state));
++	if (IS_ERR(state))
++		return PTR_ERR(state);
++	error = parp_predict_validate_header_v2(state);
++	if (error)
++		goto out_state;
++	if (check_add_overflow(state->timestamp_ns, state->ttl_ns, &expiry_ns)) {
++		error = -EOVERFLOW;
++		goto out_state;
++	}
++
++	batch = kzalloc(sizeof(*batch), GFP_KERNEL);
++	bindings = kcalloc(state->nr_bindings, sizeof(*bindings), GFP_KERNEL);
++	if (!batch || (state->nr_bindings && !bindings)) {
++		error = -ENOMEM;
++		goto out_alloc;
++	}
++	batch->schema_version = state->schema_version;
++	batch->model_version = state->model_version;
++	batch->prediction_generation = state->generation;
++	batch->flags = state->flags & PARP_PREDICT_STATE_WORKINGSET_VALID ?
++		PARP_APP_PRIOR_BATCH_WORKINGSET_VALID : 0;
++	batch->timestamp_ns = state->timestamp_ns;
++	batch->horizon_ns = state->horizon_ns;
++	batch->expiry_ns = expiry_ns;
++	batch->policy_domain_id = state->policy_domain_id;
++	batch->predicted_workingset_bytes =
++		state->predicted_workingset_bytes;
++	batch->predicted_resident_bytes = state->predicted_resident_bytes;
++	batch->workingset_confidence_q15 =
++		state->workingset_confidence_q15;
++	batch->workingset_estimator_version =
++		state->workingset_estimator_version;
++	batch->nr_entries = state->nr_predictions;
++	for (i = 0; i < state->nr_predictions; i++) {
++		const struct parp_predict_entry_v1 *source =
++			&state->predictions[i];
++
++		if (source->reserved ||
++		    source->flags & ~PARP_PREDICT_ENTRY_FOREGROUND) {
++			error = -EINVAL;
++			goto out_alloc;
++		}
++		batch->entries[i].app_id = source->app_id;
++		batch->entries[i].use_score_q15 = source->score_q15;
++		batch->entries[i].rank = source->rank;
++		batch->entries[i].foreground =
++			!!(source->flags & PARP_PREDICT_ENTRY_FOREGROUND);
++		batch->entries[i].valid = true;
++	}
++	for (i = 0; i < state->nr_bindings; i++) {
++		const struct parp_predict_binding_v1 *source =
++			&state->bindings[i];
++
++		if (source->reserved ||
++		    source->flags != PARP_PREDICT_BINDING_ACTIVE) {
++			error = -EINVAL;
++			goto out_alloc;
++		}
++		bindings[i] = (struct parp_binding) {
++			.domain_id = source->domain_id,
++			.app_id = source->app_id,
++			.bind_generation = state->generation,
++			.updated_ns = state->timestamp_ns,
++			.expires_ns = expiry_ns,
++			.epoch_id = source->epoch_id,
++			.model_version = state->model_version,
++			.active = true,
++		};
++	}
++	error = parp_snapshot_replace_state(batch, bindings,
++					    state->nr_bindings);
++out_alloc:
++	kfree(bindings);
++	kfree(batch);
++out_state:
++	kfree(state);
++	return error;
++}
++
++/*
++ * ABI v3 publishes the same LSTM/workingset snapshot as v2 plus a bounded
++ * per-cgroup page-type reclaim profile.  lzx-note
++ */
++static int parp_predict_set_state_v3(void __user *argp) /* lzx-note */
++{
++	struct parp_predict_state_v3 *state;
++	struct parp_app_prior_batch *batch;
++	struct parp_binding *bindings;
++	u64 expiry_ns;
++	unsigned int i;
++	int error;
++
++	state = memdup_user(argp, sizeof(*state));
++	if (IS_ERR(state))
++		return PTR_ERR(state);
++	error = parp_predict_validate_header_v3(state);
++	if (error)
++		goto out_state;
++	if (check_add_overflow(state->timestamp_ns, state->ttl_ns, &expiry_ns)) {
++		error = -EOVERFLOW;
++		goto out_state;
++	}
++
++	batch = kzalloc(sizeof(*batch), GFP_KERNEL);
++	bindings = kcalloc(state->nr_bindings, sizeof(*bindings), GFP_KERNEL);
++	if (!batch || (state->nr_bindings && !bindings)) {
++		error = -ENOMEM;
++		goto out_alloc;
++	}
++	batch->schema_version = state->schema_version;
++	batch->model_version = state->model_version;
++	batch->prediction_generation = state->generation;
++	batch->flags = state->flags & PARP_PREDICT_STATE_WORKINGSET_VALID ?
++		PARP_APP_PRIOR_BATCH_WORKINGSET_VALID : 0;
++	batch->timestamp_ns = state->timestamp_ns;
++	batch->horizon_ns = state->horizon_ns;
++	batch->expiry_ns = expiry_ns;
++	batch->policy_domain_id = state->policy_domain_id;
++	batch->predicted_workingset_bytes = state->predicted_workingset_bytes;
++	batch->predicted_resident_bytes = state->predicted_resident_bytes;
++	batch->workingset_confidence_q15 = state->workingset_confidence_q15;
++	batch->workingset_estimator_version = state->workingset_estimator_version;
++	batch->nr_entries = state->nr_predictions;
++	for (i = 0; i < state->nr_predictions; i++) {
++		const struct parp_predict_entry_v1 *source =
++			&state->predictions[i];
++
++		if (source->reserved ||
++		    source->flags & ~PARP_PREDICT_ENTRY_FOREGROUND) {
++			error = -EINVAL;
++			goto out_alloc;
++		}
++		batch->entries[i].app_id = source->app_id;
++		batch->entries[i].use_score_q15 = source->score_q15;
++		batch->entries[i].rank = source->rank;
++		batch->entries[i].foreground =
++			!!(source->flags & PARP_PREDICT_ENTRY_FOREGROUND);
++		batch->entries[i].valid = true;
++	}
++	for (i = 0; i < state->nr_bindings; i++) {
++		const struct parp_predict_binding_v3 *source =
++			&state->bindings[i];
++
++		if (source->flags & ~(PARP_PREDICT_BINDING_ACTIVE |
++				      PARP_PREDICT_BINDING_WORKLOAD_VALID) ||
++		    !(source->flags & PARP_PREDICT_BINDING_ACTIVE) ||
++		    (!(source->flags & PARP_PREDICT_BINDING_WORKLOAD_VALID) &&
++		     source->workload_hint)) {
++			error = -EINVAL;
++			goto out_alloc;
++		}
++		bindings[i] = (struct parp_binding) {
++			.domain_id = source->domain_id,
++			.app_id = source->app_id,
++			.bind_generation = state->generation,
++			.updated_ns = state->timestamp_ns,
++			.expires_ns = expiry_ns,
++			.epoch_id = source->epoch_id,
++			.model_version = state->model_version,
++			.active = true,
++		};
++		if (source->flags & PARP_PREDICT_BINDING_WORKLOAD_VALID) {
++			error = parp_predict_decode_workload_hint(source->workload_hint,
++							  &bindings[i]);
++			if (error)
++				goto out_alloc;
++		}
++	}
++	error = parp_snapshot_replace_state(batch, bindings, state->nr_bindings);
++out_alloc:
++	kfree(bindings);
++	kfree(batch);
++out_state:
++	kfree(state);
++	return error;
++} /* lzx-note */
++
++static int parp_predict_get_state(void __user *argp)
++{
++	const struct parp_snapshot *snapshot;
++	struct parp_predict_state_v1 *state;
++	unsigned int i;
++	int error = 0;
++
++	state = kzalloc(sizeof(*state), GFP_KERNEL);
++	if (!state)
++		return -ENOMEM;
++	state->abi_version = PARP_PREDICT_ABI_VERSION;
++	state->struct_size = sizeof(*state);
++
++	snapshot = parp_snapshot_acquire();
++	if (snapshot) {
++		state->schema_version = snapshot->prediction_schema_version;
++		state->model_version = snapshot->prediction_model_version;
++		state->generation = snapshot->prediction_generation;
++		state->timestamp_ns = snapshot->prediction_timestamp_ns;
++		state->horizon_ns = snapshot->prediction_horizon_ns;
++		if (snapshot->prediction_expiry_ns >
++		    snapshot->prediction_timestamp_ns)
++			state->ttl_ns = snapshot->prediction_expiry_ns -
++				snapshot->prediction_timestamp_ns;
++		state->nr_predictions = min_t(u32, snapshot->nr_priors,
++						 PARP_PREDICT_MAX_APPS);
++		state->nr_bindings = min_t(u32, snapshot->nr_bindings,
++					      PARP_PREDICT_MAX_BINDINGS);
++		for (i = 0; i < state->nr_predictions; i++) {
++			state->predictions[i].app_id = snapshot->priors[i].app_id;
++			state->predictions[i].score_q15 =
++				snapshot->priors[i].use_score_q15;
++			state->predictions[i].rank = snapshot->priors[i].rank;
++			if (snapshot->priors[i].foreground)
++				state->predictions[i].flags =
++					PARP_PREDICT_ENTRY_FOREGROUND;
++		}
++		for (i = 0; i < state->nr_bindings; i++) {
++			state->bindings[i].domain_id =
++				snapshot->bindings[i].domain_id;
++			state->bindings[i].app_id = snapshot->bindings[i].app_id;
++			state->bindings[i].epoch_id = snapshot->bindings[i].epoch_id;
++			if (snapshot->bindings[i].active)
++				state->bindings[i].flags =
++					PARP_PREDICT_BINDING_ACTIVE;
++		}
++	}
++	parp_snapshot_release();
++
++	if (copy_to_user(argp, state, sizeof(*state)))
++		error = -EFAULT;
++	kfree(state);
++	return error;
++}
++
++static int parp_predict_get_state_v2(void __user *argp)
++{
++	const struct parp_snapshot *snapshot;
++	struct parp_predict_state_v2 *state;
++	unsigned int i;
++	int error = 0;
++
++	state = kzalloc(sizeof(*state), GFP_KERNEL);
++	if (!state)
++		return -ENOMEM;
++	state->abi_version = PARP_PREDICT_ABI_VERSION_V2;
++	state->struct_size = sizeof(*state);
++
++	snapshot = parp_snapshot_acquire();
++	if (snapshot) {
++		state->schema_version = snapshot->prediction_schema_version;
++		state->model_version = snapshot->prediction_model_version;
++		state->generation = snapshot->prediction_generation;
++		state->timestamp_ns = snapshot->prediction_timestamp_ns;
++		state->horizon_ns = snapshot->prediction_horizon_ns;
++		if (snapshot->prediction_expiry_ns >
++		    snapshot->prediction_timestamp_ns)
++			state->ttl_ns = snapshot->prediction_expiry_ns -
++				snapshot->prediction_timestamp_ns;
++		if (snapshot->workingset_valid) {
++			state->flags |= PARP_PREDICT_STATE_WORKINGSET_VALID;
++			state->policy_domain_id =
++				snapshot->prediction_policy_domain_id;
++			state->predicted_workingset_bytes =
++				snapshot->predicted_workingset_bytes;
++			state->predicted_resident_bytes =
++				snapshot->predicted_resident_bytes;
++			state->workingset_confidence_q15 =
++				snapshot->workingset_confidence_q15;
++			state->workingset_estimator_version =
++				snapshot->workingset_estimator_version;
++		}
++		state->nr_predictions = min_t(u32, snapshot->nr_priors,
++						 PARP_PREDICT_MAX_APPS);
++		state->nr_bindings = min_t(u32, snapshot->nr_bindings,
++					      PARP_PREDICT_MAX_BINDINGS);
++		for (i = 0; i < state->nr_predictions; i++) {
++			state->predictions[i].app_id = snapshot->priors[i].app_id;
++			state->predictions[i].score_q15 =
++				snapshot->priors[i].use_score_q15;
++			state->predictions[i].rank = snapshot->priors[i].rank;
++			if (snapshot->priors[i].foreground)
++				state->predictions[i].flags =
++					PARP_PREDICT_ENTRY_FOREGROUND;
++		}
++		for (i = 0; i < state->nr_bindings; i++) {
++			state->bindings[i].domain_id =
++				snapshot->bindings[i].domain_id;
++			state->bindings[i].app_id = snapshot->bindings[i].app_id;
++			state->bindings[i].epoch_id = snapshot->bindings[i].epoch_id;
++			if (snapshot->bindings[i].active)
++				state->bindings[i].flags =
++					PARP_PREDICT_BINDING_ACTIVE;
++		}
++	}
++	parp_snapshot_release();
++
++	if (copy_to_user(argp, state, sizeof(*state)))
++		error = -EFAULT;
++	kfree(state);
++	return error;
++} /* lzx-note */
++
++static int parp_predict_get_state_v3(void __user *argp) /* lzx-note */
++{
++	const struct parp_snapshot *snapshot;
++	struct parp_predict_state_v3 *state;
++	unsigned int i;
++	int error = 0;
++
++	state = kzalloc(sizeof(*state), GFP_KERNEL);
++	if (!state)
++		return -ENOMEM;
++	state->abi_version = PARP_PREDICT_ABI_VERSION_V3;
++	state->struct_size = sizeof(*state);
++
++	snapshot = parp_snapshot_acquire();
++	if (snapshot) {
++		state->schema_version = snapshot->prediction_schema_version;
++		state->model_version = snapshot->prediction_model_version;
++		state->generation = snapshot->prediction_generation;
++		state->timestamp_ns = snapshot->prediction_timestamp_ns;
++		state->horizon_ns = snapshot->prediction_horizon_ns;
++		if (snapshot->prediction_expiry_ns >
++		    snapshot->prediction_timestamp_ns)
++			state->ttl_ns = snapshot->prediction_expiry_ns -
++				snapshot->prediction_timestamp_ns;
++		if (snapshot->workingset_valid) {
++			state->flags |= PARP_PREDICT_STATE_WORKINGSET_VALID;
++			state->policy_domain_id = snapshot->prediction_policy_domain_id;
++			state->predicted_workingset_bytes =
++				snapshot->predicted_workingset_bytes;
++			state->predicted_resident_bytes =
++				snapshot->predicted_resident_bytes;
++			state->workingset_confidence_q15 =
++				snapshot->workingset_confidence_q15;
++			state->workingset_estimator_version =
++				snapshot->workingset_estimator_version;
++		}
++		state->nr_predictions = min_t(u32, snapshot->nr_priors,
++						 PARP_PREDICT_MAX_APPS);
++		state->nr_bindings = min_t(u32, snapshot->nr_bindings,
++					      PARP_PREDICT_MAX_BINDINGS);
++		for (i = 0; i < state->nr_predictions; i++) {
++			state->predictions[i].app_id = snapshot->priors[i].app_id;
++			state->predictions[i].score_q15 =
++				snapshot->priors[i].use_score_q15;
++			state->predictions[i].rank = snapshot->priors[i].rank;
++			if (snapshot->priors[i].foreground)
++				state->predictions[i].flags =
++					PARP_PREDICT_ENTRY_FOREGROUND;
++		}
++		for (i = 0; i < state->nr_bindings; i++) {
++			const struct parp_binding *binding = &snapshot->bindings[i];
++			u64 hint = binding->workload_class |
++				((u64)binding->workload_swappiness <<
++				 PARP_PREDICT_WORKLOAD_SWAPPINESS_SHIFT) |
++				((u64)div_u64((u64)binding->workload_confidence_q15 *
++				 255, PARP_Q15_ONE) <<
++				 PARP_PREDICT_WORKLOAD_CONFIDENCE_SHIFT);
++
++			state->bindings[i].domain_id = binding->domain_id;
++			state->bindings[i].app_id = binding->app_id;
++			state->bindings[i].epoch_id = binding->epoch_id;
++			if (binding->active)
++				state->bindings[i].flags =
++					PARP_PREDICT_BINDING_ACTIVE;
++			if (binding->workload_valid) {
++				state->bindings[i].flags |=
++					PARP_PREDICT_BINDING_WORKLOAD_VALID;
++				if (binding->workload_allow_writepage)
++					hint |= PARP_PREDICT_WORKLOAD_ALLOW_WRITEPAGE;
++				state->bindings[i].workload_hint = hint;
++			}
++		}
++	}
++	parp_snapshot_release();
++
++	if (copy_to_user(argp, state, sizeof(*state)))
++		error = -EFAULT;
++	kfree(state);
++	return error;
++} /* lzx-note */
++
++static long parp_predict_ioctl(struct file *file, unsigned int cmd,
++			       unsigned long arg)
++{
++	void __user *argp = (void __user *)arg;
++
++	switch (cmd) {
++	case PARP_PREDICT_SET_STATE:
++		return parp_predict_set_state(argp);
++	case PARP_PREDICT_GET_STATE:
++		return parp_predict_get_state(argp);
++	case PARP_PREDICT_SET_STATE_V2:
++		return parp_predict_set_state_v2(argp);
++	case PARP_PREDICT_GET_STATE_V2:
++		return parp_predict_get_state_v2(argp);
++	case PARP_PREDICT_SET_STATE_V3:
++		return parp_predict_set_state_v3(argp);
++	case PARP_PREDICT_GET_STATE_V3:
++		return parp_predict_get_state_v3(argp);
++	default:
++		return -ENOTTY;
++	}
++}
++
++static const struct file_operations parp_predict_fops = {
++	.owner = THIS_MODULE,
++	.open = nonseekable_open,
++	.unlocked_ioctl = parp_predict_ioctl,
++	.compat_ioctl = compat_ptr_ioctl,
++	.llseek = noop_llseek,
++};
++
++static struct miscdevice parp_predict_device = {
++	.minor = MISC_DYNAMIC_MINOR,
++	.name = "myfs",
++	.fops = &parp_predict_fops,
++	.mode = 0660,
++};
++
++static int __init parp_predict_dev_init(void)
++{
++	int error = misc_register(&parp_predict_device);
++
++	if (error)
++		pr_err("PARP: failed to register /dev/myfs: %d\n", error);
++	else
++		pr_info("PARP: /dev/myfs prediction interface ABI v%u/v%u/v%u ready\n",
++			PARP_PREDICT_ABI_VERSION,
++			PARP_PREDICT_ABI_VERSION_V2,
++			PARP_PREDICT_ABI_VERSION_V3); /* lzx-note */
++	return error;
++}
++device_initcall(parp_predict_dev_init); /* lzx-note: misc class must exist first. */
 diff --git a/mm/parp/control/genl.c b/mm/parp/control/genl.c
 new file mode 100644
-index 000000000..40504ecfb
+index 0000000000000000000000000000000000000000..40504ecfbe866c3335206b6fe171667008fea8f5
 --- /dev/null
 +++ b/mm/parp/control/genl.c
 @@ -0,0 +1,7 @@
@@ -7601,7 +8601,7 @@ index 000000000..40504ecfb
 + */
 diff --git a/mm/parp/control/sysfs.c b/mm/parp/control/sysfs.c
 new file mode 100644
-index 000000000..3b54be44f
+index 0000000000000000000000000000000000000000..3b54be44f3469099f316de874d8a84beb2336ba8
 --- /dev/null
 +++ b/mm/parp/control/sysfs.c
 @@ -0,0 +1,3 @@
@@ -7610,7 +8610,7 @@ index 000000000..3b54be44f
 +/* Debugfs is the only enabled control surface in the safe first stage. */
 diff --git a/mm/parp/control/trace.c b/mm/parp/control/trace.c
 new file mode 100644
-index 000000000..505f68d73
+index 0000000000000000000000000000000000000000..505f68d73153aa00a7627bc23dd4451a184495e8
 --- /dev/null
 +++ b/mm/parp/control/trace.c
 @@ -0,0 +1,3 @@
@@ -7619,7 +8619,7 @@ index 000000000..505f68d73
 +#include <trace/events/parp.h>
 diff --git a/mm/parp/core/budget.c b/mm/parp/core/budget.c
 new file mode 100644
-index 000000000..43bbe4a35
+index 0000000000000000000000000000000000000000..43bbe4a3531ca199716c913a5ddb9e8428c61a5c
 --- /dev/null
 +++ b/mm/parp/core/budget.c
 @@ -0,0 +1,7 @@
@@ -7632,7 +8632,7 @@ index 000000000..43bbe4a35
 +}
 diff --git a/mm/parp/core/domain.c b/mm/parp/core/domain.c
 new file mode 100644
-index 000000000..aca81ca2d
+index 0000000000000000000000000000000000000000..aca81ca2d7321c335830098a3175e9d38999f083
 --- /dev/null
 +++ b/mm/parp/core/domain.c
 @@ -0,0 +1,31 @@
@@ -7669,7 +8669,7 @@ index 000000000..aca81ca2d
 +}
 diff --git a/mm/parp/core/effective_tier.c b/mm/parp/core/effective_tier.c
 new file mode 100644
-index 000000000..ef3827616
+index 0000000000000000000000000000000000000000..ef3827616e32ffbd5b358f2283682cb310f22448
 --- /dev/null
 +++ b/mm/parp/core/effective_tier.c
 @@ -0,0 +1,2400 @@
@@ -10075,7 +11075,7 @@ index 000000000..ef3827616
 +}
 diff --git a/mm/parp/core/engine.c b/mm/parp/core/engine.c
 new file mode 100644
-index 000000000..0d993b25e
+index 0000000000000000000000000000000000000000..0d993b25eeb40a13c93f798ddf4272e876d5be2a
 --- /dev/null
 +++ b/mm/parp/core/engine.c
 @@ -0,0 +1,103 @@
@@ -10184,7 +11184,7 @@ index 000000000..0d993b25e
 +}
 diff --git a/mm/parp/core/evidence.c b/mm/parp/core/evidence.c
 new file mode 100644
-index 000000000..69ddd0b55
+index 0000000000000000000000000000000000000000..69ddd0b55bc815237fa020ffcc0d9c21d3bbb80b
 --- /dev/null
 +++ b/mm/parp/core/evidence.c
 @@ -0,0 +1,712 @@
@@ -10902,7 +11902,7 @@ index 000000000..69ddd0b55
 +}
 diff --git a/mm/parp/core/fallback.c b/mm/parp/core/fallback.c
 new file mode 100644
-index 000000000..1e624dab7
+index 0000000000000000000000000000000000000000..1e624dab7ca87604a9468bbc4ebae297186d55a2
 --- /dev/null
 +++ b/mm/parp/core/fallback.c
 @@ -0,0 +1,7 @@
@@ -10915,7 +11915,7 @@ index 000000000..1e624dab7
 +}
 diff --git a/mm/parp/core/frontier_score.c b/mm/parp/core/frontier_score.c
 new file mode 100644
-index 000000000..0de68e14a
+index 0000000000000000000000000000000000000000..0de68e14ae5ad8893980d26d392a9921f5155dcf
 --- /dev/null
 +++ b/mm/parp/core/frontier_score.c
 @@ -0,0 +1,737 @@
@@ -11658,7 +12658,7 @@ index 000000000..0de68e14a
 +}
 diff --git a/mm/parp/core/policy.c b/mm/parp/core/policy.c
 new file mode 100644
-index 000000000..de54386ff
+index 0000000000000000000000000000000000000000..de54386ffbb892fccec1172351f5c4edf793ae0d
 --- /dev/null
 +++ b/mm/parp/core/policy.c
 @@ -0,0 +1,10 @@
@@ -11674,7 +12674,7 @@ index 000000000..de54386ff
 +}
 diff --git a/mm/parp/core/scan_budget.c b/mm/parp/core/scan_budget.c
 new file mode 100644
-index 000000000..6be3cc4b4
+index 0000000000000000000000000000000000000000..6be3cc4b403fbaf1f8513be11b5b9e6a341d5919
 --- /dev/null
 +++ b/mm/parp/core/scan_budget.c
 @@ -0,0 +1,375 @@
@@ -12055,10 +13055,10 @@ index 000000000..6be3cc4b4
 +}
 diff --git a/mm/parp/core/snapshot.c b/mm/parp/core/snapshot.c
 new file mode 100644
-index 000000000..ed3eb6711
+index 0000000000000000000000000000000000000000..e93cd7e25ab77336d25ae66e637a7885847b7f02
 --- /dev/null
 +++ b/mm/parp/core/snapshot.c
-@@ -0,0 +1,476 @@
+@@ -0,0 +1,481 @@
 +// SPDX-License-Identifier: GPL-2.0
 +#include <linux/slab.h>
 +#include <linux/mutex.h>
@@ -12489,8 +13489,13 @@ index 000000000..ed3eb6711
 +		.model_version = binding->model_version,
 +		.app_prior_q15 = prior->use_score_q15,
 +		.app_rank = prior->rank, /* lzx-note */
++		.workload_confidence_q15 = binding->workload_confidence_q15, /* lzx-note */
++		.workload_swappiness = binding->workload_swappiness, /* lzx-note */
 +		.owner_confidence_q15 = PARP_Q15_ONE,
 +		.owner_source = 1,
++		.workload_class = binding->workload_class, /* lzx-note */
++		.workload_allow_writepage = binding->workload_allow_writepage, /* lzx-note */
++		.workload_valid = binding->workload_valid, /* lzx-note */
 +		.foreground = prior->foreground, /* lzx-note */
 +	};
 +	found = true;
@@ -12537,7 +13542,7 @@ index 000000000..ed3eb6711
 +}
 diff --git a/mm/parp/core/stats.c b/mm/parp/core/stats.c
 new file mode 100644
-index 000000000..12b3d683c
+index 0000000000000000000000000000000000000000..12b3d683c2d67c7b3b27314db10f59288c4f23df
 --- /dev/null
 +++ b/mm/parp/core/stats.c
 @@ -0,0 +1,11 @@
@@ -12554,10 +13559,10 @@ index 000000000..12b3d683c
 +}
 diff --git a/mm/parp/core/watermark.c b/mm/parp/core/watermark.c
 new file mode 100644
-index 000000000..cb8e5bd52
+index 0000000000000000000000000000000000000000..1f936c2cb8287f08e1797d076de24011ea7cc018
 --- /dev/null
 +++ b/mm/parp/core/watermark.c
-@@ -0,0 +1,1379 @@
+@@ -0,0 +1,1520 @@
 +// SPDX-License-Identifier: GPL-2.0
 +/*
 + * Per-memcg secondary watermarks and EWMA arrival prediction.
@@ -12578,6 +13583,7 @@ index 000000000..cb8e5bd52
 +#include <linux/memcontrol.h>
 +#include <linux/mm.h>
 +#include <linux/page_counter.h>
++#include <linux/parp_predict.h> /* lzx-note */
 +#include <linux/parp_tier2.h>
 +#include <linux/swap.h>
 +#include <linux/sysctl.h>
@@ -12605,6 +13611,7 @@ index 000000000..cb8e5bd52
 +static int sysctl_tier2_wss_strengthen_enabled __read_mostly; /* lzx-note */
 +#endif
 +static int parp_tier2_one = 1;
++static int parp_tier2_q15_one = PARP_Q15_ONE; /* lzx-note */
 +#ifdef CONFIG_PARP_RECLAIM_COLD_AGGRESSIVE /* lzx-note */
 +static int parp_tier2_seven = 7; /* lzx-note */
 +#endif /* CONFIG_PARP_RECLAIM_COLD_AGGRESSIVE */ /* lzx-note */
@@ -12633,7 +13640,16 @@ index 000000000..cb8e5bd52
 +
 +#ifdef CONFIG_PARP_RECLAIM_COLD_AGGRESSIVE /* lzx-note */
 +static int sysctl_parp_reclaim_cold_aggressive_enabled __read_mostly;
++static int sysctl_parp_reclaim_workload_enabled __read_mostly; /* lzx-note */
 +static int sysctl_parp_reclaim_cold_bin_max __read_mostly = 2;
++/*
++ * Rank keeps the bin walk stable, but it is not a calibrated probability:
++ * a very small-probability tail entry can still inherit a nonzero rank band.
++ * Workload-aware cold pressure must therefore gate on the original LSTM
++ * probability rather than on that ordinal band.  327/32767 is about 1%.
++ * lzx-note
++ */
++static int sysctl_parp_reclaim_cold_probability_q15 __read_mostly = 327;
 +static struct { /* lzx-note */
 +	atomic64_t passes;
 +	atomic64_t scanned;
@@ -12641,6 +13657,10 @@ index 000000000..cb8e5bd52
 +	atomic64_t priority_boost_total;
 +	atomic64_t writepage_promotions;
 +	atomic64_t swappiness_promotions;
++	atomic64_t swappiness_demotions; /* lzx-note */
++	atomic64_t workload_profile_hits; /* lzx-note */
++	atomic64_t workload_profile_misses; /* lzx-note */
++	atomic64_t workload_passes[5]; /* lzx-note */
 +	atomic64_t bin_passes[8];
 +} parp_reclaim_cold_stats; /* lzx-note */
 +#endif /* CONFIG_PARP_RECLAIM_COLD_AGGRESSIVE */ /* lzx-note */
@@ -12695,6 +13715,15 @@ index 000000000..cb8e5bd52
 +		.extra2 = &parp_tier2_one,
 +	}, /* lzx-note */
 +	{
++		.procname = "parp_reclaim_workload_enabled",
++		.data = &sysctl_parp_reclaim_workload_enabled,
++		.maxlen = sizeof(sysctl_parp_reclaim_workload_enabled),
++		.mode = 0644,
++		.proc_handler = proc_dointvec_minmax,
++		.extra1 = SYSCTL_ZERO,
++		.extra2 = &parp_tier2_one,
++	}, /* lzx-note */
++	{
 +		.procname = "parp_reclaim_cold_bin_max",
 +		.data = &sysctl_parp_reclaim_cold_bin_max,
 +		.maxlen = sizeof(sysctl_parp_reclaim_cold_bin_max),
@@ -12702,6 +13731,15 @@ index 000000000..cb8e5bd52
 +		.proc_handler = proc_dointvec_minmax,
 +		.extra1 = SYSCTL_ZERO,
 +		.extra2 = &parp_tier2_seven,
++	}, /* lzx-note */
++	{
++		.procname = "parp_reclaim_cold_probability_q15",
++		.data = &sysctl_parp_reclaim_cold_probability_q15,
++		.maxlen = sizeof(sysctl_parp_reclaim_cold_probability_q15),
++		.mode = 0644,
++		.proc_handler = proc_dointvec_minmax,
++		.extra1 = SYSCTL_ZERO,
++		.extra2 = &parp_tier2_q15_one,
 +	}, /* lzx-note */
 +#endif /* CONFIG_PARP_RECLAIM_COLD_AGGRESSIVE */ /* lzx-note */
 +#ifdef CONFIG_PARP_TIER2_WSS_PREDICT
@@ -12768,6 +13806,37 @@ index 000000000..cb8e5bd52
 +	       parp_tier2_reclaim_bin_apply_enabled() &&
 +	       parp_reclaim_bin_policy_memcg(memcg); /* lzx-note */
 +} /* lzx-note */
++
++#ifdef CONFIG_PARP_RECLAIM_COLD_AGGRESSIVE /* lzx-note */
++/*
++ * A workload-aware candidate must be both explicitly predicted cold and have
++ * a fresh, usable ABI-v3 profile.  Ranking remains useful for ordinary bin
++ * reclaim, but it is not a calibrated probability: a rank-seven application
++ * can still have a sub-1%% return probability.  In this opt-in mode such a
++ * candidate belongs in the first reclaim bin, not behind a rank floor.
++ * lzx-note
++ */
++static bool parp_tier2_reclaim_workload_cold_context(
++		const struct parp_app_context *app) /* lzx-note */
++{
++	return app && parp_tier2_reclaim_bin_apply_enabled() &&
++	       READ_ONCE(sysctl_parp_reclaim_cold_aggressive_enabled) &&
++	       READ_ONCE(sysctl_parp_reclaim_workload_enabled) &&
++	       !app->foreground && app->workload_valid &&
++	       app->workload_class > PARP_PREDICT_WORKLOAD_NONE &&
++	       app->workload_class <= PARP_PREDICT_WORKLOAD_MIXED &&
++	       app->workload_confidence_q15 && app->workload_swappiness <= 200 &&
++	       app->app_prior_q15 <= min_t(unsigned int,
++		READ_ONCE(sysctl_parp_reclaim_cold_probability_q15),
++		PARP_Q15_ONE);
++} /* lzx-note */
++#else
++static bool parp_tier2_reclaim_workload_cold_context(
++		const struct parp_app_context *app) /* lzx-note */
++{
++	return false;
++} /* lzx-note */
++#endif /* CONFIG_PARP_RECLAIM_COLD_AGGRESSIVE */ /* lzx-note */
 +
 +u32 parp_tier2_reclaim_rank_score_q15(u16 app_prior_q15, u16 app_rank,
 +				      bool foreground) /* lzx-note */
@@ -12837,9 +13906,18 @@ index 000000000..cb8e5bd52
 +
 +	domain_id = parp_memcg_domain_id(memcg);
 +	if (domain_id && parp_context_lookup(domain_id, now, &app)) {
-+		score = parp_tier2_reclaim_rank_score_q15(app.app_prior_q15,
-+							 app.app_rank,
-+							 app.foreground);
++		/*
++		 * In the explicitly enabled workload policy, calibrated low
++		 * probability wins over the ordinal rank floor so every profiled
++		 * cold application is scanned in the first bin.  Other policies
++		 * retain the stable rank-based ordering exactly. lzx-note
++		 */
++		if (parp_tier2_reclaim_workload_cold_context(&app))
++			score = 0;
++		else
++			score = parp_tier2_reclaim_rank_score_q15(app.app_prior_q15,
++								 app.app_rank,
++								 app.foreground);
 +		have_signal = true;
 +		if (prediction_backed)
 +			*prediction_backed = true;
@@ -12936,25 +14014,48 @@ index 000000000..cb8e5bd52
 +	       READ_ONCE(sysctl_parp_reclaim_cold_aggressive_enabled);
 +} /* lzx-note */
 +
++bool parp_tier2_reclaim_workload_apply_enabled(void) /* lzx-note */
++{
++	return parp_tier2_reclaim_cold_aggressive_apply_enabled() &&
++	       READ_ONCE(sysctl_parp_reclaim_workload_enabled);
++} /* lzx-note */
++
 +/*
 + * Lower prediction bins get exponentially more pages from the first visit.
-+ * Swappiness stays below ANON_ONLY so cold clean/dirty file pages remain
-+ * eligible alongside anonymous pages. lzx-note
++ * With the workload switch disabled, retain the historical balanced default.
++ * With it enabled, only a fresh per-cgroup hint chooses the anon/file mix.
++ * lzx-note
 + */
-+bool parp_tier2_reclaim_cold_pressure(unsigned int bin,
-+				       u8 *priority_boost,
-+				       u16 *swappiness) /* lzx-note */
++bool parp_tier2_reclaim_cold_pressure(struct mem_cgroup *memcg,
++				       unsigned int bin, u8 *priority_boost,
++				       u16 *swappiness, bool *allow_writepage,
++				       u8 *workload_class) /* lzx-note */
 +{
 +	unsigned int max_bin;
++	struct parp_app_context app;
++	u64 domain_id;
++	u64 now;
++	bool workload_enabled;
 +
-+	if (!priority_boost || !swappiness ||
++	if (!memcg || !priority_boost || !swappiness || !allow_writepage ||
++	    !workload_class ||
 +	    !parp_tier2_reclaim_cold_aggressive_apply_enabled())
 +		return false;
 +
 +	max_bin = READ_ONCE(sysctl_parp_reclaim_cold_bin_max);
-+	if (bin > min_t(unsigned int, max_bin, 7))
++	workload_enabled = parp_tier2_reclaim_workload_apply_enabled();
++	/*
++	 * The bin cap remains the exact historical selector for balanced cold
++	 * pressure.  In workload-aware mode the calibrated LSTM probability below
++	 * is authoritative: rank bins protect likely returners, but must not keep
++	 * an explicitly unlikely application out merely because it is sixth in a
++	 * low-probability tail.  lzx-note
++	 */
++	if (bin > min_t(unsigned int, max_bin, 7) && !workload_enabled)
 +		return false;
 +
++	*allow_writepage = true;
++	*workload_class = PARP_PREDICT_WORKLOAD_NONE;
 +	if (!bin) {
 +		*priority_boost = 3;
 +		*swappiness = 140;
@@ -12965,12 +14066,34 @@ index 000000000..cb8e5bd52
 +		*priority_boost = 1;
 +		*swappiness = 100;
 +	}
++
++	if (!workload_enabled)
++		return true;
++
++	domain_id = parp_memcg_domain_id(memcg);
++	now = ktime_get_mono_fast_ns();
++	if (!domain_id || !parp_context_lookup(domain_id, now, &app) ||
++	    !app.workload_valid ||
++	    app.workload_class == PARP_PREDICT_WORKLOAD_NONE ||
++	    app.workload_class > PARP_PREDICT_WORKLOAD_MIXED ||
++	    !app.workload_confidence_q15 || app.workload_swappiness > 200) {
++		atomic64_inc(&parp_reclaim_cold_stats.workload_profile_misses);
++		return false;
++	}
++	if (!parp_tier2_reclaim_workload_cold_context(&app))
++		return false;
++
++	/* Reclaim bins choose pressure; the per-cgroup profile chooses page type. */
++	*workload_class = app.workload_class;
++	*swappiness = app.workload_swappiness;
++	*allow_writepage = app.workload_allow_writepage;
++	atomic64_inc(&parp_reclaim_cold_stats.workload_profile_hits);
 +	return true;
 +} /* lzx-note */
 +
 +void parp_tier2_reclaim_cold_note(unsigned int bin, u8 priority_boost,
 +				  bool writepage_promoted,
-+				  bool swappiness_promoted,
++				  int swappiness_delta, u8 workload_class,
 +				  unsigned long scanned,
 +				  unsigned long reclaimed) /* lzx-note */
 +{
@@ -12981,8 +14104,13 @@ index 000000000..cb8e5bd52
 +		     &parp_reclaim_cold_stats.priority_boost_total);
 +	if (writepage_promoted)
 +		atomic64_inc(&parp_reclaim_cold_stats.writepage_promotions);
-+	if (swappiness_promoted)
++	if (swappiness_delta > 0)
 +		atomic64_inc(&parp_reclaim_cold_stats.swappiness_promotions);
++	else if (swappiness_delta < 0)
++		atomic64_inc(&parp_reclaim_cold_stats.swappiness_demotions);
++	if (workload_class > PARP_PREDICT_WORKLOAD_NONE &&
++	    workload_class <= PARP_PREDICT_WORKLOAD_MIXED)
++		atomic64_inc(&parp_reclaim_cold_stats.workload_passes[workload_class]);
 +	if (bin < ARRAY_SIZE(parp_reclaim_cold_stats.bin_passes))
 +		atomic64_inc(&parp_reclaim_cold_stats.bin_passes[bin]);
 +} /* lzx-note */
@@ -13003,6 +14131,24 @@ index 000000000..cb8e5bd52
 +		&parp_reclaim_cold_stats.writepage_promotions);
 +	stats->swappiness_promotions = atomic64_read(
 +		&parp_reclaim_cold_stats.swappiness_promotions);
++	stats->swappiness_demotions = atomic64_read(
++		&parp_reclaim_cold_stats.swappiness_demotions);
++	stats->workload_profile_hits = atomic64_read(
++		&parp_reclaim_cold_stats.workload_profile_hits);
++	stats->workload_profile_misses = atomic64_read(
++		&parp_reclaim_cold_stats.workload_profile_misses);
++	stats->anon_heavy_passes = atomic64_read(
++		&parp_reclaim_cold_stats.workload_passes[
++			PARP_PREDICT_WORKLOAD_ANON_HEAVY]);
++	stats->file_clean_passes = atomic64_read(
++		&parp_reclaim_cold_stats.workload_passes[
++			PARP_PREDICT_WORKLOAD_FILE_CLEAN]);
++	stats->file_dirty_passes = atomic64_read(
++		&parp_reclaim_cold_stats.workload_passes[
++			PARP_PREDICT_WORKLOAD_FILE_DIRTY]);
++	stats->mixed_passes = atomic64_read(
++		&parp_reclaim_cold_stats.workload_passes[
++			PARP_PREDICT_WORKLOAD_MIXED]);
 +	for (bin = 0; bin < ARRAY_SIZE(stats->bin_passes); bin++)
 +		stats->bin_passes[bin] = atomic64_read(
 +			&parp_reclaim_cold_stats.bin_passes[bin]);
@@ -13939,10 +15085,10 @@ index 000000000..cb8e5bd52
 +subsys_initcall(parp_tier2_init);
 diff --git a/mm/parp/internal.h b/mm/parp/internal.h
 new file mode 100644
-index 000000000..f6c4593ff
+index 0000000000000000000000000000000000000000..dc9bd24bb6054b79e5c7f72b95115f901dd44ef0
 --- /dev/null
 +++ b/mm/parp/internal.h
-@@ -0,0 +1,635 @@
+@@ -0,0 +1,645 @@
 +/* SPDX-License-Identifier: GPL-2.0 */
 +#ifndef _MM_PARP_INTERNAL_H
 +#define _MM_PARP_INTERNAL_H
@@ -14151,8 +15297,13 @@ index 000000000..f6c4593ff
 +	u64 model_version;
 +	u16 app_prior_q15;
 +	u16 app_rank; /* lzx-note */
++	u16 workload_confidence_q15; /* lzx-note */
++	u16 workload_swappiness; /* lzx-note */
 +	u16 owner_confidence_q15;
 +	u32 owner_source;
++	u8 workload_class; /* lzx-note */
++	bool workload_allow_writepage; /* lzx-note */
++	bool workload_valid; /* lzx-note */
 +	bool foreground; /* lzx-note */
 +};
 +
@@ -14383,6 +15534,11 @@ index 000000000..f6c4593ff
 +	u64 expires_ns;
 +	u64 epoch_id;
 +	u64 model_version;
++	u16 workload_confidence_q15; /* lzx-note */
++	u16 workload_swappiness; /* lzx-note */
++	u8 workload_class; /* lzx-note */
++	bool workload_allow_writepage; /* lzx-note */
++	bool workload_valid; /* lzx-note */
 +	bool active;
 +};
 +
@@ -14580,7 +15736,7 @@ index 000000000..f6c4593ff
 +#endif
 diff --git a/mm/parp/mapping/anon_region.c b/mm/parp/mapping/anon_region.c
 new file mode 100644
-index 000000000..a9da9a46b
+index 0000000000000000000000000000000000000000..a9da9a46b811241b5ab74cc67a42e6f13d09e02a
 --- /dev/null
 +++ b/mm/parp/mapping/anon_region.c
 @@ -0,0 +1,7 @@
@@ -14593,7 +15749,7 @@ index 000000000..a9da9a46b
 +}
 diff --git a/mm/parp/mapping/file_region.c b/mm/parp/mapping/file_region.c
 new file mode 100644
-index 000000000..8c64013e9
+index 0000000000000000000000000000000000000000..8c64013e97f80b68899ad449640e55d2d0e65caf
 --- /dev/null
 +++ b/mm/parp/mapping/file_region.c
 @@ -0,0 +1,22 @@
@@ -14621,7 +15777,7 @@ index 000000000..8c64013e9
 +}
 diff --git a/mm/parp/mapping/lifecycle.c b/mm/parp/mapping/lifecycle.c
 new file mode 100644
-index 000000000..a8a39911f
+index 0000000000000000000000000000000000000000..a8a39911f79b2171eaba4d957909034eb86820a2
 --- /dev/null
 +++ b/mm/parp/mapping/lifecycle.c
 @@ -0,0 +1,7 @@
@@ -14634,7 +15790,7 @@ index 000000000..a8a39911f
 +}
 diff --git a/mm/parp/mapping/region_alignment.c b/mm/parp/mapping/region_alignment.c
 new file mode 100644
-index 000000000..a53f32a8c
+index 0000000000000000000000000000000000000000..a53f32a8cc2b1bf6152b5946662e73a7db428c90
 --- /dev/null
 +++ b/mm/parp/mapping/region_alignment.c
 @@ -0,0 +1,87 @@
@@ -14727,7 +15883,7 @@ index 000000000..a53f32a8c
 +}
 diff --git a/mm/parp/model/anon_predictor.c b/mm/parp/model/anon_predictor.c
 new file mode 100644
-index 000000000..c812894fb
+index 0000000000000000000000000000000000000000..c812894fbf1262aa187ea21487f2b5c4520596cc
 --- /dev/null
 +++ b/mm/parp/model/anon_predictor.c
 @@ -0,0 +1,18 @@
@@ -14751,7 +15907,7 @@ index 000000000..c812894fb
 +}
 diff --git a/mm/parp/model/app_prior.c b/mm/parp/model/app_prior.c
 new file mode 100644
-index 000000000..f1061cee9
+index 0000000000000000000000000000000000000000..f1061cee978a9435c86345e6569b9be2bf695897
 --- /dev/null
 +++ b/mm/parp/model/app_prior.c
 @@ -0,0 +1,7 @@
@@ -14764,7 +15920,7 @@ index 000000000..f1061cee9
 +}
 diff --git a/mm/parp/model/file_predictor.c b/mm/parp/model/file_predictor.c
 new file mode 100644
-index 000000000..223004405
+index 0000000000000000000000000000000000000000..223004405104f73878580f221c15fc2e21bf1e3c
 --- /dev/null
 +++ b/mm/parp/model/file_predictor.c
 @@ -0,0 +1,12 @@
@@ -14782,7 +15938,7 @@ index 000000000..223004405
 +}
 diff --git a/mm/parp/model/model_store.c b/mm/parp/model/model_store.c
 new file mode 100644
-index 000000000..af35453ad
+index 0000000000000000000000000000000000000000..af35453adf64e18efc80728b7e35e958ce05ce8a
 --- /dev/null
 +++ b/mm/parp/model/model_store.c
 @@ -0,0 +1,3 @@
@@ -14791,7 +15947,7 @@ index 000000000..af35453ad
 +/* Versioned models are published through immutable snapshots. */
 diff --git a/mm/parp/model/state_assigner.c b/mm/parp/model/state_assigner.c
 new file mode 100644
-index 000000000..631e104d7
+index 0000000000000000000000000000000000000000..631e104d7763eea6f3731416869eda16d6a92670
 --- /dev/null
 +++ b/mm/parp/model/state_assigner.c
 @@ -0,0 +1,26 @@
@@ -14823,7 +15979,7 @@ index 000000000..631e104d7
 +}
 diff --git a/mm/parp/model/state_predictor.c b/mm/parp/model/state_predictor.c
 new file mode 100644
-index 000000000..5bd83623b
+index 0000000000000000000000000000000000000000..5bd83623baa2cde344d1fa87bf439454ab5bed1d
 --- /dev/null
 +++ b/mm/parp/model/state_predictor.c
 @@ -0,0 +1,17 @@
@@ -14846,7 +16002,7 @@ index 000000000..5bd83623b
 +}
 diff --git a/mm/parp/tests/parp_test.c b/mm/parp/tests/parp_test.c
 new file mode 100644
-index 000000000..9e2db9e94
+index 0000000000000000000000000000000000000000..9e2db9e94f12f557e3597050cd066ff9f443fd37
 --- /dev/null
 +++ b/mm/parp/tests/parp_test.c
 @@ -0,0 +1,1557 @@
@@ -16408,7 +17564,7 @@ index 000000000..9e2db9e94
 +
 +MODULE_LICENSE("GPL");
 diff --git a/mm/rmap.c b/mm/rmap.c
-index 568198e9e..5f14e2a42 100644
+index 568198e9efc2927f540518f88e9ada9025248154..5f14e2a42b582a776883b70ae89d15997f0a7e99 100644
 --- a/mm/rmap.c
 +++ b/mm/rmap.c
 @@ -904,8 +904,11 @@ static bool folio_referenced_one(struct folio *folio,
@@ -16425,7 +17581,7 @@ index 568198e9e..5f14e2a42 100644
  			/* unexpected pmd-mapped folio? */
  			WARN_ON_ONCE(1);
 diff --git a/mm/shmem.c b/mm/shmem.c
-index 3b0356a4c..e3ad9bd64 100644
+index 3b0356a4c344273ec95e2ebba30a605db9b91dfc..e3ad9bd64bbba8214d13915a20d6db5455ee0ee8 100644
 --- a/mm/shmem.c
 +++ b/mm/shmem.c
 @@ -27,6 +27,7 @@
@@ -16473,7 +17629,7 @@ index 3b0356a4c..e3ad9bd64 100644
  			folio = NULL;
  		} else {
 diff --git a/mm/swap.c b/mm/swap.c
-index b74ebe865..ea64d6401 100644
+index b74ebe865dd92ad3165bb0a60a476cb48fc212e3..ea64d64017eef9e5b587c4ce49f611c84ee77ecb 100644
 --- a/mm/swap.c
 +++ b/mm/swap.c
 @@ -37,6 +37,7 @@
@@ -16519,7 +17675,7 @@ index b74ebe865..ea64d6401 100644
  
  /**
 diff --git a/mm/vmscan.c b/mm/vmscan.c
-index 674999999..5e8afc567 100644
+index 674999999cd067abc1481bd4c25ec3d66aeb30cc..e278f51597cca086a4b9de2387043529c7cc80de 100644
 --- a/mm/vmscan.c
 +++ b/mm/vmscan.c
 @@ -58,6 +58,8 @@
@@ -17564,7 +18720,7 @@ index 674999999..5e8afc567 100644
  
  		delta = evict_folios(nr_to_scan, lruvec, sc, swappiness);
  		if (!delta)
-@@ -4929,6 +5488,92 @@ static bool try_to_shrink_lruvec(struct lruvec *lruvec, struct scan_control *sc)
+@@ -4929,6 +5488,101 @@ static bool try_to_shrink_lruvec(struct lruvec *lruvec, struct scan_control *sc)
  	return nr_to_scan < 0;
  }
  
@@ -17572,12 +18728,14 @@ index 674999999..5e8afc567 100644
 +struct parp_cold_reclaim_context { /* lzx-note */
 +	bool active;
 +	bool writepage_promoted;
-+	bool swappiness_promoted;
++	bool allow_writepage; /* lzx-note */
 +	s8 priority;
 +	u8 priority_boost;
 +	u8 may_writepage;
++	u8 workload_class; /* lzx-note */
 +	u16 swappiness_override;
 +	u16 swappiness;
++	int swappiness_delta; /* lzx-note */
 +	unsigned int bin;
 +	unsigned long scanned;
 +	unsigned long reclaimed;
@@ -17590,11 +18748,14 @@ index 674999999..5e8afc567 100644
 +{
 +	u8 priority_boost;
 +	u16 swappiness;
++	u8 workload_class;
++	bool allow_writepage;
 +	int native_swappiness;
 +
 +	memset(ctx, 0, sizeof(*ctx));
-+	if (!parp_tier2_reclaim_cold_pressure(bin, &priority_boost,
-+					      &swappiness))
++	if (!parp_tier2_reclaim_cold_pressure(memcg, bin, &priority_boost,
++					      &swappiness, &allow_writepage,
++					      &workload_class))
 +		return;
 +
 +	ctx->active = true;
@@ -17603,16 +18764,19 @@ index 674999999..5e8afc567 100644
 +	ctx->priority_boost = sc->priority > 0 ?
 +		min_t(u8, priority_boost, sc->priority) : 0;
 +	ctx->may_writepage = sc->may_writepage;
++	ctx->allow_writepage = allow_writepage;
++	ctx->workload_class = workload_class;
 +	ctx->swappiness_override = sc->parp_swappiness_override;
 +	ctx->scanned = sc->nr_scanned;
 +	ctx->reclaimed = sc->nr_reclaimed;
 +
 +	native_swappiness = sc_swappiness(sc, memcg);
-+	ctx->swappiness = max_t(u16, native_swappiness, swappiness);
-+	ctx->writepage_promoted = !sc->may_writepage;
-+	ctx->swappiness_promoted = ctx->swappiness > native_swappiness;
++	ctx->swappiness = swappiness;
++	ctx->swappiness_delta = (int)ctx->swappiness - native_swappiness;
++	ctx->writepage_promoted = allow_writepage && !sc->may_writepage;
 +	sc->priority -= ctx->priority_boost;
-+	sc->may_writepage = 1;
++	if (allow_writepage)
++		sc->may_writepage = 1;
 +	sc->parp_swappiness_override = ctx->swappiness + 1;
 +} /* lzx-note */
 +
@@ -17630,7 +18794,8 @@ index 674999999..5e8afc567 100644
 +	sc->may_writepage = ctx->may_writepage;
 +	sc->parp_swappiness_override = ctx->swappiness_override;
 +	parp_tier2_reclaim_cold_note(ctx->bin, ctx->priority_boost,
-+		ctx->writepage_promoted, ctx->swappiness_promoted,
++		ctx->writepage_promoted, ctx->swappiness_delta,
++		ctx->workload_class,
 +		scanned, reclaimed);
 +} /* lzx-note */
 +
@@ -17657,7 +18822,7 @@ index 674999999..5e8afc567 100644
  static int shrink_one(struct lruvec *lruvec, struct scan_control *sc)
  {
  	bool success;
-@@ -4976,13 +5621,15 @@ static void shrink_many(struct pglist_data *pgdat, struct scan_control *sc)
+@@ -4976,13 +5630,15 @@ static void shrink_many(struct pglist_data *pgdat, struct scan_control *sc)
  	int gen;
  	int bin;
  	int first_bin;
@@ -17674,7 +18839,7 @@ index 674999999..5e8afc567 100644
  restart:
  	op = 0;
  	memcg = NULL;
-@@ -4990,6 +5637,11 @@ static void shrink_many(struct pglist_data *pgdat, struct scan_control *sc)
+@@ -4990,6 +5646,11 @@ static void shrink_many(struct pglist_data *pgdat, struct scan_control *sc)
  	rcu_read_lock();
  
  	hlist_nulls_for_each_entry_rcu(lrugen, pos, &pgdat->memcg_lru.fifo[gen][bin], list) {
@@ -17686,7 +18851,7 @@ index 674999999..5e8afc567 100644
  		if (op) {
  			lru_gen_rotate_memcg(lruvec, op);
  			op = 0;
-@@ -5012,7 +5664,42 @@ static void shrink_many(struct pglist_data *pgdat, struct scan_control *sc)
+@@ -5012,7 +5673,42 @@ static void shrink_many(struct pglist_data *pgdat, struct scan_control *sc)
  
  		rcu_read_unlock();
  
@@ -17729,7 +18894,7 @@ index 674999999..5e8afc567 100644
  
  		rcu_read_lock();
  
-@@ -5026,6 +5713,11 @@ static void shrink_many(struct pglist_data *pgdat, struct scan_control *sc)
+@@ -5026,6 +5722,11 @@ static void shrink_many(struct pglist_data *pgdat, struct scan_control *sc)
  		lru_gen_rotate_memcg(lruvec, op);
  
  	mem_cgroup_put(memcg);
@@ -17741,7 +18906,7 @@ index 674999999..5e8afc567 100644
  
  	if (!is_a_nulls(pos))
  		return;
-@@ -5073,8 +5765,17 @@ static void lru_gen_shrink_node(struct pglist_data *pgdat, struct scan_control *
+@@ -5073,8 +5774,17 @@ static void lru_gen_shrink_node(struct pglist_data *pgdat, struct scan_control *
  	 * them is likely futile and can cause high reclaim latency when there
  	 * is a large number of memcgs.
  	 */
@@ -17760,7 +18925,7 @@ index 674999999..5e8afc567 100644
  
  	lru_add_drain();
  
-@@ -5099,6 +5800,9 @@ static void lru_gen_shrink_node(struct pglist_data *pgdat, struct scan_control *
+@@ -5099,6 +5809,9 @@ static void lru_gen_shrink_node(struct pglist_data *pgdat, struct scan_control *
  
  	blk_finish_plug(&plug);
  done:
@@ -17770,7 +18935,7 @@ index 674999999..5e8afc567 100644
  	if (sc->nr_reclaimed > reclaimed)
  		pgdat->kswapd_failures = 0;
  }
-@@ -5203,6 +5907,7 @@ static void lru_gen_change_state(bool enabled)
+@@ -5203,6 +5916,7 @@ static void lru_gen_change_state(bool enabled)
  
  	if (enabled == lru_gen_enabled())
  		goto unlock;
@@ -17778,7 +18943,7 @@ index 674999999..5e8afc567 100644
  
  	if (enabled)
  		static_branch_enable_cpuslocked(&lru_gen_caps[LRU_GEN_CORE]);
-@@ -5711,6 +6416,9 @@ void lru_gen_init_lruvec(struct lruvec *lruvec)
+@@ -5711,6 +6425,9 @@ void lru_gen_init_lruvec(struct lruvec *lruvec)
  
  	lrugen->max_seq = MIN_NR_GENS + 1;
  	lrugen->enabled = lru_gen_enabled();
@@ -17788,7 +18953,7 @@ index 674999999..5e8afc567 100644
  
  	for (i = 0; i <= MIN_NR_GENS + 1; i++)
  		lrugen->timestamps[i] = jiffies;
-@@ -5996,6 +6704,9 @@ static void shrink_node_memcgs(pg_data_t *pgdat, struct scan_control *sc)
+@@ -5996,6 +6713,9 @@ static void shrink_node_memcgs(pg_data_t *pgdat, struct scan_control *sc)
  	};
  	struct mem_cgroup_reclaim_cookie *partial = &reclaim;
  	struct mem_cgroup *memcg;
@@ -17798,7 +18963,7 @@ index 674999999..5e8afc567 100644
  
  	/*
  	 * In most cases, direct reclaimers can do partial walks
-@@ -6008,12 +6719,31 @@ static void shrink_node_memcgs(pg_data_t *pgdat, struct scan_control *sc)
+@@ -6008,12 +6728,31 @@ static void shrink_node_memcgs(pg_data_t *pgdat, struct scan_control *sc)
  	 */
  	if (current_is_kswapd() || sc->memcg_full_walk)
  		partial = NULL;
@@ -17830,7 +18995,7 @@ index 674999999..5e8afc567 100644
  
  		/*
  		 * This loop can become CPU-bound when target memcgs
-@@ -6048,7 +6778,17 @@ static void shrink_node_memcgs(pg_data_t *pgdat, struct scan_control *sc)
+@@ -6048,7 +6787,17 @@ static void shrink_node_memcgs(pg_data_t *pgdat, struct scan_control *sc)
  		reclaimed = sc->nr_reclaimed;
  		scanned = sc->nr_scanned;
  
@@ -17848,7 +19013,7 @@ index 674999999..5e8afc567 100644
  
  		shrink_slab(sc->gfp_mask, pgdat->node_id, memcg,
  			    sc->priority);
-@@ -6060,11 +6800,15 @@ static void shrink_node_memcgs(pg_data_t *pgdat, struct scan_control *sc)
+@@ -6060,11 +6809,15 @@ static void shrink_node_memcgs(pg_data_t *pgdat, struct scan_control *sc)
  				   sc->nr_reclaimed - reclaimed);
  
  		/* If partial walks are allowed, bail once goal is reached */
@@ -17867,7 +19032,7 @@ index 674999999..5e8afc567 100644
  static void shrink_node(pg_data_t *pgdat, struct scan_control *sc)
 diff --git a/tools/parp/README.md b/tools/parp/README.md
 new file mode 100644
-index 000000000..60a711719
+index 0000000000000000000000000000000000000000..60a711719bf4540feb4b7beb8e504bf3f1b825cf
 --- /dev/null
 +++ b/tools/parp/README.md
 @@ -0,0 +1,13 @@
@@ -17886,7 +19051,7 @@ index 000000000..60a711719
 +always labelled `SYNTHETIC_LEVEL1`, never runtime data.
 diff --git a/tools/parp/alignment_analyze.py b/tools/parp/alignment_analyze.py
 new file mode 100755
-index 000000000..e586a93c5
+index 0000000000000000000000000000000000000000..e586a93c564b0ae311b98a3c11e4d51c7f8c9c0e
 --- /dev/null
 +++ b/tools/parp/alignment_analyze.py
 @@ -0,0 +1,99 @@
@@ -17991,7 +19156,7 @@ index 000000000..e586a93c5
 +    main()
 diff --git a/tools/parp/bootfix_build.sh b/tools/parp/bootfix_build.sh
 new file mode 100755
-index 000000000..fc94198f5
+index 0000000000000000000000000000000000000000..fc94198f559f7726b0919e6264e6ebaaf6f0a594
 --- /dev/null
 +++ b/tools/parp/bootfix_build.sh
 @@ -0,0 +1,84 @@
@@ -18079,9 +19244,161 @@ index 000000000..fc94198f5
 +jobs=$(nproc)
 +((jobs > 4)) && jobs=4
 +make -C "$source_tree" O="$build_dir" LOCALVERSION= -j"$jobs" bzImage modules
+diff --git a/tools/parp/build_lzx_kernel.sh b/tools/parp/build_lzx_kernel.sh
+new file mode 100755
+index 0000000000000000000000000000000000000000..e8e291968085bced9f4bff92794f2b4bed8bc16b
+--- /dev/null
++++ b/tools/parp/build_lzx_kernel.sh
+@@ -0,0 +1,146 @@
++#!/usr/bin/env bash
++# Build repeatable Linux 6.17.13 LZX experiment profiles. # lzx-note
++set -euo pipefail
++
++SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
++PARP_SRC_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
++KERNEL_WORK_ROOT="$(cd "$PARP_SRC_ROOT/../.." && pwd)"
++PROFILE="${1:-all}"
++BASE_CONFIG="${2:-/boot/config-$(uname -r)}"
++BUILD_DIR="${3:-$KERNEL_WORK_ROOT/build/linux-6.17.13-parp-lzx-$PROFILE}"
++JOBS="${JOBS:-$(nproc)}"
++RECLAIM_BIN_SCORE="${LZX_RECLAIM_BIN_SCORE:-1}"
++RECLAIM_COLD_AGGRESSIVE="${LZX_RECLAIM_COLD_AGGRESSIVE:-1}" # lzx-note
++TIER2_WSS_PREDICT="${LZX_TIER2_WSS_PREDICT:-1}" # lzx-note
++APP_PRIOR_TIER_PROTECT="${LZX_APP_PRIOR_TIER_PROTECT:-1}" # lzx-note
++NATIVE_SRC_ROOT="${NATIVE_SRC_ROOT:-$KERNEL_WORK_ROOT/src/linux-6.17.13-native}"
++NATIVE_BASELINE_COMMIT="${NATIVE_BASELINE_COMMIT:-6609c4d49ebe220a5c40d3105c3f0e68f569ba1a}"
++SRC_ROOT="$PARP_SRC_ROOT"
++
++if [[ "$PROFILE" == native ]]; then
++	SRC_ROOT="$NATIVE_SRC_ROOT"
++	if [[ ! -x "$SRC_ROOT/scripts/config" ]]; then
++		echo "native source is missing: $SRC_ROOT" >&2
++		echo "create it from upstream-v6.17.13-baseline before building" >&2
++		exit 2
++	fi
++	if [[ "$(git -C "$SRC_ROOT" rev-parse HEAD)" != "$NATIVE_BASELINE_COMMIT" ]]; then
++		echo "native source is not the pinned Linux 6.17.13 baseline" >&2
++		exit 2
++	fi
++	if [[ -n "$(git -C "$SRC_ROOT" status --porcelain --untracked-files=no)" ]]; then
++		echo "native source has tracked modifications; refusing mixed baseline" >&2
++		exit 2
++	fi
++fi
++
++CONFIG_TOOL="$SRC_ROOT/scripts/config"
++
++if [[ ! -r "$BASE_CONFIG" ]]; then
++	echo "base config is not readable: $BASE_CONFIG" >&2
++	exit 2
++fi
++
++mkdir -p "$BUILD_DIR"
++cp -- "$BASE_CONFIG" "$BUILD_DIR/.config"
++
++case "$PROFILE" in
++	native)
++		# This profile is built from the pristine pinned worktree, not from
++		# PARP sources with runtime switches set to zero. # lzx-note
++		;;
++	tier2)
++		"$CONFIG_TOOL" --file "$BUILD_DIR/.config" \
++			--enable PARP \
++			--enable PARP_TIER2 \
++			--disable PARP_EFFECTIVE_TIER \
++			--disable PARP_EFFECTIVE_TIER_EXPERIMENTAL_APPLY \
++			--disable PARP_APP_PRIOR_TIER_PROTECT \
++			--disable PARP_FRONTIER_SCORE
++		;;
++	effective-tier|all)
++		"$CONFIG_TOOL" --file "$BUILD_DIR/.config" \
++			--enable PARP \
++			--enable PARP_EFFECTIVE_TIER \
++			--disable PARP_FRONTIER_SCORE
++		if [[ "$APP_PRIOR_TIER_PROTECT" == 1 ]]; then
++			"$CONFIG_TOOL" --file "$BUILD_DIR/.config" \
++				--enable PARP_APP_PRIOR_TIER_PROTECT
++		elif [[ "$APP_PRIOR_TIER_PROTECT" == 0 ]]; then
++			"$CONFIG_TOOL" --file "$BUILD_DIR/.config" \
++				--disable PARP_APP_PRIOR_TIER_PROTECT
++		else
++			echo "LZX_APP_PRIOR_TIER_PROTECT must be 0 or 1" >&2
++			exit 2
++		fi # lzx-note
++		if [[ "$PROFILE" == all ]]; then
++			"$CONFIG_TOOL" --file "$BUILD_DIR/.config" --enable PARP_TIER2
++		else
++			"$CONFIG_TOOL" --file "$BUILD_DIR/.config" \
++				--disable PARP_TIER2 \
++				--disable PARP_RECLAIM_BIN_SCORE
++		fi
++		if [[ "${LZX_EXPERIMENTAL_APPLY:-0}" == 1 ]]; then
++			"$CONFIG_TOOL" --file "$BUILD_DIR/.config" \
++				--enable PARP_EFFECTIVE_TIER_EXPERIMENTAL_APPLY
++		else
++			"$CONFIG_TOOL" --file "$BUILD_DIR/.config" \
++				--disable PARP_EFFECTIVE_TIER_EXPERIMENTAL_APPLY
++		fi
++		;;
++	*)
++		echo "profile must be native, tier2, effective-tier, or all" >&2
++		exit 2
++		;;
++esac
++
++if [[ "$PROFILE" == tier2 || "$PROFILE" == all ]]; then
++	if [[ "$TIER2_WSS_PREDICT" == 1 ]]; then
++		"$CONFIG_TOOL" --file "$BUILD_DIR/.config" \
++			--enable PARP_MYFS \
++			--enable PARP_TIER2_WSS_PREDICT
++	elif [[ "$TIER2_WSS_PREDICT" == 0 ]]; then
++		"$CONFIG_TOOL" --file "$BUILD_DIR/.config" \
++			--disable PARP_TIER2_WSS_PREDICT
++	else
++		echo "LZX_TIER2_WSS_PREDICT must be 0 or 1" >&2
++		exit 2
++	fi # lzx-note
++	if [[ "$RECLAIM_BIN_SCORE" == 1 ]]; then
++		"$CONFIG_TOOL" --file "$BUILD_DIR/.config" --enable PARP_RECLAIM_BIN_SCORE
++	elif [[ "$RECLAIM_BIN_SCORE" == 0 ]]; then
++		"$CONFIG_TOOL" --file "$BUILD_DIR/.config" --disable PARP_RECLAIM_BIN_SCORE
++	else
++		echo "LZX_RECLAIM_BIN_SCORE must be 0 or 1" >&2
++		exit 2
++	fi
++	if [[ "$RECLAIM_COLD_AGGRESSIVE" == 1 && "$RECLAIM_BIN_SCORE" == 1 ]]; then
++		"$CONFIG_TOOL" --file "$BUILD_DIR/.config" \
++			--enable PARP_RECLAIM_COLD_AGGRESSIVE
++	elif [[ "$RECLAIM_COLD_AGGRESSIVE" == 0 || "$RECLAIM_BIN_SCORE" == 0 ]]; then
++		"$CONFIG_TOOL" --file "$BUILD_DIR/.config" \
++			--disable PARP_RECLAIM_COLD_AGGRESSIVE
++	else
++		echo "LZX_RECLAIM_COLD_AGGRESSIVE must be 0 or 1" >&2
++		exit 2
++	fi # lzx-note
++fi
++
++if [[ "$PROFILE" != native ]]; then
++	"$CONFIG_TOOL" --file "$BUILD_DIR/.config" --enable PARP_MYFS # lzx-note
++fi
++
++if [[ -n "${LZX_LOCALVERSION:-}" ]]; then
++	CONFIG_LOCALVERSION_VALUE="$LZX_LOCALVERSION" # lzx-note
++elif [[ "$PROFILE" == native ]]; then
++	CONFIG_LOCALVERSION_VALUE="-native-6.17.13"
++else
++	CONFIG_LOCALVERSION_VALUE="-parp-lzx-$PROFILE"
++fi
++"$CONFIG_TOOL" --file "$BUILD_DIR/.config" --set-str LOCALVERSION "$CONFIG_LOCALVERSION_VALUE"
++# Suppress SCM '+' and keep CONFIG_LOCALVERSION from being appended twice. # lzx-note
++make -C "$SRC_ROOT" O="$BUILD_DIR" LOCALVERSION= olddefconfig
++make -C "$SRC_ROOT" O="$BUILD_DIR" LOCALVERSION= -j"$JOBS" ${MAKE_TARGETS:-bzImage modules}
++
++echo "build complete: $BUILD_DIR"
++# lzx-note
 diff --git a/tools/parp/check_phase25_architecture.sh b/tools/parp/check_phase25_architecture.sh
 new file mode 100755
-index 000000000..fc8f23290
+index 0000000000000000000000000000000000000000..fc8f23290dc979b8bfdca269b42d3dd5f6387e20
 --- /dev/null
 +++ b/tools/parp/check_phase25_architecture.sh
 @@ -0,0 +1,33 @@
@@ -18120,7 +19437,7 @@ index 000000000..fc8f23290
 +echo "PASS: Phase 2.5 architecture constraints"
 diff --git a/tools/parp/configs/damon_default.yaml b/tools/parp/configs/damon_default.yaml
 new file mode 100644
-index 000000000..1f792f62d
+index 0000000000000000000000000000000000000000..1f792f62dcf7a9bc58612acd878ff7f7ae4eb83d
 --- /dev/null
 +++ b/tools/parp/configs/damon_default.yaml
 @@ -0,0 +1,13 @@
@@ -18139,14 +19456,14 @@ index 000000000..1f792f62d
 +anon_pageout_enabled: false
 diff --git a/tools/parp/configs/example.json b/tools/parp/configs/example.json
 new file mode 100644
-index 000000000..e973737d1
+index 0000000000000000000000000000000000000000..e973737d1ed5594c4e726803a57b81ecbdb2bf50
 --- /dev/null
 +++ b/tools/parp/configs/example.json
 @@ -0,0 +1 @@
 +{"schema_version": 1, "model_version": 1, "q15_values": [32767, 24576, 8192, 0]}
 diff --git a/tools/parp/configs/region_vectors.json b/tools/parp/configs/region_vectors.json
 new file mode 100644
-index 000000000..3d2beb161
+index 0000000000000000000000000000000000000000..3d2beb161fed53a26333adec843e91d9c92ec85f
 --- /dev/null
 +++ b/tools/parp/configs/region_vectors.json
 @@ -0,0 +1,18 @@
@@ -18170,7 +19487,7 @@ index 000000000..3d2beb161
 +}
 diff --git a/tools/parp/configs/scan_budget_vectors.json b/tools/parp/configs/scan_budget_vectors.json
 new file mode 100644
-index 000000000..639b0b542
+index 0000000000000000000000000000000000000000..639b0b542ea67033aaf90537e7ee8887e30746e9
 --- /dev/null
 +++ b/tools/parp/configs/scan_budget_vectors.json
 @@ -0,0 +1,30 @@
@@ -18204,9 +19521,12 @@ index 000000000..639b0b542
 +     "proposed": 1000, "applied": 1000, "reason": "PRESSURE_BYPASS"}
 +  ]
 +}
+diff --git a/tools/parp/control/.kunitconfig b/tools/parp/control/.kunitconfig
+new file mode 100644
+index 0000000000000000000000000000000000000000..e69de29bb2d1d6434b8b29ae775ad8c2e48c5391
 diff --git a/tools/parp/damon_collect.py b/tools/parp/damon_collect.py
 new file mode 100755
-index 000000000..1d57eebec
+index 0000000000000000000000000000000000000000..1d57eebecdd837be6a94c228c2c05f617327bdb0
 --- /dev/null
 +++ b/tools/parp/damon_collect.py
 @@ -0,0 +1,68 @@
@@ -18280,7 +19600,7 @@ index 000000000..1d57eebec
 +    main()
 diff --git a/tools/parp/dataset_export.py b/tools/parp/dataset_export.py
 new file mode 100755
-index 000000000..60e436316
+index 0000000000000000000000000000000000000000..60e436316afeeda5c5b6d8cc827569b1a2c53f93
 --- /dev/null
 +++ b/tools/parp/dataset_export.py
 @@ -0,0 +1,144 @@
@@ -18430,7 +19750,7 @@ index 000000000..60e436316
 +    main()
 diff --git a/tools/parp/effective_tier/README.md b/tools/parp/effective_tier/README.md
 new file mode 100644
-index 000000000..b731dcc29
+index 0000000000000000000000000000000000000000..b731dcc297580b42f710bcb71768030366ddfa8c
 --- /dev/null
 +++ b/tools/parp/effective_tier/README.md
 @@ -0,0 +1,76 @@
@@ -18512,7 +19832,7 @@ index 000000000..b731dcc29
 +kernel.
 diff --git a/tools/parp/effective_tier/README.phase_e.md b/tools/parp/effective_tier/README.phase_e.md
 new file mode 100644
-index 000000000..877570e83
+index 0000000000000000000000000000000000000000..877570e83b425f04da2956e687baa6c1f333f703
 --- /dev/null
 +++ b/tools/parp/effective_tier/README.phase_e.md
 @@ -0,0 +1,208 @@
@@ -18726,7 +20046,7 @@ index 000000000..877570e83
 +harness measured them independently. <!-- #lzx -->
 diff --git a/tools/parp/effective_tier/__init__.py b/tools/parp/effective_tier/__init__.py
 new file mode 100644
-index 000000000..d7cd5eaa1
+index 0000000000000000000000000000000000000000..d7cd5eaa1a960643810f24a3095fdd57c8816645
 --- /dev/null
 +++ b/tools/parp/effective_tier/__init__.py
 @@ -0,0 +1,2 @@
@@ -18734,7 +20054,7 @@ index 000000000..d7cd5eaa1
 +"""Integer reference for PARP's global effective-tier policy."""
 diff --git a/tools/parp/effective_tier/analyze.py b/tools/parp/effective_tier/analyze.py
 new file mode 100644
-index 000000000..8c79b696b
+index 0000000000000000000000000000000000000000..8c79b696b6e9f0c3b3c64eda227081d283f83b5a
 --- /dev/null
 +++ b/tools/parp/effective_tier/analyze.py
 @@ -0,0 +1,2008 @@
@@ -20748,7 +22068,7 @@ index 000000000..8c79b696b
 +    raise SystemExit(main())
 diff --git a/tools/parp/effective_tier/collector.py b/tools/parp/effective_tier/collector.py
 new file mode 100644
-index 000000000..206161bf2
+index 0000000000000000000000000000000000000000..206161bf29f68bc1767eabd849e90865b7c740f7
 --- /dev/null
 +++ b/tools/parp/effective_tier/collector.py
 @@ -0,0 +1,1032 @@
@@ -21786,7 +23106,7 @@ index 000000000..206161bf2
 +    raise SystemExit(main())
 diff --git a/tools/parp/effective_tier/contracts.py b/tools/parp/effective_tier/contracts.py
 new file mode 100644
-index 000000000..05b033056
+index 0000000000000000000000000000000000000000..05b033056294c1d37ec1bcae3fdee4e638aad62a
 --- /dev/null
 +++ b/tools/parp/effective_tier/contracts.py
 @@ -0,0 +1,636 @@
@@ -22428,7 +23748,7 @@ index 000000000..05b033056
 +        raise ContractError("live kernel/control paths are forbidden: %s" % path)
 diff --git a/tools/parp/effective_tier/cscore.c b/tools/parp/effective_tier/cscore.c
 new file mode 100644
-index 000000000..91afcf3a3
+index 0000000000000000000000000000000000000000..91afcf3a374f717b95f71f990e780d13382cb485
 --- /dev/null
 +++ b/tools/parp/effective_tier/cscore.c
 @@ -0,0 +1,224 @@
@@ -22658,7 +23978,7 @@ index 000000000..91afcf3a3
 +}
 diff --git a/tools/parp/effective_tier/default_model.json b/tools/parp/effective_tier/default_model.json
 new file mode 100644
-index 000000000..bbeb38048
+index 0000000000000000000000000000000000000000..bbeb38048ba131faf4260c314d73c486c23696b4
 --- /dev/null
 +++ b/tools/parp/effective_tier/default_model.json
 @@ -0,0 +1,53 @@
@@ -22717,7 +24037,7 @@ index 000000000..bbeb38048
 +}
 diff --git a/tools/parp/effective_tier/experiment_manifest.schema.json b/tools/parp/effective_tier/experiment_manifest.schema.json
 new file mode 100644
-index 000000000..ca3fe7031
+index 0000000000000000000000000000000000000000..ca3fe70317e58b0d7caf42c16555c5ae19a6b91e
 --- /dev/null
 +++ b/tools/parp/effective_tier/experiment_manifest.schema.json
 @@ -0,0 +1,145 @@
@@ -22868,7 +24188,7 @@ index 000000000..ca3fe7031
 +}
 diff --git a/tools/parp/effective_tier/experiment_manifest.template.json b/tools/parp/effective_tier/experiment_manifest.template.json
 new file mode 100644
-index 000000000..edb5f9f87
+index 0000000000000000000000000000000000000000..edb5f9f87ae3a25fbfc49abe2ede57153b6f865f
 --- /dev/null
 +++ b/tools/parp/effective_tier/experiment_manifest.template.json
 @@ -0,0 +1,212 @@
@@ -23086,7 +24406,7 @@ index 000000000..edb5f9f87
 +}
 diff --git a/tools/parp/effective_tier/experiment_plan.py b/tools/parp/effective_tier/experiment_plan.py
 new file mode 100644
-index 000000000..c24cbbc89
+index 0000000000000000000000000000000000000000..c24cbbc8965d2e2043a92a1bb29434be89fbd888
 --- /dev/null
 +++ b/tools/parp/effective_tier/experiment_plan.py
 @@ -0,0 +1,332 @@
@@ -23424,7 +24744,7 @@ index 000000000..c24cbbc89
 +    raise SystemExit(main())
 diff --git a/tools/parp/effective_tier/feature_schema.json b/tools/parp/effective_tier/feature_schema.json
 new file mode 100644
-index 000000000..66f189fee
+index 0000000000000000000000000000000000000000..66f189feecca9041fa22c6d9ef51ae9515a1a065
 --- /dev/null
 +++ b/tools/parp/effective_tier/feature_schema.json
 @@ -0,0 +1,175 @@
@@ -23605,7 +24925,7 @@ index 000000000..66f189fee
 +}
 diff --git a/tools/parp/effective_tier/labeled_candidate.schema.json b/tools/parp/effective_tier/labeled_candidate.schema.json
 new file mode 100644
-index 000000000..7f60d575c
+index 0000000000000000000000000000000000000000..7f60d575c98cb996fddea9eef68d887041d80616
 --- /dev/null
 +++ b/tools/parp/effective_tier/labeled_candidate.schema.json
 @@ -0,0 +1,43 @@
@@ -23654,7 +24974,7 @@ index 000000000..7f60d575c
 +}
 diff --git a/tools/parp/effective_tier/live-p1-pressure-calibrator-lzx.py b/tools/parp/effective_tier/live-p1-pressure-calibrator-lzx.py
 new file mode 100644
-index 000000000..23525a415
+index 0000000000000000000000000000000000000000..23525a4155a45471ba460dcd661e4d443cf346bf
 --- /dev/null
 +++ b/tools/parp/effective_tier/live-p1-pressure-calibrator-lzx.py
 @@ -0,0 +1,261 @@
@@ -23921,7 +25241,7 @@ index 000000000..23525a415
 +    sys.exit(main())
 diff --git a/tools/parp/effective_tier/live_shadow_preflight-lzx.py b/tools/parp/effective_tier/live_shadow_preflight-lzx.py
 new file mode 100644
-index 000000000..ad31a8bd9
+index 0000000000000000000000000000000000000000..ad31a8bd9a56dba1b0082b6037ae3b2d43a5c419
 --- /dev/null
 +++ b/tools/parp/effective_tier/live_shadow_preflight-lzx.py
 @@ -0,0 +1,528 @@
@@ -24455,7 +25775,7 @@ index 000000000..ad31a8bd9
 +    raise SystemExit(main())
 diff --git a/tools/parp/effective_tier/observability.schema.json b/tools/parp/effective_tier/observability.schema.json
 new file mode 100644
-index 000000000..66e13bc04
+index 0000000000000000000000000000000000000000..66e13bc041dd1927548d6b421dad13bafc9f5fd2
 --- /dev/null
 +++ b/tools/parp/effective_tier/observability.schema.json
 @@ -0,0 +1,134 @@
@@ -24595,7 +25915,7 @@ index 000000000..66e13bc04
 +}
 diff --git a/tools/parp/effective_tier/pressure-lzx.py b/tools/parp/effective_tier/pressure-lzx.py
 new file mode 100644
-index 000000000..4a2aaabbe
+index 0000000000000000000000000000000000000000..4a2aaabbec92c8b90da468298dd79d9ab2f531f8
 --- /dev/null
 +++ b/tools/parp/effective_tier/pressure-lzx.py
 @@ -0,0 +1,502 @@
@@ -25103,7 +26423,7 @@ index 000000000..4a2aaabbe
 +    }
 diff --git a/tools/parp/effective_tier/pressure_analysis-lzx.py b/tools/parp/effective_tier/pressure_analysis-lzx.py
 new file mode 100644
-index 000000000..3d31d05cc
+index 0000000000000000000000000000000000000000..3d31d05cca6488e7b2a8d40da32768d14bed9b0a
 --- /dev/null
 +++ b/tools/parp/effective_tier/pressure_analysis-lzx.py
 @@ -0,0 +1,48 @@
@@ -25157,7 +26477,7 @@ index 000000000..3d31d05cc
 +    raise SystemExit(main())
 diff --git a/tools/parp/effective_tier/ranking.py b/tools/parp/effective_tier/ranking.py
 new file mode 100644
-index 000000000..234eda360
+index 0000000000000000000000000000000000000000..234eda3608616a6999ceba5b0680c1d3bcfe6a49
 --- /dev/null
 +++ b/tools/parp/effective_tier/ranking.py
 @@ -0,0 +1,2262 @@
@@ -27425,7 +28745,7 @@ index 000000000..234eda360
 +    return {candidate.key: model.score(candidate) for candidate in candidates}
 diff --git a/tools/parp/effective_tier/ranking_model.schema.json b/tools/parp/effective_tier/ranking_model.schema.json
 new file mode 100644
-index 000000000..f90eb088b
+index 0000000000000000000000000000000000000000..f90eb088bba550613f4944117c6ff06deada3f07
 --- /dev/null
 +++ b/tools/parp/effective_tier/ranking_model.schema.json
 @@ -0,0 +1,441 @@
@@ -27872,7 +29192,7 @@ index 000000000..f90eb088b
 +}
 diff --git a/tools/parp/effective_tier/raw_event.schema.json b/tools/parp/effective_tier/raw_event.schema.json
 new file mode 100644
-index 000000000..106da17be
+index 0000000000000000000000000000000000000000..106da17be9d101d36836b233bf435c1e46c177fa
 --- /dev/null
 +++ b/tools/parp/effective_tier/raw_event.schema.json
 @@ -0,0 +1,239 @@
@@ -28117,7 +29437,7 @@ index 000000000..106da17be
 +}
 diff --git a/tools/parp/effective_tier/reference.py b/tools/parp/effective_tier/reference.py
 new file mode 100644
-index 000000000..474fa0a94
+index 0000000000000000000000000000000000000000..474fa0a943808499bd6e9b31d21b64784f574960
 --- /dev/null
 +++ b/tools/parp/effective_tier/reference.py
 @@ -0,0 +1,407 @@
@@ -28530,7 +29850,7 @@ index 000000000..474fa0a94
 +    yield [(1 << 62)] * model.nr_features
 diff --git a/tools/parp/effective_tier/session_metadata.schema.json b/tools/parp/effective_tier/session_metadata.schema.json
 new file mode 100644
-index 000000000..162aa9ded
+index 0000000000000000000000000000000000000000..162aa9deda3ab5cec643337cbf2a2cbdb6463f03
 --- /dev/null
 +++ b/tools/parp/effective_tier/session_metadata.schema.json
 @@ -0,0 +1,57 @@
@@ -28593,7 +29913,7 @@ index 000000000..162aa9ded
 +}
 diff --git a/tools/parp/effective_tier/tests/__init__.py b/tools/parp/effective_tier/tests/__init__.py
 new file mode 100644
-index 000000000..40516d213
+index 0000000000000000000000000000000000000000..40516d2136928483d12f4867227e530c69b189c1
 --- /dev/null
 +++ b/tools/parp/effective_tier/tests/__init__.py
 @@ -0,0 +1,2 @@
@@ -28601,7 +29921,7 @@ index 000000000..40516d213
 +"""Tests for the PARP effective-tier integer reference."""
 diff --git a/tools/parp/effective_tier/tests/test_phase_e.py b/tools/parp/effective_tier/tests/test_phase_e.py
 new file mode 100644
-index 000000000..e79e95df2
+index 0000000000000000000000000000000000000000..e79e95df2a3fcf6c4bcb31802dbf4de13755b003
 --- /dev/null
 +++ b/tools/parp/effective_tier/tests/test_phase_e.py
 @@ -0,0 +1,1202 @@
@@ -29809,7 +31129,7 @@ index 000000000..e79e95df2
 +    unittest.main()
 diff --git a/tools/parp/effective_tier/tests/test_pressure-lzx.py b/tools/parp/effective_tier/tests/test_pressure-lzx.py
 new file mode 100644
-index 000000000..6395e676d
+index 0000000000000000000000000000000000000000..6395e676dc45b242a46e7d278ec3b87bb831db72
 --- /dev/null
 +++ b/tools/parp/effective_tier/tests/test_pressure-lzx.py
 @@ -0,0 +1,112 @@
@@ -29927,7 +31247,7 @@ index 000000000..6395e676d
 +    unittest.main()
 diff --git a/tools/parp/effective_tier/tests/test_ranking.py b/tools/parp/effective_tier/tests/test_ranking.py
 new file mode 100644
-index 000000000..4cfe3a64a
+index 0000000000000000000000000000000000000000..4cfe3a64a32bbe55a86e958b2bd2bdaaa84b828e
 --- /dev/null
 +++ b/tools/parp/effective_tier/tests/test_ranking.py
 @@ -0,0 +1,737 @@
@@ -30670,7 +31990,7 @@ index 000000000..4cfe3a64a
 +    unittest.main()
 diff --git a/tools/parp/effective_tier/tests/test_reference.py b/tools/parp/effective_tier/tests/test_reference.py
 new file mode 100644
-index 000000000..8aaa5aaea
+index 0000000000000000000000000000000000000000..8aaa5aaea24197ddf326934b7d07c490ed88f5fe
 --- /dev/null
 +++ b/tools/parp/effective_tier/tests/test_reference.py
 @@ -0,0 +1,407 @@
@@ -31083,7 +32403,7 @@ index 000000000..8aaa5aaea
 +    unittest.main()
 diff --git a/tools/parp/effective_tier/workspace_layout-lzx.py b/tools/parp/effective_tier/workspace_layout-lzx.py
 new file mode 100644
-index 000000000..3c05a40ba
+index 0000000000000000000000000000000000000000..3c05a40ba87718ed29a21c097fa7e9f7018f1367
 --- /dev/null
 +++ b/tools/parp/effective_tier/workspace_layout-lzx.py
 @@ -0,0 +1,95 @@
@@ -31184,7 +32504,7 @@ index 000000000..3c05a40ba
 +    raise SystemExit(main())  #lzx
 diff --git a/tools/parp/evaluate.py b/tools/parp/evaluate.py
 new file mode 100755
-index 000000000..ad91c9218
+index 0000000000000000000000000000000000000000..ad91c9218963f9c9fab4cd5aa854ba904202e797
 --- /dev/null
 +++ b/tools/parp/evaluate.py
 @@ -0,0 +1,34 @@
@@ -31224,7 +32544,7 @@ index 000000000..ad91c9218
 +    unittest.main()
 diff --git a/tools/parp/frontier_score/.kunitconfig b/tools/parp/frontier_score/.kunitconfig
 new file mode 100644
-index 000000000..86ea27b6d
+index 0000000000000000000000000000000000000000..86ea27b6de50d2ea7cf1c3abbb2705bca122c332
 --- /dev/null
 +++ b/tools/parp/frontier_score/.kunitconfig
 @@ -0,0 +1,8 @@
@@ -31238,7 +32558,7 @@ index 000000000..86ea27b6d
 +CONFIG_DEBUG_FS=y
 diff --git a/tools/parp/frontier_score/README.md b/tools/parp/frontier_score/README.md
 new file mode 100644
-index 000000000..3041996db
+index 0000000000000000000000000000000000000000..3041996dba123cf8537a0b1916e66fda7d0abf94
 --- /dev/null
 +++ b/tools/parp/frontier_score/README.md
 @@ -0,0 +1,39 @@
@@ -31283,7 +32603,7 @@ index 000000000..3041996db
 +```
 diff --git a/tools/parp/frontier_score/__init__.py b/tools/parp/frontier_score/__init__.py
 new file mode 100644
-index 000000000..a892c5678
+index 0000000000000000000000000000000000000000..a892c567870c8afd98fcf9b2f955cc89234d13c9
 --- /dev/null
 +++ b/tools/parp/frontier_score/__init__.py
 @@ -0,0 +1,2 @@
@@ -31291,7 +32611,7 @@ index 000000000..a892c5678
 +"""Reference implementation for PARP frontier reuse scoring."""
 diff --git a/tools/parp/frontier_score/benchmark.py b/tools/parp/frontier_score/benchmark.py
 new file mode 100644
-index 000000000..27ea9e55f
+index 0000000000000000000000000000000000000000..27ea9e55f20a934fa902741b892cf407ec28a85f
 --- /dev/null
 +++ b/tools/parp/frontier_score/benchmark.py
 @@ -0,0 +1,76 @@
@@ -31373,7 +32693,7 @@ index 000000000..27ea9e55f
 +    main()
 diff --git a/tools/parp/frontier_score/cbench.c b/tools/parp/frontier_score/cbench.c
 new file mode 100644
-index 000000000..fad742867
+index 0000000000000000000000000000000000000000..fad74286721b6e5cc11a0efe0c851a1a11e3a076
 --- /dev/null
 +++ b/tools/parp/frontier_score/cbench.c
 @@ -0,0 +1,146 @@
@@ -31525,7 +32845,7 @@ index 000000000..fad742867
 +}
 diff --git a/tools/parp/frontier_score/cscore.c b/tools/parp/frontier_score/cscore.c
 new file mode 100644
-index 000000000..5ec5b6d96
+index 0000000000000000000000000000000000000000..5ec5b6d96b0a0469d96e7099660523615df35741
 --- /dev/null
 +++ b/tools/parp/frontier_score/cscore.c
 @@ -0,0 +1,130 @@
@@ -31661,7 +32981,7 @@ index 000000000..5ec5b6d96
 +#endif
 diff --git a/tools/parp/frontier_score/default_models.json b/tools/parp/frontier_score/default_models.json
 new file mode 100644
-index 000000000..f23a30982
+index 0000000000000000000000000000000000000000..f23a3098287e18a19b973c99084f1f5824622228
 --- /dev/null
 +++ b/tools/parp/frontier_score/default_models.json
 @@ -0,0 +1,48 @@
@@ -31715,7 +33035,7 @@ index 000000000..f23a30982
 +}
 diff --git a/tools/parp/frontier_score/reference.py b/tools/parp/frontier_score/reference.py
 new file mode 100644
-index 000000000..f80d88d12
+index 0000000000000000000000000000000000000000..f80d88d12059243c4ea1376a280ce7dd760773eb
 --- /dev/null
 +++ b/tools/parp/frontier_score/reference.py
 @@ -0,0 +1,188 @@
@@ -31909,7 +33229,7 @@ index 000000000..f80d88d12
 +        yield app_id, high
 diff --git a/tools/parp/frontier_score/replay_audit.py b/tools/parp/frontier_score/replay_audit.py
 new file mode 100644
-index 000000000..171f7b89d
+index 0000000000000000000000000000000000000000..171f7b89d2443692403e9b8940f24ebc559ff997
 --- /dev/null
 +++ b/tools/parp/frontier_score/replay_audit.py
 @@ -0,0 +1,149 @@
@@ -32064,7 +33384,7 @@ index 000000000..171f7b89d
 +    main()
 diff --git a/tools/parp/frontier_score/tests/__init__.py b/tools/parp/frontier_score/tests/__init__.py
 new file mode 100644
-index 000000000..81da0eb04
+index 0000000000000000000000000000000000000000..81da0eb04fb2e8defcfcb04e3e886211084a74aa
 --- /dev/null
 +++ b/tools/parp/frontier_score/tests/__init__.py
 @@ -0,0 +1,2 @@
@@ -32072,7 +33392,7 @@ index 000000000..81da0eb04
 +"""Tests for the PARP frontier reference contract."""
 diff --git a/tools/parp/frontier_score/tests/test_reference.py b/tools/parp/frontier_score/tests/test_reference.py
 new file mode 100644
-index 000000000..68ae89f1b
+index 0000000000000000000000000000000000000000..68ae89f1bf17f912778be965c29028f290fdaf2c
 --- /dev/null
 +++ b/tools/parp/frontier_score/tests/test_reference.py
 @@ -0,0 +1,151 @@
@@ -32229,7 +33549,7 @@ index 000000000..68ae89f1b
 +# SPDX-License-Identifier: GPL-2.0
 diff --git a/tools/parp/frontier_score/tests/test_replay_audit.py b/tools/parp/frontier_score/tests/test_replay_audit.py
 new file mode 100644
-index 000000000..da0eba362
+index 0000000000000000000000000000000000000000..da0eba36280352bca83d0ce6fdc66379784993ec
 --- /dev/null
 +++ b/tools/parp/frontier_score/tests/test_replay_audit.py
 @@ -0,0 +1,38 @@
@@ -32273,14 +33593,14 @@ index 000000000..da0eba362
 +    unittest.main()
 diff --git a/tools/parp/intra_app_prediction/__init__.py b/tools/parp/intra_app_prediction/__init__.py
 new file mode 100644
-index 000000000..e49fe1736
+index 0000000000000000000000000000000000000000..e49fe1736947080dd61163dbed4945d5c9ec12d9
 --- /dev/null
 +++ b/tools/parp/intra_app_prediction/__init__.py
 @@ -0,0 +1 @@
 +"""PARP Phase2.7 offline intra-application page prediction."""
 diff --git a/tools/parp/intra_app_prediction/anon_features.py b/tools/parp/intra_app_prediction/anon_features.py
 new file mode 100644
-index 000000000..a39b21c8a
+index 0000000000000000000000000000000000000000..a39b21c8ab6ddffc73832a19339e4bd4d6cb4fd9
 --- /dev/null
 +++ b/tools/parp/intra_app_prediction/anon_features.py
 @@ -0,0 +1,52 @@
@@ -32338,7 +33658,7 @@ index 000000000..a39b21c8a
 +    }
 diff --git a/tools/parp/intra_app_prediction/baselines.py b/tools/parp/intra_app_prediction/baselines.py
 new file mode 100644
-index 000000000..330e649cd
+index 0000000000000000000000000000000000000000..330e649cd5818dafd4e8263d3be1574ac7339185
 --- /dev/null
 +++ b/tools/parp/intra_app_prediction/baselines.py
 @@ -0,0 +1,44 @@
@@ -32388,7 +33708,7 @@ index 000000000..330e649cd
 +        return dict(self.probabilities)
 diff --git a/tools/parp/intra_app_prediction/collect_phase27.sh b/tools/parp/intra_app_prediction/collect_phase27.sh
 new file mode 100755
-index 000000000..fbc7f9010
+index 0000000000000000000000000000000000000000..fbc7f901009e7c24032a42d1df5447fd545309ec
 --- /dev/null
 +++ b/tools/parp/intra_app_prediction/collect_phase27.sh
 @@ -0,0 +1,99 @@
@@ -32493,7 +33813,7 @@ index 000000000..fbc7f9010
 +	"$run_id" "$start_ns" "$end_ns" "$lost" > "$output/state/trace_collection.json"
 diff --git a/tools/parp/intra_app_prediction/config.py b/tools/parp/intra_app_prediction/config.py
 new file mode 100644
-index 000000000..dd7422588
+index 0000000000000000000000000000000000000000..dd74225884c0c9b6a70f64cd46a515a8fb7183eb
 --- /dev/null
 +++ b/tools/parp/intra_app_prediction/config.py
 @@ -0,0 +1,13 @@
@@ -32512,7 +33832,7 @@ index 000000000..dd7422588
 +SOURCE_REPLAY = "RUNTIME_LEVEL3A_REPLAY_FIXTURE"
 diff --git a/tools/parp/intra_app_prediction/dataset_builder.py b/tools/parp/intra_app_prediction/dataset_builder.py
 new file mode 100755
-index 000000000..5c3e2d621
+index 0000000000000000000000000000000000000000..5c3e2d6219697d7b821933f07c1aa1d77e88279d
 --- /dev/null
 +++ b/tools/parp/intra_app_prediction/dataset_builder.py
 @@ -0,0 +1,423 @@
@@ -32941,7 +34261,7 @@ index 000000000..5c3e2d621
 +    main()
 diff --git a/tools/parp/intra_app_prediction/evaluate.py b/tools/parp/intra_app_prediction/evaluate.py
 new file mode 100644
-index 000000000..737debd6a
+index 0000000000000000000000000000000000000000..737debd6a24db36aeac886fa22b10c7046a5d720
 --- /dev/null
 +++ b/tools/parp/intra_app_prediction/evaluate.py
 @@ -0,0 +1,80 @@
@@ -33027,7 +34347,7 @@ index 000000000..737debd6a
 +    }
 diff --git a/tools/parp/intra_app_prediction/feature_encoder.py b/tools/parp/intra_app_prediction/feature_encoder.py
 new file mode 100644
-index 000000000..c67702a2f
+index 0000000000000000000000000000000000000000..c67702a2f7b4640a36ec937d6fff175de8513e26
 --- /dev/null
 +++ b/tools/parp/intra_app_prediction/feature_encoder.py
 @@ -0,0 +1,72 @@
@@ -33105,7 +34425,7 @@ index 000000000..c67702a2f
 +        }
 diff --git a/tools/parp/intra_app_prediction/file_identity.py b/tools/parp/intra_app_prediction/file_identity.py
 new file mode 100644
-index 000000000..a2f3dea09
+index 0000000000000000000000000000000000000000..a2f3dea0998180a8a76d62f2b548a32d925979e3
 --- /dev/null
 +++ b/tools/parp/intra_app_prediction/file_identity.py
 @@ -0,0 +1,39 @@
@@ -33150,7 +34470,7 @@ index 000000000..a2f3dea09
 +        return self._partitions[identity]
 diff --git a/tools/parp/intra_app_prediction/future_labels.py b/tools/parp/intra_app_prediction/future_labels.py
 new file mode 100644
-index 000000000..ef5b9e297
+index 0000000000000000000000000000000000000000..ef5b9e297aa20214900844b7da2b090b16a03d1e
 --- /dev/null
 +++ b/tools/parp/intra_app_prediction/future_labels.py
 @@ -0,0 +1,47 @@
@@ -33203,7 +34523,7 @@ index 000000000..ef5b9e297
 +                                           row.get("window_id", "")))
 diff --git a/tools/parp/intra_app_prediction/online_dry_run.py b/tools/parp/intra_app_prediction/online_dry_run.py
 new file mode 100755
-index 000000000..431e79d4a
+index 0000000000000000000000000000000000000000..431e79d4a1c612ec96f416f2e58394c4fae1acac
 --- /dev/null
 +++ b/tools/parp/intra_app_prediction/online_dry_run.py
 @@ -0,0 +1,73 @@
@@ -33282,7 +34602,7 @@ index 000000000..431e79d4a
 +    main()
 diff --git a/tools/parp/intra_app_prediction/operation_alignment.py b/tools/parp/intra_app_prediction/operation_alignment.py
 new file mode 100644
-index 000000000..baa23129c
+index 0000000000000000000000000000000000000000..baa23129c61041c7a790b3137f1c9234929e8538
 --- /dev/null
 +++ b/tools/parp/intra_app_prediction/operation_alignment.py
 @@ -0,0 +1,72 @@
@@ -33360,7 +34680,7 @@ index 000000000..baa23129c
 +                              len(overlapping), len(distinct) > 1, quality)
 diff --git a/tools/parp/intra_app_prediction/prediction_schema.json b/tools/parp/intra_app_prediction/prediction_schema.json
 new file mode 100644
-index 000000000..fed18e771
+index 0000000000000000000000000000000000000000..fed18e7715e4e0cb44d5b7cf06b38866d4b94872
 --- /dev/null
 +++ b/tools/parp/intra_app_prediction/prediction_schema.json
 @@ -0,0 +1,87 @@
@@ -33453,7 +34773,7 @@ index 000000000..fed18e771
 +}
 diff --git a/tools/parp/intra_app_prediction/real_models.py b/tools/parp/intra_app_prediction/real_models.py
 new file mode 100644
-index 000000000..9aa8dc7d8
+index 0000000000000000000000000000000000000000..9aa8dc7d883a202490524ac19ed317af0a590d70
 --- /dev/null
 +++ b/tools/parp/intra_app_prediction/real_models.py
 @@ -0,0 +1,1049 @@
@@ -34508,7 +35828,7 @@ index 000000000..9aa8dc7d8
 +    main()
 diff --git a/tools/parp/intra_app_prediction/real_pipeline.py b/tools/parp/intra_app_prediction/real_pipeline.py
 new file mode 100644
-index 000000000..cf7406dbc
+index 0000000000000000000000000000000000000000..cf7406dbcc5dab9316b682cc0839bc9042a7e0a4
 --- /dev/null
 +++ b/tools/parp/intra_app_prediction/real_pipeline.py
 @@ -0,0 +1,1373 @@
@@ -35887,7 +37207,7 @@ index 000000000..cf7406dbc
 +    main()
 diff --git a/tools/parp/intra_app_prediction/schemas.py b/tools/parp/intra_app_prediction/schemas.py
 new file mode 100644
-index 000000000..74569722d
+index 0000000000000000000000000000000000000000..74569722d26eec7af9cc647a7fa296f673c90770
 --- /dev/null
 +++ b/tools/parp/intra_app_prediction/schemas.py
 @@ -0,0 +1,92 @@
@@ -35985,7 +37305,7 @@ index 000000000..74569722d
 +    return int(value)
 diff --git a/tools/parp/intra_app_prediction/segmenter.py b/tools/parp/intra_app_prediction/segmenter.py
 new file mode 100644
-index 000000000..305c0a185
+index 0000000000000000000000000000000000000000..305c0a18552b205e3ef9314c1df58468556cdc92
 --- /dev/null
 +++ b/tools/parp/intra_app_prediction/segmenter.py
 @@ -0,0 +1,52 @@
@@ -36043,7 +37363,7 @@ index 000000000..305c0a185
 +            for segment_id in range(effective)]
 diff --git a/tools/parp/intra_app_prediction/splitter.py b/tools/parp/intra_app_prediction/splitter.py
 new file mode 100644
-index 000000000..2ebbe96f1
+index 0000000000000000000000000000000000000000..2ebbe96f15e24374469da6112c0935e0702be167
 --- /dev/null
 +++ b/tools/parp/intra_app_prediction/splitter.py
 @@ -0,0 +1,53 @@
@@ -36102,7 +37422,7 @@ index 000000000..2ebbe96f1
 +    return result
 diff --git a/tools/parp/intra_app_prediction/state_cluster.py b/tools/parp/intra_app_prediction/state_cluster.py
 new file mode 100644
-index 000000000..d595b56d5
+index 0000000000000000000000000000000000000000..d595b56d59a4a9ab32248f9a937dc8cb916cd947
 --- /dev/null
 +++ b/tools/parp/intra_app_prediction/state_cluster.py
 @@ -0,0 +1,74 @@
@@ -36182,7 +37502,7 @@ index 000000000..d595b56d5
 +        return result
 diff --git a/tools/parp/intra_app_prediction/state_markov.py b/tools/parp/intra_app_prediction/state_markov.py
 new file mode 100644
-index 000000000..23df67b39
+index 0000000000000000000000000000000000000000..23df67b39a9dc752756497104b5ad16ecc2e68e1
 --- /dev/null
 +++ b/tools/parp/intra_app_prediction/state_markov.py
 @@ -0,0 +1,39 @@
@@ -36227,7 +37547,7 @@ index 000000000..23df67b39
 +                for (state, duration), counts in sorted(self.transitions.items())}
 diff --git a/tools/parp/intra_app_prediction/synthetic_fixture.py b/tools/parp/intra_app_prediction/synthetic_fixture.py
 new file mode 100755
-index 000000000..26bf3bf54
+index 0000000000000000000000000000000000000000..26bf3bf546b48b088ffa247d9ec72b63228c0dd3
 --- /dev/null
 +++ b/tools/parp/intra_app_prediction/synthetic_fixture.py
 @@ -0,0 +1,109 @@
@@ -36342,14 +37662,14 @@ index 000000000..26bf3bf54
 +    main()
 diff --git a/tools/parp/intra_app_prediction/tests/__init__.py b/tools/parp/intra_app_prediction/tests/__init__.py
 new file mode 100644
-index 000000000..8b1378917
+index 0000000000000000000000000000000000000000..8b137891791fe96927ad78e64b0aad7bded08bdc
 --- /dev/null
 +++ b/tools/parp/intra_app_prediction/tests/__init__.py
 @@ -0,0 +1 @@
 +
 diff --git a/tools/parp/intra_app_prediction/tests/test_dataset_builder.py b/tools/parp/intra_app_prediction/tests/test_dataset_builder.py
 new file mode 100644
-index 000000000..cb59d1384
+index 0000000000000000000000000000000000000000..cb59d1384e05068866eeec663c12bdfbcfb46fb8
 --- /dev/null
 +++ b/tools/parp/intra_app_prediction/tests/test_dataset_builder.py
 @@ -0,0 +1,35 @@
@@ -36390,7 +37710,7 @@ index 000000000..cb59d1384
 +    unittest.main()
 diff --git a/tools/parp/intra_app_prediction/tests/test_labels_split.py b/tools/parp/intra_app_prediction/tests/test_labels_split.py
 new file mode 100644
-index 000000000..bcc022503
+index 0000000000000000000000000000000000000000..bcc02250302f56a8b4444ad28277dff28551dbe6
 --- /dev/null
 +++ b/tools/parp/intra_app_prediction/tests/test_labels_split.py
 @@ -0,0 +1,67 @@
@@ -36463,7 +37783,7 @@ index 000000000..bcc022503
 +    unittest.main()
 diff --git a/tools/parp/intra_app_prediction/tests/test_model_pipeline.py b/tools/parp/intra_app_prediction/tests/test_model_pipeline.py
 new file mode 100644
-index 000000000..e9b6db3b2
+index 0000000000000000000000000000000000000000..e9b6db3b291db63ab946a833f8a847b78bf48565
 --- /dev/null
 +++ b/tools/parp/intra_app_prediction/tests/test_model_pipeline.py
 @@ -0,0 +1,85 @@
@@ -36554,7 +37874,7 @@ index 000000000..e9b6db3b2
 +    unittest.main()
 diff --git a/tools/parp/intra_app_prediction/tests/test_phase27_trace.py b/tools/parp/intra_app_prediction/tests/test_phase27_trace.py
 new file mode 100644
-index 000000000..b75b05d68
+index 0000000000000000000000000000000000000000..b75b05d68c5e317b18977d01e01ff406dbf187b5
 --- /dev/null
 +++ b/tools/parp/intra_app_prediction/tests/test_phase27_trace.py
 @@ -0,0 +1,41 @@
@@ -36601,7 +37921,7 @@ index 000000000..b75b05d68
 +    unittest.main()
 diff --git a/tools/parp/intra_app_prediction/tests/test_predictors_anon.py b/tools/parp/intra_app_prediction/tests/test_predictors_anon.py
 new file mode 100644
-index 000000000..c3f3954ef
+index 0000000000000000000000000000000000000000..c3f3954eff480eb3ce6dab13e5e7d11b395f12d7
 --- /dev/null
 +++ b/tools/parp/intra_app_prediction/tests/test_predictors_anon.py
 @@ -0,0 +1,76 @@
@@ -36683,7 +38003,7 @@ index 000000000..c3f3954ef
 +    unittest.main()
 diff --git a/tools/parp/intra_app_prediction/tests/test_real_pipeline.py b/tools/parp/intra_app_prediction/tests/test_real_pipeline.py
 new file mode 100644
-index 000000000..0ae3c1635
+index 0000000000000000000000000000000000000000..0ae3c163517cb12aa7007001f79ad8d458d15111
 --- /dev/null
 +++ b/tools/parp/intra_app_prediction/tests/test_real_pipeline.py
 @@ -0,0 +1,134 @@
@@ -36823,7 +38143,7 @@ index 000000000..0ae3c1635
 +    unittest.main()
 diff --git a/tools/parp/intra_app_prediction/tests/test_segmenter.py b/tools/parp/intra_app_prediction/tests/test_segmenter.py
 new file mode 100644
-index 000000000..824e7d5e6
+index 0000000000000000000000000000000000000000..824e7d5e6e1566e48575d7c3d6c6aba67f18b2ee
 --- /dev/null
 +++ b/tools/parp/intra_app_prediction/tests/test_segmenter.py
 @@ -0,0 +1,63 @@
@@ -36892,7 +38212,7 @@ index 000000000..824e7d5e6
 +    unittest.main()
 diff --git a/tools/parp/intra_app_prediction/tests/test_weighted_coverage.py b/tools/parp/intra_app_prediction/tests/test_weighted_coverage.py
 new file mode 100644
-index 000000000..ff57b1f2f
+index 0000000000000000000000000000000000000000..ff57b1f2f18bcb52711afac7cef824d9b0718c56
 --- /dev/null
 +++ b/tools/parp/intra_app_prediction/tests/test_weighted_coverage.py
 @@ -0,0 +1,57 @@
@@ -36955,7 +38275,7 @@ index 000000000..ff57b1f2f
 +    unittest.main()
 diff --git a/tools/parp/intra_app_prediction/tests/test_windows_operations.py b/tools/parp/intra_app_prediction/tests/test_windows_operations.py
 new file mode 100644
-index 000000000..a7db2abdb
+index 0000000000000000000000000000000000000000..a7db2abdb6af396a009e59fb654f2e97c2adab4e
 --- /dev/null
 +++ b/tools/parp/intra_app_prediction/tests/test_windows_operations.py
 @@ -0,0 +1,80 @@
@@ -37041,7 +38361,7 @@ index 000000000..a7db2abdb
 +    unittest.main()
 diff --git a/tools/parp/intra_app_prediction/train.py b/tools/parp/intra_app_prediction/train.py
 new file mode 100755
-index 000000000..a958ef8c3
+index 0000000000000000000000000000000000000000..a958ef8c35997a10acf307f363a82d6760d659f2
 --- /dev/null
 +++ b/tools/parp/intra_app_prediction/train.py
 @@ -0,0 +1,250 @@
@@ -37297,7 +38617,7 @@ index 000000000..a958ef8c3
 +    main()
 diff --git a/tools/parp/intra_app_prediction/weighted_coverage.py b/tools/parp/intra_app_prediction/weighted_coverage.py
 new file mode 100644
-index 000000000..2cef06141
+index 0000000000000000000000000000000000000000..2cef06141b9dcb866d81f8c00ca162e11f40e36d
 --- /dev/null
 +++ b/tools/parp/intra_app_prediction/weighted_coverage.py
 @@ -0,0 +1,71 @@
@@ -37374,7 +38694,7 @@ index 000000000..2cef06141
 +        len(clipped))
 diff --git a/tools/parp/intra_app_prediction/window_builder.py b/tools/parp/intra_app_prediction/window_builder.py
 new file mode 100644
-index 000000000..8c1566342
+index 0000000000000000000000000000000000000000..8c15663424d9ca93c7e75cf4e97108187345604e
 --- /dev/null
 +++ b/tools/parp/intra_app_prediction/window_builder.py
 @@ -0,0 +1,62 @@
@@ -37442,7 +38762,7 @@ index 000000000..8c1566342
 +        return self.wall_anchor_ns + monotonic_ns - self.monotonic_anchor_ns
 diff --git a/tools/parp/kernel_operation_inference/__init__.py b/tools/parp/kernel_operation_inference/__init__.py
 new file mode 100644
-index 000000000..73a608d72
+index 0000000000000000000000000000000000000000..73a608d72ebb88f7e08ab05a36c1a23df338ca51
 --- /dev/null
 +++ b/tools/parp/kernel_operation_inference/__init__.py
 @@ -0,0 +1,4 @@
@@ -37452,7 +38772,7 @@ index 000000000..73a608d72
 +
 diff --git a/tools/parp/kernel_operation_inference/config/operation_taxonomy.json b/tools/parp/kernel_operation_inference/config/operation_taxonomy.json
 new file mode 100644
-index 000000000..9357badcb
+index 0000000000000000000000000000000000000000..9357badcb2ef4d2cd729cd02f024a5617df8b100
 --- /dev/null
 +++ b/tools/parp/kernel_operation_inference/config/operation_taxonomy.json
 @@ -0,0 +1,31 @@
@@ -37489,7 +38809,7 @@ index 000000000..9357badcb
 +}
 diff --git a/tools/parp/kernel_operation_inference/contracts.py b/tools/parp/kernel_operation_inference/contracts.py
 new file mode 100644
-index 000000000..74f0f4ec5
+index 0000000000000000000000000000000000000000..74f0f4ec542b39ff954423f5e98e8c6ba2dc6ee9
 --- /dev/null
 +++ b/tools/parp/kernel_operation_inference/contracts.py
 @@ -0,0 +1,64 @@
@@ -37559,7 +38879,7 @@ index 000000000..74f0f4ec5
 +
 diff --git a/tools/parp/kernel_operation_inference/dataset.py b/tools/parp/kernel_operation_inference/dataset.py
 new file mode 100644
-index 000000000..68a935b20
+index 0000000000000000000000000000000000000000..68a935b2060fcb35aff2148f14a2255b3c5f0671
 --- /dev/null
 +++ b/tools/parp/kernel_operation_inference/dataset.py
 @@ -0,0 +1,266 @@
@@ -37831,7 +39151,7 @@ index 000000000..68a935b20
 +        return summary
 diff --git a/tools/parp/kernel_operation_inference/features.py b/tools/parp/kernel_operation_inference/features.py
 new file mode 100644
-index 000000000..9457a917d
+index 0000000000000000000000000000000000000000..9457a917d5e01efaf9616439d7ea0d07f4b13501
 --- /dev/null
 +++ b/tools/parp/kernel_operation_inference/features.py
 @@ -0,0 +1,70 @@
@@ -37907,7 +39227,7 @@ index 000000000..9457a917d
 +
 diff --git a/tools/parp/kernel_operation_inference/models.py b/tools/parp/kernel_operation_inference/models.py
 new file mode 100644
-index 000000000..7d2104fab
+index 0000000000000000000000000000000000000000..7d2104fabc0a8e2ef27d1d4c691151518490d08f
 --- /dev/null
 +++ b/tools/parp/kernel_operation_inference/models.py
 @@ -0,0 +1,208 @@
@@ -38121,7 +39441,7 @@ index 000000000..7d2104fab
 +            "confusion_matrix": {truth: dict(matrix[truth]) for truth in classes}}
 diff --git a/tools/parp/kernel_operation_inference/provenance.py b/tools/parp/kernel_operation_inference/provenance.py
 new file mode 100644
-index 000000000..64ef0c81c
+index 0000000000000000000000000000000000000000..64ef0c81cb249817b193d084b33f49c5c703d950
 --- /dev/null
 +++ b/tools/parp/kernel_operation_inference/provenance.py
 @@ -0,0 +1,14 @@
@@ -38141,7 +39461,7 @@ index 000000000..64ef0c81c
 +    return rows
 diff --git a/tools/parp/kernel_operation_inference/taxonomy.py b/tools/parp/kernel_operation_inference/taxonomy.py
 new file mode 100644
-index 000000000..aea1b00e3
+index 0000000000000000000000000000000000000000..aea1b00e3c286f438d00132757c49a960c1895fe
 --- /dev/null
 +++ b/tools/parp/kernel_operation_inference/taxonomy.py
 @@ -0,0 +1,26 @@
@@ -38173,7 +39493,7 @@ index 000000000..aea1b00e3
 +                           "test": test_min}}
 diff --git a/tools/parp/kernel_operation_inference/tests/test_contracts.py b/tools/parp/kernel_operation_inference/tests/test_contracts.py
 new file mode 100644
-index 000000000..339eec8fc
+index 0000000000000000000000000000000000000000..339eec8fca3e468e2efd85a062c693b9d8e7f436
 --- /dev/null
 +++ b/tools/parp/kernel_operation_inference/tests/test_contracts.py
 @@ -0,0 +1,164 @@
@@ -38343,7 +39663,7 @@ index 000000000..339eec8fc
 +    unittest.main()
 diff --git a/tools/parp/kernel_operation_inference/vectors.py b/tools/parp/kernel_operation_inference/vectors.py
 new file mode 100644
-index 000000000..e12e3bb38
+index 0000000000000000000000000000000000000000..e12e3bb381f8cae572e2b89d84e490acf72ced21
 --- /dev/null
 +++ b/tools/parp/kernel_operation_inference/vectors.py
 @@ -0,0 +1,208 @@
@@ -38557,7 +39877,7 @@ index 000000000..e12e3bb38
 +    return examples, names, source_map
 diff --git a/tools/parp/lstm_prior_bridge.py b/tools/parp/lstm_prior_bridge.py
 new file mode 100644
-index 000000000..3d5b881fc
+index 0000000000000000000000000000000000000000..3d5b881fc9c061f0a6eacf2fbb7b2fd361470f42
 --- /dev/null
 +++ b/tools/parp/lstm_prior_bridge.py
 @@ -0,0 +1,226 @@
@@ -38789,7 +40109,7 @@ index 000000000..3d5b881fc
 +    main()
 diff --git a/tools/parp/model_pack.py b/tools/parp/model_pack.py
 new file mode 100755
-index 000000000..cf0ca5803
+index 0000000000000000000000000000000000000000..cf0ca5803cad6dd18d6a3dc005dc20b5e3a80bd4
 --- /dev/null
 +++ b/tools/parp/model_pack.py
 @@ -0,0 +1,26 @@
@@ -38821,7 +40141,7 @@ index 000000000..cf0ca5803
 +    main()
 diff --git a/tools/parp/parpctl.py b/tools/parp/parpctl.py
 new file mode 100755
-index 000000000..27d7373ed
+index 0000000000000000000000000000000000000000..27d7373ed70e52bdb99253e98f678b65fc1899c4
 --- /dev/null
 +++ b/tools/parp/parpctl.py
 @@ -0,0 +1,62 @@
@@ -38889,14 +40209,14 @@ index 000000000..27d7373ed
 +    main()
 diff --git a/tools/parp/phase210/__init__.py b/tools/parp/phase210/__init__.py
 new file mode 100644
-index 000000000..4d94d03b2
+index 0000000000000000000000000000000000000000..4d94d03b27a3ab4a489de29a5731ee8cc58c9531
 --- /dev/null
 +++ b/tools/parp/phase210/__init__.py
 @@ -0,0 +1 @@
 +"""PARP Phase2.10 app-specific reclaim evaluation contracts."""
 diff --git a/tools/parp/phase210/build_qq_collection.py b/tools/parp/phase210/build_qq_collection.py
 new file mode 100644
-index 000000000..821732c1f
+index 0000000000000000000000000000000000000000..821732c1f10a61adafe47a3907bf7c225eb7c76f
 --- /dev/null
 +++ b/tools/parp/phase210/build_qq_collection.py
 @@ -0,0 +1,138 @@
@@ -39040,7 +40360,7 @@ index 000000000..821732c1f
 +    main()
 diff --git a/tools/parp/phase210/build_qq_positive_support.py b/tools/parp/phase210/build_qq_positive_support.py
 new file mode 100644
-index 000000000..246096860
+index 0000000000000000000000000000000000000000..246096860133bcd672bfd35c1eeb8a64d3ae145b
 --- /dev/null
 +++ b/tools/parp/phase210/build_qq_positive_support.py
 @@ -0,0 +1,127 @@
@@ -39173,7 +40493,7 @@ index 000000000..246096860
 +    main()
 diff --git a/tools/parp/phase210/contracts.py b/tools/parp/phase210/contracts.py
 new file mode 100644
-index 000000000..083ed1c23
+index 0000000000000000000000000000000000000000..083ed1c235109342db3ea455d9d90383ed5b4ae5
 --- /dev/null
 +++ b/tools/parp/phase210/contracts.py
 @@ -0,0 +1,187 @@
@@ -39366,7 +40686,7 @@ index 000000000..083ed1c23
 +    return candidate < baseline if lower_is_better else candidate > baseline
 diff --git a/tools/parp/phase210/finalize.py b/tools/parp/phase210/finalize.py
 new file mode 100644
-index 000000000..8b7500573
+index 0000000000000000000000000000000000000000..8b7500573d2d2c19b340a4672c1ba3ce638ea526
 --- /dev/null
 +++ b/tools/parp/phase210/finalize.py
 @@ -0,0 +1,429 @@
@@ -39801,7 +41121,7 @@ index 000000000..8b7500573
 +    main()
 diff --git a/tools/parp/phase210/offline_pipeline.py b/tools/parp/phase210/offline_pipeline.py
 new file mode 100644
-index 000000000..3b19a7ae0
+index 0000000000000000000000000000000000000000..3b19a7ae00eef34fcae0dbfae9ad578ef99a7275
 --- /dev/null
 +++ b/tools/parp/phase210/offline_pipeline.py
 @@ -0,0 +1,776 @@
@@ -40583,7 +41903,7 @@ index 000000000..3b19a7ae0
 +    main()
 diff --git a/tools/parp/phase210/positive_support_audit.py b/tools/parp/phase210/positive_support_audit.py
 new file mode 100644
-index 000000000..3619594ba
+index 0000000000000000000000000000000000000000..3619594bad9fae26a73d956e4f1099cc4b33b89e
 --- /dev/null
 +++ b/tools/parp/phase210/positive_support_audit.py
 @@ -0,0 +1,73 @@
@@ -40662,7 +41982,7 @@ index 000000000..3619594ba
 +    main()
 diff --git a/tools/parp/phase210/qq_collection_root.sh b/tools/parp/phase210/qq_collection_root.sh
 new file mode 100644
-index 000000000..53721f0a2
+index 0000000000000000000000000000000000000000..53721f0a241075bc2cad3e6c8a5c3208ea6054e4
 --- /dev/null
 +++ b/tools/parp/phase210/qq_collection_root.sh
 @@ -0,0 +1,676 @@
@@ -41344,7 +42664,7 @@ index 000000000..53721f0a2
 +printf 'output=%s\n' "$collection"
 diff --git a/tools/parp/phase210/qq_login_gate.py b/tools/parp/phase210/qq_login_gate.py
 new file mode 100644
-index 000000000..347e8d97b
+index 0000000000000000000000000000000000000000..347e8d97b721df8718960b124bb93b0a9d9a458e
 --- /dev/null
 +++ b/tools/parp/phase210/qq_login_gate.py
 @@ -0,0 +1,231 @@
@@ -41581,7 +42901,7 @@ index 000000000..347e8d97b
 +    raise SystemExit(main())
 diff --git a/tools/parp/phase210/tests/test_phase210_contracts.py b/tools/parp/phase210/tests/test_phase210_contracts.py
 new file mode 100644
-index 000000000..b1e89cb1d
+index 0000000000000000000000000000000000000000..b1e89cb1dc79fe1a398ee3563a4d0c04ea8358a7
 --- /dev/null
 +++ b/tools/parp/phase210/tests/test_phase210_contracts.py
 @@ -0,0 +1,310 @@
@@ -41897,7 +43217,7 @@ index 000000000..b1e89cb1d
 +    unittest.main()
 diff --git a/tools/parp/phase210/tests/test_phase210_offline.py b/tools/parp/phase210/tests/test_phase210_offline.py
 new file mode 100644
-index 000000000..99c1559bd
+index 0000000000000000000000000000000000000000..99c1559bdca568b25ecf9acaf0c68feaa99ea29d
 --- /dev/null
 +++ b/tools/parp/phase210/tests/test_phase210_offline.py
 @@ -0,0 +1,77 @@
@@ -41980,7 +43300,7 @@ index 000000000..99c1559bd
 +    unittest.main()
 diff --git a/tools/parp/phase210/tests/test_phase210_positive_support.py b/tools/parp/phase210/tests/test_phase210_positive_support.py
 new file mode 100644
-index 000000000..f1fc41fc0
+index 0000000000000000000000000000000000000000..f1fc41fc02d8a1d33cf462bd2c273ffa61af9cf2
 --- /dev/null
 +++ b/tools/parp/phase210/tests/test_phase210_positive_support.py
 @@ -0,0 +1,76 @@
@@ -42062,14 +43382,14 @@ index 000000000..f1fc41fc0
 +    unittest.main()
 diff --git a/tools/parp/phase210b/__init__.py b/tools/parp/phase210b/__init__.py
 new file mode 100644
-index 000000000..7e545fb62
+index 0000000000000000000000000000000000000000..7e545fb624be9f3b84e7bc39f693b027f93d5ee2
 --- /dev/null
 +++ b/tools/parp/phase210b/__init__.py
 @@ -0,0 +1 @@
 +"""Offline Phase2.10B causal candidate selector package."""
 diff --git a/tools/parp/phase210b/finalize_reports.py b/tools/parp/phase210b/finalize_reports.py
 new file mode 100644
-index 000000000..1ac192d41
+index 0000000000000000000000000000000000000000..1ac192d41db4c81d312b289fb1cb6dd1b9cb20e4
 --- /dev/null
 +++ b/tools/parp/phase210b/finalize_reports.py
 @@ -0,0 +1,320 @@
@@ -42395,7 +43715,7 @@ index 000000000..1ac192d41
 +    main()
 diff --git a/tools/parp/phase210b/freeze_inputs.py b/tools/parp/phase210b/freeze_inputs.py
 new file mode 100644
-index 000000000..486447c94
+index 0000000000000000000000000000000000000000..486447c94ef15ea11d11560128b71cf7c20a268d
 --- /dev/null
 +++ b/tools/parp/phase210b/freeze_inputs.py
 @@ -0,0 +1,130 @@
@@ -42531,7 +43851,7 @@ index 000000000..486447c94
 +    main()
 diff --git a/tools/parp/phase210b/labeler.py b/tools/parp/phase210b/labeler.py
 new file mode 100644
-index 000000000..95f29d95f
+index 0000000000000000000000000000000000000000..95f29d95f3a24325fcec12da4328e958b5473d70
 --- /dev/null
 +++ b/tools/parp/phase210b/labeler.py
 @@ -0,0 +1,80 @@
@@ -42617,7 +43937,7 @@ index 000000000..95f29d95f
 +    return output
 diff --git a/tools/parp/phase210b/offline_pipeline_b.py b/tools/parp/phase210b/offline_pipeline_b.py
 new file mode 100644
-index 000000000..6b5e7fefa
+index 0000000000000000000000000000000000000000..6b5e7fefac0dfb96c68e9fe16ebf665274143ede
 --- /dev/null
 +++ b/tools/parp/phase210b/offline_pipeline_b.py
 @@ -0,0 +1,307 @@
@@ -42930,7 +44250,7 @@ index 000000000..6b5e7fefa
 +    main()
 diff --git a/tools/parp/phase210b/selector_v2.py b/tools/parp/phase210b/selector_v2.py
 new file mode 100644
-index 000000000..ac140070c
+index 0000000000000000000000000000000000000000..ac140070c3fcfdbbeb4e1b147fb4bf93894945d1
 --- /dev/null
 +++ b/tools/parp/phase210b/selector_v2.py
 @@ -0,0 +1,228 @@
@@ -43164,7 +44484,7 @@ index 000000000..ac140070c
 +    }
 diff --git a/tools/parp/phase210b/tests/test_labeler.py b/tools/parp/phase210b/tests/test_labeler.py
 new file mode 100644
-index 000000000..afba035a4
+index 0000000000000000000000000000000000000000..afba035a4f55954b4fc95eb7957df18ce659d182
 --- /dev/null
 +++ b/tools/parp/phase210b/tests/test_labeler.py
 @@ -0,0 +1,39 @@
@@ -43209,7 +44529,7 @@ index 000000000..afba035a4
 +    unittest.main()
 diff --git a/tools/parp/phase210b/tests/test_phase210b_contracts.py b/tools/parp/phase210b/tests/test_phase210b_contracts.py
 new file mode 100644
-index 000000000..f9dd46543
+index 0000000000000000000000000000000000000000..f9dd4654357924743954797645278a26ae2214c6
 --- /dev/null
 +++ b/tools/parp/phase210b/tests/test_phase210b_contracts.py
 @@ -0,0 +1,156 @@
@@ -43371,7 +44691,7 @@ index 000000000..f9dd46543
 +    unittest.main()
 diff --git a/tools/parp/phase210b/tests/test_selector_v2.py b/tools/parp/phase210b/tests/test_selector_v2.py
 new file mode 100644
-index 000000000..a7aeed04a
+index 0000000000000000000000000000000000000000..a7aeed04a2ba98744d9b644d79da3453f883a479
 --- /dev/null
 +++ b/tools/parp/phase210b/tests/test_selector_v2.py
 @@ -0,0 +1,102 @@
@@ -43479,14 +44799,14 @@ index 000000000..a7aeed04a
 +    unittest.main()
 diff --git a/tools/parp/phase210c/__init__.py b/tools/parp/phase210c/__init__.py
 new file mode 100644
-index 000000000..865e6bb55
+index 0000000000000000000000000000000000000000..865e6bb550055986ed3fec09befb3ffd5f28221a
 --- /dev/null
 +++ b/tools/parp/phase210c/__init__.py
 @@ -0,0 +1 @@
 +"""Phase2.10C tail-constrained offline selector."""
 diff --git a/tools/parp/phase210c/pipeline_c.py b/tools/parp/phase210c/pipeline_c.py
 new file mode 100644
-index 000000000..0341a9735
+index 0000000000000000000000000000000000000000..0341a9735657ddddbab49b6b585cfb8cda30b1f3
 --- /dev/null
 +++ b/tools/parp/phase210c/pipeline_c.py
 @@ -0,0 +1,244 @@
@@ -43736,7 +45056,7 @@ index 000000000..0341a9735
 +    main()
 diff --git a/tools/parp/phase210c/selector_v21.py b/tools/parp/phase210c/selector_v21.py
 new file mode 100644
-index 000000000..cbf8a6236
+index 0000000000000000000000000000000000000000..cbf8a62367f8db11fa2484a3ea2cd3a8a807126b
 --- /dev/null
 +++ b/tools/parp/phase210c/selector_v21.py
 @@ -0,0 +1,164 @@
@@ -43906,7 +45226,7 @@ index 000000000..cbf8a6236
 +    return row.get("positive_count", 0) >= 20 and row.get("pairwise_evaluable_decisions", 0) >= 10
 diff --git a/tools/parp/phase210c/tests/test_selector_v21_contracts.py b/tools/parp/phase210c/tests/test_selector_v21_contracts.py
 new file mode 100644
-index 000000000..1e29882bd
+index 0000000000000000000000000000000000000000..1e29882bdb8fda5e4cd93882d1b8615e430aa725
 --- /dev/null
 +++ b/tools/parp/phase210c/tests/test_selector_v21_contracts.py
 @@ -0,0 +1,205 @@
@@ -44117,7 +45437,7 @@ index 000000000..1e29882bd
 +    unittest.main()
 diff --git a/tools/parp/phase26/_common.sh b/tools/parp/phase26/_common.sh
 new file mode 100755
-index 000000000..a8d9380b3
+index 0000000000000000000000000000000000000000..a8d9380b3e210fe7029889554682a9e9176fa2d3
 --- /dev/null
 +++ b/tools/parp/phase26/_common.sh
 @@ -0,0 +1,176 @@
@@ -44299,7 +45619,7 @@ index 000000000..a8d9380b3
 +}
 diff --git a/tools/parp/phase26/phase26_apply_guarded.sh b/tools/parp/phase26/phase26_apply_guarded.sh
 new file mode 100755
-index 000000000..1e5cea7bd
+index 0000000000000000000000000000000000000000..1e5cea7bd1c710f03bce1ad948ed78a1d062e875
 --- /dev/null
 +++ b/tools/parp/phase26/phase26_apply_guarded.sh
 @@ -0,0 +1,118 @@
@@ -44423,7 +45743,7 @@ index 000000000..1e5cea7bd
 +phase26_finish
 diff --git a/tools/parp/phase26/phase26_build.sh b/tools/parp/phase26/phase26_build.sh
 new file mode 100755
-index 000000000..28414ea0d
+index 0000000000000000000000000000000000000000..28414ea0d8bc906dacc5f2dc761ecf8abddc0b89
 --- /dev/null
 +++ b/tools/parp/phase26/phase26_build.sh
 @@ -0,0 +1,39 @@
@@ -44468,7 +45788,7 @@ index 000000000..28414ea0d
 +phase26_finish
 diff --git a/tools/parp/phase26/phase26_collect_metrics.sh b/tools/parp/phase26/phase26_collect_metrics.sh
 new file mode 100755
-index 000000000..498471373
+index 0000000000000000000000000000000000000000..498471373ea60fbce06932114d09213ee589df46
 --- /dev/null
 +++ b/tools/parp/phase26/phase26_collect_metrics.sh
 @@ -0,0 +1,28 @@
@@ -44502,7 +45822,7 @@ index 000000000..498471373
 +phase26_finish
 diff --git a/tools/parp/phase26/phase26_install.sh b/tools/parp/phase26/phase26_install.sh
 new file mode 100755
-index 000000000..16cb67bc0
+index 0000000000000000000000000000000000000000..16cb67bc07bbcba549eed93602b6730fc3d04ca1
 --- /dev/null
 +++ b/tools/parp/phase26/phase26_install.sh
 @@ -0,0 +1,38 @@
@@ -44546,7 +45866,7 @@ index 000000000..16cb67bc0
 +phase26_finish
 diff --git a/tools/parp/phase26/phase26_level3a_observe.sh b/tools/parp/phase26/phase26_level3a_observe.sh
 new file mode 100755
-index 000000000..7e9ad7b28
+index 0000000000000000000000000000000000000000..7e9ad7b289e9d1453fefca3380ca86bfca3b1631
 --- /dev/null
 +++ b/tools/parp/phase26/phase26_level3a_observe.sh
 @@ -0,0 +1,159 @@
@@ -44711,7 +46031,7 @@ index 000000000..7e9ad7b28
 +phase26_finish
 diff --git a/tools/parp/phase26/phase26_level3b_observe.sh b/tools/parp/phase26/phase26_level3b_observe.sh
 new file mode 100755
-index 000000000..dc3edf326
+index 0000000000000000000000000000000000000000..dc3edf326d0ef41415b5c17dc2c07c660a473d6d
 --- /dev/null
 +++ b/tools/parp/phase26/phase26_level3b_observe.sh
 @@ -0,0 +1,26 @@
@@ -44743,7 +46063,7 @@ index 000000000..dc3edf326
 +phase26_finish
 diff --git a/tools/parp/phase26/phase26_mount_interfaces.sh b/tools/parp/phase26/phase26_mount_interfaces.sh
 new file mode 100755
-index 000000000..dbcee42fe
+index 0000000000000000000000000000000000000000..dbcee42feca09d66f46daa8a0059d904894cabe5
 --- /dev/null
 +++ b/tools/parp/phase26/phase26_mount_interfaces.sh
 @@ -0,0 +1,13 @@
@@ -44762,7 +46082,7 @@ index 000000000..dbcee42fe
 +phase26_finish
 diff --git a/tools/parp/phase26/phase26_package.sh b/tools/parp/phase26/phase26_package.sh
 new file mode 100755
-index 000000000..44a645150
+index 0000000000000000000000000000000000000000..44a6451509d217d58c0db5b1f113836c71481a77
 --- /dev/null
 +++ b/tools/parp/phase26/phase26_package.sh
 @@ -0,0 +1,32 @@
@@ -44800,7 +46120,7 @@ index 000000000..44a645150
 +phase26_finish
 diff --git a/tools/parp/phase26/phase26_postboot.sh b/tools/parp/phase26/phase26_postboot.sh
 new file mode 100755
-index 000000000..c3912bce8
+index 0000000000000000000000000000000000000000..c3912bce8ff671e48452ff3f7c05bcba5cee056b
 --- /dev/null
 +++ b/tools/parp/phase26/phase26_postboot.sh
 @@ -0,0 +1,28 @@
@@ -44834,7 +46154,7 @@ index 000000000..c3912bce8
 +phase26_finish
 diff --git a/tools/parp/phase26/phase26_preflight.sh b/tools/parp/phase26/phase26_preflight.sh
 new file mode 100755
-index 000000000..f397cc62b
+index 0000000000000000000000000000000000000000..f397cc62b3eda35e1cdd2daf910c3b0b0c4935fe
 --- /dev/null
 +++ b/tools/parp/phase26/phase26_preflight.sh
 @@ -0,0 +1,21 @@
@@ -44861,7 +46181,7 @@ index 000000000..f397cc62b
 +phase26_finish
 diff --git a/tools/parp/phase26/phase26_restore_observe.sh b/tools/parp/phase26/phase26_restore_observe.sh
 new file mode 100755
-index 000000000..5eacf1dbd
+index 0000000000000000000000000000000000000000..5eacf1dbd5a244955edd8a3ba4a46af1044d6983
 --- /dev/null
 +++ b/tools/parp/phase26/phase26_restore_observe.sh
 @@ -0,0 +1,16 @@
@@ -44883,7 +46203,7 @@ index 000000000..5eacf1dbd
 +phase26_finish
 diff --git a/tools/parp/phase26/phase26_resume.sh b/tools/parp/phase26/phase26_resume.sh
 new file mode 100755
-index 000000000..b65386608
+index 0000000000000000000000000000000000000000..b653866080b5e42be7ef1fbfcf54e029fe7ce38b
 --- /dev/null
 +++ b/tools/parp/phase26/phase26_resume.sh
 @@ -0,0 +1,20 @@
@@ -44909,7 +46229,7 @@ index 000000000..b65386608
 +phase26_finish
 diff --git a/tools/parp/phase26/phase26_rollback.sh b/tools/parp/phase26/phase26_rollback.sh
 new file mode 100755
-index 000000000..54c6c1a98
+index 0000000000000000000000000000000000000000..54c6c1a984389d81bad7a95a6966ecf0411ef569
 --- /dev/null
 +++ b/tools/parp/phase26/phase26_rollback.sh
 @@ -0,0 +1,20 @@
@@ -44935,7 +46255,7 @@ index 000000000..54c6c1a98
 +phase26_finish
 diff --git a/tools/parp/phase26/phase26_select_boot.sh b/tools/parp/phase26/phase26_select_boot.sh
 new file mode 100755
-index 000000000..2b2dc9161
+index 0000000000000000000000000000000000000000..2b2dc916184374ec905bc06ae78dca0a01458be4
 --- /dev/null
 +++ b/tools/parp/phase26/phase26_select_boot.sh
 @@ -0,0 +1,18 @@
@@ -44959,7 +46279,7 @@ index 000000000..2b2dc9161
 +phase26_finish
 diff --git a/tools/parp/phase26/runtime_identity.py b/tools/parp/phase26/runtime_identity.py
 new file mode 100644
-index 000000000..51fce1059
+index 0000000000000000000000000000000000000000..51fce1059fcaec7958ec3444c1d6d0cb92c34f7b
 --- /dev/null
 +++ b/tools/parp/phase26/runtime_identity.py
 @@ -0,0 +1,69 @@
@@ -45034,7 +46354,7 @@ index 000000000..51fce1059
 +    main()
 diff --git a/tools/parp/phase26/runtime_monitor_py38_compat_runner.py b/tools/parp/phase26/runtime_monitor_py38_compat_runner.py
 new file mode 100755
-index 000000000..79039169c
+index 0000000000000000000000000000000000000000..79039169c5f0d5afa2ac1164e974aabc27df36b2
 --- /dev/null
 +++ b/tools/parp/phase26/runtime_monitor_py38_compat_runner.py
 @@ -0,0 +1,77 @@
@@ -45117,7 +46437,7 @@ index 000000000..79039169c
 +    raise SystemExit(main(sys.argv[1:]))
 diff --git a/tools/parp/phase26/state_tool.py b/tools/parp/phase26/state_tool.py
 new file mode 100755
-index 000000000..cb43e3218
+index 0000000000000000000000000000000000000000..cb43e32182bfc6efea70b98802e037db2396fa89
 --- /dev/null
 +++ b/tools/parp/phase26/state_tool.py
 @@ -0,0 +1,69 @@
@@ -45192,7 +46512,7 @@ index 000000000..cb43e3218
 +    main(sys.argv)
 diff --git a/tools/parp/phase26_memory_workload.py b/tools/parp/phase26_memory_workload.py
 new file mode 100755
-index 000000000..578b3e1fc
+index 0000000000000000000000000000000000000000..578b3e1fc2414247be3c51d5276725fe320d2723
 --- /dev/null
 +++ b/tools/parp/phase26_memory_workload.py
 @@ -0,0 +1,119 @@
@@ -45317,7 +46637,7 @@ index 000000000..578b3e1fc
 +    main()
 diff --git a/tools/parp/phase26_prior_submit.py b/tools/parp/phase26_prior_submit.py
 new file mode 100755
-index 000000000..923e27849
+index 0000000000000000000000000000000000000000..923e2784929bba0500bfb3afba4ff1668608c33c
 --- /dev/null
 +++ b/tools/parp/phase26_prior_submit.py
 @@ -0,0 +1,58 @@
@@ -45381,7 +46701,7 @@ index 000000000..923e27849
 +        raise
 diff --git a/tools/parp/phase28/__init__.py b/tools/parp/phase28/__init__.py
 new file mode 100644
-index 000000000..c3db7ff7b
+index 0000000000000000000000000000000000000000..c3db7ff7bd59a88f29f29e34986537aa9c5f2992
 --- /dev/null
 +++ b/tools/parp/phase28/__init__.py
 @@ -0,0 +1,3 @@
@@ -45390,7 +46710,7 @@ index 000000000..c3db7ff7b
 +SCHEMA_VERSION = 1
 diff --git a/tools/parp/phase28/cgroup_sampler.py b/tools/parp/phase28/cgroup_sampler.py
 new file mode 100644
-index 000000000..1ef076a25
+index 0000000000000000000000000000000000000000..1ef076a25b64018ae6702f8ccaa99e82f01f0b77
 --- /dev/null
 +++ b/tools/parp/phase28/cgroup_sampler.py
 @@ -0,0 +1,187 @@
@@ -45583,7 +46903,7 @@ index 000000000..1ef076a25
 +    main()
 diff --git a/tools/parp/phase28/collection_plan.py b/tools/parp/phase28/collection_plan.py
 new file mode 100644
-index 000000000..49a4a37eb
+index 0000000000000000000000000000000000000000..49a4a37eb27f01d444fcfd402edf693cc3523c9c
 --- /dev/null
 +++ b/tools/parp/phase28/collection_plan.py
 @@ -0,0 +1,242 @@
@@ -45831,7 +47151,7 @@ index 000000000..49a4a37eb
 +    main()
 diff --git a/tools/parp/phase28/config/access_pattern_taxonomy.json b/tools/parp/phase28/config/access_pattern_taxonomy.json
 new file mode 100644
-index 000000000..3481f257f
+index 0000000000000000000000000000000000000000..3481f257f9f3d543256d4733720b3c9b7b297317
 --- /dev/null
 +++ b/tools/parp/phase28/config/access_pattern_taxonomy.json
 @@ -0,0 +1,10 @@
@@ -45847,7 +47167,7 @@ index 000000000..3481f257f
 +}
 diff --git a/tools/parp/phase28/config/operation_taxonomy.json b/tools/parp/phase28/config/operation_taxonomy.json
 new file mode 100644
-index 000000000..9daf07b9c
+index 0000000000000000000000000000000000000000..9daf07b9c0aa6f35f3e80d15edcac20d0c74af73
 --- /dev/null
 +++ b/tools/parp/phase28/config/operation_taxonomy.json
 @@ -0,0 +1,25 @@
@@ -45878,7 +47198,7 @@ index 000000000..9daf07b9c
 +}
 diff --git a/tools/parp/phase28/contracts.py b/tools/parp/phase28/contracts.py
 new file mode 100644
-index 000000000..c9373de78
+index 0000000000000000000000000000000000000000..c9373de7829249ebc1a4cd8ce97f8d48e5455971
 --- /dev/null
 +++ b/tools/parp/phase28/contracts.py
 @@ -0,0 +1,45 @@
@@ -45929,7 +47249,7 @@ index 000000000..c9373de78
 +    return True
 diff --git a/tools/parp/phase28/core.py b/tools/parp/phase28/core.py
 new file mode 100644
-index 000000000..ee344224d
+index 0000000000000000000000000000000000000000..ee344224de4c05220e05544dac7680d769b15682
 --- /dev/null
 +++ b/tools/parp/phase28/core.py
 @@ -0,0 +1,75 @@
@@ -46010,7 +47330,7 @@ index 000000000..ee344224d
 +        return "ALLOW_PROTECT"
 diff --git a/tools/parp/phase28/fixture_builder.py b/tools/parp/phase28/fixture_builder.py
 new file mode 100644
-index 000000000..5eb0d36f7
+index 0000000000000000000000000000000000000000..5eb0d36f7e1ad24d6d1e83052db73cffa93c5a8f
 --- /dev/null
 +++ b/tools/parp/phase28/fixture_builder.py
 @@ -0,0 +1,61 @@
@@ -46077,7 +47397,7 @@ index 000000000..5eb0d36f7
 +    main()
 diff --git a/tools/parp/phase28/gate_report.py b/tools/parp/phase28/gate_report.py
 new file mode 100644
-index 000000000..280fa9d8b
+index 0000000000000000000000000000000000000000..280fa9d8be3cc7b8126276cf2900adeeb6c89e6f
 --- /dev/null
 +++ b/tools/parp/phase28/gate_report.py
 @@ -0,0 +1,275 @@
@@ -46358,7 +47678,7 @@ index 000000000..280fa9d8b
 +    main()
 diff --git a/tools/parp/phase28/patterns.py b/tools/parp/phase28/patterns.py
 new file mode 100644
-index 000000000..a5eb4c4c3
+index 0000000000000000000000000000000000000000..a5eb4c4c386daed83c91a83f03af01c666e62cd8
 --- /dev/null
 +++ b/tools/parp/phase28/patterns.py
 @@ -0,0 +1,18 @@
@@ -46382,7 +47702,7 @@ index 000000000..a5eb4c4c3
 +    return "MIXED"
 diff --git a/tools/parp/phase28/pilot.py b/tools/parp/phase28/pilot.py
 new file mode 100644
-index 000000000..283007e78
+index 0000000000000000000000000000000000000000..283007e78f30afcc3f7792ca4fecaee9097575a3
 --- /dev/null
 +++ b/tools/parp/phase28/pilot.py
 @@ -0,0 +1,306 @@
@@ -46694,7 +48014,7 @@ index 000000000..283007e78
 +if __name__=="__main__": main()
 diff --git a/tools/parp/phase28/provenance.py b/tools/parp/phase28/provenance.py
 new file mode 100644
-index 000000000..a9fa15fab
+index 0000000000000000000000000000000000000000..a9fa15fabca8b891ca075efc754fb50f5db769ea
 --- /dev/null
 +++ b/tools/parp/phase28/provenance.py
 @@ -0,0 +1,14 @@
@@ -46714,7 +48034,7 @@ index 000000000..a9fa15fab
 +    return output
 diff --git a/tools/parp/phase28/root_runner_builder.py b/tools/parp/phase28/root_runner_builder.py
 new file mode 100644
-index 000000000..04b86dee6
+index 0000000000000000000000000000000000000000..04b86dee668c0b85a22dad5260618c33aa2d19a9
 --- /dev/null
 +++ b/tools/parp/phase28/root_runner_builder.py
 @@ -0,0 +1,168 @@
@@ -46888,7 +48208,7 @@ index 000000000..04b86dee6
 +    main()
 diff --git a/tools/parp/phase28/tests/test_phase28_contracts.py b/tools/parp/phase28/tests/test_phase28_contracts.py
 new file mode 100644
-index 000000000..20d171377
+index 0000000000000000000000000000000000000000..20d171377389be5abe8049ed4282b1369c33d357
 --- /dev/null
 +++ b/tools/parp/phase28/tests/test_phase28_contracts.py
 @@ -0,0 +1,131 @@
@@ -47025,7 +48345,7 @@ index 000000000..20d171377
 +if __name__ == "__main__": unittest.main()
 diff --git a/tools/parp/phase28b/__init__.py b/tools/parp/phase28b/__init__.py
 new file mode 100644
-index 000000000..13ecc8cf2
+index 0000000000000000000000000000000000000000..13ecc8cf2ea22a6ec8d08e78825353399afb0b1a
 --- /dev/null
 +++ b/tools/parp/phase28b/__init__.py
 @@ -0,0 +1,2 @@
@@ -47033,7 +48353,7 @@ index 000000000..13ecc8cf2
 +
 diff --git a/tools/parp/phase28b/builder.py b/tools/parp/phase28b/builder.py
 new file mode 100644
-index 000000000..86f7663b2
+index 0000000000000000000000000000000000000000..86f7663b2f49213964860f5a040e7973e1d79968
 --- /dev/null
 +++ b/tools/parp/phase28b/builder.py
 @@ -0,0 +1,347 @@
@@ -47386,7 +48706,7 @@ index 000000000..86f7663b2
 +if __name__=="__main__": main()
 diff --git a/tools/parp/phase28b/contracts.py b/tools/parp/phase28b/contracts.py
 new file mode 100644
-index 000000000..e4488c2d5
+index 0000000000000000000000000000000000000000..e4488c2d5ed2f45c3455037a646bbab270170244
 --- /dev/null
 +++ b/tools/parp/phase28b/contracts.py
 @@ -0,0 +1,103 @@
@@ -47495,7 +48815,7 @@ index 000000000..e4488c2d5
 +    return before == after
 diff --git a/tools/parp/phase28b/features.py b/tools/parp/phase28b/features.py
 new file mode 100644
-index 000000000..c1a318dca
+index 0000000000000000000000000000000000000000..c1a318dca96ea4e8d731045b6dd4277df0293a00
 --- /dev/null
 +++ b/tools/parp/phase28b/features.py
 @@ -0,0 +1,141 @@
@@ -47642,7 +48962,7 @@ index 000000000..c1a318dca
 +
 diff --git a/tools/parp/phase28b/finalize.py b/tools/parp/phase28b/finalize.py
 new file mode 100644
-index 000000000..0773e16e9
+index 0000000000000000000000000000000000000000..0773e16e9acd20cc9a3487928e22884a074c2d55
 --- /dev/null
 +++ b/tools/parp/phase28b/finalize.py
 @@ -0,0 +1,197 @@
@@ -47845,7 +49165,7 @@ index 000000000..0773e16e9
 +if __name__=="__main__": main()
 diff --git a/tools/parp/phase28b/models.py b/tools/parp/phase28b/models.py
 new file mode 100644
-index 000000000..4f125f841
+index 0000000000000000000000000000000000000000..4f125f84131c7d2122e96c40c0d93c854e026dee
 --- /dev/null
 +++ b/tools/parp/phase28b/models.py
 @@ -0,0 +1,172 @@
@@ -48023,7 +49343,7 @@ index 000000000..4f125f841
 +            "positive_rate":(tp+fn)/max(1,len(labels)),"predicted_hot_rate":(tp+fp)/max(1,len(labels))}
 diff --git a/tools/parp/phase28b/pipeline.py b/tools/parp/phase28b/pipeline.py
 new file mode 100644
-index 000000000..ae835b9d2
+index 0000000000000000000000000000000000000000..ae835b9d2ebbf665109d1b7e056433aab0370dd1
 --- /dev/null
 +++ b/tools/parp/phase28b/pipeline.py
 @@ -0,0 +1,331 @@
@@ -48360,7 +49680,7 @@ index 000000000..ae835b9d2
 +if __name__=="__main__": main()
 diff --git a/tools/parp/phase28b/segments.py b/tools/parp/phase28b/segments.py
 new file mode 100644
-index 000000000..02419948b
+index 0000000000000000000000000000000000000000..02419948bc685f8827c4a76a197e739734eeccd8
 --- /dev/null
 +++ b/tools/parp/phase28b/segments.py
 @@ -0,0 +1,382 @@
@@ -48748,7 +50068,7 @@ index 000000000..02419948b
 +if __name__=="__main__": main()
 diff --git a/tools/parp/phase28b/test_runner.py b/tools/parp/phase28b/test_runner.py
 new file mode 100644
-index 000000000..38432a0bc
+index 0000000000000000000000000000000000000000..38432a0bca8f4d25df50e124441e64a2ea8c7132
 --- /dev/null
 +++ b/tools/parp/phase28b/test_runner.py
 @@ -0,0 +1,53 @@
@@ -48807,7 +50127,7 @@ index 000000000..38432a0bc
 +if __name__=="__main__": main()
 diff --git a/tools/parp/phase28b/tests/test_phase28b_contracts.py b/tools/parp/phase28b/tests/test_phase28b_contracts.py
 new file mode 100644
-index 000000000..037f0db8d
+index 0000000000000000000000000000000000000000..037f0db8d6665662df6498872afaa06490e1ab2a
 --- /dev/null
 +++ b/tools/parp/phase28b/tests/test_phase28b_contracts.py
 @@ -0,0 +1,122 @@
@@ -48935,7 +50255,7 @@ index 000000000..037f0db8d
 +if __name__ == '__main__': unittest.main()
 diff --git a/tools/parp/phase29a/__init__.py b/tools/parp/phase29a/__init__.py
 new file mode 100644
-index 000000000..be640a361
+index 0000000000000000000000000000000000000000..be640a361b6e91b54ffdd92c7f395d5f67a3f69a
 --- /dev/null
 +++ b/tools/parp/phase29a/__init__.py
 @@ -0,0 +1,2 @@
@@ -48943,7 +50263,7 @@ index 000000000..be640a361
 +
 diff --git a/tools/parp/phase29a/audit_phase28b.py b/tools/parp/phase29a/audit_phase28b.py
 new file mode 100644
-index 000000000..08e65a4e6
+index 0000000000000000000000000000000000000000..08e65a4e63c535cf1681709e82a5799d4d06a11f
 --- /dev/null
 +++ b/tools/parp/phase29a/audit_phase28b.py
 @@ -0,0 +1,105 @@
@@ -49054,7 +50374,7 @@ index 000000000..08e65a4e6
 +if __name__=="__main__": main()
 diff --git a/tools/parp/phase29a/contracts.py b/tools/parp/phase29a/contracts.py
 new file mode 100644
-index 000000000..ae41250a1
+index 0000000000000000000000000000000000000000..ae41250a14ba1b172b04caa24a9fb921f65743df
 --- /dev/null
 +++ b/tools/parp/phase29a/contracts.py
 @@ -0,0 +1,94 @@
@@ -49154,7 +50474,7 @@ index 000000000..ae41250a1
 +
 diff --git a/tools/parp/phase29a/expert_pipeline.py b/tools/parp/phase29a/expert_pipeline.py
 new file mode 100644
-index 000000000..2447dd761
+index 0000000000000000000000000000000000000000..2447dd7615a4bbefb71ad2d7ef0d32d8ceb90518
 --- /dev/null
 +++ b/tools/parp/phase29a/expert_pipeline.py
 @@ -0,0 +1,290 @@
@@ -49450,7 +50770,7 @@ index 000000000..2447dd761
 +if __name__=="__main__": main()
 diff --git a/tools/parp/phase29a/finalize.py b/tools/parp/phase29a/finalize.py
 new file mode 100644
-index 000000000..73a3e1c7b
+index 0000000000000000000000000000000000000000..73a3e1c7b20696fbe6d7a1922b4edfaf2c6ddeaf
 --- /dev/null
 +++ b/tools/parp/phase29a/finalize.py
 @@ -0,0 +1,181 @@
@@ -49637,7 +50957,7 @@ index 000000000..73a3e1c7b
 +if __name__=="__main__": main()
 diff --git a/tools/parp/phase29a/oracle_gate.py b/tools/parp/phase29a/oracle_gate.py
 new file mode 100644
-index 000000000..e6e284fab
+index 0000000000000000000000000000000000000000..e6e284fab32db5d3b7017087897c3e5ad85a1768
 --- /dev/null
 +++ b/tools/parp/phase29a/oracle_gate.py
 @@ -0,0 +1,204 @@
@@ -49847,7 +51167,7 @@ index 000000000..e6e284fab
 +if __name__=="__main__": main()
 diff --git a/tools/parp/phase29a/setup.py b/tools/parp/phase29a/setup.py
 new file mode 100644
-index 000000000..5d84b8193
+index 0000000000000000000000000000000000000000..5d84b8193829cdedd748c97e117997f8dc1b887b
 --- /dev/null
 +++ b/tools/parp/phase29a/setup.py
 @@ -0,0 +1,76 @@
@@ -49929,7 +51249,7 @@ index 000000000..5d84b8193
 +if __name__=="__main__": main()
 diff --git a/tools/parp/phase29a/tests/test_phase29a_contracts.py b/tools/parp/phase29a/tests/test_phase29a_contracts.py
 new file mode 100644
-index 000000000..bdeb44e62
+index 0000000000000000000000000000000000000000..bdeb44e6204db66b0490509bbbde549bac7b0935
 --- /dev/null
 +++ b/tools/parp/phase29a/tests/test_phase29a_contracts.py
 @@ -0,0 +1,59 @@
@@ -49994,7 +51314,7 @@ index 000000000..bdeb44e62
 +if __name__ == "__main__": unittest.main()
 diff --git a/tools/parp/plot_summary.py b/tools/parp/plot_summary.py
 new file mode 100755
-index 000000000..16cb5e57d
+index 0000000000000000000000000000000000000000..16cb5e57d8268784793702c885fa642fc8bd53f6
 --- /dev/null
 +++ b/tools/parp/plot_summary.py
 @@ -0,0 +1,23 @@
@@ -50023,7 +51343,7 @@ index 000000000..16cb5e57d
 +    main()
 diff --git a/tools/parp/reference_model.py b/tools/parp/reference_model.py
 new file mode 100755
-index 000000000..04cb4dc71
+index 0000000000000000000000000000000000000000..04cb4dc71f32ae95c5f1e7a93e560a2f61da6c20
 --- /dev/null
 +++ b/tools/parp/reference_model.py
 @@ -0,0 +1,38 @@
@@ -50067,7 +51387,7 @@ index 000000000..04cb4dc71
 +    return -1 if distances[state] > unknown_threshold else state
 diff --git a/tools/parp/region_decode.py b/tools/parp/region_decode.py
 new file mode 100755
-index 000000000..4c8093d32
+index 0000000000000000000000000000000000000000..4c8093d3205e568063af7171e71f0ecddd4eeef1
 --- /dev/null
 +++ b/tools/parp/region_decode.py
 @@ -0,0 +1,69 @@
@@ -50142,7 +51462,7 @@ index 000000000..4c8093d32
 +    return record
 diff --git a/tools/parp/region_schema.py b/tools/parp/region_schema.py
 new file mode 100755
-index 000000000..817ea5c76
+index 0000000000000000000000000000000000000000..817ea5c76e38f0c34825ea27cfff882e5bb27abf
 --- /dev/null
 +++ b/tools/parp/region_schema.py
 @@ -0,0 +1,171 @@
@@ -50319,7 +51639,7 @@ index 000000000..817ea5c76
 +    return asdict(value)
 diff --git a/tools/parp/scan_budget_reference.py b/tools/parp/scan_budget_reference.py
 new file mode 100644
-index 000000000..17ddea36f
+index 0000000000000000000000000000000000000000..17ddea36f7092765c1bb0edad2abd0a81c929143
 --- /dev/null
 +++ b/tools/parp/scan_budget_reference.py
 @@ -0,0 +1,78 @@
@@ -50403,7 +51723,7 @@ index 000000000..17ddea36f
 +            "clamp_min": clamp_min, "clamp_max": clamp_max}
 diff --git a/tools/parp/scan_budget_replay.py b/tools/parp/scan_budget_replay.py
 new file mode 100755
-index 000000000..4001178a2
+index 0000000000000000000000000000000000000000..4001178a21daa11cc21de95ec59ab4f6752b0766
 --- /dev/null
 +++ b/tools/parp/scan_budget_replay.py
 @@ -0,0 +1,53 @@
@@ -50462,7 +51782,7 @@ index 000000000..4001178a2
 +    main()
 diff --git a/tools/parp/schema.py b/tools/parp/schema.py
 new file mode 100755
-index 000000000..d61357677
+index 0000000000000000000000000000000000000000..d61357677c69b5e71cd07aca643b38e6f6e036bf
 --- /dev/null
 +++ b/tools/parp/schema.py
 @@ -0,0 +1,21 @@
@@ -50487,9 +51807,44 @@ index 000000000..d61357677
 +    return APP_BIND.pack(SCHEMA_VERSION, domain_id, app_id, generation,
 +                         updated_ns, expires_ns, epoch_id, model_version,
 +                         active)
+diff --git a/tools/parp/test_prediction_interfaces.sh b/tools/parp/test_prediction_interfaces.sh
+new file mode 100755
+index 0000000000000000000000000000000000000000..5c95d0dd027c6239d6e1909f29386527ea3a2726
+--- /dev/null
++++ b/tools/parp/test_prediction_interfaces.sh
+@@ -0,0 +1,29 @@
++#!/usr/bin/env bash
++set -euo pipefail
++
++kernel_root="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/../.." && pwd)"
++temp_root="$(mktemp -d --tmpdir parp-uapi.XXXXXX)"
++binary="$temp_root/uapi-layout"
++trap 'case "$temp_root" in /tmp/parp-uapi.*) rm -rf -- "$temp_root" ;; esac' EXIT
++
++# lzx-note: Prediction writes must be exposed only through parp/myfs.
++make -s -C "$kernel_root" O="$temp_root/build" headers_install \
++  INSTALL_HDR_PATH="$temp_root/headers"
++cc -Wall -Wextra -Werror -I"$temp_root/headers/include" \
++  "$kernel_root/tools/parp/uapi_layout_check.c" -o "$binary"
++"$binary"
++
++debugfs_root="${PARP_DEBUGFS_ROOT:-/sys/kernel/debug/parp}"
++for legacy in app_prior app_prior_batch app_bind; do
++  if [[ -e "$debugfs_root/$legacy" ]]; then
++    echo "FAIL: legacy writable prediction node still exists: $debugfs_root/$legacy" >&2
++    exit 1
++  fi
++done
++
++if [[ -e /dev/myfs ]]; then
++  test -c /dev/myfs
++  echo "PASS: /dev/myfs is a character device"
++else
++  echo "SKIP: /dev/myfs is not present on the running (pre-update) kernel"
++fi
 diff --git a/tools/parp/tests/test_app_alignment.py b/tools/parp/tests/test_app_alignment.py
 new file mode 100755
-index 000000000..080655812
+index 0000000000000000000000000000000000000000..08065581203e09062185f1f5fa741bcfb1d51879
 --- /dev/null
 +++ b/tools/parp/tests/test_app_alignment.py
 @@ -0,0 +1,43 @@
@@ -50538,7 +51893,7 @@ index 000000000..080655812
 +    unittest.main()
 diff --git a/tools/parp/tests/test_lstm_prior_bridge.py b/tools/parp/tests/test_lstm_prior_bridge.py
 new file mode 100644
-index 000000000..170bc64bd
+index 0000000000000000000000000000000000000000..170bc64bd6ce8cafb144763e5177fef0af057259
 --- /dev/null
 +++ b/tools/parp/tests/test_lstm_prior_bridge.py
 @@ -0,0 +1,135 @@
@@ -50679,7 +52034,7 @@ index 000000000..170bc64bd
 +    unittest.main()
 diff --git a/tools/parp/tests/test_phase26_tools.py b/tools/parp/tests/test_phase26_tools.py
 new file mode 100644
-index 000000000..26363bd7b
+index 0000000000000000000000000000000000000000..26363bd7b4bd0671d581684282b060cac16b22fb
 --- /dev/null
 +++ b/tools/parp/tests/test_phase26_tools.py
 @@ -0,0 +1,195 @@
@@ -50880,7 +52235,7 @@ index 000000000..26363bd7b
 +    unittest.main()
 diff --git a/tools/parp/tests/test_region_alignment.py b/tools/parp/tests/test_region_alignment.py
 new file mode 100755
-index 000000000..7c85d32ed
+index 0000000000000000000000000000000000000000..7c85d32ed304c7385d2f57ded4cb9ee11b1bbf1b
 --- /dev/null
 +++ b/tools/parp/tests/test_region_alignment.py
 @@ -0,0 +1,68 @@
@@ -50954,7 +52309,7 @@ index 000000000..7c85d32ed
 +    unittest.main()
 diff --git a/tools/parp/tests/test_scan_budget.py b/tools/parp/tests/test_scan_budget.py
 new file mode 100644
-index 000000000..8379bcdee
+index 0000000000000000000000000000000000000000..8379bcdee45725ccd793f50bf70b6d13f916051b
 --- /dev/null
 +++ b/tools/parp/tests/test_scan_budget.py
 @@ -0,0 +1,67 @@
@@ -51027,7 +52382,7 @@ index 000000000..8379bcdee
 +    unittest.main()
 diff --git a/tools/parp/tests/test_windows.py b/tools/parp/tests/test_windows.py
 new file mode 100755
-index 000000000..679c19a66
+index 0000000000000000000000000000000000000000..679c19a668acdd6330c3a2880c55782ee00b51f5
 --- /dev/null
 +++ b/tools/parp/tests/test_windows.py
 @@ -0,0 +1,53 @@
@@ -51084,9 +52439,52 @@ index 000000000..679c19a66
 +
 +if __name__ == "__main__":
 +    unittest.main()
+diff --git a/tools/parp/uapi_layout_check.c b/tools/parp/uapi_layout_check.c
+new file mode 100644
+index 0000000000000000000000000000000000000000..800c65feab2b8b1a43ab696a66568187f6b7fb44
+--- /dev/null
++++ b/tools/parp/uapi_layout_check.c
+@@ -0,0 +1,37 @@
++// SPDX-License-Identifier: GPL-2.0
++#include <stddef.h>
++#include <stdio.h>
++#include <linux/parp_predict.h>
++
++/* lzx-note: Compile-time/userspace guard for Python ctypes ABI parity. */
++_Static_assert(sizeof(struct parp_predict_entry_v1) == 16, "entry ABI drift");
++_Static_assert(sizeof(struct parp_predict_binding_v1) == 32, "binding ABI drift");
++_Static_assert(sizeof(struct parp_predict_state_v1) == 2656, "state ABI drift");
++_Static_assert(offsetof(struct parp_predict_state_v1, predictions) == 96,
++	       "prediction offset drift");
++_Static_assert(offsetof(struct parp_predict_state_v1, bindings) == 608,
++	       "binding offset drift");
++_Static_assert(sizeof(struct parp_predict_state_v2) == 2656,
++	       "state v2 ABI drift"); /* lzx-note */
++_Static_assert(offsetof(struct parp_predict_state_v2, predictions) == 96,
++	       "v2 prediction offset drift"); /* lzx-note */
++_Static_assert(offsetof(struct parp_predict_state_v2, bindings) == 608,
++	       "v2 binding offset drift"); /* lzx-note */
++
++int main(void)
++{
++	printf("abi_v1=%u abi_v2=%u entry=%zu binding=%zu state_v1=%zu "
++	       "state_v2=%zu set_v1=0x%lx get_v1=0x%lx set_v2=0x%lx "
++	       "get_v2=0x%lx\n",
++	       PARP_PREDICT_ABI_VERSION,
++	       PARP_PREDICT_ABI_VERSION_V2,
++	       sizeof(struct parp_predict_entry_v1),
++	       sizeof(struct parp_predict_binding_v1),
++	       sizeof(struct parp_predict_state_v1),
++	       sizeof(struct parp_predict_state_v2),
++	       (unsigned long)PARP_PREDICT_SET_STATE,
++	       (unsigned long)PARP_PREDICT_GET_STATE,
++	       (unsigned long)PARP_PREDICT_SET_STATE_V2,
++	       (unsigned long)PARP_PREDICT_GET_STATE_V2);
++	return 0;
++}
 diff --git a/tools/parp/window_analyze.py b/tools/parp/window_analyze.py
 new file mode 100755
-index 000000000..662924fb2
+index 0000000000000000000000000000000000000000..662924fb2ff70021eea9c68947933a1a03133dac
 --- /dev/null
 +++ b/tools/parp/window_analyze.py
 @@ -0,0 +1,135 @@

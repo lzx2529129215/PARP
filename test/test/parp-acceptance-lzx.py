@@ -88,6 +88,11 @@ def app_specs(session_dir: Path) -> dict[str, AppSpec]:
     firefox_profile = session_dir / "firefox-profile"
     thunderbird_profile = session_dir / "thunderbird-profile"
     fixture_dir = session_dir / "fixtures"
+    writer_asset = (
+        fixture_dir / "writer-test.odt"
+        if (fixture_dir / "writer-test.odt").is_file()
+        else fixture_dir / "writer-test.txt"
+    )  # lzx-note: real-interaction rounds use an editable native document.
     file_manager = "nautilus" if command_exists("nautilus") else "pcmanfm"
     file_manager_command = (
         f"nautilus --new-window {shlex.quote(str(REPO_ROOT))}"
@@ -98,9 +103,9 @@ def app_specs(session_dir: Path) -> dict[str, AppSpec]:
         "WPS": AppSpec("WPS", "wps", "wps", "wps", "wps|Wps", "WPS|Writer|文字", ("wps", "wpsoffice", "wpp", "et"), "Page_Down"),
         "FILES": AppSpec("FILES", "files", file_manager, file_manager_command, "org.gnome.Nautilus|Nautilus|nautilus|Pcmanfm|pcmanfm", "文件|Files|Home|主文件夹|PARP", ("nautilus", "pcmanfm"), "Page_Down"),
         "QQ": AppSpec("QQ", "qq", "qq", "qq", "qq|QQ|linuxqq", "QQ", ("qq", "linuxqq"), "Tab"),
-        "FIREFOX": AppSpec("FIREFOX", "firefox", "epiphany-browser", f"env -u http_proxy -u https_proxy -u HTTP_PROXY -u HTTPS_PROXY epiphany-browser --private-instance --profile={shlex.quote(str(firefox_profile))} --new-window {shlex.quote((fixture_dir / 'local-page.html').as_uri())}", "", "PARP local page", ("epiphany", "epiphany-browser"), "Page_Down"),  # lzx-note
-        "GIMP": AppSpec("GIMP", "gimp", "gimp", f"gimp {shlex.quote(str(fixture_dir / 'image-test.png'))}", "gimp|Gimp", "image-test", ("gimp", "gimp-2.10"), "plus"),  # lzx-note: startup splash is not workload-ready
-        "LIBREOFFICE": AppSpec("LIBREOFFICE", "libreoffice", "libreoffice", f"libreoffice -env:UserInstallation=file://{shlex.quote(str(fixture_dir / 'libreoffice-profile'))} --writer --nologo --nofirststartwizard --norestore {shlex.quote(str(fixture_dir / 'writer-test.txt'))}", "libreoffice-writer|soffice", "writer-test|Writer", ("soffice.bin", "soffice"), "Page_Down"),  # lzx-note: reject splash/tip modal windows
+        "FIREFOX": AppSpec("FIREFOX", "firefox", "epiphany-browser", f"env -u http_proxy -u https_proxy -u HTTP_PROXY -u HTTPS_PROXY epiphany-browser --private-instance --profile={shlex.quote(str(firefox_profile))} --new-window {shlex.quote((fixture_dir / 'local-page.html').as_uri())}", "epiphany|Epiphany", "PARP local page", ("epiphany", "epiphany-browser"), "Page_Down"),  # lzx-note: the first isolated Epiphany profile can expose a Blank page before loading the local fixture, so identify the real window by WM_CLASS.
+        "GIMP": AppSpec("GIMP", "gimp", "gimp", f"gimp --gimprc={shlex.quote(str(fixture_dir / 'gimprc'))} {shlex.quote(str(fixture_dir / 'image-test.png'))}", "gimp|Gimp", "image-test", ("gimp", "gimp-2.10"), "plus"),  # lzx-note: isolated 64 MiB tile cache makes real edits spill through GIMP's own swap file
+        "LIBREOFFICE": AppSpec("LIBREOFFICE", "libreoffice", "libreoffice", f"libreoffice -env:UserInstallation=file://{shlex.quote(str(fixture_dir / 'libreoffice-profile'))} --writer --nologo --nofirststartwizard --norestore {shlex.quote(str(writer_asset))}", "libreoffice-writer|soffice", "writer-test|Writer", ("soffice.bin", "soffice"), "Page_Down"),  # lzx-note: reject splash/tip modal windows
         "VLC": AppSpec("VLC", "vlc", "vlc", f"vlc --no-one-instance --no-video-title-show --no-qt-privacy-ask --no-metadata-network-access {shlex.quote(str(fixture_dir / 'audio-test.wav'))}", "vlc|Vlc", "VLC|audio-test", ("vlc",), "space"),
         "AUDACITY": AppSpec("AUDACITY", "audacity", "audacity", f"env HOME={shlex.quote(str(fixture_dir / 'audacity-home'))} XDG_CONFIG_HOME={shlex.quote(str(fixture_dir / 'audacity-config'))} audacity {shlex.quote(str(fixture_dir / 'audio-test.wav'))}", "audacity|Audacity", "Audacity|audio-test", ("audacity",), "space"),
         "THUNDERBIRD": AppSpec("THUNDERBIRD", "thunderbird", "thunderbird", f"thunderbird --no-remote --profile {shlex.quote(str(thunderbird_profile))} {shlex.quote(str(fixture_dir / 'mail-test.eml'))}", "", "PARP local message", ("thunderbird",), "Page_Down"),
@@ -121,8 +126,17 @@ def write_local_app_fixtures(session_dir: Path) -> None:
     fixture_dir.mkdir(parents=True, exist_ok=True)
     (session_dir / "firefox-profile").mkdir(parents=True, exist_ok=True)
     (session_dir / "thunderbird-profile").mkdir(parents=True, exist_ok=True)
-    for name in ("libreoffice-profile", "audacity-home", "audacity-config", "shotwell"):
+    for name in (
+        "libreoffice-profile", "audacity-home", "audacity-config", "shotwell",
+        "gimp-swap",
+    ):
         (fixture_dir / name).mkdir(parents=True, exist_ok=True)  # lzx-note
+    (fixture_dir / "gimprc").write_text(
+        f'(swap-path "{fixture_dir / "gimp-swap"}")\n'
+        '(swap-compression "fast")\n'
+        '(tile-cache-size 65536k)\n',
+        encoding="utf-8",
+    )  # lzx-note: application-native dirty pages, not a sidecar fixture.
     # lzx-note: Every round uses a fresh LibreOffice profile. Seed the profile
     # before launch so first-run and Tip-of-the-Day dialogs cannot steal focus
     # and turn an otherwise identical replay into an invalid GUI round.

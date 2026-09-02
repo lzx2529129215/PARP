@@ -532,20 +532,32 @@ def _map_foreground_app(
 ) -> str:
     comm = _read_proc_text(pid, "comm").strip()
     cmdline = _read_proc_text(pid, "cmdline").replace("\x00", " ")
-    text = " ".join(wm_classes + [title, comm, cmdline]).lower()
+    identity_text = " ".join(wm_classes + [comm]).lower()
+    fallback_text = " ".join([title, cmdline]).lower()
     # Several desktop names intentionally overlap (for example, LibreOffice
-    # Calc versus GNOME Calculator; Mozilla Firefox versus Thunderbird).  A
-    # first-match policy makes the outcome depend on JSON order.  Prefer the
-    # most specific matched keyword and retain configuration order only as a
-    # deterministic tie-breaker.
-    matches: list[tuple[int, int, str]] = []
-    for app_index, (app_key, keywords) in enumerate((app_window_keywords or DEFAULT_WINDOW_KEYWORDS).items()):
-        for keyword in keywords:
-            normalized = str(keyword).lower()
-            if normalized and normalized in text:
-                matches.append((len(normalized), -app_index, app_key))
-    if matches:
-        return max(matches)[2]
+    # Calc versus GNOME Calculator; Mozilla Firefox versus Thunderbird).  The
+    # LSAPP fixtures also intentionally share filenames: both VLC/Audacity use
+    # audio-test and GIMP/Shotwell/Image Viewer use image-test.  WM_CLASS and
+    # /proc/<pid>/comm identify the application, so rank their matches before
+    # title/cmdline fallback; within one source retain longest-keyword and
+    # configuration-order tie breaking.
+    keywords_by_app = app_window_keywords or DEFAULT_WINDOW_KEYWORDS
+
+    def best_match(text: str) -> str:
+        matches: list[tuple[int, int, str]] = []
+        for app_index, (app_key, keywords) in enumerate(keywords_by_app.items()):
+            for keyword in keywords:
+                normalized = str(keyword).lower()
+                if normalized and normalized in text:
+                    matches.append((len(normalized), -app_index, app_key))
+        return max(matches)[2] if matches else ""
+
+    identity_match = best_match(identity_text)
+    if identity_match:
+        return identity_match
+    fallback_match = best_match(fallback_text)
+    if fallback_match:
+        return fallback_match
     return "UNKNOWN"
 
 

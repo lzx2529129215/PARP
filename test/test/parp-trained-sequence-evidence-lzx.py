@@ -341,6 +341,120 @@ def prediction_gate(args: argparse.Namespace) -> int:
     return 0 if result["valid"] else 4
 
 
+def evaluate_workload_profile_gate(args: argparse.Namespace) -> dict[str, Any]:
+    """Find an applied ABI-v3 batch that carried the requested profiles.
+
+    The workload policy can consume dirty pages before the final five-step
+    prediction event. This gate proves the input at the event where it was
+    published instead of requiring the already-consumed state to remain dirty
+    at the final LSTM gate. lzx-note
+    """
+    marker = read_json(args.after_mark)
+    session = active_service_session(args.service_output_root)
+    myfs_path = session / "parp/myfs_events.csv"
+    expected: dict[str, str] = {}
+    reasons: list[str] = []
+    for item in filter(None, str(args.expected_workload_profiles).split("|")):
+        try:
+            app_key, workload_class = item.split(":", 1)
+        except ValueError:
+            reasons.append(f"invalid expected workload profile: {item}")
+            continue
+        expected[app_key] = workload_class
+    if not expected:
+        reasons.append("no expected workload profile supplied")
+
+    candidates: list[tuple[dict[str, str], dict[str, list[dict[str, Any]]]]] = []
+    observed_events: list[dict[str, Any]] = []
+    for row in read_csv(myfs_path):
+        try:
+            timestamp_ns = int(row.get("timestamp_ns", "0"))
+            kernel_abi = int(row.get("kernel_abi_version", "0"))
+            bindings = int(row.get("nr_bindings", "0"))
+        except (TypeError, ValueError):
+            continue
+        if timestamp_ns < int(marker["monotonic_ns"]):
+            continue
+        try:
+            details = json.loads(row.get("workload_binding_details", "[]"))
+        except (TypeError, json.JSONDecodeError):
+            details = []
+        if not isinstance(details, list):
+            details = []
+        by_app: dict[str, list[dict[str, Any]]] = {}
+        for detail in details:
+            if isinstance(detail, dict) and detail.get("app_key"):
+                by_app.setdefault(str(detail["app_key"]), []).append(detail)
+        matched = all(
+            any(
+                detail.get("valid") is True
+                and (
+                    workload_class == "ANY"
+                    or detail.get("class") == workload_class
+                )
+                for detail in by_app.get(app_key, [])
+            )
+            for app_key, workload_class in expected.items()
+        )
+        transport_valid = (
+            row.get("status") == "APPLIED"
+            and row.get("ioctl_success") == "true"
+            and kernel_abi >= int(args.minimum_myfs_abi)
+            and bindings >= int(args.minimum_bindings)
+            and row.get("ambiguous_domains") in {"0", 0}
+        )
+        observed_events.append({
+            "timestamp_ns": timestamp_ns,
+            "current_app": row.get("current_app"),
+            "status": row.get("status"),
+            "kernel_abi_version": kernel_abi,
+            "nr_bindings": bindings,
+            "matched": matched,
+            "profiles": {
+                app_key: by_app.get(app_key, []) for app_key in expected
+            },
+        })
+        if matched and transport_valid:
+            candidates.append((row, by_app))
+
+    selected: dict[str, str] = {}
+    observed: dict[str, list[dict[str, Any]]] = {}
+    if candidates:
+        selected, observed = candidates[-1]
+    elif not reasons:
+        reasons.append(
+            "no post-marker APPLIED /dev/myfs batch carried all expected workload profiles"
+        )
+    return {
+        "schema_version": 1,
+        "valid": not reasons,
+        "reasons": reasons,
+        "service_session": str(session),
+        "myfs_file": str(myfs_path),
+        "expected_workload_profiles": expected,
+        "observed_workload_profiles": {
+            app_key: observed.get(app_key, []) for app_key in expected
+        },
+        "myfs": selected,
+        "post_marker_events": observed_events,
+    }  # lzx-note
+
+
+def workload_profile_gate(args: argparse.Namespace) -> int:
+    deadline = time.monotonic() + args.timeout
+    result: dict[str, Any] = {"valid": False, "reasons": ["gate not evaluated"]}
+    while True:
+        result = evaluate_workload_profile_gate(args)
+        if result["valid"] or time.monotonic() >= deadline:
+            break
+        time.sleep(args.poll_seconds)
+    write_json(args.output, result)
+    print(args.output)
+    if not result["valid"]:
+        print("workload profile gate failed: " + "; ".join(result["reasons"]), flush=True)
+    return 0 if result["valid"] else 4
+
+
 def resolve_scope(root: Path, name: str) -> Path | None:
     matches = [path for path in root.rglob(name) if path.is_dir()]
     return matches[0] if len(matches) == 1 else None
@@ -551,6 +665,17 @@ def parser() -> argparse.ArgumentParser:
     gate.add_argument("--timeout", type=float, default=20.0)
     gate.add_argument("--poll-seconds", type=float, default=0.25)
     gate.set_defaults(func=prediction_gate)
+
+    workload_gate = sub.add_parser("workload-profile-gate")
+    workload_gate.add_argument("--after-mark", type=Path, required=True)
+    workload_gate.add_argument("--output", type=Path, required=True)
+    workload_gate.add_argument("--service-output-root", type=Path, default=SERVICE_OUTPUT_ROOT)
+    workload_gate.add_argument("--expected-workload-profiles", required=True)
+    workload_gate.add_argument("--minimum-bindings", type=int, default=16)
+    workload_gate.add_argument("--minimum-myfs-abi", type=int, default=3)
+    workload_gate.add_argument("--timeout", type=float, default=20.0)
+    workload_gate.add_argument("--poll-seconds", type=float, default=0.25)
+    workload_gate.set_defaults(func=workload_profile_gate)
 
     snap = sub.add_parser("snapshot")
     snap.add_argument("--cgroup", type=Path, required=True)

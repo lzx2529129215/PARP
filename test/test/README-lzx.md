@@ -253,3 +253,111 @@ python3 test/test/parp-real-pc-experiment-lzx.py run \
 ```
 
 增强组除预测、绑定、驻留和 `FILE_DIRTY` 画像门禁外，还强制要求 `writepage_promotions>0`；否则该轮直接判为 `INVALID`，不能用普通深扫冒充“提前开放写回”。父 cgroup、压力 worker 等无应用身份节点允许最多 16 次 profile miss，内核在这种 miss 上必须直接回退原生路径；同时非预期 workload class 动作也限制为最多 16 次，防止安全回退预算掩盖策略污染。其他实验默认仍要求 profile miss 为 0。最终比较冷脏来源回收量、热干净页保留率、热页首次复用 refault/major fault/读取量/延迟，以及压力阶段 PSI、pgscan、写入量和 swap。收益判定必须同时满足“比 bin-only 少回收热干净页”和“新增写回/扫描成本没有抵消复用收益”。<!-- lzx-note -->
+
+## R1–R7：应用内真实操作、串行复用和预测风险版本
+
+`parp-real-interaction-config-lzx.json` 保留 M1–M5 作为机制回归，另外提供七个不使用应用内存 fixture 的真实交互场景。七个 R 场景均满足：
+
+- `synthetic_app_working_set=false`；
+- 不启动 `memory-fixture-lzx.py` 或 `reclaim-substitution-fixture-lzx.py`；
+- 不用 `PREPARE`、`MADV_COLD`、`REDIRTY`、`TOUCH_FILE/ANON/CLEAN` 建立或复用工作集；
+- 不启动匿名内存压力器；
+- 工作集由真实 GUI 应用打开离线 HTML、EML、WAV、ODT、PDF 和 8 张 4096×4096 图片，并通过滚动、翻页、搜索、播放、缩放、绘图和编辑产生；
+- 压力阶段只向实验父 cgroup 的 `memory.reclaim` 请求固定回收量，回收对象全部是此前应用操作产生的真实页面。该边界仍是实验控制，不应表述成完全自然发生的整机压力。<!-- lzx-note -->
+
+七个场景分别为：
+
+| 场景 | 应用内动作 | 压力后动作 | 主要目的 |
+|---|---|---|---|
+| `r1_app_cold_retire` | 8 个应用建立工作集；五个冷应用使用一次后不再返回 | 不复用冷应用 | 检查后续不用的真实应用是否优先释放内存 |
+| `r2_app_predicted_return` | Firefox/Thunderbird/VLC 按训练序列切换 | Firefox 回到首页、连续滚动并搜索第 1200 节 | 测量预测热应用的 refault、major fault、PSI 和交互延迟 |
+| `r3_app_source_distribution` | 三个热应用持续切换，五个冷应用留在后台 | 依次真实操作 Firefox、Thunderbird、VLC | 统计真实 cgroup 的冷热回收来源并验证多热应用复用 |
+| `r4_app_dirty_substitution` | GIMP 绘图、LibreOffice 追加并保存 4096 段文本 | 复用三个热应用 | 只有真实冷 cgroup 的 `file_dirty` 达标才验证冷脏替代收益 |
+| `r5_app_writeback_gate` | 与 R4 相同 | 在 `laptop_mode=600` 下回收后复用三个热应用 | 要求 `writepage_promotions>0`，验证受限写回下的条件收益 |
+| `r6_app_serial_major_reuse` | Firefox 页面内部申请并实际写入 384 MiB 匿名工作集；训练序列只切换窗口，不再触碰这些页 | 父 cgroup 使用相同的 `memory.reclaim swappiness=max` 匿名页请求；前台主线程按 16 MiB 分成 24 步，以确定性乱序逐页同步读写，每步等待浏览器标题确认主线程页面访问完成 | 把匿名换入放在串行关键路径，测量 Native 的 major-fault 门槛以及 PARP 的串行复用时间收益 |
+| `r7_app_fairness_misprediction` | GIMP 先做一轮不计分的滤镜预热；随后 Firefox、Thunderbird、VLC、GIMP 分别执行一次无压力热态操作作为自身基线，GIMP 逐张对六张 4096×4096 图像执行 Invert，之后重放训练序列 | 双方一致用 `memory.reclaim swappiness=max` 回收 512 MiB；四个应用执行相同操作，其中低概率 GIMP 被故意再次使用 | 用归一化 slowdown、Jain 指数观察公平性，并量化预测错误给 GIMP 带来的 fault、PSI 和响应时间代价 |
+
+R1–R7 的严格有效性门包括：8 个 GUI scope 可识别、应用工作集总量至少达到配置值、LSTM 历史/概率/绑定有效、回收实际达到目标比例、无 OOM，以及复用动作全部成功。R4/R5 额外要求观测到配置指定的冷应用高代价回收工作集；R5 还要求压力前 `laptop_mode` 证据正确，只有配置开启 `require_writepage_promotion` 时才强制 promotion 非零。R6 要求全部 24 个浏览器确认步骤完成，并在 Native 基线达到配置的 major-fault 下限；PARP 不强制 fault 下限，否则会把“成功避免换出”错误判成无效。R7 要求四个应用的热态/回收后 application cgroup 页面恢复稳定点齐全，确认故意复用的 GIMP 在模型输出中确实低于冷概率阈值，并要求 GIMP 被回收量达到 32 MiB；Native 还必须达到 128 次 `major fault + refault`，PARP 不强制该 fault 下限。<!-- lzx-note -->
+
+先分别执行 Native 与 bin-only 的 R1–R3：
+
+```bash
+python3 test/test/parp-real-pc-experiment-lzx.py run \
+  --config test/test/parp-real-interaction-config-lzx.json \
+  --policy native_kernel --scenario r2_app_predicted_return \
+  --rounds 3 --seed 20260831
+
+python3 test/test/parp-real-pc-experiment-lzx.py run \
+  --config test/test/parp-real-interaction-config-lzx.json \
+  --policy bin_lstm --scenario r2_app_predicted_return \
+  --rounds 3 --seed 20260831 \
+  --replay-from <上一步Native输出目录>
+```
+
+R4 先比较 Native 与 bin-only；R5 在同一 r11 内核上比较 bin-only 与带 workload/cold-aggressive 的策略：
+
+```bash
+python3 test/test/parp-real-pc-experiment-lzx.py run \
+  --config test/test/parp-real-interaction-config-lzx.json \
+  --policy bin_lstm --scenario r5_app_writeback_gate \
+  --rounds 3 --seed 20260831
+
+python3 test/test/parp-real-pc-experiment-lzx.py run \
+  --config test/test/parp-real-interaction-config-lzx.json \
+  --policy bin_workload_lstm --scenario r5_app_writeback_gate \
+  --rounds 3 --seed 20260831
+```
+
+R6/R7 先在 Native 运行，再在 PARP 内核使用相同 seed 和动作计划严格重放：
+
+```bash
+python3 test/test/parp-real-pc-experiment-lzx.py run \
+  --config test/test/parp-real-interaction-config-lzx.json \
+  --policy native_kernel --scenario r6_app_serial_major_reuse \
+  --rounds 3 --seed 20260921
+
+python3 test/test/parp-real-pc-experiment-lzx.py run \
+  --config test/test/parp-real-interaction-config-lzx.json \
+  --policy bin_workload_lstm --scenario r6_app_serial_major_reuse \
+  --rounds 3 --seed 20260921 --replay-from <上一步Native输出目录>
+
+python3 test/test/parp-real-pc-experiment-lzx.py run \
+  --config test/test/parp-real-interaction-config-lzx.json \
+  --policy native_kernel --scenario r7_app_fairness_misprediction \
+  --rounds 3 --seed 20260931
+
+python3 test/test/parp-real-pc-experiment-lzx.py run \
+  --config test/test/parp-real-interaction-config-lzx.json \
+  --policy bin_workload_lstm --scenario r7_app_fairness_misprediction \
+  --rounds 3 --seed 20260931 --replay-from <上一步Native输出目录>
+```
+
+正式配对必须复用相同配置和 seed，并用 `--replay-from` 读取 Native 每轮的 `action-plan.json`。该计划对临时路径和 Native/PARP 的 `/dev/myfs` 传输差异做归一化，但锁定资产 SHA-256、应用集合、冷热角色、训练历史、场景专用回收目标以及全部用户 UI 动作；哈希不一致时 Apply 在实验开始前直接 `BLOCKED`。主指标来自压力前、压力后和真实 UI 复用后的逐应用 cgroup 快照：`memory.current`、anon/file、`workingset_refault_{file,anon}`、`pswpin/pswpout`、`pgfault/pgmajfault`、direct scan、I/O 和 PSI。延迟同时输出旧的动作墙钟总和、扣除脚本按键/等待节奏后的 `successful_net_total_ms`，以及从窗口切换请求到“相对操作前画面已经变化、随后连续三帧近似稳定”的 `responsive_spans/net_responsive_ms`；旧画面一直不变不能再被误判为快速完成。R6 另输出每段主线程触页到浏览器渲染确认的时间；R7 输出逐应用归一化 slowdown、Jain 公平指数和错误预测应用代价。R4/R5 不再具有 fixture 的逐 inode `mincore()` 归因能力，因此它们用于真实体验验证，不能替代 M4/M5 的 clean/dirty 精确机制证据。<!-- lzx-note -->
+
+## R8：15 应用 memcg-OOM 生存实验
+
+`parp-r8-oom-survival-config-lzx.json` 是独立于 R1–R7 的 OOM 场景。它启动全部 15 个 LSAPP GUI 应用，并只通过应用自身打开的离线内容建立工作集：Firefox 解码 8 张 4096×4096 图像和 canvas，Thunderbird/LibreOffice/GIMP/Audacity/VLC/Evince 等执行确定的本地 EML、ODT、图片、WAV、PDF 操作。工作集门禁要求重型应用至少 128 MiB、中型至少 32 MiB、轻型至少 16 MiB，总计至少 1536 MiB。<!-- lzx-note -->
+
+Firefox 是唯一压力源。它切换到本地 `oom-pressure.html` 后，每次自动化点击都新建并保留一个 64 MiB `Uint8Array`，按 4 KiB 写入以提交实际页，并用窗口标题确认累计完成量；任何 JS 分配异常都会发布 `FAILED`，不会被记作低 OOM。14 个 victim scope 均为 `MemoryOOMGroup=yes` 且启动时继承 `oom_score_adj=500`；Firefox 为 0。自动化、trace collector 和 OOM watcher 都不在实验父 slice 内。<!-- lzx-note -->
+
+先只做 Native 校准；该命令执行 3 轮无压力工作集，按 `round_up_128MiB(max(P95 + 1024MiB, P95 × 1.10))` 生成候选 `MemoryMax`，检查不超过 `min(10240MiB, MemTotal - 4096MiB)`，再从 512 MiB 起每 128 MiB 做 5 轮浏览器 burst 搜索。只有至少 4 轮出现 1–3 个 victim 应用 OOM、没有超过 3 个 victim 且所有压力完整时，才会输出冻结配置。<!-- lzx-note -->
+
+```bash
+python3 test/test/parp-real-pc-experiment-lzx.py calibrate-r8 \
+  --config test/test/parp-r8-oom-survival-config-lzx.json \
+  --policy native_kernel --output <校准目录>
+
+python3 test/test/parp-real-pc-experiment-lzx.py run \
+  --config <校准目录>/frozen-config.json --policy native_kernel \
+  --scenario r8_multi_app_oom_survival --rounds 10 --seed 20261001
+
+python3 test/test/parp-real-pc-experiment-lzx.py run \
+  --config <校准目录>/frozen-config.json --policy bin_lstm \
+  --scenario r8_multi_app_oom_survival --rounds 10 --seed 20261001 \
+  --replay-from <Native输出根目录>
+
+python3 test/test/parp-real-pc-experiment-lzx.py report-r8 \
+  --native <Native输出根目录> --bin <Bin输出根目录> --output <对比报告目录>
+```
+
+每轮会保存压力请求/提交字节、distinct victim 应用、`oom_group_kill`/`oom_kill`/`oom` 增量、每应用压力前后 cgroup/PID/window 状态、`mark_victim` PID 归因、未知或 slice 外 OOM 标记，以及 reclaim-bin 选择/扫描/回收计数。任何 trace 丢失、Firefox 死亡、未知 PID、宿主 OOM、无 trace 的应用消失、压力字节不一致或 bin-only 未真正打开 reclaim-bin 都使该轮无效。报告仅使用 10 个有效同 seed 配对；Native victim 总数少于 10 时为 `INCONCLUSIVE`，否则只有总 victim 应用数下降至少 30% 且 Bin 中位数不高于 Native 才为 `PASS`。`r8_llm` 仅保留 runtime/GGUF 哈希、prompt、上下文、线程和缓存状态的未来契约；当前 R8 不安装 runtime、不下载模型，也不把 LLM 纳入结果。<!-- lzx-note -->

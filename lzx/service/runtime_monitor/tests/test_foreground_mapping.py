@@ -3,6 +3,7 @@ from __future__ import annotations
 import sys
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
@@ -51,6 +52,34 @@ class ForegroundMappingTests(unittest.TestCase):
             ),
             "DESKTOP",
         )
+
+    def test_process_identity_wins_over_shared_fixture_filename(self) -> None:
+        keywords = {
+            "VLC": ["vlc", "audio-test"],
+            "AUDACITY": ["audacity", "audio-test"],
+            "GIMP": ["gimp", "image-test"],
+            "SHOTWELL": ["shotwell", "photo"],
+        }
+        with patch(
+            "collectors.foreground._read_proc_text",
+            side_effect=lambda _pid, name: (
+                "audacity\n" if name == "comm" else "audacity /fixtures/audio-test.wav\0"
+            ),
+        ):
+            self.assertEqual(
+                _map_foreground_app([], "audio-test.wav", 123, keywords),
+                "AUDACITY",
+            )
+        with patch(
+            "collectors.foreground._read_proc_text",
+            side_effect=lambda _pid, name: (
+                "shotwell\n" if name == "comm" else "shotwell /fixtures/image-test.png\0"
+            ),
+        ):
+            self.assertEqual(
+                _map_foreground_app([], "image-test.png", 456, keywords),
+                "SHOTWELL",
+            )
 
 
 if __name__ == "__main__":

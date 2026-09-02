@@ -60,6 +60,7 @@ class Context:
     calibration_only: bool = False
     calibration_output_dir: Path | None = None
     screenshot_output_dir: Path | None = None
+    visual_baselines: dict[str, bytes] = field(default_factory=dict)
 
 
 @dataclass(frozen=True)
@@ -221,7 +222,65 @@ def _clear_stale_scope(unit: str) -> None:
     time.sleep(0.2)
 
 
-def _cgroup_launch(command: str, name: str, env: dict[str, str], test_slice: str = "") -> str:
+_ALLOWED_SCOPE_PROPERTIES = frozenset({"MemoryOOMGroup"})
+
+
+def _scope_property_args(properties: Any) -> list[str]:
+    if properties in (None, {}):
+        return []
+    if not isinstance(properties, dict):
+        raise AutomationError("scope_properties 必须是对象")
+    unexpected = sorted(set(properties) - _ALLOWED_SCOPE_PROPERTIES)
+    if unexpected:
+        raise AutomationError("不允许的 scope property: " + ",".join(unexpected))
+    for key, value in sorted(properties.items()):
+        normalized = str(value).lower() if isinstance(value, bool) else str(value)
+        if key == "MemoryOOMGroup" and normalized not in {"yes", "no", "true", "false", "1", "0"}:
+            raise AutomationError("MemoryOOMGroup 必须是布尔值")
+    # systemd 249 exposes no MemoryOOMGroup= unit property even though the
+    # kernel's delegated cgroup v2 endpoint exists.  R8 therefore applies this
+    # one allow-listed setting directly after scope creation and verifies it
+    # before pressure.  Do not pass an unknown property to systemd-run.
+    return []
+
+
+def _apply_scope_properties(unit: str, properties: Any) -> None:
+    _scope_property_args(properties)
+    if not properties:
+        return
+    requested = str(properties["MemoryOOMGroup"]).lower() in {"yes", "true", "1"}
+    deadline = time.monotonic() + 5.0
+    last_reason = "scope cgroup unavailable"
+    while time.monotonic() <= deadline:
+        result = subprocess.run(
+            ["systemctl", "--user", "show", unit, "--property=ControlGroup", "--value"],
+            text=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=False,
+        )
+        relative = result.stdout.strip()
+        if relative:
+            endpoint = Path("/sys/fs/cgroup") / relative.lstrip("/") / "memory.oom.group"
+            try:
+                endpoint.write_text("1\n" if requested else "0\n", encoding="ascii")
+                observed = endpoint.read_text(encoding="ascii").strip()
+                expected = "1" if requested else "0"
+                if observed != expected:
+                    raise AutomationError(
+                        f"{unit} memory.oom.group mismatch: expected={expected} observed={observed}"
+                    )
+                log(f"scope property {unit}: memory.oom.group={observed}")
+                return
+            except (FileNotFoundError, PermissionError, OSError) as exc:
+                last_reason = str(exc)
+        elif result.stderr.strip():
+            last_reason = result.stderr.strip()
+        time.sleep(0.05)
+    raise AutomationError(f"cannot apply MemoryOOMGroup to {unit}: {last_reason}")
+
+
+def _cgroup_launch(
+    command: str, name: str, env: dict[str, str], test_slice: str = "",
+    scope_properties: Any = None,
+) -> str:
     """Launch *command* (simple, no shell syntax) in a systemd scope.
 
     Uses ``--scope`` so the cgroup stays alive as long as **any** child
@@ -236,15 +295,20 @@ def _cgroup_launch(command: str, name: str, env: dict[str, str], test_slice: str
     base = ["systemd-run", "--user", "--scope", f"--unit={unit_name}"]
     if test_slice:
         base.append(f"--slice={test_slice}")
+    base.extend(_scope_property_args(scope_properties))
     args = _inject_env(base, env)
     args.extend(shlex.split(command))
     # systemd-run --scope blocks as long as the scope has processes.
     # Run in the background so the automation can continue.
     subprocess.Popen(args, env=env)
+    _apply_scope_properties(unit, scope_properties)
     return unit
 
 
-def _cgroup_launch_shell(command: str, name: str, env: dict[str, str], test_slice: str = "") -> str:
+def _cgroup_launch_shell(
+    command: str, name: str, env: dict[str, str], test_slice: str = "",
+    scope_properties: Any = None,
+) -> str:
     """Launch a full *shell* command in a systemd scope.
 
     ``nohup`` and trailing ``&`` are stripped — systemd already daemonises.
@@ -261,9 +325,11 @@ def _cgroup_launch_shell(command: str, name: str, env: dict[str, str], test_slic
     base = ["systemd-run", "--user", "--scope", f"--unit={unit_name}"]
     if test_slice:
         base.append(f"--slice={test_slice}")
+    base.extend(_scope_property_args(scope_properties))
     args = _inject_env(base, env)
     args.extend(["sh", "-c", cmd])
     subprocess.Popen(args, env=env)
+    _apply_scope_properties(unit, scope_properties)
     return unit
 
 
@@ -1095,7 +1161,10 @@ def launch(action: dict[str, Any], ctx: Context) -> None:
         return
     env = os.environ.copy()
     if _cgroup_available():
-        unit_name = _cgroup_launch(command, scope_name, env, test_slice=ctx.test_slice)
+        unit_name = _cgroup_launch(
+            command, scope_name, env, test_slice=ctx.test_slice,
+            scope_properties=action.get("scope_properties"),
+        )
         log(f"launch {command}  (cgroup: {unit_name})")
         ctx.processes[name] = unit_name
     else:
@@ -1539,9 +1608,28 @@ def robust_switch_to_app(action: dict[str, Any], ctx: Context, app: str) -> None
             subprocess.run(["xdotool", "windowactivate", candidate.window_id], check=False)
         time.sleep(min(1.0, 0.2 + attempt * 0.15))  # lzx-note
         active = get_foreground_window_info()
-        if active.mapped_app == app:
+        minimum_width = get_int(action, "minimum_foreground_width", 0)
+        minimum_height = get_int(action, "minimum_foreground_height", 0)
+        foreground_geometry_valid = (
+            active.width >= minimum_width and active.height >= minimum_height
+        )
+        if active.mapped_app == app and foreground_geometry_valid:
             log(f"switch {app} verified: {format_window_info(active)}")
             return
+        if (
+            active.mapped_app == app
+            and not foreground_geometry_valid
+            and bool(action.get("dismiss_small_transient"))
+        ):
+            # Epiphany can redirect an activation request to a short-lived
+            # profile/modal window. X11 then reports the right WM_CLASS while
+            # GNOME still considers the desktop foreground. Dismiss that
+            # transient and retry the large content window through the next
+            # activation backend. lzx-note
+            subprocess.run(
+                ["xdotool", "key", "--clearmodifiers", "Escape"], check=False,
+            )
+            time.sleep(0.25)
         errors.append(
             f"attempt {attempt}: active={format_window_info(active)} "
             f"candidates={[format_window_info(item) for item in candidates]}"
@@ -1598,6 +1686,213 @@ def wait_window(action: dict[str, Any], ctx: Context) -> None:
     raise AutomationError(f"wait_window {app} timeout after {timeout:g}s; {last_error}")
 
 
+def wait_window_title(action: dict[str, Any], ctx: Context) -> None:
+    """Wait until an application's real X11 window publishes a state title."""
+    app = infer_app(action)
+    expected = get_str(action, "expected_title")
+    if not expected:
+        raise AutomationError("wait_window_title 需要 expected_title")
+    if ctx.dry_run:
+        log(f"dry-run: wait_window_title {app} contains {expected!r}")
+        return
+    timeout = max(0.1, get_float(action, "timeout", 15.0))
+    poll = max(0.005, get_float(action, "poll_seconds", 0.02))
+    deadline = time.monotonic() + timeout
+    observed: list[str] = []
+    while time.monotonic() <= deadline:
+        candidates = list_window_candidates(action, app)
+        for candidate in candidates:
+            if candidate.mapped_app == app and expected in candidate.title:
+                log(
+                    f"wait_window_title {app}: expected={expected!r} "
+                    f"observed={candidate.title!r}"
+                )
+                return
+            if candidate.title and candidate.title not in observed:
+                observed.append(candidate.title)
+        time.sleep(poll)
+    raise AutomationError(
+        f"wait_window_title {app} timeout after {timeout:g}s; "
+        f"expected={expected!r} observed={observed[-8:]}"
+    )
+
+
+def _window_visual_sample(window_id: str, width: int, height: int) -> bytes:
+    """Capture a tiny grayscale rendering without writing an unbounded image log."""
+    require_tool("import")
+    require_tool("convert")
+    capture = subprocess.run(
+        ["import", "-silent", "-window", window_id, "png:-"],
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        check=False,
+    )
+    if capture.returncode != 0 or not capture.stdout:
+        detail = capture.stderr.decode("utf-8", errors="replace").strip()
+        raise AutomationError(f"window visual capture failed: {detail or capture.returncode}")
+    sample = subprocess.run(
+        [
+            "convert", "png:-", "-resize", f"{width}x{height}!",
+            "-colorspace", "Gray", "-depth", "8", "gray:-",
+        ],
+        input=capture.stdout,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        check=False,
+    )
+    if sample.returncode != 0 or not sample.stdout:
+        detail = sample.stderr.decode("utf-8", errors="replace").strip()
+        raise AutomationError(f"window visual conversion failed: {detail or sample.returncode}")
+    return sample.stdout
+
+
+def _mean_absolute_byte_delta(first: bytes, second: bytes) -> float:
+    if len(first) != len(second) or not first:
+        return float("inf")
+    return sum(abs(left - right) for left, right in zip(first, second)) / len(first)
+
+
+def capture_visual_baseline(action: dict[str, Any], ctx: Context) -> None:
+    """Capture the pre-operation frame used to reject an unchanged old frame."""
+    app = infer_app(action)
+    key_name = get_str(action, "baseline_key") or app
+    if ctx.dry_run:
+        log(f"dry-run: capture_visual_baseline {app} key={key_name}")
+        return
+    candidate = best_window_candidate(action, app)
+    if candidate is None or candidate.mapped_app != app:
+        raise AutomationError(f"capture_visual_baseline {app}: no mapped window")
+    width = max(8, get_int(action, "sample_width", 32))
+    height = max(8, get_int(action, "sample_height", 32))
+    ctx.visual_baselines[key_name] = _window_visual_sample(
+        candidate.window_id, width, height,
+    )
+    log(f"capture_visual_baseline {app}: key={key_name}")
+
+
+def wait_visual_stable(action: dict[str, Any], ctx: Context) -> None:
+    """Wait for consecutive near-identical rendered frames of an app window."""
+    app = infer_app(action)
+    if ctx.dry_run:
+        log(f"dry-run: wait_visual_stable {app}")
+        return
+    timeout = max(0.1, get_float(action, "timeout", 8.0))
+    poll = max(0.01, get_float(action, "poll_seconds", 0.05))
+    required = max(2, get_int(action, "stable_samples", 3))
+    tolerance = max(0.0, get_float(action, "mean_abs_delta", 0.75))
+    width = max(8, get_int(action, "sample_width", 32))
+    height = max(8, get_int(action, "sample_height", 32))
+    baseline_key = get_str(action, "baseline_key") or app
+    require_change = bool(action.get("require_visual_change", False))
+    change_threshold = max(
+        tolerance, get_float(action, "minimum_change_delta", 1.0),
+    )
+    baseline = ctx.visual_baselines.get(baseline_key)
+    if require_change and baseline is None:
+        raise AutomationError(
+            f"wait_visual_stable {app}: missing baseline {baseline_key!r}"
+        )
+    deadline = time.monotonic() + timeout
+    previous: bytes | None = None
+    stable = 0
+    changed = not require_change
+    last_delta = float("inf")
+    while time.monotonic() <= deadline:
+        candidate = best_window_candidate(action, app)
+        if candidate is None or candidate.mapped_app != app:
+            time.sleep(poll)
+            continue
+        sample = _window_visual_sample(candidate.window_id, width, height)
+        if not changed and baseline is not None:
+            changed = _mean_absolute_byte_delta(baseline, sample) >= change_threshold
+            if not changed:
+                previous = sample
+                time.sleep(poll)
+                continue
+        if previous is not None:
+            last_delta = _mean_absolute_byte_delta(previous, sample)
+            stable = stable + 1 if last_delta <= tolerance else 0
+            if stable >= required - 1:
+                log(
+                    f"wait_visual_stable {app}: samples={required} "
+                    f"changed={changed} mean_abs_delta={last_delta:.3f}"
+                )
+                ctx.visual_baselines.pop(baseline_key, None)
+                return
+        previous = sample
+        time.sleep(poll)
+    raise AutomationError(
+        f"wait_visual_stable {app} timeout after {timeout:g}s; "
+        f"changed={changed} stable={stable}/{required - 1} "
+        f"last_delta={last_delta:.3f}"
+    )
+
+
+def _unified_cgroup_path(raw: str) -> Path:
+    for line in raw.replace("|", "\n").splitlines():
+        fields = line.split(":", 2)
+        if len(fields) == 3 and fields[0] == "0" and fields[2].startswith("/"):
+            return Path("/sys/fs/cgroup") / fields[2].lstrip("/")
+    raise AutomationError(f"cannot resolve unified cgroup from {raw!r}")
+
+
+def _cgroup_pagein_counters(path: Path) -> tuple[int, int, int]:
+    values: dict[str, int] = {}
+    try:
+        for line in (path / "memory.stat").read_text(encoding="utf-8").splitlines():
+            fields = line.split()
+            if len(fields) == 2 and fields[0] in {
+                "pgmajfault", "pswpin", "workingset_refault_anon",
+                "workingset_refault_file",
+            }:
+                values[fields[0]] = int(fields[1])
+    except (FileNotFoundError, PermissionError, OSError, ValueError) as exc:
+        raise AutomationError(f"cannot sample {path}/memory.stat: {exc}") from exc
+    return (
+        values.get("pgmajfault", 0),
+        values.get("pswpin", 0),
+        values.get("workingset_refault_anon", 0)
+        + values.get("workingset_refault_file", 0),
+    )
+
+
+def wait_cgroup_pagein_stable(action: dict[str, Any], ctx: Context) -> None:
+    """Wait until an application's page-in/refault counters stop advancing."""
+    app = infer_app(action)
+    if ctx.dry_run:
+        log(f"dry-run: wait_cgroup_pagein_stable {app}")
+        return
+    candidate = best_window_candidate(action, app)
+    if candidate is None or candidate.mapped_app != app:
+        raise AutomationError(f"wait_cgroup_pagein_stable {app}: no mapped window")
+    cgroup = _unified_cgroup_path(candidate.cgroup_path)
+    timeout = max(0.2, get_float(action, "timeout", 8.0))
+    poll = max(0.02, get_float(action, "poll_seconds", 0.05))
+    minimum_wait = max(0.0, get_float(action, "minimum_wait_seconds", 0.2))
+    required = max(2, get_int(action, "stable_samples", 4))
+    deadline = time.monotonic() + timeout
+    started = time.monotonic()
+    initial = _cgroup_pagein_counters(cgroup)
+    previous = initial
+    stable = 0
+    while time.monotonic() <= deadline:
+        time.sleep(poll)
+        current = _cgroup_pagein_counters(cgroup)
+        stable = stable + 1 if current == previous else 0
+        previous = current
+        if time.monotonic() - started >= minimum_wait and stable >= required - 1:
+            delta = tuple(last - first for first, last in zip(initial, current))
+            log(
+                f"wait_cgroup_pagein_stable {app}: cgroup={cgroup} "
+                f"samples={required} delta(pgmajfault,pswpin,refault)={delta}"
+            )
+            return
+    raise AutomationError(
+        f"wait_cgroup_pagein_stable {app} timeout after {timeout:g}s; "
+        f"stable={stable}/{required - 1} counters={previous}"
+    )
+
+
 def verify_foreground(action: dict[str, Any], ctx: Context) -> None:
     app = infer_app(action)
     if ctx.dry_run:
@@ -1606,6 +1901,13 @@ def verify_foreground(action: dict[str, Any], ctx: Context) -> None:
     active = get_foreground_window_info()
     if active.mapped_app != app:
         raise AutomationError(f"foreground verify failed: expected={app} active={format_window_info(active)}")
+    minimum_width = get_int(action, "minimum_foreground_width", 0)
+    minimum_height = get_int(action, "minimum_foreground_height", 0)
+    if active.width < minimum_width or active.height < minimum_height:
+        raise AutomationError(
+            "foreground geometry verify failed: "
+            f"expected>={minimum_width}x{minimum_height} active={format_window_info(active)}"
+        )
     log(f"verify_foreground {app}: {format_window_info(active)}")
 
 
@@ -1826,6 +2128,10 @@ ACTION_HANDLERS = {
     "window_state": window_state,
     "switch": switch,
     "wait_window": wait_window,
+    "wait_window_title": wait_window_title,
+    "capture_visual_baseline": capture_visual_baseline,
+    "wait_visual_stable": wait_visual_stable,
+    "wait_cgroup_pagein_stable": wait_cgroup_pagein_stable,
     "verify_foreground": verify_foreground,
     "verify_window_profile": verify_window_profile,
     "dialog_path": dialog_path,
@@ -1847,7 +2153,10 @@ def _handle_shell(action: dict[str, Any], ctx: Context) -> None:
         log(f"dry-run: {command}")
         return
     if name and _cgroup_available():
-        unit_name = _cgroup_launch_shell(command, name, os.environ.copy(), test_slice=ctx.test_slice)
+        unit_name = _cgroup_launch_shell(
+            command, name, os.environ.copy(), test_slice=ctx.test_slice,
+            scope_properties=action.get("scope_properties"),
+        )
         log(f"shell (cgroup: {unit_name}): {command}")
         ctx.processes[name] = unit_name
     else:
@@ -1943,7 +2252,7 @@ def main(argv: list[str] | None = None) -> int:
                     continue
                 trace_action(ctx, index, "start", "running", action)
                 try:
-                    calibration_safe_actions = {"launch", "shell", "wait", "wait_json", "wait_window", "focus", "gnome_search_focus", "switch", "verify_foreground", "verify_window_profile", "close"}
+                    calibration_safe_actions = {"launch", "shell", "wait", "wait_json", "wait_window", "wait_window_title", "capture_visual_baseline", "wait_visual_stable", "focus", "gnome_search_focus", "switch", "verify_foreground", "verify_window_profile", "close"}
                     if ctx.calibration_only and action_type not in calibration_safe_actions:
                         calibration_trace(action, ctx)
                         continue
