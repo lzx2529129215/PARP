@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import array
+import hashlib
 import json
 import os
 import select
@@ -10,6 +12,7 @@ import stat
 import struct
 import threading
 import time
+import uuid
 from collections import deque
 from collections.abc import Iterable
 from pathlib import Path
@@ -55,7 +58,7 @@ class EBPFFileEventCollector:
         self.expected_uid = int(expected_uid)
         self.queue_capacity = max(1, int(queue_capacity))
         self.event_profile = str(event_profile).strip().lower()
-        if self.event_profile not in {"full", "page-hotset"}:
+        if self.event_profile not in {"full", "page-hotset", "page-access-window"}:
             raise ValueError(f"unsupported eBPF event profile: {event_profile}")
         self.event_callback = event_callback
         self._socket: socket.socket | None = None
@@ -75,6 +78,11 @@ class EBPFFileEventCollector:
         self.local_queue_drops = 0
         self._source_instance_id = ""
         self._last_source_seq = 0
+        self._capture_ready = threading.Event()
+        self._capture_stopped = threading.Event()
+        self._capture_failed = threading.Event()
+        self._capture_id = ""
+        self._capture_paths: dict[str, tuple[Path, Path]] = {}
 
     def start(self) -> None:
         if self._thread is not None:
@@ -104,6 +112,8 @@ class EBPFFileEventCollector:
         return time.monotonic() - self.last_message_monotonic > max(1.0, timeout_s)
 
     def stop(self) -> None:
+        if self._capture_id:
+            self.stop_page_access_capture(timeout_s=3.0)
         self._stop.set()
         try:
             os.write(self._wake_w, b"x")
@@ -149,6 +159,7 @@ class EBPFFileEventCollector:
             process_map[pid] = (app, role, start_time)
         body = json.dumps(
             {
+                "command": "SYNC_PROCESSES",
                 "protocol_version": PROTOCOL_VERSION,
                 "event_profile": self.event_profile,
                 "processes": entries,
@@ -168,6 +179,166 @@ class EBPFFileEventCollector:
         with self._lock:
             self._processes = process_map
         return True
+
+    def start_page_access_capture(
+        self,
+        *,
+        output_dir: str | Path,
+        session_id: str,
+        target_app: str,
+        app_id: int,
+        window_ms: int = 1000,
+        fixture_catalog: dict[str, dict[str, str]] | None = None,
+        metadata: dict[str, Any] | None = None,
+        timeout_s: float = 15.0,
+    ) -> bool:
+        """创建 0600 临时文件，并以 SCM_RIGHTS 交给 root helper 直接落盘。"""
+        if self.event_profile != "page-access-window" or self._capture_id:
+            return False
+        root = Path(output_dir)
+        root.mkdir(parents=True, exist_ok=True)
+        names = [
+            "page_access_windows.bin",
+            "page_lifecycle.bin",
+            "file_catalog.jsonl",
+            "window_summary.csv",
+            "manifest.json",
+        ]
+        paths: dict[str, tuple[Path, Path]] = {}
+        fds: list[int] = []
+        try:
+            for name in names:
+                final_path = root / name
+                partial_path = root / f"{name}.partial"
+                if final_path.exists() or partial_path.exists():
+                    raise FileExistsError(f"page capture output already exists: {final_path}")
+                fd = os.open(
+                    partial_path,
+                    os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_CLOEXEC,
+                    0o600,
+                )
+                fds.append(fd)
+                paths[name] = (partial_path, final_path)
+            capture_id = uuid.uuid4().hex
+            body = json.dumps({
+                "command": "START_PAGE_ACCESS_CAPTURE",
+                "protocol_version": PROTOCOL_VERSION,
+                "capture_id": capture_id,
+                "session_id": str(session_id),
+                "event_profile": self.event_profile,
+                "target_app": str(target_app).strip().upper(),
+                "app_id": int(app_id),
+                "window_ms": int(window_ms),
+                "fixture_catalog": fixture_catalog or {},
+                "metadata": metadata or {},
+            }, ensure_ascii=False, separators=(",", ":")).encode()
+            rights = array.array("i", fds)
+            self._capture_ready.clear()
+            self._capture_stopped.clear()
+            self._capture_failed.clear()
+            sender = socket.socket(socket.AF_UNIX, socket.SOCK_DGRAM)
+            try:
+                sender.sendmsg(
+                    [body],
+                    [(socket.SOL_SOCKET, socket.SCM_RIGHTS, rights)],
+                    0,
+                    str(self.control_socket),
+                )
+            finally:
+                sender.close()
+            self._capture_id = capture_id
+            self._capture_paths = paths
+        except Exception:
+            for partial_path, _final_path in paths.values():
+                try:
+                    partial_path.unlink()
+                except OSError:
+                    pass
+            raise
+        finally:
+            for fd in fds:
+                try:
+                    os.close(fd)
+                except OSError:
+                    pass
+        ready = self._capture_ready.wait(max(0.0, float(timeout_s)))
+        return ready and not self._capture_failed.is_set()
+
+    def stop_page_access_capture(self, *, timeout_s: float = 10.0) -> bool:
+        capture_id = self._capture_id
+        if not capture_id:
+            return True
+        body = json.dumps({
+            "command": "STOP_PAGE_ACCESS_CAPTURE",
+            "protocol_version": PROTOCOL_VERSION,
+            "capture_id": capture_id,
+        }, separators=(",", ":")).encode()
+        sender = socket.socket(socket.AF_UNIX, socket.SOCK_DGRAM)
+        try:
+            sender.sendto(body, str(self.control_socket))
+        except OSError:
+            return False
+        finally:
+            sender.close()
+        stopped = self._capture_stopped.wait(max(0.0, float(timeout_s)))
+        if stopped and not self._capture_failed.is_set():
+            self._finalize_capture_files()
+        self._capture_id = ""
+        return stopped and not self._capture_failed.is_set()
+
+    def query_page_access_capture_status(self) -> bool:
+        """请求 helper 回报当前 capture id、窗口号和无效窗口数。"""
+        body = json.dumps({
+            "command": "GET_PAGE_ACCESS_CAPTURE_STATUS",
+            "protocol_version": PROTOCOL_VERSION,
+        }, separators=(",", ":")).encode()
+        sender = socket.socket(socket.AF_UNIX, socket.SOCK_DGRAM)
+        try:
+            sender.sendto(body, str(self.control_socket))
+            return True
+        except OSError:
+            return False
+        finally:
+            sender.close()
+
+    @staticmethod
+    def _sha256_file(path: Path) -> str:
+        digest = hashlib.sha256()
+        with path.open("rb") as handle:
+            while True:
+                block = handle.read(1024 * 1024)
+                if not block:
+                    break
+                digest.update(block)
+        return digest.hexdigest()
+
+    def _finalize_capture_files(self) -> None:
+        # helper 已 fsync/close；只有结构化 STOP 成功才去掉 .partial 后缀。
+        manifest_pair = self._capture_paths.get("manifest.json")
+        for name, (partial_path, final_path) in self._capture_paths.items():
+            if name == "manifest.json":
+                continue
+            os.replace(partial_path, final_path)
+        if manifest_pair is not None:
+            partial_manifest, final_manifest = manifest_pair
+            values = json.loads(partial_manifest.read_text(encoding="utf-8"))
+            checksums: dict[str, str] = {}
+            for name, (_partial_path, final_path) in self._capture_paths.items():
+                if name != "manifest.json" and final_path.exists():
+                    checksums[name] = self._sha256_file(final_path)
+            automation_trace = partial_manifest.parent.parent / "automation_trace.csv"
+            if automation_trace.exists():
+                checksums["automation_trace.csv"] = self._sha256_file(
+                    automation_trace
+                )
+            values["sha256"] = checksums
+            partial_manifest.write_text(
+                json.dumps(values, ensure_ascii=False, indent=2, sort_keys=True) + "\n",
+                encoding="utf-8",
+            )
+            os.chmod(partial_manifest, 0o600)
+            os.replace(partial_manifest, final_manifest)
+        self._capture_paths = {}
 
     def drain_events(self) -> list[dict[str, Any]]:
         with self._lock:
@@ -271,8 +442,21 @@ class EBPFFileEventCollector:
         kind = str(payload.get("kind", ""))
         if kind == "SOURCE_STATUS":
             self._accept_source_watermark(payload)
-            if payload.get("status") == "READY":
+            status = str(payload.get("status", ""))
+            if status == "READY":
                 self._ready.set()
+            elif status == "PAGE_CAPTURE_READY":
+                self._capture_ready.set()
+            elif status == "PAGE_CAPTURE_STOPPED":
+                self._capture_stopped.set()
+            elif status in {
+                "PAGE_CAPTURE_START_FAILED",
+                "PAGE_CAPTURE_STOP_FAILED",
+                "PAGE_CAPTURE_FAILED",
+            }:
+                self._capture_failed.set()
+                self._capture_ready.set()
+                self._capture_stopped.set()
             with self._lock:
                 self._statuses.append(dict(payload))
             return

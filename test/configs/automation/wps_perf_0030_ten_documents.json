@@ -15,11 +15,6 @@
   },
   "actions": [
     {
-      "type": "shell",
-      "command": "mkdir -p \"${PROJECT_ROOT}/samples/wps\" && cp \"${PROJECT_ROOT}/outputs/wps/new_word.docx\" \"${WPS_DOC_01}\" && cp \"${PROJECT_ROOT}/outputs/wps/new_presentation.pptx\" \"${WPS_DOC_02}\" && cp \"${PROJECT_ROOT}/outputs/wps/new_spreadsheet.xlsx\" \"${WPS_DOC_03}\" && cp \"${PROJECT_ROOT}/outputs/wps/new_word.docx\" \"${WPS_DOC_04}\" && cp \"${PROJECT_ROOT}/outputs/wps/new_presentation.pptx\" \"${WPS_DOC_05}\" && cp \"${PROJECT_ROOT}/outputs/wps/new_spreadsheet.xlsx\" \"${WPS_DOC_06}\" && cp \"${PROJECT_ROOT}/outputs/wps/new_word.docx\" \"${WPS_DOC_07}\" && cp \"${PROJECT_ROOT}/outputs/wps/new_presentation.pptx\" \"${WPS_DOC_08}\" && cp \"${PROJECT_ROOT}/outputs/wps/new_spreadsheet.xlsx\" \"${WPS_DOC_09}\" && cp \"${PROJECT_ROOT}/outputs/wps/new_word.docx\" \"${WPS_DOC_10}\"",
-      "label": "WPS_PREPARE_TEN_DOCUMENTS"
-    },
-    {
       "type": "assert_file",
       "path": "${WPS_DOC_01}",
       "label": "WPS_REQUIRE_DOC_01"

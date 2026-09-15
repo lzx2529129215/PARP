@@ -40,6 +40,7 @@ from collectors.foreground import ForegroundCollector, ForegroundState
 from collectors.memory import read_meminfo, read_vmstat
 from collectors.process import ProcessCollector
 from collectors.process_events import GlobalProcessEventCollector
+from collectors.input_events import INPUT_HANDLERS, InputEventCollector
 from core.app_feature_builder import AppFeatureBuilder
 from core.app_mapper import AppMapper, ProcessIdentity, load_config
 from core.app_process_index import AppProcessIndex
@@ -130,6 +131,17 @@ class RuntimeMonitorV0:
             self.target_apps = _parse_app_list(args.target_apps) or [args.target_app]
             self.args.app_key_to_vocab_name = {}
             self.args.loaded_runtime_scope = None
+        if args.file_event_profile == "page-access-window":
+            requested_page_app = str(args.page_access_target_app or "").strip().upper()
+            defined_ids = (
+                self.runtime_scope.app_key_to_app_id
+                if self.runtime_scope is not None else {}
+            )
+            if requested_page_app not in defined_ids or int(defined_ids[requested_page_app]) <= 0:
+                raise ValueError(
+                    "page-access-window target must have a defined runtime App ID: "
+                    f"{requested_page_app or '<empty>'}"
+                )
         self.session_id = _resolve_session_id(args)
         self.stop_requested = False
 
@@ -250,6 +262,25 @@ class RuntimeMonitorV0:
         self._direct_event_id = 0
         self._direct_event_writer: CsvWriter | None = None
         self._direct_event_stats: dict[str, int] = {}
+        # 输入只在常驻脚本显式开启；历史试验/离线命令不自动争用生产 socket。
+        self.input_event_source = str(getattr(args, "input_event_source", "off"))
+        if self.input_event_source != "off" and not self.direct_x11_events:
+            raise ValueError("--input-event-source libinput requires --direct-x11-events for foreground attribution")
+        self.input_event_collector: InputEventCollector | None = None
+        self._input_event_queue: queue.Queue[dict[str, Any]] = queue.Queue(maxsize=4096)
+        self._input_event_wake_r = self._input_event_wake_w = -1
+        self._input_event_drops = 0
+        self._input_source_instance = ""
+        self._input_source_sequence = 0
+        self._input_source_health: tuple[Any, ...] | None = None
+        self._input_last_status: dict[str, Any] = {}
+        self._input_started_monotonic = 0.0
+        # 点击入口共用一个限流时钟；None 保证服务启动后的第一次点击立即通过。
+        self._last_mouse_click_monotonic_ns: int | None = None
+        # 跨线程只替换整个 dict，接收线程取得当时的前台快照，避免处理积压时
+        # 把早先输入全部标到后来切换的新 App。它只是上下文，不证明投递目标。
+        self._input_foreground_context: dict[str, Any] = {}
+        self._input_app_ids = self.runtime_scope.app_key_to_app_id if self.runtime_scope else {}
         if self.direct_x11_events:
             self._direct_event_writer = CsvWriter(
                 self.model_dir / "direct_app_events.csv", DIRECT_APP_EVENT_FIELDS
@@ -285,6 +316,10 @@ class RuntimeMonitorV0:
                 event_profile=args.file_event_profile,
                 event_callback=self._enqueue_ebpf_file_hook,
             )
+        self.page_access_target_app = str(
+            getattr(args, "page_access_target_app", "WPS") or "WPS"
+        ).strip().upper()
+        self.page_access_capture_started = False
         self.page_hotset_shadow: PageHotsetShadow | None = None
         if args.enable_page_hotset_shadow:
             if self.file_event_source != "ebpf":
@@ -369,7 +404,11 @@ class RuntimeMonitorV0:
         )
         # 生产 runner 使用 v3 LSTM。PARPMyfsBridge 与模型解耦：即使设备缺失，
         # LSTM 和事件采集仍可继续，bridge 只把失败记录为 fail-closed 审计行。
-        self.online_lstm = OnlineDurationLSTMRunner(args, self.model_dir, self.review_dir) if args.enable_online_lstm else None
+        runner_class = OnlineDurationLSTMRunner
+        if args.lstm_model_type == "visit_window":
+            from online_visit_window import OnlineVisitWindowRunner
+            runner_class = OnlineVisitWindowRunner
+        self.online_lstm = runner_class(args, self.model_dir, self.review_dir) if args.enable_online_lstm else None
         self.parp_bridge = None
         if args.enable_parp_myfs or args.enable_parp_bridge:
             self.parp_bridge = PARPMyfsBridge(
@@ -726,6 +765,7 @@ class RuntimeMonitorV0:
         else:
             print("No prefetch, active eviction, swap, generation, or anon/file policy action will be performed.")
         try:
+            self._start_input_events()
             while not self.stop_requested:
                 now = time.monotonic()
                 # duration=86400 是常驻服务的每日 session 边界。正常 break 后
@@ -741,6 +781,8 @@ class RuntimeMonitorV0:
                         wake_fds.append(self._process_event_wake_r)
                     if self.ebpf_file_collector is not None and self._file_hook_wake_r >= 0:
                         wake_fds.append(self._file_hook_wake_r)
+                    if self.input_event_collector is not None:
+                        wake_fds.append(self._input_event_wake_r)
                     if wake_fds:
                         try:
                             # 任一 pipe 可读就提前处理事件；若超时则自然落到采样。
@@ -756,6 +798,8 @@ class RuntimeMonitorV0:
                             self._drain_global_process_events()
                         if self._file_hook_wake_r in readable:
                             self._drain_ebpf_file_hooks()
+                        if self._input_event_wake_r in readable:
+                            self._drain_input_events()
                     else:
                         time.sleep(min(0.1, timeout))
                     continue
@@ -767,6 +811,9 @@ class RuntimeMonitorV0:
                     self._drain_global_process_events()
                 if self.ebpf_file_collector is not None:
                     self._drain_ebpf_file_hooks()
+                if self.input_event_collector is not None:
+                    self._drain_input_events()
+                    self._check_input_event_health()
                 self.sample_once()
                 # 使用累加的绝对 deadline，而不是 now + interval，避免一次较慢采样
                 # 把后续全部采样点永久向后漂移。
@@ -774,6 +821,7 @@ class RuntimeMonitorV0:
         finally:
             # 收尾顺序很重要：先阻止新事件进入并排空已有事件，再关 CSV；随后停止
             # sidecar/在线采样器并生成派生汇总，最后关闭 myfs/memory 审计和 review。
+            self._stop_input_events()
             self._stop_global_process_events()
             self._drain_global_process_events()
             self._stop_ebpf_file_events()
@@ -1085,7 +1133,9 @@ class RuntimeMonitorV0:
                 timestamp_ns=window_start_ns,
             )
         self._maybe_write_mglru_current_app(feature_row)
-        if self.online_lstm is not None and not self.direct_x11_events:
+        if self.online_lstm is not None and getattr(self.online_lstm, "model_type", "") == "visit_window":
+            self._run_visit_window_tick(feature_row)
+        elif self.online_lstm is not None and not self.direct_x11_events:
             # 兼容路径：没有原生事件监听时才比较相邻采样并触发预测。生产服务
             # direct_x11_events=True，因此不会在这里制造延迟或重复的 LSTM 调用。
             prediction_result = self.online_lstm.process_sample(feature_row)
@@ -1322,6 +1372,56 @@ class RuntimeMonitorV0:
         if ready:
             print("  file syscall events: eBPF READY")
             print(f"  file event socket: {self.file_event_socket}")
+            if self.args.file_event_profile == "page-access-window":
+                try:
+                    fixture_catalog: dict[str, dict[str, str]] = {}
+                    fixture_path = str(self.args.page_access_fixture_catalog or "").strip()
+                    if fixture_path:
+                        loaded = json.loads(
+                            _resolve_project_path(fixture_path).read_text(encoding="utf-8")
+                        )
+                        if not isinstance(loaded, dict):
+                            raise ValueError("page access fixture catalog must be a JSON object")
+                        fixture_catalog = loaded
+                    app_id = 0
+                    if self.runtime_scope is not None:
+                        app_id = int(
+                            self.runtime_scope.app_key_to_app_id.get(
+                                self.page_access_target_app, 0
+                            )
+                        )
+                    started = collector.start_page_access_capture(
+                        output_dir=self.output_dir / "dataset",
+                        session_id=self.session_id,
+                        target_app=self.page_access_target_app,
+                        app_id=app_id,
+                        window_ms=self.args.page_access_window_ms,
+                        fixture_catalog=fixture_catalog,
+                        metadata={
+                            "scenario_id": self.args.page_access_scenario_id,
+                            "repetition": self.args.page_access_repetition,
+                            "cache_condition": self.args.page_access_cache_condition,
+                            "app_cgroup_slice": self.args.test_slice,
+                            "process_event_source": self.args.process_event_source,
+                        },
+                        timeout_s=self.args.file_event_ready_timeout_s,
+                    )
+                    self._drain_ebpf_file_statuses()
+                    if not started:
+                        raise RuntimeError("root helper did not acknowledge Page Idle capture")
+                    self.page_access_capture_started = True
+                    print(
+                        "  page access windows: READY "
+                        f"app={self.page_access_target_app} "
+                        f"window_ms={self.args.page_access_window_ms}"
+                    )
+                except Exception as exc:
+                    self._write_file_source_status(
+                        "PAGE_CAPTURE_START_FAILED", str(exc)
+                    )
+                    print(f"warning: Page Idle capture failed: {exc}", file=sys.stderr)
+                    if self.args.require_page_idle:
+                        self.stop_requested = True
             return
         detail = start_error or (
             "no authenticated eBPF helper READY within "
@@ -1336,6 +1436,14 @@ class RuntimeMonitorV0:
         collector = self.ebpf_file_collector
         self.ebpf_file_collector = None
         if collector is not None:
+            if self.page_access_capture_started:
+                stopped = collector.stop_page_access_capture(timeout_s=10.0)
+                self.page_access_capture_started = False
+                if not stopped:
+                    self._write_file_source_status(
+                        "PAGE_CAPTURE_STOP_FAILED",
+                        "root helper did not acknowledge a clean capture stop",
+                    )
             collector.stop()
             # stop 前已经到达 socket 的 hook 仍要执行；它们与聚合队列共享 row，
             # 不会因为先停止接收线程而丢失。
@@ -1417,7 +1525,10 @@ class RuntimeMonitorV0:
             self._file_source_counters_initialized = True
             if (
                 (
-                    name not in {"READY", "WORKLOAD_PERF_LOST"}
+                    name not in {
+                        "READY", "WORKLOAD_PERF_LOST", "PAGE_CAPTURE_READY",
+                        "PAGE_CAPTURE_WINDOW_INVALID", "PAGE_CAPTURE_STOPPED",
+                    }
                     or counters_changed
                     or helper_restarted
                 )
@@ -2063,6 +2174,181 @@ class RuntimeMonitorV0:
                 return
             self._handle_direct_x11_event(event)
 
+    def _start_input_events(self) -> None:
+        """安装输入接收器；主 monitor 不需要 root，也不直接打开输入设备。"""
+        if self.input_event_source == "off":
+            return
+        self._input_event_wake_r, self._input_event_wake_w = os.pipe()
+        os.set_blocking(self._input_event_wake_r, False)
+        os.set_blocking(self._input_event_wake_w, False)
+        self.input_event_collector = InputEventCollector(
+            self._enqueue_input_event,
+            socket_path=self.args.input_event_socket,
+        )
+        self._input_started_monotonic = time.monotonic()
+        self.input_event_collector.start()
+        self._report_input_source({"source": "libinput", "status": "STARTING"})
+
+    def _stop_input_events(self) -> None:
+        if self.input_event_collector is not None:
+            self.input_event_collector.stop()
+            self.input_event_collector = None
+        while not self._input_event_queue.empty():
+            self._drain_input_events()
+        for name in ("_input_event_wake_r", "_input_event_wake_w"):
+            fd = getattr(self, name, -1)
+            if fd >= 0:
+                os.close(fd)
+                setattr(self, name, -1)
+
+    def _enqueue_input_event(self, payload: dict[str, Any]) -> None:
+        """认证后展开小批次；有界队列溢出必须可见，不无限增长或合并运动事件。"""
+        if payload.get("kind") == "SOURCE_STATUS":
+            events = [payload]
+        elif payload.get("kind") == "INPUT_EVENTS":
+            batch = payload.get("events", [])
+            if not isinstance(batch, list) or len(batch) > 16:
+                return
+            context = self._input_foreground_context
+            events = [
+                {**event, "source": "libinput", "source_instance_id": payload.get("source_instance_id", ""),
+                 "foreground_context": context}
+                for event in batch if isinstance(event, dict) and event.get("event_type") in INPUT_HANDLERS
+            ]
+        else:
+            return
+        for event in events:
+            try:
+                self._input_event_queue.put_nowait(event)
+            except queue.Full:
+                self._input_event_drops += 1
+        self._wake_input_events()
+
+    def _wake_input_events(self) -> None:
+        try:
+            os.write(self._input_event_wake_w, b"i")
+        except OSError:
+            pass
+
+    def _drain_input_events(self) -> None:
+        """每批最多处理 256 条，保证连续鼠标移动不会饿死进程事件及秒级采样。"""
+        if self._input_event_wake_r >= 0:
+            try:
+                os.read(self._input_event_wake_r, 65536)
+            except (BlockingIOError, OSError):
+                pass
+        for _ in range(256):
+            try:
+                event = self._input_event_queue.get_nowait()
+            except queue.Empty:
+                return
+            self._handle_input_event(event)
+        if not self._input_event_queue.empty():
+            self._wake_input_events()
+
+    def _report_input_source(self, payload: dict[str, Any]) -> None:
+        """仅在状态/丢失计数变化时输出健康日志，静止桌面不反复打印心跳。"""
+        health = (payload.get("status", "READY"), payload.get("source_instance_id", ""),
+                  payload.get("delivery_drops", 0), self._input_event_drops,
+                  tuple(sorted(payload.get("devices", {}))))
+        if health == self._input_source_health:
+            return
+        self._input_source_health = health
+        self._print_event_trigger_log(
+            "inputEventSource", {**payload, "event_type": "INPUT_SOURCE_STATUS"},
+            status=health[0], helper_instance_id=health[1], delivery_drops=health[2],
+            queue_drops=health[3], devices=payload.get("devices", {}),
+        )
+
+    def _check_input_event_health(self) -> None:
+        """十秒没有任何认证消息才超时；NO_DEVICES 仍是健康送达的状态消息。"""
+        collector = self.input_event_collector
+        if collector is None:
+            return
+        last_message = collector.last_message_monotonic or self._input_started_monotonic
+        if time.monotonic() - last_message > 10.0:
+            self._report_input_source({**self._input_last_status, "status": "STALE", "source": "libinput"})
+
+    def _handle_input_event(self, event: dict[str, Any]) -> None:
+        """所有已认证输入先经过统一分发，再进入对应 hook；未知 App 也调用。"""
+        if event.get("kind") == "SOURCE_STATUS":
+            self._input_last_status = event
+            self._report_input_source(event)
+            return
+        handler = INPUT_HANDLERS.get(str(event.get("event_type", "")))
+        if handler is None:
+            return
+        instance = str(event.get("source_instance_id", ""))
+        sequence = int(event.get("source_seq", 0) or 0)
+        if instance == self._input_source_instance and self._input_source_sequence and sequence != self._input_source_sequence + 1:
+            self._print_event_trigger_log("inputEventSource", event, status="SEQUENCE_GAP",
+                                          previous_seq=self._input_source_sequence, queue_drops=self._input_event_drops)
+        self._input_source_instance, self._input_source_sequence = instance, sequence
+        getattr(self, handler)(event)
+
+    def _log_input_hook(self, handler: str, event: dict[str, Any]) -> None:
+        """按已有 App ID 过滤即时日志；不持久化输入，也不调用 LSTM。
+
+        evdev/libinput 不提供最终接收窗口或 PID。这里输出的是接收时刻保存的
+        FOREGROUND_SNAPSHOT；鼠标可以作用于非前台窗口，切换和输入也可能交错。
+        因此该关联不能作为“这个 App 一定收到此输入”的证据。
+        """
+        context = event.get("foreground_context", {})
+        app = str(context.get("app", "UNKNOWN"))
+        app_id = self._input_app_ids.get(app)
+        if app_id is None:
+            return
+        details = {key: value for key, value in event.items() if key not in {
+            "event_type", "timestamp_ns", "source", "source_seq", "foreground_context", "kind",
+        }}
+        self._print_event_trigger_log(handler, event, **details, app=app, app_id=app_id,
+                                      foreground_pid=context.get("pid", 0), window_id=context.get("window_id", ""),
+                                      attribution="FOREGROUND_SNAPSHOT",
+                                      foreground_since_ns=context.get("since_ns", 0))
+
+    def mouseClick(self, event: dict[str, Any]) -> None:
+        """鼠标按钮每次按下/松开均进入本函数，间隔不足一秒立即返回。
+
+        左右中键及扩展键、不同 App 共用一个点击限流时钟。优先比较事件自身的
+        monotonic_ns，避免主线程积压或墙钟校时改变真实点击间隔；无来源时间时
+        才读取本机单调时钟。首次事件直接通过，恰好相隔一秒也允许通过。
+
+        被跳过的事件不打印日志、不执行下方业务，也不刷新上次通过的时间。
+        普通点击的松开边沿通常紧跟按下，因此同样会被这一秒检查跳过。底层
+        仍完整捕获并调用本入口；滚动、移动和键盘事件不受此检查影响。
+        """
+        now_ns = int(event.get("monotonic_ns", 0) or time.monotonic_ns())
+        last_ns = self._last_mouse_click_monotonic_ns
+        if last_ns is not None and now_ns - last_ns < 1_000_000_000:
+            return
+        self._last_mouse_click_monotonic_ns = now_ns
+        self._log_input_hook("mouseClick", event)
+
+    def mouseScroll(self, event: dict[str, Any]) -> None:
+        """每次滚动通知调用：支持滚轮、触控板双指滚动及连续滚动。
+
+        vertical/horizontal 正值为下/右。wheel 的 *_v120=120 表示一格；finger
+        的零值事件表示滚动结束。只处理 libinput 新滚动事件，避免新旧协议重复。
+        """
+        self._log_input_hook("mouseScroll", event)
+
+    def mouseMove(self, event: dict[str, Any]) -> None:
+        """每次指针移动/拖动，或触控板 swipe 的 begin/update/end 调用。
+
+        relative 给出 dx/dy；absolute 给出归一化位置；dragging 表示有按钮按住。
+        swipe 还提供 fingers 和 phase。每个 libinput 通知都进入本 hook，没有
+        每秒轮询、定时合并或主动降采样；硬件频率高时即时日志也会相应增多。
+        """
+        self._log_input_hook("mouseMove", event)
+
+    def keyPress(self, event: dict[str, Any]) -> None:
+        """键盘每次按下/松开调用；key_code 是 Linux 原始键码，松开有 held_ns。
+
+        libinput 不上报桌面自动连发，因此长按是一条 pressed 加一条 released。
+        不自行模拟 repeat，不解析输入法/键盘布局，也不拼接用户输入的文本。
+        """
+        self._log_input_hook("keyPress", event)
+
     def switchApp(self, event: dict[str, Any]) -> dict[str, Any]:
         """处理每一个高层 APP_SWITCH，并在本入口调用 LSTM 预测链。
 
@@ -2122,6 +2408,7 @@ class RuntimeMonitorV0:
             if (
                 prediction_foreground in {"", "UNKNOWN"}
                 and event_app not in {"", "UNKNOWN"}
+                and getattr(self.online_lstm, "model_type", "") != "visit_window"
             ):
                 prediction_foreground = event_app
             feature_row = {
@@ -2139,6 +2426,8 @@ class RuntimeMonitorV0:
             # 直接事件已有明确触发类型，process_event 会绕过采样模式 TTL/cooldown，
             # 但仍执行 App 映射、历史更新以及模型输入合法性检查。
             prediction_result = self.online_lstm.process_event(feature_row, event_type)
+            if prediction_result.get("prediction_format") == "visit_window":
+                return prediction_result
             self._maybe_write_mglru_predictions(prediction_result)
             # 同一个桌面事件至多读取一次索引 PID。旧代码会让 PARP、memory
             # shadow 和两个实验控制器各自再次全量枚举 /proc；现在它们共享一份
@@ -2304,6 +2593,12 @@ class RuntimeMonitorV0:
         # 第一步：状态机解析原生事件。返回列表可能为空（重复/未知窗口），也可能
         # 包含多条具有一致时间戳的高层 APP_* 事件。
         high_level_events = self._direct_event_state.handle(raw_event)
+        self._input_foreground_context = {
+            "app": self._direct_event_state.foreground_app or "UNKNOWN",
+            "pid": self._direct_event_state.foreground_pid,
+            "window_id": self._direct_event_state.foreground_window_id,
+            "since_ns": self._direct_event_state.foreground_since_ns,
+        }
         if self.page_hotset_shadow is not None:
             foreground_snapshot = self._direct_event_state.snapshot()
             self.page_hotset_shadow.observe_foreground(
@@ -2866,7 +3161,17 @@ class RuntimeMonitorV0:
         if cgroup_id is not None:
             self.last_mglru_foreground_app_key = app_key
 
+    def _run_visit_window_tick(self, feature_row: dict[str, Any]) -> dict[str, Any]:
+        """Refresh on the sample clock, using native state when available."""
+        visit_feature = dict(feature_row)
+        if self.direct_x11_events:
+            visit_feature.update(self._direct_event_state.snapshot())
+            visit_feature["timestamp"] = dt.datetime.now().isoformat(sep=" ")
+        return self.online_lstm.process_sample(visit_feature)
+
     def _maybe_write_mglru_predictions(self, prediction_result: dict[str, Any]) -> None:
+        if prediction_result.get("prediction_format") == "visit_window":
+            return
         if self.runtime_scope is None:
             return
         if prediction_result.get("status") != "success":
@@ -3021,11 +3326,11 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     )
     parser.add_argument(
         "--file-event-profile",
-        choices=["full", "page-hotset"],
+        choices=["full", "page-hotset", "page-access-window"],
         default="full",
         help=(
             "Select all eBPF file/cache/workload events or forward only "
-            "page_access events for dedicated page-hotset collection."
+            "page events for a dedicated hotset/Page-Idle dataset."
         ),
     )
     parser.add_argument(
@@ -3058,6 +3363,25 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--page-hotset-base-coverage", type=float, default=0.8)
     parser.add_argument("--page-hotset-bucket-coverage", type=float, default=0.5)
     parser.add_argument(
+        "--page-access-target-app",
+        default="WPS",
+        help="Defined runtime App key captured by page-access-window profile.",
+    )
+    parser.add_argument("--page-access-window-ms", type=int, default=1000)
+    parser.add_argument(
+        "--require-page-idle",
+        action="store_true",
+        help="Stop cleanly if the privileged Page Idle window capture cannot start.",
+    )
+    parser.add_argument(
+        "--page-access-fixture-catalog",
+        default="",
+        help="Optional path->logical_id/content_sha256 JSON prepared before automation.",
+    )
+    parser.add_argument("--page-access-scenario-id", default="")
+    parser.add_argument("--page-access-repetition", type=int, default=0)
+    parser.add_argument("--page-access-cache-condition", default="")
+    parser.add_argument(
         "--process-cgroup-routing",
         choices=["off", "systemd"],
         default="off",
@@ -3075,6 +3399,9 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         help="Fail startup if the systemd cgroup routing worker cannot start.",
     )
     parser.add_argument("--foreground-backend", choices=["desktop", "x11", "wayland", "manual"], default="desktop")
+    parser.add_argument("--input-event-source", choices=["off", "libinput"], default="off",
+                        help="Consume event-driven keyboard/pointer input from the root libinput helper.")
+    parser.add_argument("--input-event-socket", default=f"/run/user/{os.getuid()}/parp-input-events.sock")
     parser.add_argument(
         "--direct-x11-events",
         action="store_true",
@@ -3109,7 +3436,9 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         help="Seconds between resident output size/free-space checks.",
     )
     parser.add_argument("--enable-online-lstm", action="store_true", help="Enable online duration-aware switch LSTM prediction.")
-    parser.add_argument("--lstm-model-type", choices=["duration", "v2", "v3"], default="duration", help="Online LSTM checkpoint contract.")
+    parser.add_argument("--lstm-model-type", choices=["duration", "v2", "v3", "visit_window"], default="duration", help="Online LSTM checkpoint contract.")
+    parser.add_argument("--visit-hot-threshold", type=float, default=0.90)
+    parser.add_argument("--visit-cold-threshold", type=float, default=0.20)
     parser.add_argument("--enable-parp-bridge", action="store_true", help="Enable the independent PARP prediction sink bridge.")
     parser.add_argument("--enable-parp-myfs", action="store_true", help="Enable atomic PARP prediction updates through /dev/myfs.")
     parser.add_argument("--parp-myfs-device", default="/dev/myfs")
@@ -3284,7 +3613,17 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
             "dataset records and all event handlers remain enabled."
         ),
     )
-    return parser.parse_args(argv)
+    args = parser.parse_args(argv)
+    if args.lstm_model_type == "visit_window":
+        incompatible = [name for name in (
+            "enable_parp_myfs", "enable_parp_bridge", "enable_mglru_markov_debugfs",
+            "enable_mglru_lstm_reclaim_policy", "enable_app_reclaim_controller", "enable_test4b_ballast",
+        ) if getattr(args, name, False)]
+        if incompatible or args.parp_myfs_mode != "off" or args.parp_bridge_mode != "off":
+            parser.error("visit_window currently supports prediction output only; disable legacy kernel/reclaim sinks")
+        if not 0 <= args.visit_cold_threshold < args.visit_hot_threshold <= 1:
+            parser.error("visit thresholds require 0 <= cold < hot <= 1")
+    return args
 
 
 def _load_runtime_scope(args: argparse.Namespace) -> RuntimeAppScope | None:
@@ -3443,6 +3782,47 @@ def main(argv: list[str] | None = None) -> int:
             file=sys.stderr,
         )
         return 2
+    if args.file_event_profile == "page-access-window":
+        if args.file_event_source != "ebpf":
+            print(
+                "error: --file-event-profile page-access-window requires "
+                "--file-event-source ebpf",
+                file=sys.stderr,
+            )
+            return 2
+        incompatible_online = any((
+            args.enable_online_lstm,
+            args.enable_online_workload_markov,
+            args.enable_dual_workload_markov,
+        ))
+        if (
+            args.enable_page_hotset_shadow
+            or args.enable_region_monitor
+            or incompatible_online
+        ):
+            print(
+                "error: page-access-window is mutually exclusive with "
+                "PageHotsetShadow, DAMON region monitoring and online training",
+                file=sys.stderr,
+            )
+            return 2
+        if args.page_access_window_ms != 1000:
+            print(
+                "error: the WPS dataset contract requires "
+                "--page-access-window-ms 1000",
+                file=sys.stderr,
+            )
+            return 2
+        if not str(args.page_access_target_app or "").strip():
+            print("error: --page-access-target-app cannot be empty", file=sys.stderr)
+            return 2
+    if args.require_page_idle and args.file_event_profile != "page-access-window":
+        print(
+            "error: --require-page-idle requires "
+            "--file-event-profile page-access-window",
+            file=sys.stderr,
+        )
+        return 2
     if (
         args.page_hotset_window_ms <= 0
         or args.page_hotset_lateness_ms < 0
@@ -3469,7 +3849,11 @@ def main(argv: list[str] | None = None) -> int:
     if args.foreground_backend == "wayland":
         print("warning: Wayland foreground collection is not reliable in v0; using manual fallback.", file=sys.stderr)
         args.foreground_backend = "manual"
-    monitor = RuntimeMonitorV0(args)
+    try:
+        monitor = RuntimeMonitorV0(args)
+    except (OSError, ValueError) as exc:
+        print(f"error: runtime monitor initialization failed: {exc}", file=sys.stderr)
+        return 2
     return monitor.run()
 
 

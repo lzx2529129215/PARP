@@ -1,0 +1,114 @@
+{
+  "schema_version": 1,
+  "real_app_count": 30,
+  "vocab_size_with_special_tokens": 32,
+  "replacements": [
+    {
+      "app_id": 15,
+      "old_app_key": "SOLITAIRE",
+      "new_app_key": "WPS"
+    },
+    {
+      "app_id": 25,
+      "old_app_key": "CLAWS_MAIL",
+      "new_app_key": "FILE_ROLLER"
+    },
+    {
+      "app_id": 28,
+      "old_app_key": "MARBLE",
+      "new_app_key": "MOUSEPAD"
+    },
+    {
+      "app_id": 29,
+      "old_app_key": "MINES",
+      "new_app_key": "SHOTCUT"
+    }
+  ],
+  "predictor_policy": "All prediction_enabled=false until a matching checkpoint is trained and validated; original LSApp mappings/checkpoints are not compatible.",
+  "phase1_apps": [
+    "WPS",
+    "FILE_ROLLER",
+    "MOUSEPAD",
+    "SHOTCUT"
+  ],
+  "excluded_phase2": [
+    "virtual_machine",
+    "video_conference",
+    "assistant"
+  ],
+  "status": "phase1_four_app_gui_acceptance_pass",
+  "existing_wps_scenarios": "test/automation/README_WPS.md",
+  "acceptance_summary": "test/configs/source20_phase1/acceptance_summary.json",
+  "evidence_dir": "test/outputs/source20-phase1-20260912-final",
+  "runner": "test/test/source20_phase1_gui.py",
+  "readme": "test/test/README-source20-phase1.md",
+  "apps": [
+    {
+      "app_key": "WPS",
+      "status": "GUI_ACCEPTANCE_PASS",
+      "runtime_app_id": 15,
+      "operation": {
+        "operation": "append_and_save_docx",
+        "saved_token": "PARP_PHASE1_GUI_EDIT_20260912"
+      }
+    },
+    {
+      "app_key": "FILE_ROLLER",
+      "status": "GUI_ACCEPTANCE_PASS",
+      "runtime_app_id": 25,
+      "operation": {
+        "operation": "gui_extract_zip",
+        "payload_sha256": "6576aaf1c91ffe0b3d91b6fb04c41ce2b552917c51c65d840c0461a31d944d59"
+      }
+    },
+    {
+      "app_key": "MOUSEPAD",
+      "status": "GUI_ACCEPTANCE_PASS",
+      "runtime_app_id": 28,
+      "operation": {
+        "operation": "append_and_save_text",
+        "saved_token": "PARP_PHASE1_GUI_EDIT_20260912"
+      }
+    },
+    {
+      "app_key": "SHOTCUT",
+      "status": "GUI_ACCEPTANCE_PASS",
+      "runtime_app_id": 29,
+      "operation": {
+        "operation": "timeline_split_preview_save_export",
+        "split": {
+          "original_frames": [
+            0,
+            172
+          ],
+          "split_frames": [
+            [
+              0,
+              59
+            ],
+            [
+              60,
+              172
+            ]
+          ]
+        },
+        "export": {
+          "programs": [],
+          "streams": [
+            {
+              "codec_type": "video",
+              "width": 1920,
+              "height": 1080
+            },
+            {
+              "codec_type": "audio"
+            }
+          ],
+          "format": {
+            "duration": "5.782000"
+          }
+        }
+      }
+    }
+  ]
+}

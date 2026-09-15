@@ -1,0 +1,8 @@
+{
+  "path": "/home/lzx/Desktop/PARP/test/outputs/lsapp-30-gui-20260910-v1/EVOLUTION/runtime/gvfs",
+  "before_errno": 107,
+  "before_error": "[Errno 107] Transport endpoint is not connected: '/home/lzx/Desktop/PARP/test/outputs/lsapp-30-gui-20260910-v1/EVOLUTION/runtime/gvfs'",
+  "action": "unmount_disconnected_fuse_mount_only",
+  "returncode": 0,
+  "stderr": ""
+}

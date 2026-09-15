@@ -462,6 +462,8 @@ class PARPDebugfsBridge:
 
     def submit_prediction(self, feature_row: dict[str, Any], prediction_result: dict[str, Any]) -> None:
         """Queue one event-triggered LSTM output for PARP prior serialization."""
+        if prediction_result.get("prediction_format") == "visit_window":
+            return
         if self.mode == "off":
             return
         trigger_type = str(prediction_result.get("trigger_type", ""))

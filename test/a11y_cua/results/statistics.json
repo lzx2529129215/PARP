@@ -1,0 +1,2660 @@
+{
+  "revision": "26ee1103f74436cb7051543ba65d0c57902c0eb6",
+  "totals": {
+    "usable": 479,
+    "raw_desktop_events": 91977,
+    "metadata_desktop_events": 93840,
+    "raw_web_events": 9384,
+    "merged_events": 97022,
+    "mapped_events": 87570,
+    "mapped_desktop_events": 82525,
+    "raw_switches": 2446,
+    "mapped_switches": 956,
+    "collapsed_switches": 94,
+    "unmapped_switches": 1396,
+    "segments": 2736,
+    "reentry_events": 448,
+    "censored_candidates": 508,
+    "users": 8,
+    "sessions": 480,
+    "unique_source_apps": 59,
+    "unique_target_apps": 16,
+    "bins": {
+      "C0": 393,
+      "C1": 36,
+      "C2": 17,
+      "C3": 2,
+      "C4": 0,
+      "C5": 0,
+      "C6": 0,
+      "C7": 0
+    },
+    "mapping_coverage": 0.9025787965616046,
+    "desktop_mapping_coverage": 0.8972351783598074,
+    "switch_retention": 0.39084219133278825,
+    "session_duration_min": 13.905023336410522,
+    "session_duration_median": 65.62003302574158,
+    "session_duration_max": 658.3419823646545,
+    "total_session_seconds": 44519.03122925758
+  },
+  "web_merge_audit": {
+    "raw": 9384,
+    "paired_desktop_duplicate": 2327,
+    "accepted": 5045,
+    "blur_excluded": 1059,
+    "title_or_source_conflict": 229,
+    "outside_session": 713,
+    "nonbrowser_foreground": 11
+  },
+  "file_counts": {
+    "desktop_log": 1101,
+    "a11y_tree": 2899,
+    "metadata": 480,
+    "html": 341,
+    "web_log": 546
+  },
+  "semantic_evidence_counts": {
+    "process": 36387,
+    "shell_window": 3714,
+    "browser_fallback": 5811,
+    "window_title": 4248,
+    "matched_window_title_url": 14919,
+    "web_url_with_desktop_context": 5045,
+    "window_title_pdf": 96,
+    "host_window_title": 12066,
+    "explorer_content_window": 14544,
+    "shell_title": 168,
+    "unresolved_host": 24
+  },
+  "raw_source_counts": {
+    "Recorder": 200,
+    "WindowsShell": 3714,
+    "ChromeBrowser": 5690,
+    "GoogleSearch": 1429,
+    "Facebook": 279,
+    "AppleWebsite": 2862,
+    "Walmart": 960,
+    "Target": 2100,
+    "GoogleForms": 865,
+    "YouTube": 4007,
+    "Web:studycat.com": 139,
+    "BrowserPDFReader": 96,
+    "France24": 254,
+    "Expedia": 1800,
+    "DuckDuckGo": 477,
+    "WindowsClock": 794,
+    "FileExplorer": 14544,
+    "WindowsPhotos": 4693,
+    "WindowsSettings": 1966,
+    "WindowsWeather": 1927,
+    "Calculator": 2267,
+    "Installer": 16,
+    "Slack": 73,
+    "Word": 8258,
+    "Excel": 8498,
+    "PowerPoint": 8160,
+    "FontViewer": 178,
+    "OpenWithDialog": 56,
+    "Notepad": 1196,
+    "Wikipedia": 1071,
+    "SnippingTool": 2608,
+    "GoogleMaps": 1396,
+    "StickyNotes": 990,
+    "VLC": 92,
+    "WindowsMediaPlayer": 4382,
+    "FilePicker": 560,
+    "Paint": 1365,
+    "VSCode": 48,
+    "Web:subaru.com": 53,
+    "TaskManager": 231,
+    "Web:tinyurl.com": 16,
+    "Web:oklahoman.com": 980,
+    "GooglePlay": 32,
+    "EdgeBrowser": 121,
+    "WebCalculator": 31,
+    "Instagram": 8,
+    "Web:norcal.hondadealers.com": 17,
+    "Web:toyota.com": 14,
+    "Web:pdfcrowd.com": 50,
+    "OneNote": 2,
+    "Web:azlyrics.com": 108,
+    "WindowsWidgets": 40,
+    "MSNWeather": 60,
+    "MediaPlayerSetup": 21,
+    "GoogleAccount": 22,
+    "BingSearch": 84,
+    "Web:genius.com": 46,
+    "Web:grammarly.com": 7,
+    "UnresolvedApplicationFrameHost": 24
+  },
+  "quality_audit": {
+    "invalid_desktop_timestamp": 0,
+    "desktop_outside_metadata_bounds": 0,
+    "duplicate_desktop_events": 0,
+    "departures_into_unknown_not_candidates": 546
+  },
+  "issues": [
+    {
+      "session": "SU1/4",
+      "kind": "metadata_count_mismatch",
+      "file": "metadata_4.json",
+      "detail": "65 vs 163"
+    },
+    {
+      "session": "SU1/5",
+      "kind": "metadata_count_mismatch",
+      "file": "metadata_5.json",
+      "detail": "244 vs 231"
+    },
+    {
+      "session": "SU1/6",
+      "kind": "metadata_count_mismatch",
+      "file": "metadata_6.json",
+      "detail": "101 vs 99"
+    },
+    {
+      "session": "SU1/7",
+      "kind": "metadata_count_mismatch",
+      "file": "metadata_7.json",
+      "detail": "127 vs 123"
+    },
+    {
+      "session": "SU1/9",
+      "kind": "metadata_count_mismatch",
+      "file": "metadata_9.json",
+      "detail": "286 vs 287"
+    },
+    {
+      "session": "SU1/13",
+      "kind": "zero_event_metadata_reference_without_file",
+      "file": "2_ApplicationFrameHost.exe.json",
+      "detail": "not present in fixed-revision session directory; actual session files scanned independently"
+    },
+    {
+      "session": "SU1/15",
+      "kind": "zero_event_metadata_reference_without_file",
+      "file": "2_ApplicationFrameHost.exe.json",
+      "detail": "not present in fixed-revision session directory; actual session files scanned independently"
+    },
+    {
+      "session": "SU1/16",
+      "kind": "zero_event_metadata_reference_without_file",
+      "file": "2_ApplicationFrameHost.exe.json",
+      "detail": "not present in fixed-revision session directory; actual session files scanned independently"
+    },
+    {
+      "session": "SU1/17",
+      "kind": "zero_event_metadata_reference_without_file",
+      "file": "2_ApplicationFrameHost.exe.json",
+      "detail": "not present in fixed-revision session directory; actual session files scanned independently"
+    },
+    {
+      "session": "SU1/19",
+      "kind": "zero_event_metadata_reference_without_file",
+      "file": "2_ApplicationFrameHost.exe.json",
+      "detail": "not present in fixed-revision session directory; actual session files scanned independently"
+    },
+    {
+      "session": "SU1/20",
+      "kind": "metadata_count_mismatch",
+      "file": "metadata_20.json",
+      "detail": "76 vs 74"
+    },
+    {
+      "session": "SU1/22",
+      "kind": "zero_event_metadata_reference_without_file",
+      "file": "3_ApplicationFrameHost.exe.json",
+      "detail": "not present in fixed-revision session directory; actual session files scanned independently"
+    },
+    {
+      "session": "SU1/25",
+      "kind": "metadata_count_mismatch",
+      "file": "metadata_25.json",
+      "detail": "95 vs 91"
+    },
+    {
+      "session": "SU1/26",
+      "kind": "metadata_count_mismatch",
+      "file": "metadata_26.json",
+      "detail": "137 vs 131"
+    },
+    {
+      "session": "SU1/27",
+      "kind": "metadata_count_mismatch",
+      "file": "metadata_27.json",
+      "detail": "370 vs 351"
+    },
+    {
+      "session": "SU1/29",
+      "kind": "metadata_count_mismatch",
+      "file": "metadata_29.json",
+      "detail": "186 vs 184"
+    },
+    {
+      "session": "SU1/30",
+      "kind": "metadata_count_mismatch",
+      "file": "metadata_30.json",
+      "detail": "396 vs 378"
+    },
+    {
+      "session": "SU1/31",
+      "kind": "metadata_count_mismatch",
+      "file": "metadata_31.json",
+      "detail": "238 vs 220"
+    },
+    {
+      "session": "SU1/34",
+      "kind": "metadata_count_mismatch",
+      "file": "metadata_34.json",
+      "detail": "261 vs 252"
+    },
+    {
+      "session": "SU1/35",
+      "kind": "metadata_count_mismatch",
+      "file": "metadata_35.json",
+      "detail": "116 vs 108"
+    },
+    {
+      "session": "SU1/37",
+      "kind": "metadata_count_mismatch",
+      "file": "metadata_37.json",
+      "detail": "408 vs 412"
+    },
+    {
+      "session": "SU1/40",
+      "kind": "metadata_count_mismatch",
+      "file": "metadata_40.json",
+      "detail": "433 vs 434"
+    },
+    {
+      "session": "SU1/41",
+      "kind": "zero_event_metadata_reference_without_file",
+      "file": "3_ApplicationFrameHost.exe.json",
+      "detail": "not present in fixed-revision session directory; actual session files scanned independently"
+    },
+    {
+      "session": "SU1/44",
+      "kind": "metadata_count_mismatch",
+      "file": "metadata_44.json",
+      "detail": "200 vs 196"
+    },
+    {
+      "session": "SU1/46",
+      "kind": "metadata_count_mismatch",
+      "file": "metadata_46.json",
+      "detail": "160 vs 158"
+    },
+    {
+      "session": "SU1/47",
+      "kind": "metadata_count_mismatch",
+      "file": "metadata_47.json",
+      "detail": "562 vs 560"
+    },
+    {
+      "session": "SU1/48",
+      "kind": "zero_event_metadata_reference_without_file",
+      "file": "3_ApplicationFrameHost.exe.json",
+      "detail": "not present in fixed-revision session directory; actual session files scanned independently"
+    },
+    {
+      "session": "SU1/48",
+      "kind": "metadata_count_mismatch",
+      "file": "metadata_48.json",
+      "detail": "253 vs 250"
+    },
+    {
+      "session": "SU1/50",
+      "kind": "zero_event_metadata_reference_without_file",
+      "file": "2_ApplicationFrameHost.exe.json",
+      "detail": "not present in fixed-revision session directory; actual session files scanned independently"
+    },
+    {
+      "session": "SU1/51",
+      "kind": "zero_event_metadata_reference_without_file",
+      "file": "2_ApplicationFrameHost.exe.json",
+      "detail": "not present in fixed-revision session directory; actual session files scanned independently"
+    },
+    {
+      "session": "SU1/51",
+      "kind": "metadata_count_mismatch",
+      "file": "metadata_51.json",
+      "detail": "524 vs 520"
+    },
+    {
+      "session": "SU1/53",
+      "kind": "zero_event_metadata_reference_without_file",
+      "file": "2_ApplicationFrameHost.exe.json",
+      "detail": "not present in fixed-revision session directory; actual session files scanned independently"
+    },
+    {
+      "session": "SU1/55",
+      "kind": "metadata_count_mismatch",
+      "file": "metadata_55.json",
+      "detail": "620 vs 613"
+    },
+    {
+      "session": "SU1/56",
+      "kind": "zero_event_metadata_reference_without_file",
+      "file": "2_ApplicationFrameHost.exe.json",
+      "detail": "not present in fixed-revision session directory; actual session files scanned independently"
+    },
+    {
+      "session": "SU2/9",
+      "kind": "metadata_count_mismatch",
+      "file": "metadata_9.json",
+      "detail": "99 vs 89"
+    },
+    {
+      "session": "SU2/13",
+      "kind": "zero_event_metadata_reference_without_file",
+      "file": "1_ApplicationFrameHost.exe.json",
+      "detail": "not present in fixed-revision session directory; actual session files scanned independently"
+    },
+    {
+      "session": "SU2/14",
+      "kind": "metadata_count_mismatch",
+      "file": "metadata_14.json",
+      "detail": "35 vs 32"
+    },
+    {
+      "session": "SU2/16",
+      "kind": "zero_event_metadata_reference_without_file",
+      "file": "2_ApplicationFrameHost.exe.json",
+      "detail": "not present in fixed-revision session directory; actual session files scanned independently"
+    },
+    {
+      "session": "SU2/17",
+      "kind": "zero_event_metadata_reference_without_file",
+      "file": "1_ApplicationFrameHost.exe.json",
+      "detail": "not present in fixed-revision session directory; actual session files scanned independently"
+    },
+    {
+      "session": "SU2/19",
+      "kind": "zero_event_metadata_reference_without_file",
+      "file": "1_ApplicationFrameHost.exe.json",
+      "detail": "not present in fixed-revision session directory; actual session files scanned independently"
+    },
+    {
+      "session": "SU2/20",
+      "kind": "metadata_count_mismatch",
+      "file": "metadata_20.json",
+      "detail": "84 vs 80"
+    },
+    {
+      "session": "SU2/22",
+      "kind": "zero_event_metadata_reference_without_file",
+      "file": "1_ApplicationFrameHost.exe.json",
+      "detail": "not present in fixed-revision session directory; actual session files scanned independently"
+    },
+    {
+      "session": "SU2/25",
+      "kind": "metadata_count_mismatch",
+      "file": "metadata_25.json",
+      "detail": "88 vs 84"
+    },
+    {
+      "session": "SU2/26",
+      "kind": "metadata_count_mismatch",
+      "file": "metadata_26.json",
+      "detail": "70 vs 66"
+    },
+    {
+      "session": "SU2/27",
+      "kind": "metadata_count_mismatch",
+      "file": "metadata_27.json",
+      "detail": "152 vs 142"
+    },
+    {
+      "session": "SU2/29",
+      "kind": "metadata_count_mismatch",
+      "file": "metadata_29.json",
+      "detail": "106 vs 104"
+    },
+    {
+      "session": "SU2/30",
+      "kind": "metadata_count_mismatch",
+      "file": "metadata_30.json",
+      "detail": "108 vs 104"
+    },
+    {
+      "session": "SU2/31",
+      "kind": "metadata_count_mismatch",
+      "file": "metadata_31.json",
+      "detail": "175 vs 150"
+    },
+    {
+      "session": "SU2/34",
+      "kind": "metadata_count_mismatch",
+      "file": "metadata_34.json",
+      "detail": "188 vs 186"
+    },
+    {
+      "session": "SU2/36",
+      "kind": "metadata_count_mismatch",
+      "file": "metadata_36.json",
+      "detail": "218 vs 216"
+    },
+    {
+      "session": "SU2/37",
+      "kind": "metadata_count_mismatch",
+      "file": "metadata_37.json",
+      "detail": "264 vs 211"
+    },
+    {
+      "session": "SU2/38",
+      "kind": "metadata_count_mismatch",
+      "file": "metadata_38.json",
+      "detail": "124 vs 122"
+    },
+    {
+      "session": "SU2/40",
+      "kind": "metadata_count_mismatch",
+      "file": "metadata_40.json",
+      "detail": "193 vs 185"
+    },
+    {
+      "session": "SU2/41",
+      "kind": "zero_event_metadata_reference_without_file",
+      "file": "2_ApplicationFrameHost.exe.json",
+      "detail": "not present in fixed-revision session directory; actual session files scanned independently"
+    },
+    {
+      "session": "SU2/41",
+      "kind": "metadata_count_mismatch",
+      "file": "metadata_41.json",
+      "detail": "518 vs 510"
+    },
+    {
+      "session": "SU2/42",
+      "kind": "metadata_count_mismatch",
+      "file": "metadata_42.json",
+      "detail": "74 vs 73"
+    },
+    {
+      "session": "SU2/43",
+      "kind": "metadata_count_mismatch",
+      "file": "metadata_43.json",
+      "detail": "168 vs 164"
+    },
+    {
+      "session": "SU2/44",
+      "kind": "metadata_count_mismatch",
+      "file": "metadata_44.json",
+      "detail": "120 vs 116"
+    },
+    {
+      "session": "SU2/45",
+      "kind": "metadata_count_mismatch",
+      "file": "metadata_45.json",
+      "detail": "210 vs 204"
+    },
+    {
+      "session": "SU2/46",
+      "kind": "metadata_count_mismatch",
+      "file": "metadata_46.json",
+      "detail": "92 vs 90"
+    },
+    {
+      "session": "SU2/47",
+      "kind": "zero_event_metadata_reference_without_file",
+      "file": "2_ApplicationFrameHost.exe.json",
+      "detail": "not present in fixed-revision session directory; actual session files scanned independently"
+    },
+    {
+      "session": "SU2/47",
+      "kind": "metadata_count_mismatch",
+      "file": "metadata_47.json",
+      "detail": "426 vs 417"
+    },
+    {
+      "session": "SU2/48",
+      "kind": "zero_event_metadata_reference_without_file",
+      "file": "3_ApplicationFrameHost.exe.json",
+      "detail": "not present in fixed-revision session directory; actual session files scanned independently"
+    },
+    {
+      "session": "SU2/48",
+      "kind": "metadata_count_mismatch",
+      "file": "metadata_48.json",
+      "detail": "170 vs 157"
+    },
+    {
+      "session": "SU2/49",
+      "kind": "zero_event_metadata_reference_without_file",
+      "file": "2_ApplicationFrameHost.exe.json",
+      "detail": "not present in fixed-revision session directory; actual session files scanned independently"
+    },
+    {
+      "session": "SU2/50",
+      "kind": "zero_event_metadata_reference_without_file",
+      "file": "3_ApplicationFrameHost.exe.json",
+      "detail": "not present in fixed-revision session directory; actual session files scanned independently"
+    },
+    {
+      "session": "SU2/51",
+      "kind": "zero_event_metadata_reference_without_file",
+      "file": "2_ApplicationFrameHost.exe.json",
+      "detail": "not present in fixed-revision session directory; actual session files scanned independently"
+    },
+    {
+      "session": "SU2/51",
+      "kind": "metadata_count_mismatch",
+      "file": "metadata_51.json",
+      "detail": "124 vs 120"
+    },
+    {
+      "session": "SU2/53",
+      "kind": "zero_event_metadata_reference_without_file",
+      "file": "2_ApplicationFrameHost.exe.json",
+      "detail": "not present in fixed-revision session directory; actual session files scanned independently"
+    },
+    {
+      "session": "SU2/56",
+      "kind": "zero_event_metadata_reference_without_file",
+      "file": "2_ApplicationFrameHost.exe.json",
+      "detail": "not present in fixed-revision session directory; actual session files scanned independently"
+    },
+    {
+      "session": "SU3/5",
+      "kind": "metadata_count_mismatch",
+      "file": "metadata_5.json",
+      "detail": "616 vs 593"
+    },
+    {
+      "session": "SU3/6",
+      "kind": "metadata_count_mismatch",
+      "file": "metadata_6.json",
+      "detail": "214 vs 212"
+    },
+    {
+      "session": "SU3/8",
+      "kind": "metadata_count_mismatch",
+      "file": "metadata_8.json",
+      "detail": "137 vs 134"
+    },
+    {
+      "session": "SU3/9",
+      "kind": "metadata_count_mismatch",
+      "file": "metadata_9.json",
+      "detail": "253 vs 245"
+    },
+    {
+      "session": "SU3/11",
+      "kind": "metadata_count_mismatch",
+      "file": "metadata_11.json",
+      "detail": "337 vs 333"
+    },
+    {
+      "session": "SU3/13",
+      "kind": "zero_event_metadata_reference_without_file",
+      "file": "2_ApplicationFrameHost.exe.json",
+      "detail": "not present in fixed-revision session directory; actual session files scanned independently"
+    },
+    {
+      "session": "SU3/15",
+      "kind": "zero_event_metadata_reference_without_file",
+      "file": "2_ApplicationFrameHost.exe.json",
+      "detail": "not present in fixed-revision session directory; actual session files scanned independently"
+    },
+    {
+      "session": "SU3/16",
+      "kind": "zero_event_metadata_reference_without_file",
+      "file": "2_ApplicationFrameHost.exe.json",
+      "detail": "not present in fixed-revision session directory; actual session files scanned independently"
+    },
+    {
+      "session": "SU3/17",
+      "kind": "zero_event_metadata_reference_without_file",
+      "file": "2_ApplicationFrameHost.exe.json",
+      "detail": "not present in fixed-revision session directory; actual session files scanned independently"
+    },
+    {
+      "session": "SU3/19",
+      "kind": "zero_event_metadata_reference_without_file",
+      "file": "2_ApplicationFrameHost.exe.json",
+      "detail": "not present in fixed-revision session directory; actual session files scanned independently"
+    },
+    {
+      "session": "SU3/20",
+      "kind": "metadata_count_mismatch",
+      "file": "metadata_20.json",
+      "detail": "72 vs 70"
+    },
+    {
+      "session": "SU3/22",
+      "kind": "zero_event_metadata_reference_without_file",
+      "file": "3_ApplicationFrameHost.exe.json",
+      "detail": "not present in fixed-revision session directory; actual session files scanned independently"
+    },
+    {
+      "session": "SU3/25",
+      "kind": "metadata_count_mismatch",
+      "file": "metadata_25.json",
+      "detail": "185 vs 146"
+    },
+    {
+      "session": "SU3/26",
+      "kind": "metadata_count_mismatch",
+      "file": "metadata_26.json",
+      "detail": "125 vs 121"
+    },
+    {
+      "session": "SU3/27",
+      "kind": "metadata_count_mismatch",
+      "file": "metadata_27.json",
+      "detail": "287 vs 264"
+    },
+    {
+      "session": "SU3/29",
+      "kind": "metadata_count_mismatch",
+      "file": "metadata_29.json",
+      "detail": "79 vs 77"
+    },
+    {
+      "session": "SU3/30",
+      "kind": "metadata_count_mismatch",
+      "file": "metadata_30.json",
+      "detail": "309 vs 270"
+    },
+    {
+      "session": "SU3/31",
+      "kind": "metadata_count_mismatch",
+      "file": "metadata_31.json",
+      "detail": "293 vs 256"
+    },
+    {
+      "session": "SU3/34",
+      "kind": "metadata_count_mismatch",
+      "file": "metadata_34.json",
+      "detail": "315 vs 290"
+    },
+    {
+      "session": "SU3/37",
+      "kind": "metadata_count_mismatch",
+      "file": "metadata_37.json",
+      "detail": "282 vs 278"
+    },
+    {
+      "session": "SU3/38",
+      "kind": "metadata_count_mismatch",
+      "file": "metadata_38.json",
+      "detail": "230 vs 228"
+    },
+    {
+      "session": "SU3/40",
+      "kind": "metadata_count_mismatch",
+      "file": "metadata_40.json",
+      "detail": "497 vs 492"
+    },
+    {
+      "session": "SU3/41",
+      "kind": "zero_event_metadata_reference_without_file",
+      "file": "3_ApplicationFrameHost.exe.json",
+      "detail": "not present in fixed-revision session directory; actual session files scanned independently"
+    },
+    {
+      "session": "SU3/41",
+      "kind": "metadata_count_mismatch",
+      "file": "metadata_41.json",
+      "detail": "1319 vs 1317"
+    },
+    {
+      "session": "SU3/42",
+      "kind": "metadata_count_mismatch",
+      "file": "metadata_42.json",
+      "detail": "79 vs 76"
+    },
+    {
+      "session": "SU3/43",
+      "kind": "metadata_count_mismatch",
+      "file": "metadata_43.json",
+      "detail": "192 vs 189"
+    },
+    {
+      "session": "SU3/44",
+      "kind": "metadata_count_mismatch",
+      "file": "metadata_44.json",
+      "detail": "325 vs 323"
+    },
+    {
+      "session": "SU3/48",
+      "kind": "zero_event_metadata_reference_without_file",
+      "file": "3_ApplicationFrameHost.exe.json",
+      "detail": "not present in fixed-revision session directory; actual session files scanned independently"
+    },
+    {
+      "session": "SU3/48",
+      "kind": "metadata_count_mismatch",
+      "file": "metadata_48.json",
+      "detail": "173 vs 170"
+    },
+    {
+      "session": "SU3/49",
+      "kind": "zero_event_metadata_reference_without_file",
+      "file": "2_ApplicationFrameHost.exe.json",
+      "detail": "not present in fixed-revision session directory; actual session files scanned independently"
+    },
+    {
+      "session": "SU3/50",
+      "kind": "zero_event_metadata_reference_without_file",
+      "file": "2_ApplicationFrameHost.exe.json",
+      "detail": "not present in fixed-revision session directory; actual session files scanned independently"
+    },
+    {
+      "session": "SU3/51",
+      "kind": "zero_event_metadata_reference_without_file",
+      "file": "1_ApplicationFrameHost.exe.json",
+      "detail": "not present in fixed-revision session directory; actual session files scanned independently"
+    },
+    {
+      "session": "SU3/51",
+      "kind": "metadata_count_mismatch",
+      "file": "metadata_51.json",
+      "detail": "589 vs 581"
+    },
+    {
+      "session": "SU3/53",
+      "kind": "zero_event_metadata_reference_without_file",
+      "file": "2_ApplicationFrameHost.exe.json",
+      "detail": "not present in fixed-revision session directory; actual session files scanned independently"
+    },
+    {
+      "session": "SU3/53",
+      "kind": "metadata_count_mismatch",
+      "file": "metadata_53.json",
+      "detail": "292 vs 281"
+    },
+    {
+      "session": "SU3/56",
+      "kind": "zero_event_metadata_reference_without_file",
+      "file": "2_ApplicationFrameHost.exe.json",
+      "detail": "not present in fixed-revision session directory; actual session files scanned independently"
+    },
+    {
+      "session": "SU4/1",
+      "kind": "metadata_count_mismatch",
+      "file": "metadata_1.json",
+      "detail": "90 vs 88"
+    },
+    {
+      "session": "SU4/5",
+      "kind": "metadata_count_mismatch",
+      "file": "metadata_5.json",
+      "detail": "293 vs 284"
+    },
+    {
+      "session": "SU4/6",
+      "kind": "metadata_count_mismatch",
+      "file": "metadata_6.json",
+      "detail": "137 vs 133"
+    },
+    {
+      "session": "SU4/7",
+      "kind": "metadata_count_mismatch",
+      "file": "metadata_7.json",
+      "detail": "155 vs 153"
+    },
+    {
+      "session": "SU4/9",
+      "kind": "metadata_count_mismatch",
+      "file": "metadata_9.json",
+      "detail": "322 vs 316"
+    },
+    {
+      "session": "SU4/13",
+      "kind": "zero_event_metadata_reference_without_file",
+      "file": "1_ApplicationFrameHost.exe.json",
+      "detail": "not present in fixed-revision session directory; actual session files scanned independently"
+    },
+    {
+      "session": "SU4/15",
+      "kind": "zero_event_metadata_reference_without_file",
+      "file": "2_ApplicationFrameHost.exe.json",
+      "detail": "not present in fixed-revision session directory; actual session files scanned independently"
+    },
+    {
+      "session": "SU4/16",
+      "kind": "zero_event_metadata_reference_without_file",
+      "file": "2_ApplicationFrameHost.exe.json",
+      "detail": "not present in fixed-revision session directory; actual session files scanned independently"
+    },
+    {
+      "session": "SU4/17",
+      "kind": "zero_event_metadata_reference_without_file",
+      "file": "2_ApplicationFrameHost.exe.json",
+      "detail": "not present in fixed-revision session directory; actual session files scanned independently"
+    },
+    {
+      "session": "SU4/19",
+      "kind": "zero_event_metadata_reference_without_file",
+      "file": "1_ApplicationFrameHost.exe.json",
+      "detail": "not present in fixed-revision session directory; actual session files scanned independently"
+    },
+    {
+      "session": "SU4/20",
+      "kind": "metadata_count_mismatch",
+      "file": "metadata_20.json",
+      "detail": "81 vs 79"
+    },
+    {
+      "session": "SU4/22",
+      "kind": "zero_event_metadata_reference_without_file",
+      "file": "1_ApplicationFrameHost.exe.json",
+      "detail": "not present in fixed-revision session directory; actual session files scanned independently"
+    },
+    {
+      "session": "SU4/25",
+      "kind": "metadata_count_mismatch",
+      "file": "metadata_25.json",
+      "detail": "181 vs 177"
+    },
+    {
+      "session": "SU4/26",
+      "kind": "metadata_count_mismatch",
+      "file": "metadata_26.json",
+      "detail": "137 vs 133"
+    },
+    {
+      "session": "SU4/27",
+      "kind": "metadata_count_mismatch",
+      "file": "metadata_27.json",
+      "detail": "184 vs 174"
+    },
+    {
+      "session": "SU4/29",
+      "kind": "metadata_count_mismatch",
+      "file": "metadata_29.json",
+      "detail": "155 vs 154"
+    },
+    {
+      "session": "SU4/30",
+      "kind": "metadata_count_mismatch",
+      "file": "metadata_30.json",
+      "detail": "300 vs 296"
+    },
+    {
+      "session": "SU4/31",
+      "kind": "metadata_count_mismatch",
+      "file": "metadata_31.json",
+      "detail": "206 vs 200"
+    },
+    {
+      "session": "SU4/32",
+      "kind": "metadata_count_mismatch",
+      "file": "metadata_32.json",
+      "detail": "153 vs 145"
+    },
+    {
+      "session": "SU4/34",
+      "kind": "metadata_count_mismatch",
+      "file": "metadata_34.json",
+      "detail": "277 vs 271"
+    },
+    {
+      "session": "SU4/35",
+      "kind": "metadata_count_mismatch",
+      "file": "metadata_35.json",
+      "detail": "205 vs 198"
+    },
+    {
+      "session": "SU4/37",
+      "kind": "metadata_count_mismatch",
+      "file": "metadata_37.json",
+      "detail": "271 vs 259"
+    },
+    {
+      "session": "SU4/38",
+      "kind": "metadata_count_mismatch",
+      "file": "metadata_38.json",
+      "detail": "317 vs 316"
+    },
+    {
+      "session": "SU4/40",
+      "kind": "metadata_count_mismatch",
+      "file": "metadata_40.json",
+      "detail": "321 vs 317"
+    },
+    {
+      "session": "SU4/41",
+      "kind": "zero_event_metadata_reference_without_file",
+      "file": "2_ApplicationFrameHost.exe.json",
+      "detail": "not present in fixed-revision session directory; actual session files scanned independently"
+    },
+    {
+      "session": "SU4/42",
+      "kind": "metadata_count_mismatch",
+      "file": "metadata_42.json",
+      "detail": "121 vs 116"
+    },
+    {
+      "session": "SU4/43",
+      "kind": "metadata_count_mismatch",
+      "file": "metadata_43.json",
+      "detail": "238 vs 226"
+    },
+    {
+      "session": "SU4/44",
+      "kind": "metadata_count_mismatch",
+      "file": "metadata_44.json",
+      "detail": "158 vs 154"
+    },
+    {
+      "session": "SU4/45",
+      "kind": "metadata_count_mismatch",
+      "file": "metadata_45.json",
+      "detail": "241 vs 229"
+    },
+    {
+      "session": "SU4/46",
+      "kind": "metadata_count_mismatch",
+      "file": "metadata_46.json",
+      "detail": "89 vs 87"
+    },
+    {
+      "session": "SU4/47",
+      "kind": "metadata_count_mismatch",
+      "file": "metadata_47.json",
+      "detail": "563 vs 549"
+    },
+    {
+      "session": "SU4/48",
+      "kind": "zero_event_metadata_reference_without_file",
+      "file": "3_ApplicationFrameHost.exe.json",
+      "detail": "not present in fixed-revision session directory; actual session files scanned independently"
+    },
+    {
+      "session": "SU4/48",
+      "kind": "metadata_count_mismatch",
+      "file": "metadata_48.json",
+      "detail": "407 vs 389"
+    },
+    {
+      "session": "SU4/49",
+      "kind": "zero_event_metadata_reference_without_file",
+      "file": "2_ApplicationFrameHost.exe.json",
+      "detail": "not present in fixed-revision session directory; actual session files scanned independently"
+    },
+    {
+      "session": "SU4/50",
+      "kind": "zero_event_metadata_reference_without_file",
+      "file": "2_ApplicationFrameHost.exe.json",
+      "detail": "not present in fixed-revision session directory; actual session files scanned independently"
+    },
+    {
+      "session": "SU4/51",
+      "kind": "zero_event_metadata_reference_without_file",
+      "file": "1_ApplicationFrameHost.exe.json",
+      "detail": "not present in fixed-revision session directory; actual session files scanned independently"
+    },
+    {
+      "session": "SU4/51",
+      "kind": "metadata_count_mismatch",
+      "file": "metadata_51.json",
+      "detail": "460 vs 457"
+    },
+    {
+      "session": "SU4/53",
+      "kind": "zero_event_metadata_reference_without_file",
+      "file": "2_ApplicationFrameHost.exe.json",
+      "detail": "not present in fixed-revision session directory; actual session files scanned independently"
+    },
+    {
+      "session": "SU4/56",
+      "kind": "zero_event_metadata_reference_without_file",
+      "file": "2_ApplicationFrameHost.exe.json",
+      "detail": "not present in fixed-revision session directory; actual session files scanned independently"
+    },
+    {
+      "session": "SU5/5",
+      "kind": "metadata_count_mismatch",
+      "file": "metadata_5.json",
+      "detail": "392 vs 374"
+    },
+    {
+      "session": "SU5/7",
+      "kind": "metadata_count_mismatch",
+      "file": "metadata_7.json",
+      "detail": "98 vs 92"
+    },
+    {
+      "session": "SU5/13",
+      "kind": "zero_event_metadata_reference_without_file",
+      "file": "1_ApplicationFrameHost.exe.json",
+      "detail": "not present in fixed-revision session directory; actual session files scanned independently"
+    },
+    {
+      "session": "SU5/16",
+      "kind": "no_usable_interactions",
+      "file": "metadata_16.json",
+      "detail": "no desktop or accepted web interaction events"
+    },
+    {
+      "session": "SU5/17",
+      "kind": "zero_event_metadata_reference_without_file",
+      "file": "1_ApplicationFrameHost.exe.json",
+      "detail": "not present in fixed-revision session directory; actual session files scanned independently"
+    },
+    {
+      "session": "SU5/17",
+      "kind": "metadata_count_mismatch",
+      "file": "metadata_17.json",
+      "detail": "230 vs 232"
+    },
+    {
+      "session": "SU5/20",
+      "kind": "metadata_count_mismatch",
+      "file": "metadata_20.json",
+      "detail": "88 vs 86"
+    },
+    {
+      "session": "SU5/22",
+      "kind": "zero_event_metadata_reference_without_file",
+      "file": "1_ApplicationFrameHost.exe.json",
+      "detail": "not present in fixed-revision session directory; actual session files scanned independently"
+    },
+    {
+      "session": "SU5/25",
+      "kind": "metadata_count_mismatch",
+      "file": "metadata_25.json",
+      "detail": "256 vs 245"
+    },
+    {
+      "session": "SU5/26",
+      "kind": "metadata_count_mismatch",
+      "file": "metadata_26.json",
+      "detail": "198 vs 190"
+    },
+    {
+      "session": "SU5/27",
+      "kind": "metadata_count_mismatch",
+      "file": "metadata_27.json",
+      "detail": "217 vs 213"
+    },
+    {
+      "session": "SU5/29",
+      "kind": "metadata_count_mismatch",
+      "file": "metadata_29.json",
+      "detail": "296 vs 290"
+    },
+    {
+      "session": "SU5/30",
+      "kind": "metadata_count_mismatch",
+      "file": "metadata_30.json",
+      "detail": "403 vs 399"
+    },
+    {
+      "session": "SU5/31",
+      "kind": "metadata_count_mismatch",
+      "file": "metadata_31.json",
+      "detail": "170 vs 166"
+    },
+    {
+      "session": "SU5/34",
+      "kind": "metadata_count_mismatch",
+      "file": "metadata_34.json",
+      "detail": "472 vs 471"
+    },
+    {
+      "session": "SU5/35",
+      "kind": "metadata_count_mismatch",
+      "file": "metadata_35.json",
+      "detail": "221 vs 215"
+    },
+    {
+      "session": "SU5/37",
+      "kind": "metadata_count_mismatch",
+      "file": "metadata_37.json",
+      "detail": "205 vs 198"
+    },
+    {
+      "session": "SU5/38",
+      "kind": "metadata_count_mismatch",
+      "file": "metadata_38.json",
+      "detail": "276 vs 270"
+    },
+    {
+      "session": "SU5/40",
+      "kind": "metadata_count_mismatch",
+      "file": "metadata_40.json",
+      "detail": "359 vs 358"
+    },
+    {
+      "session": "SU5/41",
+      "kind": "zero_event_metadata_reference_without_file",
+      "file": "3_ApplicationFrameHost.exe.json",
+      "detail": "not present in fixed-revision session directory; actual session files scanned independently"
+    },
+    {
+      "session": "SU5/41",
+      "kind": "metadata_count_mismatch",
+      "file": "metadata_41.json",
+      "detail": "1223 vs 966"
+    },
+    {
+      "session": "SU5/43",
+      "kind": "metadata_count_mismatch",
+      "file": "metadata_43.json",
+      "detail": "426 vs 424"
+    },
+    {
+      "session": "SU5/44",
+      "kind": "metadata_count_mismatch",
+      "file": "metadata_44.json",
+      "detail": "195 vs 183"
+    },
+    {
+      "session": "SU5/45",
+      "kind": "metadata_count_mismatch",
+      "file": "metadata_45.json",
+      "detail": "380 vs 378"
+    },
+    {
+      "session": "SU5/46",
+      "kind": "metadata_count_mismatch",
+      "file": "metadata_46.json",
+      "detail": "411 vs 409"
+    },
+    {
+      "session": "SU5/47",
+      "kind": "zero_event_metadata_reference_without_file",
+      "file": "2_ApplicationFrameHost.exe.json",
+      "detail": "not present in fixed-revision session directory; actual session files scanned independently"
+    },
+    {
+      "session": "SU5/47",
+      "kind": "metadata_count_mismatch",
+      "file": "metadata_47.json",
+      "detail": "973 vs 959"
+    },
+    {
+      "session": "SU5/48",
+      "kind": "zero_event_metadata_reference_without_file",
+      "file": "3_ApplicationFrameHost.exe.json",
+      "detail": "not present in fixed-revision session directory; actual session files scanned independently"
+    },
+    {
+      "session": "SU5/48",
+      "kind": "metadata_count_mismatch",
+      "file": "metadata_48.json",
+      "detail": "181 vs 171"
+    },
+    {
+      "session": "SU5/49",
+      "kind": "zero_event_metadata_reference_without_file",
+      "file": "3_ApplicationFrameHost.exe.json",
+      "detail": "not present in fixed-revision session directory; actual session files scanned independently"
+    },
+    {
+      "session": "SU5/50",
+      "kind": "zero_event_metadata_reference_without_file",
+      "file": "2_ApplicationFrameHost.exe.json",
+      "detail": "not present in fixed-revision session directory; actual session files scanned independently"
+    },
+    {
+      "session": "SU5/51",
+      "kind": "zero_event_metadata_reference_without_file",
+      "file": "1_ApplicationFrameHost.exe.json",
+      "detail": "not present in fixed-revision session directory; actual session files scanned independently"
+    },
+    {
+      "session": "SU5/51",
+      "kind": "metadata_count_mismatch",
+      "file": "metadata_51.json",
+      "detail": "566 vs 562"
+    },
+    {
+      "session": "SU5/53",
+      "kind": "zero_event_metadata_reference_without_file",
+      "file": "2_ApplicationFrameHost.exe.json",
+      "detail": "not present in fixed-revision session directory; actual session files scanned independently"
+    },
+    {
+      "session": "SU5/55",
+      "kind": "metadata_count_mismatch",
+      "file": "metadata_55.json",
+      "detail": "812 vs 800"
+    },
+    {
+      "session": "SU5/56",
+      "kind": "zero_event_metadata_reference_without_file",
+      "file": "2_ApplicationFrameHost.exe.json",
+      "detail": "not present in fixed-revision session directory; actual session files scanned independently"
+    },
+    {
+      "session": "SU6/5",
+      "kind": "metadata_count_mismatch",
+      "file": "metadata_5.json",
+      "detail": "222 vs 198"
+    },
+    {
+      "session": "SU6/7",
+      "kind": "metadata_count_mismatch",
+      "file": "metadata_7.json",
+      "detail": "400 vs 395"
+    },
+    {
+      "session": "SU6/8",
+      "kind": "metadata_count_mismatch",
+      "file": "metadata_8.json",
+      "detail": "83 vs 79"
+    },
+    {
+      "session": "SU6/9",
+      "kind": "metadata_count_mismatch",
+      "file": "metadata_9.json",
+      "detail": "1057 vs 1037"
+    },
+    {
+      "session": "SU6/13",
+      "kind": "zero_event_metadata_reference_without_file",
+      "file": "2_ApplicationFrameHost.exe.json",
+      "detail": "not present in fixed-revision session directory; actual session files scanned independently"
+    },
+    {
+      "session": "SU6/17",
+      "kind": "zero_event_metadata_reference_without_file",
+      "file": "3_ApplicationFrameHost.exe.json",
+      "detail": "not present in fixed-revision session directory; actual session files scanned independently"
+    },
+    {
+      "session": "SU6/19",
+      "kind": "zero_event_metadata_reference_without_file",
+      "file": "2_ApplicationFrameHost.exe.json",
+      "detail": "not present in fixed-revision session directory; actual session files scanned independently"
+    },
+    {
+      "session": "SU6/20",
+      "kind": "metadata_count_mismatch",
+      "file": "metadata_20.json",
+      "detail": "76 vs 72"
+    },
+    {
+      "session": "SU6/22",
+      "kind": "zero_event_metadata_reference_without_file",
+      "file": "2_ApplicationFrameHost.exe.json",
+      "detail": "not present in fixed-revision session directory; actual session files scanned independently"
+    },
+    {
+      "session": "SU6/25",
+      "kind": "metadata_count_mismatch",
+      "file": "metadata_25.json",
+      "detail": "114 vs 110"
+    },
+    {
+      "session": "SU6/26",
+      "kind": "metadata_count_mismatch",
+      "file": "metadata_26.json",
+      "detail": "81 vs 77"
+    },
+    {
+      "session": "SU6/27",
+      "kind": "metadata_count_mismatch",
+      "file": "metadata_27.json",
+      "detail": "234 vs 197"
+    },
+    {
+      "session": "SU6/29",
+      "kind": "metadata_count_mismatch",
+      "file": "metadata_29.json",
+      "detail": "99 vs 97"
+    },
+    {
+      "session": "SU6/30",
+      "kind": "metadata_count_mismatch",
+      "file": "metadata_30.json",
+      "detail": "141 vs 137"
+    },
+    {
+      "session": "SU6/31",
+      "kind": "metadata_count_mismatch",
+      "file": "metadata_31.json",
+      "detail": "111 vs 95"
+    },
+    {
+      "session": "SU6/34",
+      "kind": "metadata_count_mismatch",
+      "file": "metadata_34.json",
+      "detail": "228 vs 216"
+    },
+    {
+      "session": "SU6/35",
+      "kind": "metadata_count_mismatch",
+      "file": "metadata_35.json",
+      "detail": "134 vs 126"
+    },
+    {
+      "session": "SU6/37",
+      "kind": "metadata_count_mismatch",
+      "file": "metadata_37.json",
+      "detail": "245 vs 239"
+    },
+    {
+      "session": "SU6/38",
+      "kind": "metadata_count_mismatch",
+      "file": "metadata_38.json",
+      "detail": "193 vs 191"
+    },
+    {
+      "session": "SU6/40",
+      "kind": "metadata_count_mismatch",
+      "file": "metadata_40.json",
+      "detail": "230 vs 212"
+    },
+    {
+      "session": "SU6/41",
+      "kind": "zero_event_metadata_reference_without_file",
+      "file": "3_ApplicationFrameHost.exe.json",
+      "detail": "not present in fixed-revision session directory; actual session files scanned independently"
+    },
+    {
+      "session": "SU6/46",
+      "kind": "metadata_count_mismatch",
+      "file": "metadata_46.json",
+      "detail": "242 vs 240"
+    },
+    {
+      "session": "SU6/47",
+      "kind": "metadata_count_mismatch",
+      "file": "metadata_47.json",
+      "detail": "544 vs 534"
+    },
+    {
+      "session": "SU6/48",
+      "kind": "zero_event_metadata_reference_without_file",
+      "file": "3_ApplicationFrameHost.exe.json",
+      "detail": "not present in fixed-revision session directory; actual session files scanned independently"
+    },
+    {
+      "session": "SU6/48",
+      "kind": "metadata_count_mismatch",
+      "file": "metadata_48.json",
+      "detail": "395 vs 381"
+    },
+    {
+      "session": "SU6/49",
+      "kind": "zero_event_metadata_reference_without_file",
+      "file": "2_ApplicationFrameHost.exe.json",
+      "detail": "not present in fixed-revision session directory; actual session files scanned independently"
+    },
+    {
+      "session": "SU6/50",
+      "kind": "zero_event_metadata_reference_without_file",
+      "file": "2_ApplicationFrameHost.exe.json",
+      "detail": "not present in fixed-revision session directory; actual session files scanned independently"
+    },
+    {
+      "session": "SU6/51",
+      "kind": "zero_event_metadata_reference_without_file",
+      "file": "1_ApplicationFrameHost.exe.json",
+      "detail": "not present in fixed-revision session directory; actual session files scanned independently"
+    },
+    {
+      "session": "SU6/51",
+      "kind": "metadata_count_mismatch",
+      "file": "metadata_51.json",
+      "detail": "352 vs 350"
+    },
+    {
+      "session": "SU6/53",
+      "kind": "zero_event_metadata_reference_without_file",
+      "file": "2_ApplicationFrameHost.exe.json",
+      "detail": "not present in fixed-revision session directory; actual session files scanned independently"
+    },
+    {
+      "session": "SU6/53",
+      "kind": "metadata_count_mismatch",
+      "file": "metadata_53.json",
+      "detail": "105 vs 102"
+    },
+    {
+      "session": "SU6/56",
+      "kind": "zero_event_metadata_reference_without_file",
+      "file": "2_ApplicationFrameHost.exe.json",
+      "detail": "not present in fixed-revision session directory; actual session files scanned independently"
+    },
+    {
+      "session": "SU6/60",
+      "kind": "metadata_count_mismatch",
+      "file": "metadata_60.json",
+      "detail": "582 vs 580"
+    },
+    {
+      "session": "SU7/1",
+      "kind": "metadata_count_mismatch",
+      "file": "metadata_1.json",
+      "detail": "97 vs 95"
+    },
+    {
+      "session": "SU7/3",
+      "kind": "metadata_count_mismatch",
+      "file": "metadata_3.json",
+      "detail": "335 vs 337"
+    },
+    {
+      "session": "SU7/5",
+      "kind": "metadata_count_mismatch",
+      "file": "metadata_5.json",
+      "detail": "446 vs 427"
+    },
+    {
+      "session": "SU7/6",
+      "kind": "metadata_count_mismatch",
+      "file": "metadata_6.json",
+      "detail": "160 vs 150"
+    },
+    {
+      "session": "SU7/7",
+      "kind": "metadata_count_mismatch",
+      "file": "metadata_7.json",
+      "detail": "140 vs 136"
+    },
+    {
+      "session": "SU7/8",
+      "kind": "metadata_count_mismatch",
+      "file": "metadata_8.json",
+      "detail": "151 vs 148"
+    },
+    {
+      "session": "SU7/9",
+      "kind": "metadata_count_mismatch",
+      "file": "metadata_9.json",
+      "detail": "253 vs 245"
+    },
+    {
+      "session": "SU7/12",
+      "kind": "metadata_count_mismatch",
+      "file": "metadata_12.json",
+      "detail": "117 vs 112"
+    },
+    {
+      "session": "SU7/13",
+      "kind": "zero_event_metadata_reference_without_file",
+      "file": "1_ApplicationFrameHost.exe.json",
+      "detail": "not present in fixed-revision session directory; actual session files scanned independently"
+    },
+    {
+      "session": "SU7/16",
+      "kind": "zero_event_metadata_reference_without_file",
+      "file": "1_ApplicationFrameHost.exe.json",
+      "detail": "not present in fixed-revision session directory; actual session files scanned independently"
+    },
+    {
+      "session": "SU7/17",
+      "kind": "zero_event_metadata_reference_without_file",
+      "file": "1_ApplicationFrameHost.exe.json",
+      "detail": "not present in fixed-revision session directory; actual session files scanned independently"
+    },
+    {
+      "session": "SU7/19",
+      "kind": "zero_event_metadata_reference_without_file",
+      "file": "2_ApplicationFrameHost.exe.json",
+      "detail": "not present in fixed-revision session directory; actual session files scanned independently"
+    },
+    {
+      "session": "SU7/20",
+      "kind": "metadata_count_mismatch",
+      "file": "metadata_20.json",
+      "detail": "83 vs 81"
+    },
+    {
+      "session": "SU7/22",
+      "kind": "zero_event_metadata_reference_without_file",
+      "file": "1_ApplicationFrameHost.exe.json",
+      "detail": "not present in fixed-revision session directory; actual session files scanned independently"
+    },
+    {
+      "session": "SU7/22",
+      "kind": "metadata_count_mismatch",
+      "file": "metadata_22.json",
+      "detail": "41 vs 39"
+    },
+    {
+      "session": "SU7/24",
+      "kind": "metadata_count_mismatch",
+      "file": "metadata_24.json",
+      "detail": "117 vs 118"
+    },
+    {
+      "session": "SU7/25",
+      "kind": "metadata_count_mismatch",
+      "file": "metadata_25.json",
+      "detail": "120 vs 117"
+    },
+    {
+      "session": "SU7/26",
+      "kind": "metadata_count_mismatch",
+      "file": "metadata_26.json",
+      "detail": "107 vs 101"
+    },
+    {
+      "session": "SU7/27",
+      "kind": "metadata_count_mismatch",
+      "file": "metadata_27.json",
+      "detail": "249 vs 216"
+    },
+    {
+      "session": "SU7/28",
+      "kind": "metadata_count_mismatch",
+      "file": "metadata_28.json",
+      "detail": "86 vs 84"
+    },
+    {
+      "session": "SU7/29",
+      "kind": "metadata_count_mismatch",
+      "file": "metadata_29.json",
+      "detail": "156 vs 146"
+    },
+    {
+      "session": "SU7/30",
+      "kind": "metadata_count_mismatch",
+      "file": "metadata_30.json",
+      "detail": "254 vs 250"
+    },
+    {
+      "session": "SU7/31",
+      "kind": "metadata_count_mismatch",
+      "file": "metadata_31.json",
+      "detail": "145 vs 143"
+    },
+    {
+      "session": "SU7/32",
+      "kind": "metadata_count_mismatch",
+      "file": "metadata_32.json",
+      "detail": "82 vs 80"
+    },
+    {
+      "session": "SU7/33",
+      "kind": "metadata_count_mismatch",
+      "file": "metadata_33.json",
+      "detail": "183 vs 177"
+    },
+    {
+      "session": "SU7/34",
+      "kind": "metadata_count_mismatch",
+      "file": "metadata_34.json",
+      "detail": "368 vs 358"
+    },
+    {
+      "session": "SU7/35",
+      "kind": "metadata_count_mismatch",
+      "file": "metadata_35.json",
+      "detail": "558 vs 521"
+    },
+    {
+      "session": "SU7/36",
+      "kind": "metadata_count_mismatch",
+      "file": "metadata_36.json",
+      "detail": "424 vs 432"
+    },
+    {
+      "session": "SU7/37",
+      "kind": "metadata_count_mismatch",
+      "file": "metadata_37.json",
+      "detail": "204 vs 198"
+    },
+    {
+      "session": "SU7/38",
+      "kind": "metadata_count_mismatch",
+      "file": "metadata_38.json",
+      "detail": "438 vs 431"
+    },
+    {
+      "session": "SU7/40",
+      "kind": "metadata_count_mismatch",
+      "file": "metadata_40.json",
+      "detail": "268 vs 250"
+    },
+    {
+      "session": "SU7/41",
+      "kind": "zero_event_metadata_reference_without_file",
+      "file": "2_ApplicationFrameHost.exe.json",
+      "detail": "not present in fixed-revision session directory; actual session files scanned independently"
+    },
+    {
+      "session": "SU7/41",
+      "kind": "metadata_count_mismatch",
+      "file": "metadata_41.json",
+      "detail": "723 vs 719"
+    },
+    {
+      "session": "SU7/42",
+      "kind": "metadata_count_mismatch",
+      "file": "metadata_42.json",
+      "detail": "92 vs 90"
+    },
+    {
+      "session": "SU7/43",
+      "kind": "metadata_count_mismatch",
+      "file": "metadata_43.json",
+      "detail": "220 vs 214"
+    },
+    {
+      "session": "SU7/44",
+      "kind": "metadata_count_mismatch",
+      "file": "metadata_44.json",
+      "detail": "142 vs 140"
+    },
+    {
+      "session": "SU7/45",
+      "kind": "metadata_count_mismatch",
+      "file": "metadata_45.json",
+      "detail": "552 vs 512"
+    },
+    {
+      "session": "SU7/46",
+      "kind": "metadata_count_mismatch",
+      "file": "metadata_46.json",
+      "detail": "146 vs 136"
+    },
+    {
+      "session": "SU7/47",
+      "kind": "metadata_count_mismatch",
+      "file": "metadata_47.json",
+      "detail": "512 vs 474"
+    },
+    {
+      "session": "SU7/48",
+      "kind": "zero_event_metadata_reference_without_file",
+      "file": "3_ApplicationFrameHost.exe.json",
+      "detail": "not present in fixed-revision session directory; actual session files scanned independently"
+    },
+    {
+      "session": "SU7/48",
+      "kind": "metadata_count_mismatch",
+      "file": "metadata_48.json",
+      "detail": "445 vs 436"
+    },
+    {
+      "session": "SU7/49",
+      "kind": "zero_event_metadata_reference_without_file",
+      "file": "2_ApplicationFrameHost.exe.json",
+      "detail": "not present in fixed-revision session directory; actual session files scanned independently"
+    },
+    {
+      "session": "SU7/49",
+      "kind": "metadata_count_mismatch",
+      "file": "metadata_49.json",
+      "detail": "144 vs 131"
+    },
+    {
+      "session": "SU7/50",
+      "kind": "zero_event_metadata_reference_without_file",
+      "file": "2_ApplicationFrameHost.exe.json",
+      "detail": "not present in fixed-revision session directory; actual session files scanned independently"
+    },
+    {
+      "session": "SU7/51",
+      "kind": "zero_event_metadata_reference_without_file",
+      "file": "1_ApplicationFrameHost.exe.json",
+      "detail": "not present in fixed-revision session directory; actual session files scanned independently"
+    },
+    {
+      "session": "SU7/51",
+      "kind": "metadata_count_mismatch",
+      "file": "metadata_51.json",
+      "detail": "553 vs 546"
+    },
+    {
+      "session": "SU7/53",
+      "kind": "zero_event_metadata_reference_without_file",
+      "file": "2_ApplicationFrameHost.exe.json",
+      "detail": "not present in fixed-revision session directory; actual session files scanned independently"
+    },
+    {
+      "session": "SU7/53",
+      "kind": "metadata_count_mismatch",
+      "file": "metadata_53.json",
+      "detail": "63 vs 60"
+    },
+    {
+      "session": "SU7/55",
+      "kind": "metadata_count_mismatch",
+      "file": "metadata_55.json",
+      "detail": "644 vs 635"
+    },
+    {
+      "session": "SU7/56",
+      "kind": "zero_event_metadata_reference_without_file",
+      "file": "2_ApplicationFrameHost.exe.json",
+      "detail": "not present in fixed-revision session directory; actual session files scanned independently"
+    },
+    {
+      "session": "SU7/57",
+      "kind": "metadata_count_mismatch",
+      "file": "metadata_57.json",
+      "detail": "131 vs 134"
+    },
+    {
+      "session": "SU7/58",
+      "kind": "metadata_count_mismatch",
+      "file": "metadata_58.json",
+      "detail": "89 vs 87"
+    },
+    {
+      "session": "SU7/59",
+      "kind": "metadata_count_mismatch",
+      "file": "metadata_59.json",
+      "detail": "477 vs 475"
+    },
+    {
+      "session": "SU8/5",
+      "kind": "metadata_count_mismatch",
+      "file": "metadata_5.json",
+      "detail": "213 vs 207"
+    },
+    {
+      "session": "SU8/7",
+      "kind": "metadata_count_mismatch",
+      "file": "metadata_7.json",
+      "detail": "152 vs 123"
+    },
+    {
+      "session": "SU8/8",
+      "kind": "metadata_count_mismatch",
+      "file": "metadata_8.json",
+      "detail": "125 vs 120"
+    },
+    {
+      "session": "SU8/9",
+      "kind": "metadata_count_mismatch",
+      "file": "metadata_9.json",
+      "detail": "142 vs 132"
+    },
+    {
+      "session": "SU8/13",
+      "kind": "zero_event_metadata_reference_without_file",
+      "file": "2_ApplicationFrameHost.exe.json",
+      "detail": "not present in fixed-revision session directory; actual session files scanned independently"
+    },
+    {
+      "session": "SU8/15",
+      "kind": "zero_event_metadata_reference_without_file",
+      "file": "2_ApplicationFrameHost.exe.json",
+      "detail": "not present in fixed-revision session directory; actual session files scanned independently"
+    },
+    {
+      "session": "SU8/17",
+      "kind": "zero_event_metadata_reference_without_file",
+      "file": "2_ApplicationFrameHost.exe.json",
+      "detail": "not present in fixed-revision session directory; actual session files scanned independently"
+    },
+    {
+      "session": "SU8/18",
+      "kind": "metadata_count_mismatch",
+      "file": "metadata_18.json",
+      "detail": "49 vs 46"
+    },
+    {
+      "session": "SU8/19",
+      "kind": "zero_event_metadata_reference_without_file",
+      "file": "2_ApplicationFrameHost.exe.json",
+      "detail": "not present in fixed-revision session directory; actual session files scanned independently"
+    },
+    {
+      "session": "SU8/19",
+      "kind": "metadata_count_mismatch",
+      "file": "metadata_19.json",
+      "detail": "400 vs 401"
+    },
+    {
+      "session": "SU8/20",
+      "kind": "metadata_count_mismatch",
+      "file": "metadata_20.json",
+      "detail": "89 vs 87"
+    },
+    {
+      "session": "SU8/22",
+      "kind": "zero_event_metadata_reference_without_file",
+      "file": "2_ApplicationFrameHost.exe.json",
+      "detail": "not present in fixed-revision session directory; actual session files scanned independently"
+    },
+    {
+      "session": "SU8/25",
+      "kind": "metadata_count_mismatch",
+      "file": "metadata_25.json",
+      "detail": "106 vs 96"
+    },
+    {
+      "session": "SU8/26",
+      "kind": "metadata_count_mismatch",
+      "file": "metadata_26.json",
+      "detail": "75 vs 72"
+    },
+    {
+      "session": "SU8/27",
+      "kind": "metadata_count_mismatch",
+      "file": "metadata_27.json",
+      "detail": "160 vs 139"
+    },
+    {
+      "session": "SU8/28",
+      "kind": "metadata_count_mismatch",
+      "file": "metadata_28.json",
+      "detail": "105 vs 99"
+    },
+    {
+      "session": "SU8/29",
+      "kind": "metadata_count_mismatch",
+      "file": "metadata_29.json",
+      "detail": "138 vs 132"
+    },
+    {
+      "session": "SU8/30",
+      "kind": "metadata_count_mismatch",
+      "file": "metadata_30.json",
+      "detail": "247 vs 218"
+    },
+    {
+      "session": "SU8/31",
+      "kind": "metadata_count_mismatch",
+      "file": "metadata_31.json",
+      "detail": "201 vs 195"
+    },
+    {
+      "session": "SU8/32",
+      "kind": "metadata_count_mismatch",
+      "file": "metadata_32.json",
+      "detail": "78 vs 76"
+    },
+    {
+      "session": "SU8/33",
+      "kind": "metadata_count_mismatch",
+      "file": "metadata_33.json",
+      "detail": "185 vs 183"
+    },
+    {
+      "session": "SU8/34",
+      "kind": "metadata_count_mismatch",
+      "file": "metadata_34.json",
+      "detail": "269 vs 245"
+    },
+    {
+      "session": "SU8/35",
+      "kind": "metadata_count_mismatch",
+      "file": "metadata_35.json",
+      "detail": "156 vs 154"
+    },
+    {
+      "session": "SU8/37",
+      "kind": "metadata_count_mismatch",
+      "file": "metadata_37.json",
+      "detail": "188 vs 179"
+    },
+    {
+      "session": "SU8/40",
+      "kind": "metadata_count_mismatch",
+      "file": "metadata_40.json",
+      "detail": "319 vs 309"
+    },
+    {
+      "session": "SU8/41",
+      "kind": "zero_event_metadata_reference_without_file",
+      "file": "4_ApplicationFrameHost.exe.json",
+      "detail": "not present in fixed-revision session directory; actual session files scanned independently"
+    },
+    {
+      "session": "SU8/41",
+      "kind": "metadata_count_mismatch",
+      "file": "metadata_41.json",
+      "detail": "508 vs 499"
+    },
+    {
+      "session": "SU8/42",
+      "kind": "metadata_count_mismatch",
+      "file": "metadata_42.json",
+      "detail": "90 vs 86"
+    },
+    {
+      "session": "SU8/43",
+      "kind": "metadata_count_mismatch",
+      "file": "metadata_43.json",
+      "detail": "81 vs 75"
+    },
+    {
+      "session": "SU8/44",
+      "kind": "metadata_count_mismatch",
+      "file": "metadata_44.json",
+      "detail": "119 vs 116"
+    },
+    {
+      "session": "SU8/45",
+      "kind": "metadata_count_mismatch",
+      "file": "metadata_45.json",
+      "detail": "379 vs 341"
+    },
+    {
+      "session": "SU8/46",
+      "kind": "metadata_count_mismatch",
+      "file": "metadata_46.json",
+      "detail": "213 vs 195"
+    },
+    {
+      "session": "SU8/47",
+      "kind": "zero_event_metadata_reference_without_file",
+      "file": "3_ApplicationFrameHost.exe.json",
+      "detail": "not present in fixed-revision session directory; actual session files scanned independently"
+    },
+    {
+      "session": "SU8/48",
+      "kind": "zero_event_metadata_reference_without_file",
+      "file": "3_ApplicationFrameHost.exe.json",
+      "detail": "not present in fixed-revision session directory; actual session files scanned independently"
+    },
+    {
+      "session": "SU8/48",
+      "kind": "metadata_count_mismatch",
+      "file": "metadata_48.json",
+      "detail": "206 vs 189"
+    },
+    {
+      "session": "SU8/49",
+      "kind": "zero_event_metadata_reference_without_file",
+      "file": "2_ApplicationFrameHost.exe.json",
+      "detail": "not present in fixed-revision session directory; actual session files scanned independently"
+    },
+    {
+      "session": "SU8/50",
+      "kind": "zero_event_metadata_reference_without_file",
+      "file": "2_ApplicationFrameHost.exe.json",
+      "detail": "not present in fixed-revision session directory; actual session files scanned independently"
+    },
+    {
+      "session": "SU8/51",
+      "kind": "zero_event_metadata_reference_without_file",
+      "file": "2_ApplicationFrameHost.exe.json",
+      "detail": "not present in fixed-revision session directory; actual session files scanned independently"
+    },
+    {
+      "session": "SU8/51",
+      "kind": "metadata_count_mismatch",
+      "file": "metadata_51.json",
+      "detail": "535 vs 532"
+    },
+    {
+      "session": "SU8/53",
+      "kind": "zero_event_metadata_reference_without_file",
+      "file": "2_ApplicationFrameHost.exe.json",
+      "detail": "not present in fixed-revision session directory; actual session files scanned independently"
+    },
+    {
+      "session": "SU8/55",
+      "kind": "metadata_count_mismatch",
+      "file": "metadata_55.json",
+      "detail": "183 vs 168"
+    },
+    {
+      "session": "SU8/56",
+      "kind": "zero_event_metadata_reference_without_file",
+      "file": "2_ApplicationFrameHost.exe.json",
+      "detail": "not present in fixed-revision session directory; actual session files scanned independently"
+    },
+    {
+      "session": "SU8/57",
+      "kind": "metadata_count_mismatch",
+      "file": "metadata_57.json",
+      "detail": "172 vs 173"
+    },
+    {
+      "session": "SU8/60",
+      "kind": "metadata_count_mismatch",
+      "file": "metadata_60.json",
+      "detail": "442 vs 432"
+    }
+  ],
+  "mapping": [
+    {
+      "source_app": "AppleWebsite",
+      "app_id": 15,
+      "app_name": "Falkon",
+      "category": "产品网页",
+      "desktop_events": 2862,
+      "web_events": 756,
+      "total": 3618
+    },
+    {
+      "source_app": "BingSearch",
+      "app_id": 16,
+      "app_name": "Konqueror",
+      "category": "搜索",
+      "desktop_events": 84,
+      "web_events": 6,
+      "total": 90
+    },
+    {
+      "source_app": "BrowserPDFReader",
+      "app_id": 6,
+      "app_name": "Evince",
+      "category": "PDF阅读",
+      "desktop_events": 96,
+      "web_events": 0,
+      "total": 96
+    },
+    {
+      "source_app": "Calculator",
+      "app_id": 8,
+      "app_name": "Calculator",
+      "category": "计算器",
+      "desktop_events": 2267,
+      "web_events": 0,
+      "total": 2267
+    },
+    {
+      "source_app": "ChromeBrowser",
+      "app_id": 15,
+      "app_name": "Falkon",
+      "category": "浏览器界面/未识别网页",
+      "desktop_events": 5690,
+      "web_events": 0,
+      "total": 5690
+    },
+    {
+      "source_app": "DuckDuckGo",
+      "app_id": 16,
+      "app_name": "Konqueror",
+      "category": "搜索",
+      "desktop_events": 477,
+      "web_events": 230,
+      "total": 707
+    },
+    {
+      "source_app": "EdgeBrowser",
+      "app_id": 15,
+      "app_name": "Falkon",
+      "category": "浏览器界面/未识别网页",
+      "desktop_events": 121,
+      "web_events": 0,
+      "total": 121
+    },
+    {
+      "source_app": "Excel",
+      "app_id": 1,
+      "app_name": "LibreOffice",
+      "category": "表格编辑",
+      "desktop_events": 8498,
+      "web_events": 0,
+      "total": 8498
+    },
+    {
+      "source_app": "Expedia",
+      "app_id": 15,
+      "app_name": "Falkon",
+      "category": "旅行网页",
+      "desktop_events": 1800,
+      "web_events": 443,
+      "total": 2243
+    },
+    {
+      "source_app": "Facebook",
+      "app_id": 0,
+      "app_name": "Firefox",
+      "category": "社交网页",
+      "desktop_events": 279,
+      "web_events": 2,
+      "total": 281
+    },
+    {
+      "source_app": "FileExplorer",
+      "app_id": 7,
+      "app_name": "Files",
+      "category": "文件管理",
+      "desktop_events": 14544,
+      "web_events": 0,
+      "total": 14544
+    },
+    {
+      "source_app": "FilePicker",
+      "app_id": "",
+      "app_name": "",
+      "category": "未映射",
+      "desktop_events": 560,
+      "web_events": 0,
+      "total": 560
+    },
+    {
+      "source_app": "FontViewer",
+      "app_id": "",
+      "app_name": "",
+      "category": "未映射",
+      "desktop_events": 178,
+      "web_events": 0,
+      "total": 178
+    },
+    {
+      "source_app": "France24",
+      "app_id": 6,
+      "app_name": "Evince",
+      "category": "资讯阅读",
+      "desktop_events": 254,
+      "web_events": 28,
+      "total": 282
+    },
+    {
+      "source_app": "GoogleAccount",
+      "app_id": 15,
+      "app_name": "Falkon",
+      "category": "网页账号",
+      "desktop_events": 22,
+      "web_events": 1,
+      "total": 23
+    },
+    {
+      "source_app": "GoogleForms",
+      "app_id": 15,
+      "app_name": "Falkon",
+      "category": "网页表单",
+      "desktop_events": 865,
+      "web_events": 310,
+      "total": 1175
+    },
+    {
+      "source_app": "GoogleMaps",
+      "app_id": 27,
+      "app_name": "Marble",
+      "category": "地图",
+      "desktop_events": 1396,
+      "web_events": 479,
+      "total": 1875
+    },
+    {
+      "source_app": "GooglePlay",
+      "app_id": 22,
+      "app_name": "GNOMESoftware",
+      "category": "应用商店",
+      "desktop_events": 32,
+      "web_events": 0,
+      "total": 32
+    },
+    {
+      "source_app": "GoogleSearch",
+      "app_id": 16,
+      "app_name": "Konqueror",
+      "category": "搜索",
+      "desktop_events": 1429,
+      "web_events": 331,
+      "total": 1760
+    },
+    {
+      "source_app": "Instagram",
+      "app_id": 0,
+      "app_name": "Firefox",
+      "category": "社交网页",
+      "desktop_events": 8,
+      "web_events": 0,
+      "total": 8
+    },
+    {
+      "source_app": "Installer",
+      "app_id": "",
+      "app_name": "",
+      "category": "未映射",
+      "desktop_events": 16,
+      "web_events": 0,
+      "total": 16
+    },
+    {
+      "source_app": "MSNWeather",
+      "app_id": "",
+      "app_name": "",
+      "category": "未映射",
+      "desktop_events": 60,
+      "web_events": 0,
+      "total": 60
+    },
+    {
+      "source_app": "MediaPlayerSetup",
+      "app_id": "",
+      "app_name": "",
+      "category": "未映射",
+      "desktop_events": 21,
+      "web_events": 0,
+      "total": 21
+    },
+    {
+      "source_app": "Notepad",
+      "app_id": 1,
+      "app_name": "LibreOffice",
+      "category": "文本编辑",
+      "desktop_events": 1196,
+      "web_events": 0,
+      "total": 1196
+    },
+    {
+      "source_app": "OneNote",
+      "app_id": 1,
+      "app_name": "LibreOffice",
+      "category": "笔记",
+      "desktop_events": 2,
+      "web_events": 0,
+      "total": 2
+    },
+    {
+      "source_app": "OpenWithDialog",
+      "app_id": "",
+      "app_name": "",
+      "category": "未映射",
+      "desktop_events": 56,
+      "web_events": 0,
+      "total": 56
+    },
+    {
+      "source_app": "Paint",
+      "app_id": 3,
+      "app_name": "GIMP",
+      "category": "图像编辑",
+      "desktop_events": 1365,
+      "web_events": 0,
+      "total": 1365
+    },
+    {
+      "source_app": "PowerPoint",
+      "app_id": 1,
+      "app_name": "LibreOffice",
+      "category": "演示编辑",
+      "desktop_events": 8160,
+      "web_events": 0,
+      "total": 8160
+    },
+    {
+      "source_app": "Recorder",
+      "app_id": "",
+      "app_name": "",
+      "category": "未映射",
+      "desktop_events": 200,
+      "web_events": 0,
+      "total": 200
+    },
+    {
+      "source_app": "Slack",
+      "app_id": 17,
+      "app_name": "Pidgin",
+      "category": "即时通信",
+      "desktop_events": 73,
+      "web_events": 0,
+      "total": 73
+    },
+    {
+      "source_app": "SnippingTool",
+      "app_id": "",
+      "app_name": "",
+      "category": "未映射",
+      "desktop_events": 2608,
+      "web_events": 0,
+      "total": 2608
+    },
+    {
+      "source_app": "StickyNotes",
+      "app_id": 1,
+      "app_name": "LibreOffice",
+      "category": "笔记",
+      "desktop_events": 990,
+      "web_events": 0,
+      "total": 990
+    },
+    {
+      "source_app": "Target",
+      "app_id": 0,
+      "app_name": "Firefox",
+      "category": "购物网页",
+      "desktop_events": 2100,
+      "web_events": 680,
+      "total": 2780
+    },
+    {
+      "source_app": "TaskManager",
+      "app_id": 13,
+      "app_name": "SystemMonitor",
+      "category": "资源监控",
+      "desktop_events": 231,
+      "web_events": 0,
+      "total": 231
+    },
+    {
+      "source_app": "UnresolvedApplicationFrameHost",
+      "app_id": "",
+      "app_name": "",
+      "category": "未映射",
+      "desktop_events": 24,
+      "web_events": 0,
+      "total": 24
+    },
+    {
+      "source_app": "VLC",
+      "app_id": 2,
+      "app_name": "VLC",
+      "category": "媒体播放",
+      "desktop_events": 92,
+      "web_events": 0,
+      "total": 92
+    },
+    {
+      "source_app": "VSCode",
+      "app_id": "",
+      "app_name": "",
+      "category": "未映射",
+      "desktop_events": 48,
+      "web_events": 0,
+      "total": 48
+    },
+    {
+      "source_app": "Walmart",
+      "app_id": 0,
+      "app_name": "Firefox",
+      "category": "购物网页",
+      "desktop_events": 960,
+      "web_events": 272,
+      "total": 1232
+    },
+    {
+      "source_app": "Web:azlyrics.com",
+      "app_id": 15,
+      "app_name": "Falkon",
+      "category": "其他网页",
+      "desktop_events": 108,
+      "web_events": 12,
+      "total": 120
+    },
+    {
+      "source_app": "Web:genius.com",
+      "app_id": 15,
+      "app_name": "Falkon",
+      "category": "其他网页",
+      "desktop_events": 46,
+      "web_events": 31,
+      "total": 77
+    },
+    {
+      "source_app": "Web:grammarly.com",
+      "app_id": 15,
+      "app_name": "Falkon",
+      "category": "其他网页",
+      "desktop_events": 7,
+      "web_events": 1,
+      "total": 8
+    },
+    {
+      "source_app": "Web:norcal.hondadealers.com",
+      "app_id": 15,
+      "app_name": "Falkon",
+      "category": "其他网页",
+      "desktop_events": 17,
+      "web_events": 1,
+      "total": 18
+    },
+    {
+      "source_app": "Web:oklahoman.com",
+      "app_id": 15,
+      "app_name": "Falkon",
+      "category": "其他网页",
+      "desktop_events": 980,
+      "web_events": 65,
+      "total": 1045
+    },
+    {
+      "source_app": "Web:pdfcrowd.com",
+      "app_id": 15,
+      "app_name": "Falkon",
+      "category": "其他网页",
+      "desktop_events": 50,
+      "web_events": 7,
+      "total": 57
+    },
+    {
+      "source_app": "Web:studycat.com",
+      "app_id": 15,
+      "app_name": "Falkon",
+      "category": "其他网页",
+      "desktop_events": 139,
+      "web_events": 4,
+      "total": 143
+    },
+    {
+      "source_app": "Web:subaru.com",
+      "app_id": 15,
+      "app_name": "Falkon",
+      "category": "其他网页",
+      "desktop_events": 53,
+      "web_events": 3,
+      "total": 56
+    },
+    {
+      "source_app": "Web:tinyurl.com",
+      "app_id": 15,
+      "app_name": "Falkon",
+      "category": "其他网页",
+      "desktop_events": 16,
+      "web_events": 1,
+      "total": 17
+    },
+    {
+      "source_app": "Web:toyota.com",
+      "app_id": 15,
+      "app_name": "Falkon",
+      "category": "其他网页",
+      "desktop_events": 14,
+      "web_events": 1,
+      "total": 15
+    },
+    {
+      "source_app": "WebCalculator",
+      "app_id": 8,
+      "app_name": "Calculator",
+      "category": "网页计算器",
+      "desktop_events": 31,
+      "web_events": 0,
+      "total": 31
+    },
+    {
+      "source_app": "Wikipedia",
+      "app_id": 6,
+      "app_name": "Evince",
+      "category": "参考阅读",
+      "desktop_events": 1071,
+      "web_events": 83,
+      "total": 1154
+    },
+    {
+      "source_app": "WindowsClock",
+      "app_id": 25,
+      "app_name": "GNOMEClocks",
+      "category": "时间工具",
+      "desktop_events": 794,
+      "web_events": 0,
+      "total": 794
+    },
+    {
+      "source_app": "WindowsMediaPlayer",
+      "app_id": 2,
+      "app_name": "VLC",
+      "category": "媒体播放",
+      "desktop_events": 4382,
+      "web_events": 0,
+      "total": 4382
+    },
+    {
+      "source_app": "WindowsPhotos",
+      "app_id": 12,
+      "app_name": "Shotwell",
+      "category": "照片管理",
+      "desktop_events": 4693,
+      "web_events": 0,
+      "total": 4693
+    },
+    {
+      "source_app": "WindowsSettings",
+      "app_id": 29,
+      "app_name": "GNOMEControlCenter",
+      "category": "系统设置",
+      "desktop_events": 1966,
+      "web_events": 0,
+      "total": 1966
+    },
+    {
+      "source_app": "WindowsShell",
+      "app_id": "",
+      "app_name": "",
+      "category": "未映射",
+      "desktop_events": 3714,
+      "web_events": 0,
+      "total": 3714
+    },
+    {
+      "source_app": "WindowsWeather",
+      "app_id": "",
+      "app_name": "",
+      "category": "未映射",
+      "desktop_events": 1927,
+      "web_events": 0,
+      "total": 1927
+    },
+    {
+      "source_app": "WindowsWidgets",
+      "app_id": "",
+      "app_name": "",
+      "category": "未映射",
+      "desktop_events": 40,
+      "web_events": 0,
+      "total": 40
+    },
+    {
+      "source_app": "Word",
+      "app_id": 1,
+      "app_name": "LibreOffice",
+      "category": "文档编辑",
+      "desktop_events": 8258,
+      "web_events": 0,
+      "total": 8258
+    },
+    {
+      "source_app": "YouTube",
+      "app_id": 2,
+      "app_name": "VLC",
+      "category": "在线视频",
+      "desktop_events": 4007,
+      "web_events": 1298,
+      "total": 5305
+    }
+  ],
+  "unmapped_sources": [
+    {
+      "source_app": "FilePicker",
+      "app_id": "",
+      "app_name": "",
+      "category": "未映射",
+      "desktop_events": 560,
+      "web_events": 0,
+      "total": 560
+    },
+    {
+      "source_app": "FontViewer",
+      "app_id": "",
+      "app_name": "",
+      "category": "未映射",
+      "desktop_events": 178,
+      "web_events": 0,
+      "total": 178
+    },
+    {
+      "source_app": "Installer",
+      "app_id": "",
+      "app_name": "",
+      "category": "未映射",
+      "desktop_events": 16,
+      "web_events": 0,
+      "total": 16
+    },
+    {
+      "source_app": "MSNWeather",
+      "app_id": "",
+      "app_name": "",
+      "category": "未映射",
+      "desktop_events": 60,
+      "web_events": 0,
+      "total": 60
+    },
+    {
+      "source_app": "MediaPlayerSetup",
+      "app_id": "",
+      "app_name": "",
+      "category": "未映射",
+      "desktop_events": 21,
+      "web_events": 0,
+      "total": 21
+    },
+    {
+      "source_app": "OpenWithDialog",
+      "app_id": "",
+      "app_name": "",
+      "category": "未映射",
+      "desktop_events": 56,
+      "web_events": 0,
+      "total": 56
+    },
+    {
+      "source_app": "Recorder",
+      "app_id": "",
+      "app_name": "",
+      "category": "未映射",
+      "desktop_events": 200,
+      "web_events": 0,
+      "total": 200
+    },
+    {
+      "source_app": "SnippingTool",
+      "app_id": "",
+      "app_name": "",
+      "category": "未映射",
+      "desktop_events": 2608,
+      "web_events": 0,
+      "total": 2608
+    },
+    {
+      "source_app": "UnresolvedApplicationFrameHost",
+      "app_id": "",
+      "app_name": "",
+      "category": "未映射",
+      "desktop_events": 24,
+      "web_events": 0,
+      "total": 24
+    },
+    {
+      "source_app": "VSCode",
+      "app_id": "",
+      "app_name": "",
+      "category": "未映射",
+      "desktop_events": 48,
+      "web_events": 0,
+      "total": 48
+    },
+    {
+      "source_app": "WindowsShell",
+      "app_id": "",
+      "app_name": "",
+      "category": "未映射",
+      "desktop_events": 3714,
+      "web_events": 0,
+      "total": 3714
+    },
+    {
+      "source_app": "WindowsWeather",
+      "app_id": "",
+      "app_name": "",
+      "category": "未映射",
+      "desktop_events": 1927,
+      "web_events": 0,
+      "total": 1927
+    },
+    {
+      "source_app": "WindowsWidgets",
+      "app_id": "",
+      "app_name": "",
+      "category": "未映射",
+      "desktop_events": 40,
+      "web_events": 0,
+      "total": 40
+    }
+  ],
+  "censor_reasons": {
+    "unknown_boundary": 335,
+    "session_end": 173
+  }
+}

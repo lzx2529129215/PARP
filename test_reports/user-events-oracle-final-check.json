@@ -1,0 +1,36 @@
+{
+  "at": "2026-09-14T12:10:48.243803+08:00",
+  "controls_match": true,
+  "controls": {
+    "/sys/kernel/debug/parp/mode": "1",
+    "/sys/kernel/debug/parp/effective_tier_mode": "0",
+    "/proc/sys/vm/tier2_predict_enabled": "0",
+    "/proc/sys/vm/tier2_wss_predict_enabled": "1",
+    "/proc/sys/vm/tier2_wss_strengthen_enabled": "0",
+    "/proc/sys/vm/parp_reclaim_bin_enabled": "0",
+    "/proc/sys/vm/parp_reclaim_cold_aggressive_enabled": "0",
+    "/proc/sys/vm/parp_reclaim_workload_enabled": "0"
+  },
+  "service": "active",
+  "owned_units": {
+    "oracle99644bc56f.slice": "inactive",
+    "parp30-99644bc5-firefox.service": "inactive",
+    "parp30-99644bc5-falkon.service": "inactive",
+    "parp30-99644bc5-files.service": "inactive",
+    "parp30-99644bc5-file_roller.service": "inactive",
+    "parp30-99644bc5-file_roller-row208.service": "inactive",
+    "parp30-99644bc5-file_roller-row218.service": "inactive",
+    "oraclea68de61d59.slice": "inactive",
+    "parp30-a68de61d-firefox.service": "inactive",
+    "parp30-a68de61d-falkon.service": "inactive",
+    "parp30-a68de61d-files.service": "inactive",
+    "parp30-a68de61d-file_roller.service": "inactive",
+    "parp30-a68de61d-file_roller-row208.service": "inactive",
+    "parp30-a68de61d-file_roller-row218.service": "inactive"
+  },
+  "tests": {
+    "test_oracle_next_use": 19,
+    "test_user_events": 9,
+    "all_passed": true
+  }
+}

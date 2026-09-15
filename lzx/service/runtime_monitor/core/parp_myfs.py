@@ -366,6 +366,8 @@ class PARPMyfsBridge:
         event: dict[str, Any] | None = None,
     ) -> None:
         """验证并提交一个完整预测批次；任何局部失败都不发布残缺状态。"""
+        if prediction_result.get("prediction_format") == "visit_window":
+            return  # Independent window probabilities have no legacy prior ABI.
         self._stats["events_received"] += 1
         if self.mode == "off":
             return

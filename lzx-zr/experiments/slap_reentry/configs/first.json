@@ -1,0 +1,27 @@
+{
+  "reentry_bins": [
+    30,
+    60,
+    180,
+    300,
+    600,
+    1800,
+    3600
+  ],
+  "period_s": 30,
+  "history_len": 20,
+  "duration_cap_s": 600,
+  "max_session_gap_s": 3600,
+  "epochs": 20,
+  "batch_size": 2048,
+  "lr": 0.001,
+  "seed": 42,
+  "threads": 2,
+  "initialization": "same seed from scratch, not pretrained M0 warm start",
+  "selection": "validation masked cross entropy",
+  "gate_relative_poa_gain": 0.05,
+  "gate_other_improvements_required": 2,
+  "gate_bootstrap_seed": 42,
+  "gate_bootstrap_replicates": 1000,
+  "output": "/home/lzx/Desktop/PARP/lzx-zr/experiments/slap_reentry/outputs/slap-reentry-20260911-v1"
+}

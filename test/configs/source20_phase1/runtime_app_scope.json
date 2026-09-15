@@ -1,0 +1,545 @@
+{
+  "slice": "source20-phase1.slice",
+  "apps": [
+    {
+      "app_key": "FIREFOX",
+      "app_id": 1,
+      "vocab_name": "Firefox",
+      "scope_name": "source20-phase1-firefox.scope",
+      "unit_name": "source20-phase1-firefox",
+      "workload_enabled": true,
+      "prediction_enabled": false,
+      "window_keywords": [
+        "epiphany",
+        "org.gnome.Epiphany",
+        "Web",
+        "PARP LSAPP"
+      ],
+      "process_keywords": [
+        "epiphany",
+        "epiphany-browser"
+      ],
+      "binding_scope_names": []
+    },
+    {
+      "app_key": "LIBREOFFICE",
+      "app_id": 2,
+      "vocab_name": "LibreOffice",
+      "scope_name": "source20-phase1-libreoffice.scope",
+      "unit_name": "source20-phase1-libreoffice",
+      "workload_enabled": true,
+      "prediction_enabled": false,
+      "window_keywords": [
+        "libreoffice",
+        "soffice",
+        "writer"
+      ],
+      "process_keywords": [
+        "soffice.bin",
+        "soffice",
+        "lowriter"
+      ],
+      "binding_scope_names": []
+    },
+    {
+      "app_key": "VLC",
+      "app_id": 3,
+      "vocab_name": "VLC",
+      "scope_name": "source20-phase1-vlc.scope",
+      "unit_name": "source20-phase1-vlc",
+      "workload_enabled": true,
+      "prediction_enabled": false,
+      "window_keywords": [
+        "vlc",
+        "videolan",
+        "audio-test"
+      ],
+      "process_keywords": [
+        "vlc"
+      ],
+      "binding_scope_names": []
+    },
+    {
+      "app_key": "GIMP",
+      "app_id": 4,
+      "vocab_name": "GIMP",
+      "scope_name": "source20-phase1-gimp.scope",
+      "unit_name": "source20-phase1-gimp",
+      "workload_enabled": true,
+      "prediction_enabled": false,
+      "window_keywords": [
+        "gimp",
+        "gnu image manipulation",
+        "image-test"
+      ],
+      "process_keywords": [
+        "gimp",
+        "gimp-2.10"
+      ],
+      "binding_scope_names": []
+    },
+    {
+      "app_key": "AUDACITY",
+      "app_id": 5,
+      "vocab_name": "Audacity",
+      "scope_name": "source20-phase1-audacity.scope",
+      "unit_name": "source20-phase1-audacity",
+      "workload_enabled": true,
+      "prediction_enabled": false,
+      "window_keywords": [
+        "audacity",
+        "audio-test"
+      ],
+      "process_keywords": [
+        "audacity"
+      ],
+      "binding_scope_names": []
+    },
+    {
+      "app_key": "THUNDERBIRD",
+      "app_id": 6,
+      "vocab_name": "Thunderbird",
+      "scope_name": "source20-phase1-thunderbird.scope",
+      "unit_name": "source20-phase1-thunderbird",
+      "workload_enabled": true,
+      "prediction_enabled": false,
+      "window_keywords": [
+        "thunderbird",
+        "PARP local message"
+      ],
+      "process_keywords": [
+        "thunderbird"
+      ],
+      "binding_scope_names": []
+    },
+    {
+      "app_key": "EVINCE",
+      "app_id": 7,
+      "vocab_name": "Evince",
+      "scope_name": "source20-phase1-evince.scope",
+      "unit_name": "source20-phase1-evince",
+      "workload_enabled": true,
+      "prediction_enabled": false,
+      "window_keywords": [
+        "evince",
+        "document viewer",
+        "document-test",
+        "文档查看器"
+      ],
+      "process_keywords": [
+        "evince"
+      ],
+      "binding_scope_names": []
+    },
+    {
+      "app_key": "FILES",
+      "app_id": 8,
+      "vocab_name": "Files",
+      "scope_name": "source20-phase1-files.scope",
+      "unit_name": "source20-phase1-files",
+      "workload_enabled": true,
+      "prediction_enabled": false,
+      "window_keywords": [
+        "nautilus",
+        "files",
+        "文件",
+        "lsapp-fixtures"
+      ],
+      "process_keywords": [
+        "nautilus",
+        "org.gnome.Nautilus"
+      ],
+      "binding_scope_names": []
+    },
+    {
+      "app_key": "CALCULATOR",
+      "app_id": 9,
+      "vocab_name": "Calculator",
+      "scope_name": "source20-phase1-calculator.scope",
+      "unit_name": "source20-phase1-calculator",
+      "workload_enabled": true,
+      "prediction_enabled": false,
+      "window_keywords": [
+        "gnome-calculator",
+        "calculator",
+        "计算器"
+      ],
+      "process_keywords": [
+        "gnome-calculator"
+      ],
+      "binding_scope_names": []
+    },
+    {
+      "app_key": "CALENDAR",
+      "app_id": 10,
+      "vocab_name": "Calendar",
+      "scope_name": "source20-phase1-calendar.scope",
+      "unit_name": "source20-phase1-calendar",
+      "workload_enabled": true,
+      "prediction_enabled": false,
+      "window_keywords": [
+        "gnome-calendar",
+        "calendar",
+        "日历"
+      ],
+      "process_keywords": [
+        "gnome-calendar"
+      ],
+      "binding_scope_names": []
+    },
+    {
+      "app_key": "RHYTHMBOX",
+      "app_id": 11,
+      "vocab_name": "Rhythmbox",
+      "scope_name": "source20-phase1-rhythmbox.scope",
+      "unit_name": "source20-phase1-rhythmbox",
+      "workload_enabled": true,
+      "prediction_enabled": false,
+      "window_keywords": [
+        "rhythmbox",
+        "music",
+        "音乐"
+      ],
+      "process_keywords": [
+        "rhythmbox"
+      ],
+      "binding_scope_names": []
+    },
+    {
+      "app_key": "IMAGE_VIEWER",
+      "app_id": 12,
+      "vocab_name": "ImageViewer",
+      "scope_name": "source20-phase1-image_viewer.scope",
+      "unit_name": "source20-phase1-image_viewer",
+      "workload_enabled": true,
+      "prediction_enabled": false,
+      "window_keywords": [
+        "eog",
+        "image viewer",
+        "image-test",
+        "图像查看器"
+      ],
+      "process_keywords": [
+        "eog"
+      ],
+      "binding_scope_names": []
+    },
+    {
+      "app_key": "SHOTWELL",
+      "app_id": 13,
+      "vocab_name": "Shotwell",
+      "scope_name": "source20-phase1-shotwell.scope",
+      "unit_name": "source20-phase1-shotwell",
+      "workload_enabled": true,
+      "prediction_enabled": false,
+      "window_keywords": [
+        "shotwell",
+        "photo",
+        "照片"
+      ],
+      "process_keywords": [
+        "shotwell"
+      ],
+      "binding_scope_names": []
+    },
+    {
+      "app_key": "SYSTEM_MONITOR",
+      "app_id": 14,
+      "vocab_name": "SystemMonitor",
+      "scope_name": "source20-phase1-system_monitor.scope",
+      "unit_name": "source20-phase1-system_monitor",
+      "workload_enabled": true,
+      "prediction_enabled": false,
+      "window_keywords": [
+        "gnome-system-monitor",
+        "system monitor",
+        "系统监视器"
+      ],
+      "process_keywords": [
+        "gnome-system-monitor"
+      ],
+      "binding_scope_names": []
+    },
+    {
+      "app_key": "WPS",
+      "app_id": 15,
+      "vocab_name": "WPS",
+      "scope_name": "source20-phase1-wps.scope",
+      "unit_name": "source20-phase1-wps",
+      "workload_enabled": true,
+      "prediction_enabled": false,
+      "window_keywords": [
+        "wps",
+        "wpsoffice",
+        "wpp",
+        "wpspdf"
+      ],
+      "process_keywords": [
+        "wpsoffice",
+        "/office6/wps",
+        "/office6/wpp",
+        "/office6/et",
+        "wpspdf",
+        "wpscloudsvr",
+        "wpscenter"
+      ],
+      "binding_scope_names": []
+    },
+    {
+      "app_key": "FALKON",
+      "app_id": 16,
+      "vocab_name": "Falkon",
+      "scope_name": "source20-phase1-falkon.scope",
+      "unit_name": "source20-phase1-falkon",
+      "workload_enabled": true,
+      "prediction_enabled": false,
+      "window_keywords": [
+        "Falkon",
+        "Falkon Browser"
+      ],
+      "process_keywords": [
+        "falkon"
+      ],
+      "binding_scope_names": []
+    },
+    {
+      "app_key": "KONQUEROR",
+      "app_id": 17,
+      "vocab_name": "Konqueror",
+      "scope_name": "source20-phase1-konqueror.scope",
+      "unit_name": "source20-phase1-konqueror",
+      "workload_enabled": true,
+      "prediction_enabled": false,
+      "window_keywords": [
+        "konqueror"
+      ],
+      "process_keywords": [
+        "konqueror"
+      ],
+      "binding_scope_names": []
+    },
+    {
+      "app_key": "PIDGIN",
+      "app_id": 18,
+      "vocab_name": "Pidgin",
+      "scope_name": "source20-phase1-pidgin.scope",
+      "unit_name": "source20-phase1-pidgin",
+      "workload_enabled": true,
+      "prediction_enabled": false,
+      "window_keywords": [
+        "Pidgin"
+      ],
+      "process_keywords": [
+        "pidgin"
+      ],
+      "binding_scope_names": []
+    },
+    {
+      "app_key": "GAJIM",
+      "app_id": 19,
+      "vocab_name": "Gajim",
+      "scope_name": "source20-phase1-gajim.scope",
+      "unit_name": "source20-phase1-gajim",
+      "workload_enabled": true,
+      "prediction_enabled": false,
+      "window_keywords": [
+        "Gajim",
+        "org.gajim.Gajim"
+      ],
+      "process_keywords": [
+        "gajim"
+      ],
+      "binding_scope_names": []
+    },
+    {
+      "app_key": "DINO",
+      "app_id": 20,
+      "vocab_name": "Dino",
+      "scope_name": "source20-phase1-dino.scope",
+      "unit_name": "source20-phase1-dino",
+      "workload_enabled": true,
+      "prediction_enabled": false,
+      "window_keywords": [
+        "Dino-im",
+        "dino-im"
+      ],
+      "process_keywords": [
+        "dino-im"
+      ],
+      "binding_scope_names": []
+    },
+    {
+      "app_key": "PSI_PLUS",
+      "app_id": 21,
+      "vocab_name": "PsiPlus",
+      "scope_name": "source20-phase1-psi_plus.scope",
+      "unit_name": "source20-phase1-psi_plus",
+      "workload_enabled": true,
+      "prediction_enabled": false,
+      "window_keywords": [
+        "Psi+",
+        "main"
+      ],
+      "process_keywords": [
+        "psi-plus"
+      ],
+      "binding_scope_names": []
+    },
+    {
+      "app_key": "KAIDAN",
+      "app_id": 22,
+      "vocab_name": "Kaidan",
+      "scope_name": "source20-phase1-kaidan.scope",
+      "unit_name": "source20-phase1-kaidan",
+      "workload_enabled": true,
+      "prediction_enabled": false,
+      "window_keywords": [
+        "kaidan"
+      ],
+      "process_keywords": [
+        "kaidan"
+      ],
+      "binding_scope_names": []
+    },
+    {
+      "app_key": "SOFTWARE",
+      "app_id": 23,
+      "vocab_name": "GNOMESoftware",
+      "scope_name": "source20-phase1-software.scope",
+      "unit_name": "source20-phase1-software",
+      "workload_enabled": true,
+      "prediction_enabled": false,
+      "window_keywords": [
+        "Org.gnome.Software",
+        "org.gnome.Software"
+      ],
+      "process_keywords": [
+        "gnome-software"
+      ],
+      "binding_scope_names": []
+    },
+    {
+      "app_key": "EVOLUTION",
+      "app_id": 24,
+      "vocab_name": "Evolution",
+      "scope_name": "source20-phase1-evolution.scope",
+      "unit_name": "source20-phase1-evolution",
+      "workload_enabled": true,
+      "prediction_enabled": false,
+      "window_keywords": [
+        "Evolution",
+        "evolution"
+      ],
+      "process_keywords": [
+        "evolution"
+      ],
+      "binding_scope_names": []
+    },
+    {
+      "app_key": "FILE_ROLLER",
+      "app_id": 25,
+      "vocab_name": "FileRoller",
+      "scope_name": "source20-phase1-file_roller.scope",
+      "unit_name": "source20-phase1-file_roller",
+      "workload_enabled": true,
+      "prediction_enabled": false,
+      "window_keywords": [
+        "file-roller",
+        "File-roller"
+      ],
+      "process_keywords": [
+        "file-roller"
+      ],
+      "binding_scope_names": []
+    },
+    {
+      "app_key": "CLOCKS",
+      "app_id": 26,
+      "vocab_name": "GNOMEClocks",
+      "scope_name": "source20-phase1-clocks.scope",
+      "unit_name": "source20-phase1-clocks",
+      "workload_enabled": true,
+      "prediction_enabled": false,
+      "window_keywords": [
+        "Org.gnome.clocks",
+        "org.gnome.clocks"
+      ],
+      "process_keywords": [
+        "gnome-clocks"
+      ],
+      "binding_scope_names": []
+    },
+    {
+      "app_key": "CONTACTS",
+      "app_id": 27,
+      "vocab_name": "GNOMEContacts",
+      "scope_name": "source20-phase1-contacts.scope",
+      "unit_name": "source20-phase1-contacts",
+      "workload_enabled": true,
+      "prediction_enabled": false,
+      "window_keywords": [
+        "Gnome-contacts",
+        "gnome-contacts"
+      ],
+      "process_keywords": [
+        "gnome-contacts"
+      ],
+      "binding_scope_names": []
+    },
+    {
+      "app_key": "MOUSEPAD",
+      "app_id": 28,
+      "vocab_name": "Mousepad",
+      "scope_name": "source20-phase1-mousepad.scope",
+      "unit_name": "source20-phase1-mousepad",
+      "workload_enabled": true,
+      "prediction_enabled": false,
+      "window_keywords": [
+        "mousepad",
+        "Mousepad"
+      ],
+      "process_keywords": [
+        "mousepad"
+      ],
+      "binding_scope_names": []
+    },
+    {
+      "app_key": "SHOTCUT",
+      "app_id": 29,
+      "vocab_name": "Shotcut",
+      "scope_name": "source20-phase1-shotcut.scope",
+      "unit_name": "source20-phase1-shotcut",
+      "workload_enabled": true,
+      "prediction_enabled": false,
+      "window_keywords": [
+        "shotcut",
+        "Shotcut"
+      ],
+      "process_keywords": [
+        "shotcut",
+        "melt",
+        "qmelt"
+      ],
+      "binding_scope_names": []
+    },
+    {
+      "app_key": "CONTROL_CENTER",
+      "app_id": 30,
+      "vocab_name": "GNOMEControlCenter",
+      "scope_name": "source20-phase1-control_center.scope",
+      "unit_name": "source20-phase1-control_center",
+      "workload_enabled": true,
+      "prediction_enabled": false,
+      "window_keywords": [
+        "Gnome-control-center",
+        "gnome-control-center"
+      ],
+      "process_keywords": [
+        "gnome-control-center"
+      ],
+      "binding_scope_names": []
+    }
+  ],
+  "status": "phase1_four_app_gui_acceptance_pass_predictions_disabled",
+  "schema_version": 1
+}

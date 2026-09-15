@@ -360,4 +360,28 @@ python3 test/test/parp-real-pc-experiment-lzx.py report-r8 \
   --native <Native输出根目录> --bin <Bin输出根目录> --output <对比报告目录>
 ```
 
-每轮会保存压力请求/提交字节、distinct victim 应用、`oom_group_kill`/`oom_kill`/`oom` 增量、每应用压力前后 cgroup/PID/window 状态、`mark_victim` PID 归因、未知或 slice 外 OOM 标记，以及 reclaim-bin 选择/扫描/回收计数。任何 trace 丢失、Firefox 死亡、未知 PID、宿主 OOM、无 trace 的应用消失、压力字节不一致或 bin-only 未真正打开 reclaim-bin 都使该轮无效。报告仅使用 10 个有效同 seed 配对；Native victim 总数少于 10 时为 `INCONCLUSIVE`，否则只有总 victim 应用数下降至少 30% 且 Bin 中位数不高于 Native 才为 `PASS`。`r8_llm` 仅保留 runtime/GGUF 哈希、prompt、上下文、线程和缓存状态的未来契约；当前 R8 不安装 runtime、不下载模型，也不把 LLM 纳入结果。<!-- lzx-note -->
+每轮会保存压力请求/提交字节、distinct victim 应用、`oom_group_kill`/`oom_kill`/`oom` 增量、每应用压力前后 cgroup/PID/window 状态、`mark_victim` PID 归因、未知或 slice 外 OOM 标记，以及 reclaim-bin 选择/扫描/回收计数。任何 trace 丢失、Firefox 死亡、未知 PID、宿主 OOM、无 trace 的应用消失、压力字节不一致或 bin-only 未真正打开 reclaim-bin 都使该轮无效。报告仅使用 10 个有效同 seed 配对；Native victim 总数少于 10 时为 `INCONCLUSIVE`，否则只有总 victim 应用数下降至少 30% 且 Bin 中位数不高于 Native 才为 `PASS`。<!-- lzx-note -->
+
+## R8-LLM：真实模型权重加载峰值
+
+`parp-r8-llm-oom-survival-config-lzx.json` 是独立 profile：原有 15 个 GUI 都是 `oom_score_adj=500` 的 victim，第 16 个 `llm-aggressor.scope` 是唯一 score 0 压力源。压力器只接受本地、SHA-256 固定的 `llama-server` 和 GGUF，执行 `--no-mmap` 权重加载、`POSIX_FADV_DONTNEED` 冷缓存处理及固定 prompt 的 1-token 推理；加载完成后保持模型常驻，并以 100 ms 周期记录 cgroup 与 `smaps_rollup`。它不下载模型、不安装 runtime，也不允许 dummy allocator。<!-- lzx-note -->
+
+先在配置的 `r8_llm` 中填入可执行 runtime、GGUF 的绝对路径、两个 SHA-256、精确模型字节数并将 `status` 改为 `ready`。校准先做 3 轮无 LLM 的 GUI 基线，再在同一 Native 上做 5 轮完全相同的模型加载；至少 4 轮稳定产生 1–3 个 GUI victim 且无轮超过 3 个，才会冻结 `MemoryMax`。<!-- lzx-note -->
+
+```bash
+python3 test/test/parp-real-pc-experiment-lzx.py calibrate-r8-llm \
+  --config test/test/parp-r8-llm-oom-survival-config-lzx.json \
+  --policy native_kernel --output <LLM校准目录>
+
+python3 test/test/parp-real-pc-experiment-lzx.py run \
+  --config <LLM校准目录>/frozen-config.json --policy native_kernel \
+  --scenario r8_llm_weight_load --rounds 10 --seed 20261001
+
+python3 test/test/parp-real-pc-experiment-lzx.py run \
+  --config <LLM校准目录>/frozen-config.json --policy bin_lstm \
+  --scenario r8_llm_weight_load --rounds 10 --seed 20261001 \
+  --replay-from <Native输出根目录>
+
+python3 test/test/parp-real-pc-experiment-lzx.py report-r8-llm \
+  --native <Native输出根目录> --bin <Bin输出根目录> --output <LLM对比报告目录>
+```

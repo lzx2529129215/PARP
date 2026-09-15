@@ -14,7 +14,7 @@ UMask=0077
 # Three 1024-page per-CPU perf rings require about 24 MiB on the two-vCPU
 # collection VM.  Keep the allowance explicit and bounded instead of changing
 # the machine-wide perf_event_mlock_kb sysctl.
-LimitMEMLOCK=64M
+LimitMEMLOCK=128M
 
 # monitor 自身始终无特权；只有此 helper 能加载/附着 BPF tracepoint，并读取
 # 目标 UID 的 /proc/<pid>/{cwd,fd} 以把 fd 参数解析为文件路径。
@@ -26,6 +26,9 @@ PrivateDevices=true
 ProtectSystem=strict
 ProtectHome=read-only
 ProtectKernelTunables=true
+# page-access-window 只写这一处标准 Page Idle bitmap；其余 kernel tunable
+# 继续由 ProtectKernelTunables 保持只读。
+ReadWritePaths=/sys/kernel/mm/page_idle/bitmap
 # BCC 必须读取 /lib/modules/<release>/{build,source} 编译 tracepoint。保持
 # ProtectSystem=strict 且不授予 CAP_SYS_MODULE，helper 仍无法写入或加载模块。
 ProtectKernelModules=false

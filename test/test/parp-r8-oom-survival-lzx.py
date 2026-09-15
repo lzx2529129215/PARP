@@ -28,6 +28,8 @@ from typing import Any
 
 MIB = 1024 * 1024
 SCENARIO = "r8_multi_app_oom_survival"
+LLM_SCENARIO = "r8_llm_weight_load"
+R8_SCENARIOS = frozenset({SCENARIO, LLM_SCENARIO})
 HEAVY_APPS = frozenset({"FIREFOX", "THUNDERBIRD", "GIMP", "LIBREOFFICE", "AUDACITY"})
 MEDIUM_APPS = frozenset({"VLC", "EVINCE", "IMAGE_VIEWER", "RHYTHMBOX", "SHOTWELL", "FILES"})
 LIGHT_APPS = frozenset({"CALCULATOR", "CALENDAR", "SYSTEM_MONITOR", "SOLITAIRE"})
@@ -40,6 +42,7 @@ TEST_DIR = Path(__file__).resolve().parent
 TEST_ROOT = TEST_DIR.parent
 AUTOMATION = TEST_ROOT / "automation" / "app_automation.py"
 ASSET_BUILDER = TEST_ROOT / "automation" / "create_real_pc_assets_lzx.py"
+LLM_PRESSURE = TEST_ROOT / "automation" / "r8_llm_pressure_lzx.py"
 EVIDENCE = TEST_DIR / "parp-trained-sequence-evidence-lzx.py"
 
 
@@ -84,6 +87,25 @@ def read_kv(path: Path) -> dict[str, int]:
 def canonical_sha256(value: Any) -> str:
     encoded = json.dumps(value, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
     return hashlib.sha256(encoded.encode("utf-8")).hexdigest()
+
+
+def file_sha256(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as stream:
+        while chunk := stream.read(8 * MIB):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+def configured_scenario(config: dict[str, Any]) -> str:
+    scenarios = list(config.get("scenarios", []))
+    if len(scenarios) != 1 or scenarios[0] not in R8_SCENARIOS:
+        raise ValueError("R8 config must contain exactly one supported R8 scenario")
+    return str(scenarios[0])
+
+
+def is_llm_scenario(config: dict[str, Any]) -> bool:
+    return configured_scenario(config) == LLM_SCENARIO
 
 
 def memtotal_mib() -> int:
@@ -139,8 +161,8 @@ def validate_config(config: dict[str, Any], *, require_frozen: bool = False) -> 
     missing = sorted(required - set(config))
     if missing:
         raise ValueError("R8 config missing: " + ",".join(missing))
-    if list(config["scenarios"]) != [SCENARIO]:
-        raise ValueError("R8 config must contain only r8_multi_app_oom_survival")
+    scenario_name = configured_scenario(config)
+    llm_mode = scenario_name == LLM_SCENARIO
     apps = list(config["apps"])
     if len(apps) != 15 or set(apps) != ALL_R8_APPS:
         raise ValueError("R8 requires the exact 15 LSAPP GUI applications")
@@ -150,22 +172,32 @@ def validate_config(config: dict[str, Any], *, require_frozen: bool = False) -> 
         raise ValueError("R8 hot/cold application sets overlap")
     if len(config["trained_history"]) != 5 or len(config["trained_history_vocab"]) != 5:
         raise ValueError("R8 requires the five-event LSTM history contract")
-    if config.get("pressure_mode") != "firefox_arraybuffer_oom_burst":
-        raise ValueError("R8 pressure must be Firefox ArrayBuffer only")
+    expected_pressure = "llm_weight_load" if llm_mode else "firefox_arraybuffer_oom_burst"
+    if config.get("pressure_mode") != expected_pressure:
+        raise ValueError(f"{scenario_name} requires pressure_mode={expected_pressure}")
     r8 = config["r8_oom"]
-    if r8.get("aggressor_app") != "FIREFOX":
-        raise ValueError("R8 Firefox must be the only aggressor")
+    expected_aggressor = "LLM" if llm_mode else "FIREFOX"
+    if r8.get("aggressor_app") != expected_aggressor:
+        raise ValueError(f"{scenario_name} requires {expected_aggressor} as the only aggressor")
     victims = list(r8.get("victim_apps", []))
-    if set(victims) != set(apps) - {"FIREFOX"} or len(victims) != 14:
-        raise ValueError("R8 must declare exactly the other 14 applications as victims")
-    if int(r8.get("pressure_chunk_mib", 0)) != 64:
+    expected_victims = set(apps) if llm_mode else set(apps) - {"FIREFOX"}
+    if set(victims) != expected_victims or len(victims) != len(expected_victims):
+        raise ValueError(f"{scenario_name} victim application set is invalid")
+    if not llm_mode and int(r8.get("pressure_chunk_mib", 0)) != 64:
         raise ValueError("R8 Firefox pressure chunk must be exactly 64 MiB")
     if int(r8.get("memory_swap_max_mib", 0)) != 1024:
         raise ValueError("R8 MemorySwapMax must be 1024 MiB")
     if str(r8.get("memory_high", "")) != "infinity":
         raise ValueError("R8 MemoryHigh must remain infinity")
-    if int(r8.get("victim_oom_score_adj", -1)) != 500 or int(r8.get("aggressor_oom_score_adj", -1)) != 0:
-        raise ValueError("R8 OOM score contract is Firefox=0 and victims=500")
+    expected_victim_score = 1000 if llm_mode else 500
+    if (
+        int(r8.get("victim_oom_score_adj", -1)) != expected_victim_score
+        or int(r8.get("aggressor_oom_score_adj", -1)) != 0
+    ):
+        raise ValueError(
+            f"{scenario_name} OOM score contract is aggressor=0 "
+            f"and victims={expected_victim_score}"
+        )
     if not bool(r8.get("memory_oom_group", False)):
         raise ValueError("R8 requires MemoryOOMGroup=yes per application scope")
     tiers = _tiers(config)
@@ -176,17 +208,51 @@ def validate_config(config: dict[str, Any], *, require_frozen: bool = False) -> 
     calibration = r8.get("calibration", {})
     if int(calibration.get("baseline_rounds", 0)) != 3 or int(calibration.get("candidate_rounds", 0)) != 5:
         raise ValueError("R8 calibration requires three baseline and five candidate rounds")
-    if int(calibration.get("burst_start_mib", 0)) != 512 or int(calibration.get("burst_step_mib", 0)) != 128:
+    if not llm_mode and (
+        int(calibration.get("burst_start_mib", 0)) != 512
+        or int(calibration.get("burst_step_mib", 0)) != 128
+    ):
         raise ValueError("R8 burst search must start at 512 MiB and step by 128 MiB")
     if int(calibration.get("minimum_in_range_rounds", 0)) < 4:
         raise ValueError("R8 calibration requires at least four in-range OOM rounds")
+    if llm_mode:
+        if "r8_llm" not in config:
+            raise ValueError("R8 LLM config is missing r8_llm")
+        llm = config["r8_llm"]
+        if llm.get("runtime_kind") != "llama_cpp_server":
+            raise ValueError("R8 LLM requires runtime_kind=llama_cpp_server")
+        if llm.get("model_cache_state") != "cold_fadvise_dontneed":
+            raise ValueError("R8 LLM requires cold_fadvise_dontneed model cache state")
+        cached_ratio = float(llm.get("maximum_cached_model_ratio", -1))
+        if not 0 <= cached_ratio <= 0.10:
+            raise ValueError("R8 LLM maximum cached model ratio must be between 0 and 0.10")
+        if not bool(llm.get("no_mmap")):
+            raise ValueError("R8 LLM requires --no-mmap weight loading")
+        if int(llm.get("context_length", 0)) <= 0 or int(llm.get("threads", 0)) <= 0:
+            raise ValueError("R8 LLM context length and thread count must be positive")
+        if int(llm.get("n_predict", 0)) != 1 or float(llm.get("temperature", -1)) != 0:
+            raise ValueError("R8 LLM first phase requires one deterministic token")
+        if not str(llm.get("prompt", "")):
+            raise ValueError("R8 LLM prompt must be non-empty")
+        if int(llm.get("minimum_model_bytes", 0)) < 128 * MIB:
+            raise ValueError("R8 LLM minimum model size must be at least 128 MiB")
     if require_frozen:
         if not calibration.get("frozen"):
             raise ValueError("formal R8 runs require a frozen native calibration config")
-        if int(r8.get("memory_max_mib", 0)) <= 0 or int(r8.get("burst_mib", 0)) <= 0:
-            raise ValueError("frozen R8 config lacks MemoryMax or Firefox burst")
-        if int(r8["burst_mib"]) % 64:
-            raise ValueError("frozen R8 Firefox burst must be divisible by 64 MiB")
+        if int(r8.get("memory_max_mib", 0)) <= 0:
+            raise ValueError("frozen R8 config lacks MemoryMax")
+        if llm_mode:
+            llm = config["r8_llm"]
+            hashes = (str(llm.get("runtime_sha256", "")), str(llm.get("gguf_sha256", "")))
+            if llm.get("status") != "ready" or any(not re.fullmatch(r"[0-9a-f]{64}", value) for value in hashes):
+                raise ValueError("frozen R8 LLM config lacks ready runtime/GGUF hashes")
+            if int(llm.get("model_size_bytes", 0)) < int(llm["minimum_model_bytes"]):
+                raise ValueError("frozen R8 LLM config lacks a valid model size")
+        else:
+            if int(r8.get("burst_mib", 0)) <= 0:
+                raise ValueError("frozen R8 config lacks Firefox burst")
+            if int(r8["burst_mib"]) % 64:
+                raise ValueError("frozen R8 Firefox burst must be divisible by 64 MiB")
         configured_hash = str(calibration.get("frozen_config_sha256", ""))
         if not configured_hash or configured_hash != canonical_sha256(frozen_config_contract(config)):
             raise ValueError("frozen R8 calibration config hash mismatch")
@@ -233,6 +299,117 @@ def prepare_assets(config: dict[str, Any], run_dir: Path) -> dict[str, Any]:
     return read_json(root / "manifest.json")
 
 
+def llm_asset_preflight(config: dict[str, Any], *, verify_hashes: bool = True) -> dict[str, Any]:
+    """Fail closed unless the pinned real llama.cpp runtime and GGUF are local."""
+    llm = config.get("r8_llm", {})
+    runtime_text = str(llm.get("runtime_path", ""))
+    model_text = str(llm.get("model_path", ""))
+    runtime = Path(runtime_text) if runtime_text else Path("/__r8_missing_runtime__")
+    model = Path(model_text) if model_text else Path("/__r8_missing_model__")
+    checks = {
+        "status_ready": llm.get("status") == "ready",
+        "loader_exists": LLM_PRESSURE.is_file(),
+        "runtime_executable": runtime.is_file() and os.access(runtime, os.X_OK),
+        "gguf_regular_file": model.is_file(),
+        "runtime_sha256_configured": bool(re.fullmatch(r"[0-9a-f]{64}", str(llm.get("runtime_sha256", "")))),
+        "gguf_sha256_configured": bool(re.fullmatch(r"[0-9a-f]{64}", str(llm.get("gguf_sha256", "")))),
+    }
+    observed: dict[str, Any] = {
+        "runtime_path": runtime_text,
+        "model_path": model_text,
+        "runtime_sha256": "",
+        "gguf_sha256": "",
+        "model_size_bytes": model.stat().st_size if model.is_file() else 0,
+        "gguf_magic": "",
+    }
+    if model.is_file():
+        try:
+            observed["gguf_magic"] = model.open("rb").read(4).decode("ascii", errors="replace")
+        except OSError:
+            pass
+    checks["gguf_magic"] = observed["gguf_magic"] == "GGUF"
+    checks["model_size_matches"] = (
+        observed["model_size_bytes"] == int(llm.get("model_size_bytes", 0))
+        and observed["model_size_bytes"] >= int(llm.get("minimum_model_bytes", 0))
+    )
+    if verify_hashes and checks["runtime_executable"]:
+        observed["runtime_sha256"] = file_sha256(runtime)
+    if verify_hashes and checks["gguf_regular_file"]:
+        observed["gguf_sha256"] = file_sha256(model)
+    checks["runtime_sha256_matches"] = bool(
+        verify_hashes and checks["runtime_sha256_configured"]
+        and observed["runtime_sha256"] == str(llm.get("runtime_sha256", ""))
+    )
+    checks["gguf_sha256_matches"] = bool(
+        verify_hashes and checks["gguf_sha256_configured"]
+        and observed["gguf_sha256"] == str(llm.get("gguf_sha256", ""))
+    )
+    reasons = [name for name, passed in checks.items() if not passed]
+    return {
+        "schema_version": 1,
+        "status": "READY" if not reasons else "BLOCKED",
+        "checks": checks,
+        "reasons": reasons,
+        "observed": observed,
+        "contract": {
+            key: llm.get(key) for key in (
+                "runtime_kind", "runtime_source_tag", "runtime_source_commit",
+                "runtime_sha256", "model_repository", "model_revision",
+                "model_filename", "model_quantization", "gguf_sha256", "model_size_bytes",
+                "prompt", "context_length", "threads", "n_predict", "temperature",
+                "model_cache_state", "maximum_cached_model_ratio", "no_mmap",
+            )
+        },
+    }
+
+
+def prune_round_working_assets(run_dir: Path) -> dict[str, Any]:
+    """Drop reproducible per-round working copies after evidence is frozen."""
+    names = (
+        "fixtures", "firefox-profile", "firefox-pressure-profile",
+        "firefox-pressure-a-profile", "firefox-pressure-b-profile",
+        "thunderbird-profile",
+    )
+    removed: list[dict[str, Any]] = []
+    for name in names:
+        target = run_dir / name
+        if not target.exists():
+            continue
+        files = sum(1 for path in target.rglob("*") if path.is_file())
+        bytes_used = sum(
+            path.stat().st_size
+            for path in target.rglob("*")
+            if path.is_file() and not path.is_symlink()
+        )
+        shutil.rmtree(target)
+        removed.append({"name": name, "files": files, "logical_bytes": bytes_used})
+    payload = {
+        "schema_version": 1,
+        "reason": "reproducible temporary working copies pruned after evidence capture",
+        "removed": removed,
+    }
+    if removed:
+        write_json(run_dir / "r8-pruned-working-assets.json", payload)
+    return payload
+
+
+def command_prune_outputs(args: Any) -> int:
+    root = Path(args.root).resolve()
+    if not root.is_dir() or "r8_calibration" not in root.name:
+        raise ValueError("prune root must be one R8 calibration output directory")
+    rows: list[dict[str, Any]] = []
+    for run_dir in sorted(path for path in root.iterdir() if path.is_dir()):
+        if not (run_dir / "asset-manifest.json").is_file():
+            continue
+        payload = prune_round_working_assets(run_dir)
+        if payload["removed"]:
+            rows.append({"run_dir": str(run_dir), **payload})
+    summary = {"schema_version": 1, "root": str(root), "runs_pruned": len(rows), "runs": rows}
+    write_json(root / "r8-prune-summary.json", summary)
+    print(root / "r8-prune-summary.json")
+    return 0
+
+
 def _scope_path(cgroup: Path, app: str) -> Path | None:
     slug = app.lower().replace("_", "-")
     direct = cgroup / f"automation-{slug}.scope"
@@ -249,10 +426,15 @@ def _scope_path(cgroup: Path, app: str) -> Path | None:
 
 def _scope_row(path: Path | None) -> dict[str, Any]:
     if path is None or not path.exists():
-        return {"valid": False, "reason": "scope missing", "pids": []}
+        return {"valid": False, "reason": "scope missing", "pids": [], "threads": []}
     pids = []
+    threads = []
     try:
         pids = [int(item) for item in (path / "cgroup.procs").read_text(encoding="ascii").split()]
+    except (FileNotFoundError, PermissionError, OSError, ValueError):
+        pass
+    try:
+        threads = [int(item) for item in (path / "cgroup.threads").read_text(encoding="ascii").split()]
     except (FileNotFoundError, PermissionError, OSError, ValueError):
         pass
     processes: list[dict[str, Any]] = []
@@ -286,7 +468,7 @@ def _scope_row(path: Path | None) -> dict[str, Any]:
         "memory_events": read_kv(path / "memory.events"),
         "memory_events_local": read_kv(path / "memory.events.local"),
         "memory_oom_group": read_int(path / "memory.oom.group"),
-        "pids": pids, "processes": processes,
+        "pids": pids, "threads": threads, "processes": processes,
     }
 
 
@@ -300,7 +482,10 @@ def _window_ids(window_class: str) -> list[str]:
     return [line for line in result.stdout.splitlines() if line.isdigit()]
 
 
-def snapshot(cgroup: Path, apps: list[str], specs: dict[str, Any], label: str) -> dict[str, Any]:
+def snapshot(
+    cgroup: Path, apps: list[str], specs: dict[str, Any], label: str,
+    *, include_llm: bool = False,
+) -> dict[str, Any]:
     rows: dict[str, Any] = {}
     for app in apps:
         row = _scope_row(_scope_path(cgroup, app))
@@ -308,37 +493,64 @@ def snapshot(cgroup: Path, apps: list[str], specs: dict[str, Any], label: str) -
         row["window_alive"] = bool(row["window_ids"])
         row["scope_alive"] = bool(row.get("pids"))
         rows[app] = row
-    return {
+    payload = {
         "schema_version": 1, "label": label, "timestamp_ns": time.time_ns(),
         "cgroup": _scope_row(cgroup), "apps": rows,
     }
+    if include_llm:
+        llm_row = _scope_row(_scope_path(cgroup, "LLM_AGGRESSOR"))
+        # Keep the LLM scope contract identical to application scope rows.
+        # evaluate_result deliberately requires the aggressor to still own a
+        # live PID after the pressure hold; a valid raw scope row alone does
+        # not prove that because an empty systemd scope can briefly persist.
+        llm_row["scope_alive"] = bool(llm_row.get("pids"))
+        payload["llm"] = llm_row
+    return payload
 
 
-def _r8_specs(run_dir: Path, pressure_mib: int, seed: int) -> dict[str, Any]:
+def _r8_specs(
+    run_dir: Path, pressure_mib: int, seed: int, *, firefox_pressure: bool = True,
+) -> dict[str, Any]:
     _need_bound()
     specs = ACCEPT.app_specs(run_dir)
     fixture = run_dir / "fixtures"
-    pressure_uri = (
-        (fixture / "oom-pressure.html").as_uri()
-        + f"?mib={max(512, pressure_mib)}&seed={seed}"
-    )
+    effective_burst_mib = max(512, pressure_mib)
+    total_chunks = effective_burst_mib // 64
+    lane_a_mib = ((total_chunks + 1) // 2) * 64
+    lane_b_mib = (total_chunks // 2) * 64
     browser_environment = [
         "env", "-u", "http_proxy", "-u", "https_proxy",
         "-u", "HTTP_PROXY", "-u", "HTTPS_PROXY",
+        # WebKitGTK otherwise terminates its web process from the userspace
+        # memory-pressure monitor before the ancestor memcg OOM killer can
+        # select one of R8's higher-scored victim scopes.  R8 is specifically
+        # an experiment of the kernel OOM decision, so keep that independent
+        # userspace safety mechanism out of both browser instances.
+        "WEBKIT_DISABLE_MEMORY_PRESSURE_MONITOR=1",
     ]
-    pressure_command = [
+    pressure_a_command = [
         *browser_environment, "epiphany-browser", "--private-instance",
-        f"--profile={run_dir / 'firefox-pressure-profile'}",
-        pressure_uri,
+        f"--profile={run_dir / 'firefox-pressure-a-profile'}",
+        (fixture / "oom-pressure.html").as_uri() + f"?mib={lane_a_mib}&seed={seed}",
+    ]
+    pressure_b_command = [
+        *browser_environment, "epiphany-browser", "--private-instance",
+        f"--profile={run_dir / 'firefox-pressure-b-profile'}",
+        (fixture / "oom-pressure.html").as_uri() + f"?mib={lane_b_mib}&seed={seed + 1}",
     ]
     workset_command = [
         *browser_environment, "epiphany-browser", "--private-instance",
         f"--profile={run_dir / 'firefox-profile'}",
         (fixture / "local-page.html").as_uri(),
     ]
-    dual_browser_script = (
-        f"{shlex.join(pressure_command)} & exec {shlex.join(workset_command)}"
-    )
+    pressure_commands: list[list[str]] = []
+    if firefox_pressure:
+        pressure_commands.append(pressure_a_command)
+        if pressure_mib:
+            pressure_commands.append(pressure_b_command)
+    dual_browser_script = " ".join(
+        f"{shlex.join(command)} &" for command in pressure_commands
+    ) + f" exec {shlex.join(workset_command)}"
     specs["FIREFOX"] = dataclasses.replace(
         specs["FIREFOX"],
         command=shlex.join(["/bin/sh", "-c", dual_browser_script]),
@@ -357,6 +569,39 @@ def _r8_specs(run_dir: Path, pressure_mib: int, seed: int) -> dict[str, Any]:
     specs["IMAGE_VIEWER"] = dataclasses.replace(
         specs["IMAGE_VIEWER"],
         command=f"env GDK_BACKEND=x11 eog --new-instance {image_paths}",
+    )
+    specs["GIMP"] = dataclasses.replace(
+        specs["GIMP"],
+        command=(
+            f"env HOME={shlex.quote(str(fixture / 'gimp-home'))} "
+            f"XDG_CONFIG_HOME={shlex.quote(str(fixture / 'gimp-config'))} "
+            f"gimp --new-instance --no-splash --console-messages "
+            f"--gimprc={shlex.quote(str(fixture / 'gimprc'))} "
+            + " ".join(
+                shlex.quote(str(fixture / f"image-test-{index:02d}.png"))
+                for index in range(1, 7)
+            )
+        ),
+    )
+    audio = shlex.quote(str(fixture / "audio-test.wav"))
+    specs["AUDACITY"] = dataclasses.replace(
+        specs["AUDACITY"],
+        command=(
+            f"env HOME={shlex.quote(str(fixture / 'audacity-home'))} "
+            f"XDG_CONFIG_HOME={shlex.quote(str(fixture / 'audacity-config'))} "
+            f"audacity {' '.join([audio] * 8)}"
+        ),
+    )
+    pdf = shlex.quote(str(fixture / "document-test.pdf"))
+    evince_command = " ".join(
+        f"evince --new-window {pdf} &" for _ in range(3)
+    ) + f" exec evince --new-window {pdf}"
+    specs["EVINCE"] = dataclasses.replace(
+        specs["EVINCE"], command=shlex.join(["/bin/sh", "-c", evince_command]),
+    )
+    specs["CALCULATOR"] = dataclasses.replace(
+        specs["CALCULATOR"],
+        command="gnome-calculator --mode=programming --equation=100000!",
     )
     specs["VLC"] = dataclasses.replace(
         specs["VLC"],
@@ -384,7 +629,9 @@ def _score_wrapped(command: str, score: int) -> str:
     ])
 
 
-def _switch(spec: Any, label: str) -> list[dict[str, Any]]:
+def _switch(
+    spec: Any, label: str, *, pid_cmdline_contains: str | None = None,
+) -> list[dict[str, Any]]:
     window_contract = {
         "name": spec.name,
         "app_key": spec.key,
@@ -402,10 +649,18 @@ def _switch(spec: Any, label: str) -> list[dict[str, Any]]:
             "minimum_foreground_width": 700,
             "minimum_foreground_height": 500,
             "dismiss_small_transient": True,
-            "pid_cmdline_contains": (
+            "pid_cmdline_contains": pid_cmdline_contains or (
                 "firefox-pressure-profile"
                 if "PARP R8" in spec.window_title else "/firefox-profile"
             ),
+        })
+    elif spec.key == "GIMP":
+        # First-run/recovery dialogs use the same WM_CLASS as the content
+        # window.  They cannot satisfy a native working-set action.
+        window_contract.update({
+            "minimum_foreground_width": 700,
+            "minimum_foreground_height": 500,
+            "dismiss_small_transient": True,
         })
     return [
         {"type": "switch", **window_contract, "label": f"{label}_SWITCH_{spec.key}"},
@@ -445,7 +700,7 @@ def _prepare_steps(app: str, run_dir: Path) -> list[dict[str, Any]]:
             {"type": "hotkey", "key": "ctrl+d"},
             *(
                 {"type": "open_file", "shortcut": "ctrl+shift+i", "path": str(fixture / "audio-test.wav"), "wait_after": 2.0}
-                for _ in range(3)
+                for _ in range(8)
             ),
             {"type": "key", "key": "ctrl+a"}, {"type": "key", "key": "ctrl+f"},
             {"type": "key", "key": "plus", "repeat": 6},
@@ -456,7 +711,8 @@ def _prepare_steps(app: str, run_dir: Path) -> list[dict[str, Any]]:
             {"type": "key", "key": "space"},
         ],
         "EVINCE": [
-            {"type": "key", "key": "Home"}, {"type": "key", "key": "Page_Down", "repeat": 239, "interval": 0.01},
+            {"type": "key", "key": "plus", "repeat": 5, "interval": 0.08},
+            {"type": "key", "key": "Home"}, {"type": "key", "key": "Page_Down", "repeat": 239, "interval": 0.05},
             {"type": "key", "key": "Home"},
         ],
         "IMAGE_VIEWER": [
@@ -477,7 +733,11 @@ def _prepare_steps(app: str, run_dir: Path) -> list[dict[str, Any]]:
         ],
         "CALCULATOR": [
             {"type": "key", "key": "alt+F10"},
+            {"type": "key", "key": "ctrl+n", "repeat": 8, "interval": 0.3},
             {"type": "type", "text": "".join(f"{index}+{index}=" for index in range(1, 257)), "delay_ms": 2},
+            {"type": "key", "key": "Return"},
+            {"type": "key", "key": "ctrl+a"},
+            {"type": "type", "text": "100000!", "delay_ms": 20},
             {"type": "key", "key": "Return"},
         ],
         "CALENDAR": [{"type": "key", "key": "Right", "repeat": 36, "interval": 0.04}],
@@ -502,19 +762,27 @@ def generate_scenario(
 ) -> tuple[dict[str, Any], dict[str, Any]]:
     """Build the R8-only GUI scenario and its static action-plan contract."""
     _need_bound()
+    scenario_name = configured_scenario(config)
+    llm_mode = scenario_name == LLM_SCENARIO
     apps = list(config["apps"])
     r8 = config["r8_oom"]
-    specs = _r8_specs(run_dir, burst_mib, seed)
+    aggressor = str(r8["aggressor_app"])
+    specs = _r8_specs(run_dir, burst_mib, seed, firefox_pressure=not llm_mode)
     actions: list[dict[str, Any]] = [{
         "type": "trace_marker", "event_type": "R8_START", "status": "running",
-        "label": "R8_START", "metadata": {"scenario": SCENARIO, "seed": seed},
+        "label": "R8_START", "metadata": {"scenario": scenario_name, "seed": seed},
     }]
     for app in apps:
         launch, wait = ACCEPT.app_launch_actions(specs[app])
         launch = dict(launch)
-        score = int(r8["aggressor_oom_score_adj"] if app == "FIREFOX" else r8["victim_oom_score_adj"])
+        score = int(r8["aggressor_oom_score_adj"] if app == aggressor else r8["victim_oom_score_adj"])
         launch["command"] = _score_wrapped(str(launch["command"]), score)
-        launch["scope_properties"] = {"MemoryOOMGroup": "yes"}
+        # Some systemd 249 scopes remain in stop-sigterm until the default
+        # 90-second timer even after cgroup.events reports populated=0.  Bound
+        # that post-snapshot cleanup delay without changing pressure behavior.
+        launch["scope_properties"] = {
+            "MemoryOOMGroup": "yes", "TimeoutStopSec": "5s",
+        }
         launch["label"] = f"R8_LAUNCH_{app}"
         wait = dict(wait)
         wait["label"] = f"R8_WAIT_{app}"
@@ -535,10 +803,27 @@ def generate_scenario(
 
     # Publish exactly the same LSTM history on both kernels after all native
     # content is resident.  The R8 action-plan deliberately locks this order.
+    # The final workset app is Solitaire today, but do not rely on that order
+    # to create the first trained-history transition.  Pin the foreground to
+    # the configured current app before the marker so the first Thunderbird
+    # switch always emits a distinct desktop event.  Otherwise a stale
+    # Thunderbird foreground can silently shorten the five-event LSTM history.
+    actions.extend(_switch(specs[str(config["current_app"])], "R8_PREDICTION_ANCHOR"))
+    actions.append({
+        "type": "wait", "seconds": float(config["history_dwell_seconds"]),
+        "label": "R8_PREDICTION_ANCHOR_DWELL",
+    })
     marker = run_dir / "r8-prediction-mark.json"
     actions.append(_evidence_action(["mark", "--output", str(marker)], "R8_PREDICTION_MARK"))
     for index, app in enumerate(config["trained_history"], start=1):
         actions.extend(_switch(specs[app], f"R8_TRAINED_{index:02d}"))
+        actions.append(_runner_action([
+            "r8-publish-verified-switch", "--app", app,
+            "--sequence", str(index),
+            "--title", str(specs[app].window_title),
+            "--class", str(specs[app].window_class),
+            "--output", str(run_dir / f"r8-prediction-switch-{index:02d}.json"),
+        ], f"R8_TRAINED_{index:02d}_PUBLISH_{app}"))
         actions.append({"type": "wait", "seconds": float(config["history_dwell_seconds"]), "label": f"R8_TRAINED_{index:02d}_DWELL"})
     actions.append(_runner_action([
         "r8-enforce-oom-scores", "--config", str(run_dir / "r8-config.json"),
@@ -573,30 +858,99 @@ def generate_scenario(
             "r8-pressure-record", "--requested-mib", "0", "--committed-mib", "0",
             "--output", str(run_dir / "r8-pressure.json"),
         ], "R8_PRESSURE_BASELINE_RECORD"))
+    elif llm_mode:
+        llm = config["r8_llm"]
+        state = run_dir / "r8-llm-state.json"
+        samples = run_dir / "r8-llm-memory-samples.jsonl"
+        server_log = run_dir / "r8-llm-server.log"
+        port = int(llm["port_base"]) + seed % int(llm["port_span"])
+        llm_command = shlex.join([
+            sys.executable, str(LLM_PRESSURE),
+            "--runtime", str(llm["runtime_path"]),
+            "--model", str(llm["model_path"]),
+            "--runtime-sha256", str(llm["runtime_sha256"]),
+            "--gguf-sha256", str(llm["gguf_sha256"]),
+            "--model-size-bytes", str(int(llm["model_size_bytes"])),
+            "--prompt", str(llm["prompt"]),
+            "--context-length", str(int(llm["context_length"])),
+            "--threads", str(int(llm["threads"])),
+            "--seed", str(seed), "--port", str(port),
+            "--load-timeout", str(float(llm["load_timeout_seconds"])),
+            "--completion-timeout", str(float(llm["completion_timeout_seconds"])),
+            "--sample-interval", str(float(llm["sample_interval_seconds"])),
+            "--maximum-cached-ratio", str(float(llm["maximum_cached_model_ratio"])),
+            "--state", str(state), "--samples", str(samples),
+            "--server-log", str(server_log),
+        ])
+        actions.append({
+            "type": "trace_marker", "event_type": "R8_LLM_LOAD_START",
+            "status": "running", "label": "R8_LLM_LOAD_START",
+        })
+        actions.append({
+            "type": "launch", "name": "LLM", "app_key": "LLM",
+            "scope_name": "llm-aggressor", "command": _score_wrapped(llm_command, 0),
+            "scope_properties": {"MemoryOOMGroup": "yes", "TimeoutStopSec": "5s"},
+            "label": "R8_LLM_LAUNCH",
+        })
+        actions.append({
+            "type": "wait_json", "path": str(state), "field": "status",
+            "equals": "FIRST_TOKEN_COMPLETE", "timeout": float(llm["load_timeout_seconds"]) + float(llm["completion_timeout_seconds"]),
+            "poll_seconds": 0.1, "label": "R8_LLM_FIRST_TOKEN_GATE",
+        })
+        actions.append(_runner_action([
+            "r8-llm-pressure-record", "--config", str(run_dir / "r8-config.json"),
+            "--state", str(state), "--output", str(run_dir / "r8-pressure.json"),
+        ], "R8_LLM_PRESSURE_COMPLETE_RECORD"))
+        actions.append({
+            "type": "wait", "seconds": float(r8["pressure_hold_seconds"]),
+            "label": "R8_LLM_PRESSURE_HOLD",
+        })
     else:
         firefox = specs["FIREFOX"]
         pressure_firefox = dataclasses.replace(firefox, window_title="PARP R8")
-        actions.extend(_switch(pressure_firefox, "R8_PRESSURE"))
-        actions.extend([
-            {"type": "wait_window_title", "name": firefox.name, "app_key": "FIREFOX", "class": firefox.window_class,
-             "title": "PARP R8", "pid_cmdline_contains": "firefox-pressure-profile",
-             "expected_title": f"PARP R8 READY 0/{burst_mib} MiB",
-             "timeout": float(r8["pressure_navigation_timeout_seconds"]), "poll_seconds": 0.02,
-             "label": "R8_PRESSURE_READY_FIREFOX"},
-            {"type": "trace_marker", "event_type": "R8_PRESSURE_START", "status": "running", "label": "R8_PRESSURE_START"},
-        ])
+        total_chunks = burst_mib // 64
+        lane_targets = {
+            "A": ((total_chunks + 1) // 2) * 64,
+            "B": (total_chunks // 2) * 64,
+        }
+        lane_profiles = {
+            "A": "firefox-pressure-a-profile",
+            "B": "firefox-pressure-b-profile",
+        }
+        for lane in ("A", "B"):
+            profile = lane_profiles[lane]
+            actions.extend(_switch(
+                pressure_firefox, f"R8_PRESSURE_{lane}",
+                pid_cmdline_contains=profile,
+            ))
+            actions.append({
+                "type": "wait_window_title", "name": firefox.name,
+                "app_key": "FIREFOX", "class": firefox.window_class,
+                "title": "PARP R8", "pid_cmdline_contains": profile,
+                "expected_title": f"PARP R8 READY 0/{lane_targets[lane]} MiB",
+                "timeout": float(r8["pressure_navigation_timeout_seconds"]),
+                "poll_seconds": 0.02,
+                "label": f"R8_PRESSURE_READY_FIREFOX_{lane}",
+            })
+        actions.append({
+            "type": "trace_marker", "event_type": "R8_PRESSURE_START",
+            "status": "running", "label": "R8_PRESSURE_START",
+        })
         for chunk_index in range(1, burst_mib // 64 + 1):
-            completed = chunk_index * 64
+            lane = "A" if chunk_index % 2 else "B"
+            profile = lane_profiles[lane]
+            completed = ((chunk_index + 1) // 2 if lane == "A" else chunk_index // 2) * 64
             prefix = f"R8_PRESSURE_CHUNK_{chunk_index:03d}"
             actions.extend([
                 {"type": "click_window", "name": firefox.name, "app_key": "FIREFOX", "class": firefox.window_class,
-                 "title": "PARP R8", "pid_cmdline_contains": "firefox-pressure-profile",
-                 "x_ratio": 0.5, "y_ratio": 0.5, "label": f"{prefix}_REQUEST_FIREFOX"},
+                 "title": "PARP R8", "pid_cmdline_contains": profile,
+                 "x_ratio": 0.5, "y_ratio": 0.5, "activate_before_click": True,
+                 "label": f"{prefix}_REQUEST_FIREFOX_{lane}"},
                 {"type": "wait_window_title", "name": firefox.name, "app_key": "FIREFOX", "class": firefox.window_class,
-                 "title": "PARP R8", "pid_cmdline_contains": "firefox-pressure-profile",
-                 "expected_title": f"PARP R8 ALLOCATED {completed}/{burst_mib} MiB",
+                 "title": "PARP R8", "pid_cmdline_contains": profile,
+                 "expected_title": f"PARP R8 ALLOCATED {completed}/{lane_targets[lane]} MiB",
                  "timeout": float(r8["pressure_chunk_timeout_seconds"]), "poll_seconds": 0.01,
-                 "label": f"{prefix}_READY_FIREFOX"},
+                 "label": f"{prefix}_READY_FIREFOX_{lane}"},
             ])
         actions.append(_runner_action([
             "r8-pressure-record", "--requested-mib", str(burst_mib), "--committed-mib", str(burst_mib),
@@ -607,24 +961,56 @@ def generate_scenario(
     actions.append(_runner_action([
         "r8-snapshot", "--cgroup", str(cgroup), "--apps", "|".join(apps),
         "--label", "after_pressure", "--output", str(after),
+        *(["--include-llm"] if llm_mode and not baseline_only else []),
     ], "R8_SNAPSHOT_AFTER_PRESSURE"))
     actions.append({"type": "trace_marker", "event_type": "R8_COMPLETE", "status": "success", "label": "R8_COMPLETE"})
-    scenario = {"name": SCENARIO, "seed": seed, "actions": actions, "keep_alive_after_s": 0}
+    scenario = {"name": scenario_name, "seed": seed, "actions": actions, "keep_alive_after_s": 0}
+    llm_contract = {}
+    if llm_mode:
+        llm_contract = {
+            key: config["r8_llm"][key] for key in (
+                "runtime_kind", "runtime_source_tag", "runtime_source_commit",
+                "runtime_sha256", "model_repository", "model_revision",
+                "model_filename", "model_quantization", "gguf_sha256", "model_size_bytes",
+                "prompt", "context_length", "threads", "n_predict", "temperature",
+                "model_cache_state", "no_mmap", "load_timeout_seconds",
+                "maximum_cached_model_ratio", "completion_timeout_seconds",
+                "sample_interval_seconds", "port_base", "port_span",
+            )
+        }
     static = {
-        "schema_version": 1, "scenario": SCENARIO, "seed": seed, "apps": apps,
+        "schema_version": 1, "scenario": scenario_name, "seed": seed, "apps": apps,
         "asset_sha256": {key: row.get("sha256") for key, row in sorted(read_json(run_dir / "asset-manifest.json")["assets"].items())},
         "workset_actions": [
             {"label": str(action.get("label", "")), "type": str(action.get("type", "")),
              "key": action.get("key"), "repeat": action.get("repeat"), "interval": action.get("interval"),
              "seconds": action.get("seconds"), "timeout": action.get("timeout"),
              "text_bytes": len(str(action.get("text", "")).encode("utf-8"))}
-            for action in actions if str(action.get("label", "")).startswith(("R8_WORKSET_", "R8_TRAINED_"))
+            for action in actions if str(action.get("label", "")).startswith(
+                ("R8_WORKSET_", "R8_PREDICTION_ANCHOR", "R8_TRAINED_")
+            )
         ],
         "memory_max_mib": int(r8.get("memory_max_mib", 0)), "memory_swap_max_mib": int(r8["memory_swap_max_mib"]),
         "memory_oom_group": bool(r8["memory_oom_group"]), "aggressor_score": int(r8["aggressor_oom_score_adj"]),
-        "victim_score": int(r8["victim_oom_score_adj"]), "pressure_chunk_mib": 64, "pressure_burst_mib": burst_mib,
-        "firefox_pressure_window_mode": "same_scope_dual_private_instance",
-        "pressure_chunk_order": list(range(1, burst_mib // 64 + 1)),
+        "victim_score": int(r8["victim_oom_score_adj"]),
+        "pressure_kind": "llama_cpp_no_mmap_weight_load" if llm_mode else "firefox_arraybuffer",
+        "pressure_chunk_mib": 0 if llm_mode else 64,
+        "pressure_burst_mib": 0 if llm_mode else burst_mib,
+        "firefox_pressure_window_mode": "disabled_llm_is_only_aggressor" if llm_mode else "same_scope_two_pressure_plus_workset_private_instances",
+        "pressure_click_activates_target": not llm_mode,
+        "pressure_chunk_order": [
+            {
+                "index": index,
+                "lane": "A" if index % 2 else "B",
+                "lane_completed_mib": (
+                    ((index + 1) // 2) if index % 2 else (index // 2)
+                ) * 64,
+            }
+            for index in range(1, (0 if llm_mode else burst_mib // 64) + 1)
+        ],
+        "llm_contract": llm_contract,
+        "runtime_monitor_reset": "systemd_restart_before_each_r8_round",
+        "prediction_event_source": "verified_active_window_dbus_after_ui_switch",
         "waits": {key: r8[key] for key in sorted(r8) if key.endswith("seconds")},
         "frozen_calibration_sha256": str(r8.get("calibration", {}).get("frozen_config_sha256", "")),
     }
@@ -642,6 +1028,125 @@ def command_oom_score_exec(args: Any) -> int:
     return 127
 
 
+def command_publish_verified_switch(args: Any) -> int:
+    """Publish one LSTM edge only after verifying the real active GUI scope."""
+    app = str(args.app).upper()
+    if app not in ALL_R8_APPS:
+        raise ValueError(f"unsupported R8 app: {app}")
+    scope = f"automation-{app.lower().replace('_', '-')}.scope"
+    active = subprocess.run(
+        ["xdotool", "getactivewindow"], text=True, capture_output=True,
+        check=False, timeout=5,
+    )
+    active_window_id = active.stdout.strip()
+
+    def inspect_window(candidate: str) -> dict[str, Any]:
+        title_result = subprocess.run(
+            ["xdotool", "getwindowname", candidate], text=True, capture_output=True,
+            check=False, timeout=5,
+        )
+        properties = subprocess.run(
+            ["xprop", "-id", candidate, "WM_CLASS", "_NET_WM_PID"],
+            text=True, capture_output=True, check=False, timeout=5,
+        )
+        title = title_result.stdout.strip()
+        wm_class = ""
+        pid = 0
+        for line in properties.stdout.splitlines():
+            if line.startswith("WM_CLASS") and "=" in line:
+                wm_class = "|".join(
+                    item.strip().strip('"') for item in line.split("=", 1)[1].split(",")
+                )
+            elif line.startswith("_NET_WM_PID") and "=" in line:
+                try:
+                    pid = int(line.split("=", 1)[1].strip())
+                except ValueError:
+                    pid = 0
+        proc = Path("/proc") / str(pid)
+        try:
+            cgroup = (proc / "cgroup").read_text(encoding="utf-8", errors="replace")
+            comm = (proc / "comm").read_text(encoding="utf-8", errors="replace").strip()
+        except (FileNotFoundError, PermissionError, OSError):
+            cgroup = ""
+            comm = ""
+        return {
+            "window_id": candidate, "title": title, "wm_class": wm_class,
+            "pid": pid, "comm": comm, "cgroup": cgroup,
+        }
+
+    inspected: list[dict[str, Any]] = []
+    if active_window_id:
+        inspected.append(inspect_window(active_window_id))
+    for option, pattern in (("--class", str(args.window_class)), ("--name", str(args.title))):
+        if not pattern:
+            continue
+        found = subprocess.run(
+            ["xdotool", "search", "--onlyvisible", option, pattern],
+            text=True, capture_output=True, check=False, timeout=5,
+        )
+        known = {str(row["window_id"]) for row in inspected}
+        for candidate in found.stdout.splitlines():
+            candidate = candidate.strip()
+            if candidate and candidate not in known:
+                inspected.append(inspect_window(candidate))
+                known.add(candidate)
+    eligible = [row for row in inspected if f"/{scope}" in str(row["cgroup"])]
+    chosen = eligible[0] if eligible else (
+        inspected[0] if inspected else {
+            "window_id": "", "title": "", "wm_class": "", "pid": 0,
+            "comm": "", "cgroup": "",
+        }
+    )
+    window_id = str(chosen["window_id"])
+    title = str(chosen["title"])
+    wm_class = str(chosen["wm_class"])
+    pid = int(chosen["pid"])
+    comm = str(chosen["comm"])
+    cgroup = str(chosen["cgroup"])
+    reasons: list[str] = []
+    if not window_id:
+        reasons.append("no verified target X11 window")
+    if pid <= 0:
+        reasons.append("target window has no _NET_WM_PID")
+    if f"/{scope}" not in cgroup:
+        reasons.append(f"target window PID is not in {scope}")
+    event = {
+        "event_type": "Switched",
+        "timestamp_ms": time.time_ns() // 1_000_000,
+        "window_id": f"r8-verified-{window_id}",
+        "title": title,
+        "wm_class": wm_class,
+        "gtk_app_id": "",
+        "pid": pid,
+        "is_minimized": False,
+    }
+    result: dict[str, Any] = {
+        "schema_version": 1, "valid": not reasons, "reasons": reasons,
+        "app": app, "sequence": int(args.sequence), "window_id": window_id,
+        "active_window_id": active_window_id,
+        "selection": "active_window" if window_id == active_window_id else "verified_scope_window",
+        "title": title, "wm_class": wm_class, "pid": pid, "comm": comm,
+        "expected_scope": scope, "cgroup": cgroup, "event": event,
+        "source": "verified_active_window_dbus_after_ui_switch",
+    }
+    if not reasons:
+        emitted = subprocess.run([
+            "gdbus", "emit", "--session",
+            "--object-path", "/org/huawei/RuntimeAppMonitor",
+            "--signal", "org.huawei.RuntimeAppMonitor.WindowEvent",
+            json.dumps(event, ensure_ascii=False, separators=(",", ":")),
+        ], text=True, capture_output=True, check=False, timeout=5)
+        result["gdbus_returncode"] = emitted.returncode
+        result["gdbus_stdout"] = emitted.stdout.strip()
+        result["gdbus_stderr"] = emitted.stderr.strip()
+        if emitted.returncode != 0:
+            result["valid"] = False
+            result["reasons"].append("gdbus signal emission failed")
+    write_json(args.output, result)
+    print(args.output)
+    return 0 if result["valid"] else 10
+
+
 def _snapshot_for_cli(cgroup: Path, apps: list[str], label: str) -> dict[str, Any]:
     _need_bound()
     # The fixture directory is not needed to query existing X11 window classes.
@@ -650,7 +1155,11 @@ def _snapshot_for_cli(cgroup: Path, apps: list[str], label: str) -> dict[str, An
 
 
 def command_snapshot(args: Any) -> int:
-    payload = _snapshot_for_cli(args.cgroup, args.apps.split("|"), args.label)
+    specs = ACCEPT.app_specs(Path("/tmp/parp-r8-snapshot"))
+    payload = snapshot(
+        args.cgroup, args.apps.split("|"), specs, args.label,
+        include_llm=bool(getattr(args, "include_llm", False)),
+    )
     write_json(args.output, payload)
     print(args.output)
     return 0
@@ -675,7 +1184,11 @@ def command_workset_gate(args: Any) -> int:
             reasons.append(f"{app}: memory.current below tier threshold")
         if int(row.get("memory_oom_group") or 0) != 1:
             reasons.append(f"{app}: memory.oom.group is not 1")
-        expected_score = int(config["r8_oom"]["aggressor_oom_score_adj"] if app == "FIREFOX" else config["r8_oom"]["victim_oom_score_adj"])
+        expected_score = int(
+            config["r8_oom"]["aggressor_oom_score_adj"]
+            if app == config["r8_oom"]["aggressor_app"]
+            else config["r8_oom"]["victim_oom_score_adj"]
+        )
         processes = list(row.get("processes", []))
         if not processes:
             reasons.append(f"{app}: no PID in scope")
@@ -708,7 +1221,8 @@ def command_enforce_oom_scores(args: Any) -> int:
         initial = _scope_row(scope)
         expected = int(
             config["r8_oom"]["aggressor_oom_score_adj"]
-            if app == "FIREFOX" else config["r8_oom"]["victim_oom_score_adj"]
+            if app == config["r8_oom"]["aggressor_app"]
+            else config["r8_oom"]["victim_oom_score_adj"]
         )
         writes: list[dict[str, Any]] = []
         for pid in initial.get("pids", []):
@@ -756,6 +1270,45 @@ def command_pressure_record(args: Any) -> int:
     return 0 if payload["pressure_complete"] else 10
 
 
+def command_llm_pressure_record(args: Any) -> int:
+    config = read_json(args.config)
+    validate_config(config)
+    state = read_json(args.state)
+    llm = config["r8_llm"]
+    requested = int(llm["model_size_bytes"])
+    resident = int(state.get("resident_after_load_bytes", 0) or 0)
+    peak_delta = int(state.get("peak_memory_delta_bytes", 0) or 0)
+    complete = bool(
+        state.get("status") == "FIRST_TOKEN_COMPLETE"
+        and state.get("runtime_sha256") == llm.get("runtime_sha256")
+        and state.get("gguf_sha256") == llm.get("gguf_sha256")
+        and int(state.get("model_size_bytes", 0)) == requested
+        and state.get("fadvise_dontneed_applied") is True
+        and state.get("cold_cache_gate", {}).get("valid") is True
+        and state.get("no_mmap") is True
+        and state.get("oom_score_gate", {}).get("valid") is True
+        and resident >= int(llm["minimum_resident_delta_mib"]) * MIB
+    )
+    payload = {
+        "schema_version": 1,
+        "pressure_requested_bytes": requested,
+        # A successful llama.cpp READY state with --no-mmap proves the complete
+        # model was loaded.  The separately reported resident/peak deltas retain
+        # the actual cgroup measurement rather than pretending file size is RSS.
+        "pressure_committed_bytes": requested if complete else 0,
+        "pressure_complete": complete,
+        "pressure_kind": "llama_cpp_no_mmap_weight_load",
+        "llm_load_complete": state.get("status") == "FIRST_TOKEN_COMPLETE",
+        "llm_first_token_complete": state.get("status") == "FIRST_TOKEN_COMPLETE",
+        "llm_resident_after_load_bytes": resident,
+        "llm_peak_memory_delta_bytes": peak_delta,
+        "llm_state": state,
+    }
+    write_json(args.output, payload)
+    print(args.output)
+    return 0 if complete else 12
+
+
 def _pid_map(snapshot_payload: dict[str, Any]) -> dict[int, dict[str, Any]]:
     result: dict[int, dict[str, Any]] = {}
     for app, row in snapshot_payload.get("apps", {}).items():
@@ -763,6 +1316,23 @@ def _pid_map(snapshot_payload: dict[str, Any]) -> dict[int, dict[str, Any]]:
             pid = int(process.get("pid", 0) or 0)
             if pid:
                 result[pid] = {"app": app, **process}
+        # oom/mark_victim can report a non-leader thread TID (for example
+        # LibreOffice's PipeIPC thread), while cgroup.procs contains only
+        # thread-group leaders.  cgroup.threads is sampled before pressure so
+        # those marks remain attributable after the group has been killed.
+        for tid in row.get("threads", []):
+            tid = int(tid or 0)
+            if tid:
+                result.setdefault(tid, {"app": app, "pid": tid, "thread": True})
+    llm = snapshot_payload.get("llm", {})
+    for process in llm.get("processes", []):
+        pid = int(process.get("pid", 0) or 0)
+        if pid:
+            result[pid] = {"app": "LLM", **process}
+    for tid in llm.get("threads", []):
+        tid = int(tid or 0)
+        if tid:
+            result.setdefault(tid, {"app": "LLM", "pid": tid, "thread": True})
     return result
 
 
@@ -818,6 +1388,8 @@ def evaluate_result(
     *, baseline_only: bool,
 ) -> dict[str, Any]:
     """Attribute OOM marks to pre-pressure application scopes and validate R8."""
+    scenario_name = configured_scenario(config)
+    llm_mode = scenario_name == LLM_SCENARIO
     reasons: list[str] = []
     try:
         before = read_json(run_dir / "r8-before-pressure.json")
@@ -849,28 +1421,36 @@ def evaluate_result(
     trace_victims = _trace_victims(run_dir / "trace.txt")
     all_pids = dict(pid_history)
     all_pids.update(_pid_map(before))
+    all_pids.update(_pid_map(after))
+    llm_state = pressure.get("llm_state", {}) if llm_mode else {}
+    for key in ("wrapper_pid", "server_pid"):
+        pid = int(llm_state.get(key, 0) or 0)
+        if pid:
+            all_pids.setdefault(pid, {"app": "LLM", "pid": pid})
     victims: set[str] = set()
     unknown_marks: list[dict[str, Any]] = []
     aggressor_marks: list[dict[str, Any]] = []
     score_mismatches: list[dict[str, Any]] = []
     r8 = config["r8_oom"]
+    aggressor_app = str(r8["aggressor_app"])
+    aggressor_label = "Firefox" if aggressor_app == "FIREFOX" else aggressor_app
     for mark in trace_victims:
         owner = all_pids.get(int(mark["pid"]))
         if owner is None:
             unknown_marks.append(mark)
             continue
         app = str(owner["app"])
-        expected = int(r8["aggressor_oom_score_adj"] if app == "FIREFOX" else r8["victim_oom_score_adj"])
+        expected = int(r8["aggressor_oom_score_adj"] if app == aggressor_app else r8["victim_oom_score_adj"])
         if mark.get("oom_score_adj") != expected:
             score_mismatches.append(mark)
-        if app == "FIREFOX":
+        if app == aggressor_app:
             aggressor_marks.append(mark)
         else:
             victims.add(app)
     if unknown_marks:
         reasons.append("host or unknown OOM mark")
     if aggressor_marks:
-        reasons.append("Firefox aggressor was selected as an OOM victim")
+        reasons.append(f"{aggressor_label} aggressor was selected as an OOM victim")
     if score_mismatches:
         reasons.append("OOM trace score does not match scope contract")
     parent_before = before.get("cgroup", {}).get("memory_events", {})
@@ -897,15 +1477,34 @@ def evaluate_result(
         }
     if untraced_disappearances:
         reasons.append("application disappeared without an OOM trace")
-    aggressor_survived = bool(app_rows["FIREFOX"]["survived"])
+    if baseline_only:
+        aggressor_survived = True
+    elif llm_mode:
+        llm_after = after.get("llm", {})
+        aggressor_survived = bool(
+            llm_after.get("scope_alive")
+            and llm_state.get("status") == "FIRST_TOKEN_COMPLETE"
+        )
+    else:
+        aggressor_survived = bool(app_rows["FIREFOX"]["survived"])
     if not aggressor_survived:
-        reasons.append("Firefox aggressor did not survive")
+        reasons.append(f"{aggressor_label} aggressor did not survive")
     if not baseline_only:
-        requested = int(r8["burst_mib"]) * MIB
+        requested = int(config["r8_llm"]["model_size_bytes"]) if llm_mode else int(r8["burst_mib"]) * MIB
         if int(pressure.get("pressure_requested_bytes", -1)) != requested:
-            reasons.append("pressure request does not equal frozen Firefox burst")
+            reasons.append("pressure request does not equal the frozen aggressor contract")
         if not pressure.get("pressure_complete") or int(pressure.get("pressure_committed_bytes", -1)) != requested:
-            reasons.append("Firefox pressure was not fully committed")
+            reasons.append(f"{aggressor_label} pressure was not fully committed")
+        if llm_mode:
+            llm = config["r8_llm"]
+            if not pressure.get("llm_load_complete") or not pressure.get("llm_first_token_complete"):
+                reasons.append("LLM model load or first-token inference did not complete")
+            if int(pressure.get("llm_resident_after_load_bytes", 0)) < int(llm["minimum_resident_delta_mib"]) * MIB:
+                reasons.append("LLM resident memory delta is below the frozen gate")
+            if llm_state.get("runtime_sha256") != llm.get("runtime_sha256") or llm_state.get("gguf_sha256") != llm.get("gguf_sha256"):
+                reasons.append("LLM runtime or GGUF hash differs from the frozen contract")
+            if llm_state.get("oom_score_gate", {}).get("valid") is not True:
+                reasons.append("LLM aggressor OOM score/cgroup gate did not pass")
         if victims and group_delta < len(victims):
             reasons.append("oom_group_kill cross-check is lower than distinct victim apps")
         if (event_delta or kill_delta) and not trace_victims:
@@ -928,7 +1527,7 @@ def evaluate_result(
             reasons.append("reclaim-bin selected no cgroup subtree")
     result = {
         "status": "VALID" if not reasons else "INVALID", "valid": not reasons,
-        "invalid_reasons": list(dict.fromkeys(reasons)), "scenario": SCENARIO, "policy": policy,
+        "invalid_reasons": list(dict.fromkeys(reasons)), "scenario": scenario_name, "policy": policy,
         "pressure_requested_bytes": int(pressure.get("pressure_requested_bytes", 0)),
         "pressure_committed_bytes": int(pressure.get("pressure_committed_bytes", 0)),
         "pressure_complete": bool(pressure.get("pressure_complete")),
@@ -940,6 +1539,15 @@ def evaluate_result(
         "unknown_oom_marks": unknown_marks, "aggressor_oom_marks": aggressor_marks,
         "trace_victims": trace_victims, "applications": app_rows,
         "prediction_gate": prediction_gate, "workset_gate": gate, "reclaim_bin_delta": bin_delta,
+        "llm": {
+            "enabled": llm_mode,
+            "state": llm_state,
+            "scope_after": after.get("llm", {}) if llm_mode else {},
+            "load_complete": bool(pressure.get("llm_load_complete")),
+            "first_token_complete": bool(pressure.get("llm_first_token_complete")),
+            "resident_after_load_bytes": int(pressure.get("llm_resident_after_load_bytes", 0)),
+            "peak_memory_delta_bytes": int(pressure.get("llm_peak_memory_delta_bytes", 0)),
+        },
         "policy_before": policy_before, "policy_after": policy_after,
         "baseline_only": baseline_only,
     }
@@ -957,6 +1565,62 @@ def _setup(config: dict[str, Any], *, memory_max_mib: int) -> dict[str, Any]:
     }
 
 
+def _restart_runtime_monitor_for_round(timeout_seconds: float = 30.0) -> dict[str, Any]:
+    """Give every R8 round an independent desktop/LSTM event session."""
+    unit = "parp-runtime-monitor.service"
+    restarted = ACCEPT.run(
+        ["systemctl", "--user", "restart", unit], timeout=max(5.0, timeout_seconds),
+    )
+    payload: dict[str, Any] = {
+        "schema_version": 1,
+        "valid": False,
+        "unit": unit,
+        "contract": "systemd_restart_before_each_r8_round",
+        "restart_returncode": restarted.returncode,
+        "restart_stderr": restarted.stderr.strip(),
+        "main_pid": 0,
+        "active_state": "",
+        "sub_state": "",
+    }
+    if restarted.returncode != 0:
+        return payload
+    deadline = time.monotonic() + timeout_seconds
+    stable_pid = 0
+    stable_observations = 0
+    while time.monotonic() < deadline:
+        shown = ACCEPT.run([
+            "systemctl", "--user", "show", unit,
+            "-p", "MainPID", "-p", "ActiveState", "-p", "SubState",
+        ], timeout=5)
+        values: dict[str, str] = {}
+        for line in shown.stdout.splitlines():
+            key, separator, value = line.partition("=")
+            if separator:
+                values[key] = value
+        try:
+            pid = int(values.get("MainPID", "0"))
+        except ValueError:
+            pid = 0
+        active = values.get("ActiveState", "")
+        sub = values.get("SubState", "")
+        payload.update({"main_pid": pid, "active_state": active, "sub_state": sub})
+        if pid > 0 and active == "active" and sub == "running":
+            if pid == stable_pid:
+                stable_observations += 1
+            else:
+                stable_pid = pid
+                stable_observations = 1
+            if stable_observations >= 3:
+                payload["valid"] = True
+                return payload
+        else:
+            stable_pid = 0
+            stable_observations = 0
+        time.sleep(1.0)
+    payload["reason"] = "runtime monitor did not remain active with one PID"
+    return payload
+
+
 def _record_pid_history(cgroup: Path, apps: list[str], history: dict[int, dict[str, Any]]) -> None:
     for app in apps:
         row = _scope_row(_scope_path(cgroup, app))
@@ -964,6 +1628,19 @@ def _record_pid_history(cgroup: Path, apps: list[str], history: dict[int, dict[s
             pid = int(process.get("pid", 0) or 0)
             if pid:
                 history[pid] = {"app": app, **process}
+        for tid in row.get("threads", []):
+            tid = int(tid or 0)
+            if tid:
+                history.setdefault(tid, {"app": app, "pid": tid, "thread": True})
+    llm_row = _scope_row(_scope_path(cgroup, "LLM_AGGRESSOR"))
+    for process in llm_row.get("processes", []):
+        pid = int(process.get("pid", 0) or 0)
+        if pid:
+            history[pid] = {"app": "LLM", **process}
+    for tid in llm_row.get("threads", []):
+        tid = int(tid or 0)
+        if tid:
+            history.setdefault(tid, {"app": "LLM", "pid": tid, "thread": True})
 
 
 def run_one(
@@ -974,29 +1651,78 @@ def run_one(
     _need_bound()
     run_dir = run_dir.resolve()
     validate_config(config, require_frozen=not allow_unfrozen)
+    scenario_name = configured_scenario(config)
+    llm_mode = scenario_name == LLM_SCENARIO
     if policy not in {"native_kernel", "bin_lstm"}:
         raise ValueError("R8 first phase supports native_kernel and bin_lstm only")
     run_dir.mkdir(parents=True, exist_ok=False)
+    if llm_mode:
+        llm_preflight = llm_asset_preflight(config)
+        write_json(run_dir / "llm-preflight.json", llm_preflight)
+        if llm_preflight["status"] != "READY":
+            result = {
+                "status": "BLOCKED", "valid": False, "scenario": scenario_name,
+                "policy": policy, "seed": seed, "preflight": llm_preflight,
+                "invalid_reasons": [
+                    "LLM asset preflight failed: " + ",".join(llm_preflight["reasons"]),
+                ],
+                "run_dir": str(run_dir),
+            }
+            write_json(run_dir / "run-result.json", result)
+            return result
+    runtime_reset = _restart_runtime_monitor_for_round()
+    write_json(run_dir / "runtime-monitor-reset.json", runtime_reset)
+    if not runtime_reset["valid"]:
+        result = {
+            "status": "BLOCKED", "valid": False, "scenario": scenario_name,
+            "policy": policy, "seed": seed,
+            "invalid_reasons": ["runtime monitor round reset failed"],
+            "runtime_monitor_reset": runtime_reset,
+            "run_dir": str(run_dir),
+        }
+        write_json(run_dir / "run-result.json", result)
+        return result
     asset_manifest = prepare_assets(config, run_dir)
     write_json(run_dir / "asset-manifest.json", asset_manifest)
     # The in-scenario gate reads this immutable per-round copy, never a path
     # supplied by the caller that could change during a paired run.
     write_json(run_dir / "r8-config.json", config)
     preflight = TRAINED.preflight(config, policy)
-    preflight["checks"]["r8_pressure_asset"] = (run_dir / "fixtures" / "oom-pressure.html").is_file()
+    if llm_mode:
+        for name, passed in llm_preflight["checks"].items():
+            preflight["checks"][f"llm_{name}"] = passed
+    else:
+        preflight["checks"]["r8_pressure_asset"] = (run_dir / "fixtures" / "oom-pressure.html").is_file()
     preflight["status"] = "READY" if all(preflight["checks"].values()) else "BLOCKED"
     write_json(run_dir / "preflight.json", preflight)
     if preflight["status"] != "READY":
-        return {"status": "BLOCKED", "valid": False, "preflight": preflight, "run_dir": str(run_dir)}
+        result = {
+            "status": "BLOCKED", "valid": False, "scenario": scenario_name,
+            "policy": policy, "seed": seed, "preflight": preflight,
+            "run_dir": str(run_dir),
+        }
+        write_json(run_dir / "run-result.json", result)
+        prune_round_working_assets(run_dir)
+        return result
     r8 = config["r8_oom"]
-    burst_mib = 0 if baseline_only else int(burst_override_mib if burst_override_mib is not None else r8["burst_mib"])
-    if burst_mib and burst_mib % 64:
+    burst_mib = 0 if baseline_only or llm_mode else int(
+        burst_override_mib if burst_override_mib is not None else r8["burst_mib"]
+    )
+    if not llm_mode and burst_mib and burst_mib % 64:
         raise ValueError("R8 burst must be divisible by the 64 MiB browser chunk")
     cap_mib = memory_limit_cap_bytes(memtotal_mib()) // MIB
     configured_max = int(r8.get("memory_max_mib", 0))
     memory_max_mib = configured_max if configured_max > 0 else cap_mib
     if memory_max_mib <= 0 or memory_max_mib * MIB > memory_limit_cap_bytes(memtotal_mib()):
-        return {"status": "BLOCKED", "valid": False, "invalid_reasons": ["R8 MemoryMax exceeds host calibration cap"], "run_dir": str(run_dir)}
+        result = {
+            "status": "BLOCKED", "valid": False, "scenario": scenario_name,
+            "policy": policy, "seed": seed,
+            "invalid_reasons": ["R8 MemoryMax exceeds host calibration cap"],
+            "run_dir": str(run_dir),
+        }
+        write_json(run_dir / "run-result.json", result)
+        prune_round_working_assets(run_dir)
+        return result
     setup = _setup(config, memory_max_mib=memory_max_mib)
     variant = "bin_apply" if policy == "bin_lstm" else "native"
     original_policy: dict[str, Any] | None = None
@@ -1027,12 +1753,15 @@ def run_one(
         write_json(run_dir / "scenario.json", scenario)
         write_json(run_dir / "action-plan.json", action_plan)
         if expected_plan is not None and action_plan.get("sha256") != expected_plan.get("sha256"):
-            return {
-                "status": "BLOCKED", "valid": False, "scenario": SCENARIO, "policy": policy, "seed": seed,
+            result = {
+                "status": "BLOCKED", "valid": False, "scenario": scenario_name, "policy": policy, "seed": seed,
                 "run_dir": str(run_dir), "expected_action_plan_sha256": expected_plan.get("sha256"),
                 "observed_action_plan_sha256": action_plan.get("sha256"),
                 "invalid_reasons": ["action-plan hash differs from Native replay"],
             }
+            write_json(run_dir / "run-result.json", result)
+            prune_round_working_assets(run_dir)
+            return result
         trace_setup = ACCEPT.run([
             "sudo", "-n", "bash", str(ACCEPT.TRACE_HELPER), "setup", trace_instance,
             str(int(config["safety"]["trace_buffer_kb_per_cpu"])),
@@ -1050,7 +1779,7 @@ def run_one(
             sys.executable, str(AUTOMATION), str(run_dir / "scenario.json"),
             "--display", env["DISPLAY"], "--xauthority", env["XAUTHORITY"],
             "--trace-output", str(run_dir / "automation-trace.csv"), "--session-id", run_dir.name,
-            "--scenario-id", "real_r8_multi_app_oom_survival", "--test-slice", str(config["slice"]),
+            "--scenario-id", f"real_{scenario_name}", "--test-slice", str(config["slice"]),
             "--screenshot-output-dir", str(run_dir / "screenshots"),
         ]
         log = (run_dir / "automation.log").open("w", encoding="utf-8")
@@ -1123,34 +1852,62 @@ def run_one(
         "monitor": {"samples": len(monitor), "min_memavailable_bytes": min((row["memavailable"] for row in monitor), default=None)},
     })
     write_json(run_dir / "run-result.json", result)
+    prune_round_working_assets(run_dir)
     return result
 
 
 def command_run(args: Any) -> int:
     config = read_json(args.config)
     validate_config(config, require_frozen=True)
-    if args.scenario not in {"all", SCENARIO}:
+    scenario_name = configured_scenario(config)
+    if args.scenario not in {"all", scenario_name}:
         raise ValueError("this configuration only supports R8")
-    root = Path(config["output_root"])
-    stamp = time.strftime("%Y%m%d_%H%M%S")
-    session = root / f"r8-{args.policy}-{stamp}-{os.uname().release}"
-    session.mkdir(parents=True, exist_ok=False)
-    write_json(session / "config.json", config)
+    resume_session = getattr(args, "resume_session", None)
+    if resume_session is not None:
+        session = Path(resume_session).resolve()
+        existing_summary = read_json(session / "summary.json")
+        existing_config = read_json(session / "config.json")
+        if canonical_sha256(existing_config) != canonical_sha256(config):
+            raise ValueError("resume session config differs")
+        if existing_summary.get("policy") != args.policy:
+            raise ValueError("resume session policy differs")
+        results = list(existing_summary.get("runs", []))
+    else:
+        root = Path(config["output_root"])
+        stamp = time.strftime("%Y%m%d_%H%M%S")
+        profile = "r8-llm" if scenario_name == LLM_SCENARIO else "r8"
+        session = root / f"{profile}-{args.policy}-{stamp}-{os.uname().release}"
+        session.mkdir(parents=True, exist_ok=False)
+        write_json(session / "config.json", config)
+        results = []
     native_runs: dict[int, dict[str, Any]] = {}
     if args.replay_from is not None:
         native_summary = read_json(args.replay_from / "summary.json")
         for row in native_summary.get("runs", []):
-            if row.get("scenario") == SCENARIO and row.get("valid"):
+            if row.get("scenario") == scenario_name and row.get("valid"):
                 native_runs[int(row["seed"])] = row
-    results: list[dict[str, Any]] = []
-    for index in range(1, int(args.rounds) + 1):
-        seed = int(args.seed) + index - 1
+    replay_seeds = sorted(native_runs)[:int(args.rounds)] if native_runs else []
+    attempt = 0
+    used_seeds = {int(row["seed"]) for row in results if "seed" in row}
+    while sum(1 for row in results if row.get("valid")) < int(args.rounds):
+        if replay_seeds:
+            remaining = [seed for seed in replay_seeds if seed not in used_seeds]
+            if not remaining:
+                break
+            seed = remaining[0]
+        else:
+            seed = int(args.seed) + attempt
+            attempt += 1
+            if seed in used_seeds:
+                continue
+        used_seeds.add(seed)
+        index = len(results) + 1
         expected: dict[str, Any] | None = None
         if args.replay_from is not None:
             native = native_runs.get(seed)
             if native is None:
                 result = {
-                    "status": "BLOCKED", "valid": False, "scenario": SCENARIO, "policy": args.policy,
+                    "status": "BLOCKED", "valid": False, "scenario": scenario_name, "policy": args.policy,
                     "seed": seed, "invalid_reasons": ["no valid Native round with this seed for replay"],
                 }
                 results.append(result)
@@ -1159,13 +1916,17 @@ def command_run(args: Any) -> int:
                 expected = read_json(Path(native["run_dir"]) / "action-plan.json")
             except (FileNotFoundError, OSError, json.JSONDecodeError) as exc:
                 result = {
-                    "status": "BLOCKED", "valid": False, "scenario": SCENARIO, "policy": args.policy,
+                    "status": "BLOCKED", "valid": False, "scenario": scenario_name, "policy": args.policy,
                     "seed": seed, "invalid_reasons": [f"Native action plan unavailable: {exc}"],
                 }
                 results.append(result)
                 break
-        run_dir = session / f"round-{index:02d}-{SCENARIO}"
-        print(f"R8 policy={args.policy} round={index}/{args.rounds} seed={seed}", flush=True)
+        run_dir = session / f"round-{index:02d}-{scenario_name}"
+        valid_before = sum(1 for row in results if row.get("valid"))
+        print(
+            f"R8 policy={args.policy} attempt={index} "
+            f"valid={valid_before}/{args.rounds} seed={seed}", flush=True,
+        )
         result = run_one(config, args.policy, seed, run_dir, expected_plan=expected)
         results.append(result)
         print(f"status={result['status']} output={run_dir}", flush=True)
@@ -1173,8 +1934,8 @@ def command_run(args: Any) -> int:
             break
     summary = {
         "schema_version": 1,
-        "status": "COMPLETE" if len(results) == int(args.rounds) and all(row.get("valid") for row in results) else "INCOMPLETE",
-        "scenario": SCENARIO, "policy": args.policy, "rounds_requested": int(args.rounds),
+        "status": "COMPLETE" if sum(1 for row in results if row.get("valid")) >= int(args.rounds) else "INCOMPLETE",
+        "scenario": scenario_name, "policy": args.policy, "rounds_requested": int(args.rounds),
         "runs": results, "config_sha256": canonical_sha256(frozen_config_contract(config)),
         "replay_from": str(args.replay_from) if args.replay_from else None,
     }
@@ -1201,14 +1962,26 @@ def command_calibrate(args: Any) -> int:
     calibration = config["r8_oom"]["calibration"]
     baseline_results: list[dict[str, Any]] = []
     baseline_currents: list[int] = []
-    baseline_source = Path(args.baseline_from).resolve() if args.baseline_from else None
-    if baseline_source is not None:
+    resume_sources = [Path(source).resolve() for source in (args.resume_from or [])]
+    explicit_baseline_source = (
+        Path(args.baseline_from).resolve() if args.baseline_from else None
+    )
+    baseline_source = (
+        explicit_baseline_source
+        if explicit_baseline_source is not None
+        else (resume_sources[0] if resume_sources else None)
+    )
+    reuse_sources = []
+    for source in (*resume_sources, baseline_source):
+        if source is not None and source not in reuse_sources:
+            reuse_sources.append(source)
+    for source in reuse_sources:
         try:
-            source_config = read_json(baseline_source / "input-config.json")
+            source_config = read_json(source / "input-config.json")
         except (FileNotFoundError, OSError, json.JSONDecodeError) as exc:
-            raise ValueError(f"cannot read baseline source config: {exc}") from exc
+            raise ValueError(f"cannot read resume source config: {source}: {exc}") from exc
         if canonical_sha256(source_config) != canonical_sha256(config):
-            raise ValueError("baseline source config differs from current calibration config")
+            raise ValueError(f"resume source config differs: {source}")
     for index in range(1, int(calibration["baseline_rounds"]) + 1):
         seed = int(calibration.get("seed", 20261001)) + index - 1
         run_dir = (
@@ -1249,6 +2022,7 @@ def command_calibrate(args: Any) -> int:
     step = int(calibration["burst_step_mib"])
     maximum = int(calibration["burst_max_mib"])
     rounds = int(calibration["candidate_rounds"])
+    rerun_from = int(getattr(args, "rerun_candidates_from", 0) or 0)
     for burst in range(start, maximum + 1, step):
         rows: list[dict[str, Any]] = []
         for index in range(1, rounds + 1):
@@ -1256,10 +2030,36 @@ def command_calibrate(args: Any) -> int:
             candidate_config["r8_oom"]["memory_max_mib"] = requested_limit // MIB
             candidate_config["r8_oom"]["burst_mib"] = burst
             seed = int(calibration.get("seed", 20261001)) + 1000 + (burst - start) // step * rounds + index - 1
-            result = run_one(
-                candidate_config, "native_kernel", seed, output / f"burst-{burst:04d}-round-{index:02d}",
-                burst_override_mib=burst, allow_unfrozen=True,
-            )
+            relative_run = Path(f"burst-{burst:04d}-round-{index:02d}")
+            resume_run: Path | None = None
+            resumed_result: dict[str, Any] | None = None
+            for source in (() if rerun_from and burst >= rerun_from else reuse_sources):
+                candidate_run = source / relative_run
+                candidate_result_path = candidate_run / "run-result.json"
+                if not candidate_result_path.is_file():
+                    continue
+                candidate_result = read_json(candidate_result_path)
+                # Invalid/incomplete rounds never satisfy the five-new-round
+                # calibration contract.  Re-run that slot in the new output.
+                if not candidate_result.get("valid"):
+                    continue
+                resume_run = candidate_run
+                resumed_result = candidate_result
+                break
+            result: dict[str, Any]
+            if resume_run is not None and resumed_result is not None:
+                resumed_config = read_json(resume_run / "r8-config.json")
+                if canonical_sha256(resumed_config) != canonical_sha256(candidate_config):
+                    raise ValueError(f"resume candidate config mismatch: {resume_run}")
+                result = resumed_result
+                if int(result.get("seed", -1)) != seed:
+                    raise ValueError(f"resume candidate seed mismatch: {resume_run}")
+            else:
+                result = run_one(
+                    candidate_config, "native_kernel", seed,
+                    output / f"burst-{burst:04d}-round-{index:02d}",
+                    burst_override_mib=burst, allow_unfrozen=True,
+                )
             rows.append(result)
         in_range = sum(1 for row in rows if 1 <= int(row.get("distinct_oom_victim_apps", 0)) <= 3)
         candidate = {
@@ -1304,14 +2104,166 @@ def command_calibrate(args: Any) -> int:
     return 0 if selected_burst else 1
 
 
-def _session_results(root: Path) -> list[dict[str, Any]]:
+def command_calibrate_llm(args: Any) -> int:
+    """Freeze MemoryMax around one pinned, real llama.cpp weight-load burst."""
+    config = read_json(args.config)
+    validate_config(config, require_frozen=False)
+    if configured_scenario(config) != LLM_SCENARIO:
+        raise ValueError("calibrate-r8-llm requires an r8_llm_weight_load config")
+    if args.policy != "native_kernel":
+        raise ValueError("R8 LLM calibration is Native-only")
+    output = Path(args.output).resolve()
+    output.mkdir(parents=True, exist_ok=False)
+    write_json(output / "input-config.json", config)
+    asset_preflight = llm_asset_preflight(config)
+    write_json(output / "llm-preflight.json", asset_preflight)
+    if asset_preflight["status"] != "READY":
+        report_payload = {
+            "schema_version": 1,
+            "scenario": LLM_SCENARIO,
+            "status": "BLOCKED",
+            "reason": "pinned local llama.cpp runtime/GGUF asset preflight failed",
+            "llm_preflight": asset_preflight,
+            "baseline_runs": [],
+            "model_load_runs": [],
+        }
+        write_json(output / "calibration-report.json", report_payload)
+        print(output / "calibration-report.json")
+        return 1
+
+    native_preflight = TRAINED.preflight(config, "native_kernel")
+    write_json(output / "native-preflight.json", native_preflight)
+    if native_preflight["status"] != "READY":
+        report_payload = {
+            "schema_version": 1,
+            "scenario": LLM_SCENARIO,
+            "status": "BLOCKED",
+            "reason": "Native host preflight failed",
+            "llm_preflight": asset_preflight,
+            "native_preflight": native_preflight,
+            "baseline_runs": [],
+            "model_load_runs": [],
+        }
+        write_json(output / "calibration-report.json", report_payload)
+        print(output / "calibration-report.json")
+        return 1
+
+    calibration = config["r8_oom"]["calibration"]
+    seed_base = int(calibration.get("seed", 20261001))
+    baseline_results: list[dict[str, Any]] = []
+    baseline_currents: list[int] = []
+    for index in range(1, int(calibration["baseline_rounds"]) + 1):
+        run_dir = output / f"baseline-{index:02d}"
+        result = run_one(
+            config, "native_kernel", seed_base + index - 1, run_dir,
+            baseline_only=True, allow_unfrozen=True,
+        )
+        baseline_results.append(result)
+        try:
+            before = read_json(run_dir / "r8-before-pressure.json")
+            baseline_currents.append(int(before["cgroup"]["memory_current"]))
+        except (FileNotFoundError, OSError, KeyError, TypeError, ValueError):
+            pass
+    if (
+        len(baseline_currents) != int(calibration["baseline_rounds"])
+        or not all(row.get("valid") for row in baseline_results)
+    ):
+        report_payload = {
+            "schema_version": 1, "scenario": LLM_SCENARIO, "status": "BLOCKED",
+            "reason": "native no-LLM working-set calibration invalid",
+            "llm_preflight": asset_preflight, "baseline_runs": baseline_results,
+            "model_load_runs": [],
+        }
+        write_json(output / "calibration-report.json", report_payload)
+        print(output / "calibration-report.json")
+        return 1
+
+    p95 = _nearest_rank_p95(baseline_currents)
+    requested_limit = memory_limit_from_p95(p95)
+    cap = memory_limit_cap_bytes(memtotal_mib())
+    if requested_limit > cap:
+        report_payload = {
+            "schema_version": 1, "scenario": LLM_SCENARIO, "status": "BLOCKED",
+            "reason": "native P95-derived MemoryMax exceeds host cap",
+            "p95_parent_memory_current_bytes": p95,
+            "requested_memory_max_bytes": requested_limit, "host_cap_bytes": cap,
+            "llm_preflight": asset_preflight, "baseline_runs": baseline_results,
+            "model_load_runs": [],
+        }
+        write_json(output / "calibration-report.json", report_payload)
+        print(output / "calibration-report.json")
+        return 1
+
+    candidate_config = copy.deepcopy(config)
+    candidate_config["r8_oom"]["memory_max_mib"] = requested_limit // MIB
+    model_load_results: list[dict[str, Any]] = []
+    for index in range(1, int(calibration["candidate_rounds"]) + 1):
+        result = run_one(
+            candidate_config, "native_kernel", seed_base + 1000 + index - 1,
+            output / f"model-load-round-{index:02d}", allow_unfrozen=True,
+        )
+        model_load_results.append(result)
+    victim_counts = [
+        int(row.get("distinct_oom_victim_apps", 0)) for row in model_load_results
+    ]
+    in_range = sum(1 for count in victim_counts if 1 <= count <= 3)
+    too_many = sum(1 for count in victim_counts if count > 3)
+    accepted = bool(
+        all(row.get("valid") for row in model_load_results)
+        and all(row.get("pressure_complete") for row in model_load_results)
+        and in_range >= int(calibration["minimum_in_range_rounds"])
+        and too_many == 0
+    )
+    status = "READY" if accepted else "INCONCLUSIVE"
+    report_payload = {
+        "schema_version": 1, "scenario": LLM_SCENARIO, "status": status,
+        "p95_parent_memory_current_bytes": p95,
+        "memory_max_bytes": requested_limit, "host_cap_bytes": cap,
+        "llm_preflight": asset_preflight, "baseline_runs": baseline_results,
+        "model_load_runs": model_load_results, "victim_counts": victim_counts,
+        "in_range_rounds": in_range, "too_many_victim_rounds": too_many,
+    }
+    if accepted:
+        frozen = copy.deepcopy(candidate_config)
+        frozen_r8 = frozen["r8_oom"]
+        frozen_r8["calibration"]["frozen"] = True
+        frozen_r8["calibration"]["native_parent_p95_bytes"] = p95
+        frozen_r8["calibration"]["report_contract_sha256"] = canonical_sha256({
+            "p95": p95,
+            "memory_max": requested_limit,
+            "llm_contract": asset_preflight["contract"],
+            "baseline": [row.get("action_plan_sha256") for row in baseline_results],
+            "model_load": [row.get("action_plan_sha256") for row in model_load_results],
+        })
+        frozen_r8["calibration"].pop("frozen_config_sha256", None)
+        frozen_r8["calibration"]["frozen_config_sha256"] = canonical_sha256(
+            frozen_config_contract(frozen)
+        )
+        validate_config(frozen, require_frozen=True)
+        write_json(output / "frozen-config.json", frozen)
+        report_payload["frozen_config"] = str(output / "frozen-config.json")
+        report_payload["frozen_config_sha256"] = frozen_r8["calibration"]["frozen_config_sha256"]
+    write_json(output / "calibration-report.json", report_payload)
+    print(output / "calibration-report.json")
+    return 0 if accepted else 1
+
+
+def _session_results(root: Path, scenario_name: str = SCENARIO) -> list[dict[str, Any]]:
     summary = read_json(root / "summary.json")
-    return [row for row in summary.get("runs", []) if row.get("scenario") == SCENARIO]
+    return [row for row in summary.get("runs", []) if row.get("scenario") == scenario_name]
 
 
-def report(native_root: Path, bin_root: Path) -> dict[str, Any]:
-    native_rows = {int(row["seed"]): row for row in _session_results(native_root) if row.get("valid")}
-    bin_rows = {int(row["seed"]): row for row in _session_results(bin_root) if row.get("valid")}
+def report(
+    native_root: Path, bin_root: Path, scenario_name: str = SCENARIO,
+) -> dict[str, Any]:
+    native_rows = {
+        int(row["seed"]): row
+        for row in _session_results(native_root, scenario_name) if row.get("valid")
+    }
+    bin_rows = {
+        int(row["seed"]): row
+        for row in _session_results(bin_root, scenario_name) if row.get("valid")
+    }
     pairs: list[dict[str, Any]] = []
     rejected: list[dict[str, Any]] = []
     for seed in sorted(set(native_rows) & set(bin_rows)):
@@ -1342,7 +2294,8 @@ def report(native_root: Path, bin_root: Path) -> dict[str, Any]:
         bin_median = statistics.median(bin_counts)
         status = "PASS" if reduction >= 0.30 and bin_median <= native_median else "FAIL"
     return {
-        "schema_version": 1, "status": status, "valid_pairs": len(selected), "available_valid_pairs": len(pairs),
+        "schema_version": 1, "scenario": scenario_name, "status": status,
+        "valid_pairs": len(selected), "available_valid_pairs": len(pairs),
         "rejected_pairs": rejected, "pairs": selected, "native_total_victim_apps": native_total,
         "bin_total_victim_apps": bin_total,
         "reduction": (1.0 - bin_total / native_total) if native_total else None,
@@ -1367,4 +2320,23 @@ def command_report(args: Any) -> int:
     ]
     (output / "r8-comparison.md").write_text("\n".join(lines) + "\n", encoding="utf-8")
     print(output / "r8-comparison.json")
+    return 0 if payload["status"] == "PASS" else 1
+
+
+def command_report_llm(args: Any) -> int:
+    payload = report(Path(args.native), Path(args.bin), LLM_SCENARIO)
+    output = Path(args.output)
+    output.mkdir(parents=True, exist_ok=False)
+    write_json(output / "r8-llm-comparison.json", payload)
+    lines = [
+        "# R8-LLM 权重加载 OOM 生存对比", "", f"判定：**{payload['status']}**", "",
+        f"有效配对：{payload['valid_pairs']}（可用 {payload['available_valid_pairs']}）", "",
+        f"Native victim 应用总数：{payload['native_total_victim_apps']}",
+        f"Bin victim 应用总数：{payload['bin_total_victim_apps']}",
+        f"降幅：{payload['reduction']:.2%}" if payload["reduction"] is not None else "降幅：N/A",
+        f"中位数（Native / Bin）：{payload['native_median']} / {payload['bin_median']}", "",
+        "仅接受 10 个同 seed 有效配对；两侧必须加载同一哈希的 GGUF、完成首 token，且压力字节一致。",
+    ]
+    (output / "r8-llm-comparison.md").write_text("\n".join(lines) + "\n", encoding="utf-8")
+    print(output / "r8-llm-comparison.json")
     return 0 if payload["status"] == "PASS" else 1

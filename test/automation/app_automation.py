@@ -73,6 +73,7 @@ class Scenario:
 TRACE_FIELDS = [
     "session_id",
     "ts_ns",
+    "monotonic_ns",
     "ts_iso",
     "timestamp",
     "scenario_id",
@@ -104,6 +105,8 @@ TRACE_FIELDS = [
     "requested_operation",
     "start_time_ns",
     "end_time_ns",
+    "start_monotonic_ns",
+    "end_monotonic_ns",
     "duration_ms",
     "side_effect_level",
     "scope_name",
@@ -123,14 +126,17 @@ class TraceWriter:
         self.path.parent.mkdir(parents=True, exist_ok=True)
         self._file = self.path.open("w", encoding="utf-8", newline="")
         self._writer = csv.DictWriter(self._file, fieldnames=TRACE_FIELDS)
+        self._operation_starts: dict[str, tuple[int, int]] = {}
         self._writer.writeheader()
         self._file.flush()
 
     def write(self, row: dict[str, Any]) -> None:
         now_ns = time.time_ns()
+        monotonic_ns = time.monotonic_ns()
         payload = {
             "session_id": self.session_id,
             "ts_ns": now_ns,
+            "monotonic_ns": monotonic_ns,
             "ts_iso": dt.datetime.now().isoformat(timespec="microseconds"),
             "scenario_id": self.scenario_id,
             **row,
@@ -138,7 +144,23 @@ class TraceWriter:
         payload.setdefault("timestamp", payload["ts_iso"])
         payload.setdefault("start_time_ns", now_ns)
         payload.setdefault("end_time_ns", now_ns)
+        payload.setdefault("start_monotonic_ns", monotonic_ns)
+        payload.setdefault("end_monotonic_ns", monotonic_ns)
         payload.setdefault("duration_ms", "0")
+        event_type = str(payload.get("event_type", ""))
+        operation_key = str(
+            payload.get("operation_id") or f"step:{payload.get('step_id', '')}"
+        )
+        if event_type == "OP_START":
+            self._operation_starts[operation_key] = (now_ns, monotonic_ns)
+        elif event_type in {"OP_DONE", "OP_FAILED"}:
+            started = self._operation_starts.pop(operation_key, None)
+            if started is not None:
+                payload["start_time_ns"] = started[0]
+                payload["end_time_ns"] = now_ns
+                payload["start_monotonic_ns"] = started[1]
+                payload["end_monotonic_ns"] = monotonic_ns
+                payload["duration_ms"] = f"{(monotonic_ns - started[1]) / 1e6:.3f}"
         metadata = payload.get("metadata_json", "")
         if isinstance(metadata, (dict, list)):
             payload["metadata_json"] = json.dumps(metadata, ensure_ascii=False, sort_keys=True)
@@ -222,7 +244,7 @@ def _clear_stale_scope(unit: str) -> None:
     time.sleep(0.2)
 
 
-_ALLOWED_SCOPE_PROPERTIES = frozenset({"MemoryOOMGroup"})
+_ALLOWED_SCOPE_PROPERTIES = frozenset({"MemoryOOMGroup", "TimeoutStopSec"})
 
 
 def _scope_property_args(properties: Any) -> list[str]:
@@ -237,16 +259,21 @@ def _scope_property_args(properties: Any) -> list[str]:
         normalized = str(value).lower() if isinstance(value, bool) else str(value)
         if key == "MemoryOOMGroup" and normalized not in {"yes", "no", "true", "false", "1", "0"}:
             raise AutomationError("MemoryOOMGroup 必须是布尔值")
+        if key == "TimeoutStopSec" and not re.fullmatch(r"[1-9][0-9]*(?:ms|s|min)?", normalized):
+            raise AutomationError("TimeoutStopSec 必须是正整数时间值")
     # systemd 249 exposes no MemoryOOMGroup= unit property even though the
     # kernel's delegated cgroup v2 endpoint exists.  R8 therefore applies this
     # one allow-listed setting directly after scope creation and verifies it
     # before pressure.  Do not pass an unknown property to systemd-run.
-    return []
+    return [
+        f"--property=TimeoutStopSec={properties['TimeoutStopSec']}"
+        for _ in (0,) if "TimeoutStopSec" in properties
+    ]
 
 
 def _apply_scope_properties(unit: str, properties: Any) -> None:
     _scope_property_args(properties)
-    if not properties:
+    if not properties or "MemoryOOMGroup" not in properties:
         return
     requested = str(properties["MemoryOOMGroup"]).lower() in {"yes", "true", "1"}
     deadline = time.monotonic() + 5.0
@@ -1376,6 +1403,9 @@ def click_window(action: dict[str, Any], ctx: Context) -> None:
     if y < 0:
         y = int(candidate.height * get_float(action, "y_ratio", 0.82))
     log(f"click_window {app}: {format_window_info(candidate)} at {x},{y}")
+    if bool(action.get("activate_before_click", False)):
+        run(["xdotool", "windowactivate", "--sync", candidate.window_id], ctx)
+        run(["xdotool", "windowraise", candidate.window_id], ctx)
     run(["xdotool", "mousemove", "--window", candidate.window_id, str(x), str(y), "click", button], ctx)
 
 
@@ -1899,10 +1929,24 @@ def verify_foreground(action: dict[str, Any], ctx: Context) -> None:
         log(f"dry-run: verify_foreground {app}")
         return
     active = get_foreground_window_info()
-    if active.mapped_app != app:
-        raise AutomationError(f"foreground verify failed: expected={app} active={format_window_info(active)}")
     minimum_width = get_int(action, "minimum_foreground_width", 0)
     minimum_height = get_int(action, "minimum_foreground_height", 0)
+    if (
+        bool(action.get("dismiss_small_transient"))
+        and active.mapped_app == app
+        and (active.width < minimum_width or active.height < minimum_height)
+    ):
+        # A same-scope Epiphany helper may steal focus in the short interval
+        # between the robust switch and its separate verify action.  Dismiss
+        # it and repeat the bounded main-window selection before failing the
+        # deterministic foreground contract.
+        subprocess.run(
+            ["xdotool", "key", "--clearmodifiers", "Escape"], check=False,
+        )
+        robust_switch_to_app(action, ctx, app)
+        active = get_foreground_window_info()
+    if active.mapped_app != app:
+        raise AutomationError(f"foreground verify failed: expected={app} active={format_window_info(active)}")
     if active.width < minimum_width or active.height < minimum_height:
         raise AutomationError(
             "foreground geometry verify failed: "
@@ -2104,7 +2148,29 @@ def cleanup_tracked_processes(ctx: Context) -> None:
             log(f"cleanup skipped for {name}: {exc}")
 
 
+def wps_replay_action(action: dict[str, Any], ctx: Context) -> None:
+    # Lazy import keeps ordinary automation independent of Office audit deps.
+    if __package__:
+        from .wps_replay import perform
+    else:
+        from wps_replay import perform
+    perform(action, ctx, sys.modules[__name__])
+
+
+def wps_long_action(action: dict[str, Any], ctx: Context) -> None:
+    import sys
+    try:
+        from .wps_long_scenarios import perform
+    except ImportError:
+        # Direct script execution still imports the package for relative helpers.
+        sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+        from automation.wps_long_scenarios import perform
+    perform(action, ctx, sys.modules[__name__])
+
+
 ACTION_HANDLERS = {
+    "wps_long_sequence": wps_long_action,
+    "wps_replay_operation": wps_replay_action,
     "trace_marker": trace_marker_action,
     "launch": launch,
     "wait": wait,

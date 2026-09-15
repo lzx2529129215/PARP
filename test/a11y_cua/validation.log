@@ -1,0 +1,17 @@
+{
+  "status": "PASS",
+  "sessions": 480,
+  "su_files_hashed": 5367,
+  "events": 97022,
+  "segments": 2736,
+  "candidate_episodes": 956,
+  "tests": [
+    "8 users \u00d7 exact tasks 1..60",
+    "chronological collapsed sequence",
+    "departure belongs to candidate app",
+    "next return independently located before unknown boundary",
+    "censored rows have no observed return",
+    "counts reconcile",
+    "SU input hashes unchanged"
+  ]
+}

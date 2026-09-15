@@ -32,6 +32,8 @@ file_event_socket="${PARP_SERVICE_FILE_EVENT_SOCKET:-/run/user/$(id -u)/parp-fil
 file_event_control_socket="${PARP_SERVICE_FILE_EVENT_CONTROL_SOCKET:-/run/parp-file-events-$(id -u).sock}"
 file_event_ready_timeout="${PARP_SERVICE_FILE_EVENT_READY_TIMEOUT:-15}"
 file_event_stale_timeout="${PARP_SERVICE_FILE_EVENT_STALE_TIMEOUT:-10}"
+input_event_source="${PARP_SERVICE_INPUT_EVENT_SOURCE:-libinput}"
+input_event_socket="${PARP_SERVICE_INPUT_EVENT_SOCKET:-/run/user/$(id -u)/parp-input-events.sock}"
 
 mkdir -p "$PARP_SERVICE_OUTPUT_ROOT"
 # lzx-note: Rotate resident collection into daily sessions and remove only
@@ -138,6 +140,16 @@ case "$myfs_enabled" in
     ;;
   *)
     echo "invalid PARP_SERVICE_ENABLE_MYFS=$myfs_enabled (expected 0 or 1)" >&2
+    exit 2
+    ;;
+esac
+
+case "$input_event_source" in
+  libinput|off)
+    monitor_args+=(--input-event-source "$input_event_source" --input-event-socket "$input_event_socket")
+    ;;
+  *)
+    echo "invalid PARP_SERVICE_INPUT_EVENT_SOURCE=$input_event_source (expected libinput or off)" >&2
     exit 2
     ;;
 esac

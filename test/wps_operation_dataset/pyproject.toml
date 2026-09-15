@@ -1,0 +1,19 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "wps-operation-dataset"
+version = "0.1.0"
+requires-python = ">=3.10"
+dependencies = ["requests>=2.28", "ijson>=3.3,<4", "pyarrow>=15,<22"]
+
+[project.optional-dependencies]
+test = ["pytest>=8,<9"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-p no:cacheprovider"
+
+[tool.setuptools.packages.find]
+include = ["wps_operation_dataset*"]

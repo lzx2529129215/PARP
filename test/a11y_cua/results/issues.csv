@@ -1,0 +1,312 @@
+session,kind,file,detail
+SU1/4,metadata_count_mismatch,metadata_4.json,65 vs 163
+SU1/5,metadata_count_mismatch,metadata_5.json,244 vs 231
+SU1/6,metadata_count_mismatch,metadata_6.json,101 vs 99
+SU1/7,metadata_count_mismatch,metadata_7.json,127 vs 123
+SU1/9,metadata_count_mismatch,metadata_9.json,286 vs 287
+SU1/13,zero_event_metadata_reference_without_file,2_ApplicationFrameHost.exe.json,not present in fixed-revision session directory; actual session files scanned independently
+SU1/15,zero_event_metadata_reference_without_file,2_ApplicationFrameHost.exe.json,not present in fixed-revision session directory; actual session files scanned independently
+SU1/16,zero_event_metadata_reference_without_file,2_ApplicationFrameHost.exe.json,not present in fixed-revision session directory; actual session files scanned independently
+SU1/17,zero_event_metadata_reference_without_file,2_ApplicationFrameHost.exe.json,not present in fixed-revision session directory; actual session files scanned independently
+SU1/19,zero_event_metadata_reference_without_file,2_ApplicationFrameHost.exe.json,not present in fixed-revision session directory; actual session files scanned independently
+SU1/20,metadata_count_mismatch,metadata_20.json,76 vs 74
+SU1/22,zero_event_metadata_reference_without_file,3_ApplicationFrameHost.exe.json,not present in fixed-revision session directory; actual session files scanned independently
+SU1/25,metadata_count_mismatch,metadata_25.json,95 vs 91
+SU1/26,metadata_count_mismatch,metadata_26.json,137 vs 131
+SU1/27,metadata_count_mismatch,metadata_27.json,370 vs 351
+SU1/29,metadata_count_mismatch,metadata_29.json,186 vs 184
+SU1/30,metadata_count_mismatch,metadata_30.json,396 vs 378
+SU1/31,metadata_count_mismatch,metadata_31.json,238 vs 220
+SU1/34,metadata_count_mismatch,metadata_34.json,261 vs 252
+SU1/35,metadata_count_mismatch,metadata_35.json,116 vs 108
+SU1/37,metadata_count_mismatch,metadata_37.json,408 vs 412
+SU1/40,metadata_count_mismatch,metadata_40.json,433 vs 434
+SU1/41,zero_event_metadata_reference_without_file,3_ApplicationFrameHost.exe.json,not present in fixed-revision session directory; actual session files scanned independently
+SU1/44,metadata_count_mismatch,metadata_44.json,200 vs 196
+SU1/46,metadata_count_mismatch,metadata_46.json,160 vs 158
+SU1/47,metadata_count_mismatch,metadata_47.json,562 vs 560
+SU1/48,zero_event_metadata_reference_without_file,3_ApplicationFrameHost.exe.json,not present in fixed-revision session directory; actual session files scanned independently
+SU1/48,metadata_count_mismatch,metadata_48.json,253 vs 250
+SU1/50,zero_event_metadata_reference_without_file,2_ApplicationFrameHost.exe.json,not present in fixed-revision session directory; actual session files scanned independently
+SU1/51,zero_event_metadata_reference_without_file,2_ApplicationFrameHost.exe.json,not present in fixed-revision session directory; actual session files scanned independently
+SU1/51,metadata_count_mismatch,metadata_51.json,524 vs 520
+SU1/53,zero_event_metadata_reference_without_file,2_ApplicationFrameHost.exe.json,not present in fixed-revision session directory; actual session files scanned independently
+SU1/55,metadata_count_mismatch,metadata_55.json,620 vs 613
+SU1/56,zero_event_metadata_reference_without_file,2_ApplicationFrameHost.exe.json,not present in fixed-revision session directory; actual session files scanned independently
+SU2/9,metadata_count_mismatch,metadata_9.json,99 vs 89
+SU2/13,zero_event_metadata_reference_without_file,1_ApplicationFrameHost.exe.json,not present in fixed-revision session directory; actual session files scanned independently
+SU2/14,metadata_count_mismatch,metadata_14.json,35 vs 32
+SU2/16,zero_event_metadata_reference_without_file,2_ApplicationFrameHost.exe.json,not present in fixed-revision session directory; actual session files scanned independently
+SU2/17,zero_event_metadata_reference_without_file,1_ApplicationFrameHost.exe.json,not present in fixed-revision session directory; actual session files scanned independently
+SU2/19,zero_event_metadata_reference_without_file,1_ApplicationFrameHost.exe.json,not present in fixed-revision session directory; actual session files scanned independently
+SU2/20,metadata_count_mismatch,metadata_20.json,84 vs 80
+SU2/22,zero_event_metadata_reference_without_file,1_ApplicationFrameHost.exe.json,not present in fixed-revision session directory; actual session files scanned independently
+SU2/25,metadata_count_mismatch,metadata_25.json,88 vs 84
+SU2/26,metadata_count_mismatch,metadata_26.json,70 vs 66
+SU2/27,metadata_count_mismatch,metadata_27.json,152 vs 142
+SU2/29,metadata_count_mismatch,metadata_29.json,106 vs 104
+SU2/30,metadata_count_mismatch,metadata_30.json,108 vs 104
+SU2/31,metadata_count_mismatch,metadata_31.json,175 vs 150
+SU2/34,metadata_count_mismatch,metadata_34.json,188 vs 186
+SU2/36,metadata_count_mismatch,metadata_36.json,218 vs 216
+SU2/37,metadata_count_mismatch,metadata_37.json,264 vs 211
+SU2/38,metadata_count_mismatch,metadata_38.json,124 vs 122
+SU2/40,metadata_count_mismatch,metadata_40.json,193 vs 185
+SU2/41,zero_event_metadata_reference_without_file,2_ApplicationFrameHost.exe.json,not present in fixed-revision session directory; actual session files scanned independently
+SU2/41,metadata_count_mismatch,metadata_41.json,518 vs 510
+SU2/42,metadata_count_mismatch,metadata_42.json,74 vs 73
+SU2/43,metadata_count_mismatch,metadata_43.json,168 vs 164
+SU2/44,metadata_count_mismatch,metadata_44.json,120 vs 116
+SU2/45,metadata_count_mismatch,metadata_45.json,210 vs 204
+SU2/46,metadata_count_mismatch,metadata_46.json,92 vs 90
+SU2/47,zero_event_metadata_reference_without_file,2_ApplicationFrameHost.exe.json,not present in fixed-revision session directory; actual session files scanned independently
+SU2/47,metadata_count_mismatch,metadata_47.json,426 vs 417
+SU2/48,zero_event_metadata_reference_without_file,3_ApplicationFrameHost.exe.json,not present in fixed-revision session directory; actual session files scanned independently
+SU2/48,metadata_count_mismatch,metadata_48.json,170 vs 157
+SU2/49,zero_event_metadata_reference_without_file,2_ApplicationFrameHost.exe.json,not present in fixed-revision session directory; actual session files scanned independently
+SU2/50,zero_event_metadata_reference_without_file,3_ApplicationFrameHost.exe.json,not present in fixed-revision session directory; actual session files scanned independently
+SU2/51,zero_event_metadata_reference_without_file,2_ApplicationFrameHost.exe.json,not present in fixed-revision session directory; actual session files scanned independently
+SU2/51,metadata_count_mismatch,metadata_51.json,124 vs 120
+SU2/53,zero_event_metadata_reference_without_file,2_ApplicationFrameHost.exe.json,not present in fixed-revision session directory; actual session files scanned independently
+SU2/56,zero_event_metadata_reference_without_file,2_ApplicationFrameHost.exe.json,not present in fixed-revision session directory; actual session files scanned independently
+SU3/5,metadata_count_mismatch,metadata_5.json,616 vs 593
+SU3/6,metadata_count_mismatch,metadata_6.json,214 vs 212
+SU3/8,metadata_count_mismatch,metadata_8.json,137 vs 134
+SU3/9,metadata_count_mismatch,metadata_9.json,253 vs 245
+SU3/11,metadata_count_mismatch,metadata_11.json,337 vs 333
+SU3/13,zero_event_metadata_reference_without_file,2_ApplicationFrameHost.exe.json,not present in fixed-revision session directory; actual session files scanned independently
+SU3/15,zero_event_metadata_reference_without_file,2_ApplicationFrameHost.exe.json,not present in fixed-revision session directory; actual session files scanned independently
+SU3/16,zero_event_metadata_reference_without_file,2_ApplicationFrameHost.exe.json,not present in fixed-revision session directory; actual session files scanned independently
+SU3/17,zero_event_metadata_reference_without_file,2_ApplicationFrameHost.exe.json,not present in fixed-revision session directory; actual session files scanned independently
+SU3/19,zero_event_metadata_reference_without_file,2_ApplicationFrameHost.exe.json,not present in fixed-revision session directory; actual session files scanned independently
+SU3/20,metadata_count_mismatch,metadata_20.json,72 vs 70
+SU3/22,zero_event_metadata_reference_without_file,3_ApplicationFrameHost.exe.json,not present in fixed-revision session directory; actual session files scanned independently
+SU3/25,metadata_count_mismatch,metadata_25.json,185 vs 146
+SU3/26,metadata_count_mismatch,metadata_26.json,125 vs 121
+SU3/27,metadata_count_mismatch,metadata_27.json,287 vs 264
+SU3/29,metadata_count_mismatch,metadata_29.json,79 vs 77
+SU3/30,metadata_count_mismatch,metadata_30.json,309 vs 270
+SU3/31,metadata_count_mismatch,metadata_31.json,293 vs 256
+SU3/34,metadata_count_mismatch,metadata_34.json,315 vs 290
+SU3/37,metadata_count_mismatch,metadata_37.json,282 vs 278
+SU3/38,metadata_count_mismatch,metadata_38.json,230 vs 228
+SU3/40,metadata_count_mismatch,metadata_40.json,497 vs 492
+SU3/41,zero_event_metadata_reference_without_file,3_ApplicationFrameHost.exe.json,not present in fixed-revision session directory; actual session files scanned independently
+SU3/41,metadata_count_mismatch,metadata_41.json,1319 vs 1317
+SU3/42,metadata_count_mismatch,metadata_42.json,79 vs 76
+SU3/43,metadata_count_mismatch,metadata_43.json,192 vs 189
+SU3/44,metadata_count_mismatch,metadata_44.json,325 vs 323
+SU3/48,zero_event_metadata_reference_without_file,3_ApplicationFrameHost.exe.json,not present in fixed-revision session directory; actual session files scanned independently
+SU3/48,metadata_count_mismatch,metadata_48.json,173 vs 170
+SU3/49,zero_event_metadata_reference_without_file,2_ApplicationFrameHost.exe.json,not present in fixed-revision session directory; actual session files scanned independently
+SU3/50,zero_event_metadata_reference_without_file,2_ApplicationFrameHost.exe.json,not present in fixed-revision session directory; actual session files scanned independently
+SU3/51,zero_event_metadata_reference_without_file,1_ApplicationFrameHost.exe.json,not present in fixed-revision session directory; actual session files scanned independently
+SU3/51,metadata_count_mismatch,metadata_51.json,589 vs 581
+SU3/53,zero_event_metadata_reference_without_file,2_ApplicationFrameHost.exe.json,not present in fixed-revision session directory; actual session files scanned independently
+SU3/53,metadata_count_mismatch,metadata_53.json,292 vs 281
+SU3/56,zero_event_metadata_reference_without_file,2_ApplicationFrameHost.exe.json,not present in fixed-revision session directory; actual session files scanned independently
+SU4/1,metadata_count_mismatch,metadata_1.json,90 vs 88
+SU4/5,metadata_count_mismatch,metadata_5.json,293 vs 284
+SU4/6,metadata_count_mismatch,metadata_6.json,137 vs 133
+SU4/7,metadata_count_mismatch,metadata_7.json,155 vs 153
+SU4/9,metadata_count_mismatch,metadata_9.json,322 vs 316
+SU4/13,zero_event_metadata_reference_without_file,1_ApplicationFrameHost.exe.json,not present in fixed-revision session directory; actual session files scanned independently
+SU4/15,zero_event_metadata_reference_without_file,2_ApplicationFrameHost.exe.json,not present in fixed-revision session directory; actual session files scanned independently
+SU4/16,zero_event_metadata_reference_without_file,2_ApplicationFrameHost.exe.json,not present in fixed-revision session directory; actual session files scanned independently
+SU4/17,zero_event_metadata_reference_without_file,2_ApplicationFrameHost.exe.json,not present in fixed-revision session directory; actual session files scanned independently
+SU4/19,zero_event_metadata_reference_without_file,1_ApplicationFrameHost.exe.json,not present in fixed-revision session directory; actual session files scanned independently
+SU4/20,metadata_count_mismatch,metadata_20.json,81 vs 79
+SU4/22,zero_event_metadata_reference_without_file,1_ApplicationFrameHost.exe.json,not present in fixed-revision session directory; actual session files scanned independently
+SU4/25,metadata_count_mismatch,metadata_25.json,181 vs 177
+SU4/26,metadata_count_mismatch,metadata_26.json,137 vs 133
+SU4/27,metadata_count_mismatch,metadata_27.json,184 vs 174
+SU4/29,metadata_count_mismatch,metadata_29.json,155 vs 154
+SU4/30,metadata_count_mismatch,metadata_30.json,300 vs 296
+SU4/31,metadata_count_mismatch,metadata_31.json,206 vs 200
+SU4/32,metadata_count_mismatch,metadata_32.json,153 vs 145
+SU4/34,metadata_count_mismatch,metadata_34.json,277 vs 271
+SU4/35,metadata_count_mismatch,metadata_35.json,205 vs 198
+SU4/37,metadata_count_mismatch,metadata_37.json,271 vs 259
+SU4/38,metadata_count_mismatch,metadata_38.json,317 vs 316
+SU4/40,metadata_count_mismatch,metadata_40.json,321 vs 317
+SU4/41,zero_event_metadata_reference_without_file,2_ApplicationFrameHost.exe.json,not present in fixed-revision session directory; actual session files scanned independently
+SU4/42,metadata_count_mismatch,metadata_42.json,121 vs 116
+SU4/43,metadata_count_mismatch,metadata_43.json,238 vs 226
+SU4/44,metadata_count_mismatch,metadata_44.json,158 vs 154
+SU4/45,metadata_count_mismatch,metadata_45.json,241 vs 229
+SU4/46,metadata_count_mismatch,metadata_46.json,89 vs 87
+SU4/47,metadata_count_mismatch,metadata_47.json,563 vs 549
+SU4/48,zero_event_metadata_reference_without_file,3_ApplicationFrameHost.exe.json,not present in fixed-revision session directory; actual session files scanned independently
+SU4/48,metadata_count_mismatch,metadata_48.json,407 vs 389
+SU4/49,zero_event_metadata_reference_without_file,2_ApplicationFrameHost.exe.json,not present in fixed-revision session directory; actual session files scanned independently
+SU4/50,zero_event_metadata_reference_without_file,2_ApplicationFrameHost.exe.json,not present in fixed-revision session directory; actual session files scanned independently
+SU4/51,zero_event_metadata_reference_without_file,1_ApplicationFrameHost.exe.json,not present in fixed-revision session directory; actual session files scanned independently
+SU4/51,metadata_count_mismatch,metadata_51.json,460 vs 457
+SU4/53,zero_event_metadata_reference_without_file,2_ApplicationFrameHost.exe.json,not present in fixed-revision session directory; actual session files scanned independently
+SU4/56,zero_event_metadata_reference_without_file,2_ApplicationFrameHost.exe.json,not present in fixed-revision session directory; actual session files scanned independently
+SU5/5,metadata_count_mismatch,metadata_5.json,392 vs 374
+SU5/7,metadata_count_mismatch,metadata_7.json,98 vs 92
+SU5/13,zero_event_metadata_reference_without_file,1_ApplicationFrameHost.exe.json,not present in fixed-revision session directory; actual session files scanned independently
+SU5/16,no_usable_interactions,metadata_16.json,no desktop or accepted web interaction events
+SU5/17,zero_event_metadata_reference_without_file,1_ApplicationFrameHost.exe.json,not present in fixed-revision session directory; actual session files scanned independently
+SU5/17,metadata_count_mismatch,metadata_17.json,230 vs 232
+SU5/20,metadata_count_mismatch,metadata_20.json,88 vs 86
+SU5/22,zero_event_metadata_reference_without_file,1_ApplicationFrameHost.exe.json,not present in fixed-revision session directory; actual session files scanned independently
+SU5/25,metadata_count_mismatch,metadata_25.json,256 vs 245
+SU5/26,metadata_count_mismatch,metadata_26.json,198 vs 190
+SU5/27,metadata_count_mismatch,metadata_27.json,217 vs 213
+SU5/29,metadata_count_mismatch,metadata_29.json,296 vs 290
+SU5/30,metadata_count_mismatch,metadata_30.json,403 vs 399
+SU5/31,metadata_count_mismatch,metadata_31.json,170 vs 166
+SU5/34,metadata_count_mismatch,metadata_34.json,472 vs 471
+SU5/35,metadata_count_mismatch,metadata_35.json,221 vs 215
+SU5/37,metadata_count_mismatch,metadata_37.json,205 vs 198
+SU5/38,metadata_count_mismatch,metadata_38.json,276 vs 270
+SU5/40,metadata_count_mismatch,metadata_40.json,359 vs 358
+SU5/41,zero_event_metadata_reference_without_file,3_ApplicationFrameHost.exe.json,not present in fixed-revision session directory; actual session files scanned independently
+SU5/41,metadata_count_mismatch,metadata_41.json,1223 vs 966
+SU5/43,metadata_count_mismatch,metadata_43.json,426 vs 424
+SU5/44,metadata_count_mismatch,metadata_44.json,195 vs 183
+SU5/45,metadata_count_mismatch,metadata_45.json,380 vs 378
+SU5/46,metadata_count_mismatch,metadata_46.json,411 vs 409
+SU5/47,zero_event_metadata_reference_without_file,2_ApplicationFrameHost.exe.json,not present in fixed-revision session directory; actual session files scanned independently
+SU5/47,metadata_count_mismatch,metadata_47.json,973 vs 959
+SU5/48,zero_event_metadata_reference_without_file,3_ApplicationFrameHost.exe.json,not present in fixed-revision session directory; actual session files scanned independently
+SU5/48,metadata_count_mismatch,metadata_48.json,181 vs 171
+SU5/49,zero_event_metadata_reference_without_file,3_ApplicationFrameHost.exe.json,not present in fixed-revision session directory; actual session files scanned independently
+SU5/50,zero_event_metadata_reference_without_file,2_ApplicationFrameHost.exe.json,not present in fixed-revision session directory; actual session files scanned independently
+SU5/51,zero_event_metadata_reference_without_file,1_ApplicationFrameHost.exe.json,not present in fixed-revision session directory; actual session files scanned independently
+SU5/51,metadata_count_mismatch,metadata_51.json,566 vs 562
+SU5/53,zero_event_metadata_reference_without_file,2_ApplicationFrameHost.exe.json,not present in fixed-revision session directory; actual session files scanned independently
+SU5/55,metadata_count_mismatch,metadata_55.json,812 vs 800
+SU5/56,zero_event_metadata_reference_without_file,2_ApplicationFrameHost.exe.json,not present in fixed-revision session directory; actual session files scanned independently
+SU6/5,metadata_count_mismatch,metadata_5.json,222 vs 198
+SU6/7,metadata_count_mismatch,metadata_7.json,400 vs 395
+SU6/8,metadata_count_mismatch,metadata_8.json,83 vs 79
+SU6/9,metadata_count_mismatch,metadata_9.json,1057 vs 1037
+SU6/13,zero_event_metadata_reference_without_file,2_ApplicationFrameHost.exe.json,not present in fixed-revision session directory; actual session files scanned independently
+SU6/17,zero_event_metadata_reference_without_file,3_ApplicationFrameHost.exe.json,not present in fixed-revision session directory; actual session files scanned independently
+SU6/19,zero_event_metadata_reference_without_file,2_ApplicationFrameHost.exe.json,not present in fixed-revision session directory; actual session files scanned independently
+SU6/20,metadata_count_mismatch,metadata_20.json,76 vs 72
+SU6/22,zero_event_metadata_reference_without_file,2_ApplicationFrameHost.exe.json,not present in fixed-revision session directory; actual session files scanned independently
+SU6/25,metadata_count_mismatch,metadata_25.json,114 vs 110
+SU6/26,metadata_count_mismatch,metadata_26.json,81 vs 77
+SU6/27,metadata_count_mismatch,metadata_27.json,234 vs 197
+SU6/29,metadata_count_mismatch,metadata_29.json,99 vs 97
+SU6/30,metadata_count_mismatch,metadata_30.json,141 vs 137
+SU6/31,metadata_count_mismatch,metadata_31.json,111 vs 95
+SU6/34,metadata_count_mismatch,metadata_34.json,228 vs 216
+SU6/35,metadata_count_mismatch,metadata_35.json,134 vs 126
+SU6/37,metadata_count_mismatch,metadata_37.json,245 vs 239
+SU6/38,metadata_count_mismatch,metadata_38.json,193 vs 191
+SU6/40,metadata_count_mismatch,metadata_40.json,230 vs 212
+SU6/41,zero_event_metadata_reference_without_file,3_ApplicationFrameHost.exe.json,not present in fixed-revision session directory; actual session files scanned independently
+SU6/46,metadata_count_mismatch,metadata_46.json,242 vs 240
+SU6/47,metadata_count_mismatch,metadata_47.json,544 vs 534
+SU6/48,zero_event_metadata_reference_without_file,3_ApplicationFrameHost.exe.json,not present in fixed-revision session directory; actual session files scanned independently
+SU6/48,metadata_count_mismatch,metadata_48.json,395 vs 381
+SU6/49,zero_event_metadata_reference_without_file,2_ApplicationFrameHost.exe.json,not present in fixed-revision session directory; actual session files scanned independently
+SU6/50,zero_event_metadata_reference_without_file,2_ApplicationFrameHost.exe.json,not present in fixed-revision session directory; actual session files scanned independently
+SU6/51,zero_event_metadata_reference_without_file,1_ApplicationFrameHost.exe.json,not present in fixed-revision session directory; actual session files scanned independently
+SU6/51,metadata_count_mismatch,metadata_51.json,352 vs 350
+SU6/53,zero_event_metadata_reference_without_file,2_ApplicationFrameHost.exe.json,not present in fixed-revision session directory; actual session files scanned independently
+SU6/53,metadata_count_mismatch,metadata_53.json,105 vs 102
+SU6/56,zero_event_metadata_reference_without_file,2_ApplicationFrameHost.exe.json,not present in fixed-revision session directory; actual session files scanned independently
+SU6/60,metadata_count_mismatch,metadata_60.json,582 vs 580
+SU7/1,metadata_count_mismatch,metadata_1.json,97 vs 95
+SU7/3,metadata_count_mismatch,metadata_3.json,335 vs 337
+SU7/5,metadata_count_mismatch,metadata_5.json,446 vs 427
+SU7/6,metadata_count_mismatch,metadata_6.json,160 vs 150
+SU7/7,metadata_count_mismatch,metadata_7.json,140 vs 136
+SU7/8,metadata_count_mismatch,metadata_8.json,151 vs 148
+SU7/9,metadata_count_mismatch,metadata_9.json,253 vs 245
+SU7/12,metadata_count_mismatch,metadata_12.json,117 vs 112
+SU7/13,zero_event_metadata_reference_without_file,1_ApplicationFrameHost.exe.json,not present in fixed-revision session directory; actual session files scanned independently
+SU7/16,zero_event_metadata_reference_without_file,1_ApplicationFrameHost.exe.json,not present in fixed-revision session directory; actual session files scanned independently
+SU7/17,zero_event_metadata_reference_without_file,1_ApplicationFrameHost.exe.json,not present in fixed-revision session directory; actual session files scanned independently
+SU7/19,zero_event_metadata_reference_without_file,2_ApplicationFrameHost.exe.json,not present in fixed-revision session directory; actual session files scanned independently
+SU7/20,metadata_count_mismatch,metadata_20.json,83 vs 81
+SU7/22,zero_event_metadata_reference_without_file,1_ApplicationFrameHost.exe.json,not present in fixed-revision session directory; actual session files scanned independently
+SU7/22,metadata_count_mismatch,metadata_22.json,41 vs 39
+SU7/24,metadata_count_mismatch,metadata_24.json,117 vs 118
+SU7/25,metadata_count_mismatch,metadata_25.json,120 vs 117
+SU7/26,metadata_count_mismatch,metadata_26.json,107 vs 101
+SU7/27,metadata_count_mismatch,metadata_27.json,249 vs 216
+SU7/28,metadata_count_mismatch,metadata_28.json,86 vs 84
+SU7/29,metadata_count_mismatch,metadata_29.json,156 vs 146
+SU7/30,metadata_count_mismatch,metadata_30.json,254 vs 250
+SU7/31,metadata_count_mismatch,metadata_31.json,145 vs 143
+SU7/32,metadata_count_mismatch,metadata_32.json,82 vs 80
+SU7/33,metadata_count_mismatch,metadata_33.json,183 vs 177
+SU7/34,metadata_count_mismatch,metadata_34.json,368 vs 358
+SU7/35,metadata_count_mismatch,metadata_35.json,558 vs 521
+SU7/36,metadata_count_mismatch,metadata_36.json,424 vs 432
+SU7/37,metadata_count_mismatch,metadata_37.json,204 vs 198
+SU7/38,metadata_count_mismatch,metadata_38.json,438 vs 431
+SU7/40,metadata_count_mismatch,metadata_40.json,268 vs 250
+SU7/41,zero_event_metadata_reference_without_file,2_ApplicationFrameHost.exe.json,not present in fixed-revision session directory; actual session files scanned independently
+SU7/41,metadata_count_mismatch,metadata_41.json,723 vs 719
+SU7/42,metadata_count_mismatch,metadata_42.json,92 vs 90
+SU7/43,metadata_count_mismatch,metadata_43.json,220 vs 214
+SU7/44,metadata_count_mismatch,metadata_44.json,142 vs 140
+SU7/45,metadata_count_mismatch,metadata_45.json,552 vs 512
+SU7/46,metadata_count_mismatch,metadata_46.json,146 vs 136
+SU7/47,metadata_count_mismatch,metadata_47.json,512 vs 474
+SU7/48,zero_event_metadata_reference_without_file,3_ApplicationFrameHost.exe.json,not present in fixed-revision session directory; actual session files scanned independently
+SU7/48,metadata_count_mismatch,metadata_48.json,445 vs 436
+SU7/49,zero_event_metadata_reference_without_file,2_ApplicationFrameHost.exe.json,not present in fixed-revision session directory; actual session files scanned independently
+SU7/49,metadata_count_mismatch,metadata_49.json,144 vs 131
+SU7/50,zero_event_metadata_reference_without_file,2_ApplicationFrameHost.exe.json,not present in fixed-revision session directory; actual session files scanned independently
+SU7/51,zero_event_metadata_reference_without_file,1_ApplicationFrameHost.exe.json,not present in fixed-revision session directory; actual session files scanned independently
+SU7/51,metadata_count_mismatch,metadata_51.json,553 vs 546
+SU7/53,zero_event_metadata_reference_without_file,2_ApplicationFrameHost.exe.json,not present in fixed-revision session directory; actual session files scanned independently
+SU7/53,metadata_count_mismatch,metadata_53.json,63 vs 60
+SU7/55,metadata_count_mismatch,metadata_55.json,644 vs 635
+SU7/56,zero_event_metadata_reference_without_file,2_ApplicationFrameHost.exe.json,not present in fixed-revision session directory; actual session files scanned independently
+SU7/57,metadata_count_mismatch,metadata_57.json,131 vs 134
+SU7/58,metadata_count_mismatch,metadata_58.json,89 vs 87
+SU7/59,metadata_count_mismatch,metadata_59.json,477 vs 475
+SU8/5,metadata_count_mismatch,metadata_5.json,213 vs 207
+SU8/7,metadata_count_mismatch,metadata_7.json,152 vs 123
+SU8/8,metadata_count_mismatch,metadata_8.json,125 vs 120
+SU8/9,metadata_count_mismatch,metadata_9.json,142 vs 132
+SU8/13,zero_event_metadata_reference_without_file,2_ApplicationFrameHost.exe.json,not present in fixed-revision session directory; actual session files scanned independently
+SU8/15,zero_event_metadata_reference_without_file,2_ApplicationFrameHost.exe.json,not present in fixed-revision session directory; actual session files scanned independently
+SU8/17,zero_event_metadata_reference_without_file,2_ApplicationFrameHost.exe.json,not present in fixed-revision session directory; actual session files scanned independently
+SU8/18,metadata_count_mismatch,metadata_18.json,49 vs 46
+SU8/19,zero_event_metadata_reference_without_file,2_ApplicationFrameHost.exe.json,not present in fixed-revision session directory; actual session files scanned independently
+SU8/19,metadata_count_mismatch,metadata_19.json,400 vs 401
+SU8/20,metadata_count_mismatch,metadata_20.json,89 vs 87
+SU8/22,zero_event_metadata_reference_without_file,2_ApplicationFrameHost.exe.json,not present in fixed-revision session directory; actual session files scanned independently
+SU8/25,metadata_count_mismatch,metadata_25.json,106 vs 96
+SU8/26,metadata_count_mismatch,metadata_26.json,75 vs 72
+SU8/27,metadata_count_mismatch,metadata_27.json,160 vs 139
+SU8/28,metadata_count_mismatch,metadata_28.json,105 vs 99
+SU8/29,metadata_count_mismatch,metadata_29.json,138 vs 132
+SU8/30,metadata_count_mismatch,metadata_30.json,247 vs 218
+SU8/31,metadata_count_mismatch,metadata_31.json,201 vs 195
+SU8/32,metadata_count_mismatch,metadata_32.json,78 vs 76
+SU8/33,metadata_count_mismatch,metadata_33.json,185 vs 183
+SU8/34,metadata_count_mismatch,metadata_34.json,269 vs 245
+SU8/35,metadata_count_mismatch,metadata_35.json,156 vs 154
+SU8/37,metadata_count_mismatch,metadata_37.json,188 vs 179
+SU8/40,metadata_count_mismatch,metadata_40.json,319 vs 309
+SU8/41,zero_event_metadata_reference_without_file,4_ApplicationFrameHost.exe.json,not present in fixed-revision session directory; actual session files scanned independently
+SU8/41,metadata_count_mismatch,metadata_41.json,508 vs 499
+SU8/42,metadata_count_mismatch,metadata_42.json,90 vs 86
+SU8/43,metadata_count_mismatch,metadata_43.json,81 vs 75
+SU8/44,metadata_count_mismatch,metadata_44.json,119 vs 116
+SU8/45,metadata_count_mismatch,metadata_45.json,379 vs 341
+SU8/46,metadata_count_mismatch,metadata_46.json,213 vs 195
+SU8/47,zero_event_metadata_reference_without_file,3_ApplicationFrameHost.exe.json,not present in fixed-revision session directory; actual session files scanned independently
+SU8/48,zero_event_metadata_reference_without_file,3_ApplicationFrameHost.exe.json,not present in fixed-revision session directory; actual session files scanned independently
+SU8/48,metadata_count_mismatch,metadata_48.json,206 vs 189
+SU8/49,zero_event_metadata_reference_without_file,2_ApplicationFrameHost.exe.json,not present in fixed-revision session directory; actual session files scanned independently
+SU8/50,zero_event_metadata_reference_without_file,2_ApplicationFrameHost.exe.json,not present in fixed-revision session directory; actual session files scanned independently
+SU8/51,zero_event_metadata_reference_without_file,2_ApplicationFrameHost.exe.json,not present in fixed-revision session directory; actual session files scanned independently
+SU8/51,metadata_count_mismatch,metadata_51.json,535 vs 532
+SU8/53,zero_event_metadata_reference_without_file,2_ApplicationFrameHost.exe.json,not present in fixed-revision session directory; actual session files scanned independently
+SU8/55,metadata_count_mismatch,metadata_55.json,183 vs 168
+SU8/56,zero_event_metadata_reference_without_file,2_ApplicationFrameHost.exe.json,not present in fixed-revision session directory; actual session files scanned independently
+SU8/57,metadata_count_mismatch,metadata_57.json,172 vs 173
+SU8/60,metadata_count_mismatch,metadata_60.json,442 vs 432

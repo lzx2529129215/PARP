@@ -1,0 +1,506 @@
+{
+  "slice": "lsapp-30.slice",
+  "apps": [
+    {
+      "app_key": "FIREFOX",
+      "app_id": 1,
+      "vocab_name": "Firefox",
+      "scope_name": "automation-firefox.scope",
+      "unit_name": "automation-firefox",
+      "workload_enabled": true,
+      "prediction_enabled": true,
+      "window_keywords": [
+        "epiphany",
+        "org.gnome.Epiphany",
+        "Web",
+        "PARP LSAPP"
+      ],
+      "process_keywords": [
+        "epiphany",
+        "epiphany-browser"
+      ]
+    },
+    {
+      "app_key": "LIBREOFFICE",
+      "app_id": 2,
+      "vocab_name": "LibreOffice",
+      "scope_name": "automation-libreoffice.scope",
+      "unit_name": "automation-libreoffice",
+      "workload_enabled": true,
+      "prediction_enabled": true,
+      "window_keywords": [
+        "libreoffice",
+        "soffice",
+        "writer"
+      ],
+      "process_keywords": [
+        "soffice.bin",
+        "soffice",
+        "lowriter"
+      ]
+    },
+    {
+      "app_key": "VLC",
+      "app_id": 3,
+      "vocab_name": "VLC",
+      "scope_name": "automation-vlc.scope",
+      "unit_name": "automation-vlc",
+      "workload_enabled": true,
+      "prediction_enabled": true,
+      "window_keywords": [
+        "vlc",
+        "videolan",
+        "audio-test"
+      ],
+      "process_keywords": [
+        "vlc"
+      ]
+    },
+    {
+      "app_key": "GIMP",
+      "app_id": 4,
+      "vocab_name": "GIMP",
+      "scope_name": "automation-gimp.scope",
+      "unit_name": "automation-gimp",
+      "workload_enabled": true,
+      "prediction_enabled": true,
+      "window_keywords": [
+        "gimp",
+        "gnu image manipulation",
+        "image-test"
+      ],
+      "process_keywords": [
+        "gimp",
+        "gimp-2.10"
+      ]
+    },
+    {
+      "app_key": "AUDACITY",
+      "app_id": 5,
+      "vocab_name": "Audacity",
+      "scope_name": "automation-audacity.scope",
+      "unit_name": "automation-audacity",
+      "workload_enabled": true,
+      "prediction_enabled": true,
+      "window_keywords": [
+        "audacity",
+        "audio-test"
+      ],
+      "process_keywords": [
+        "audacity"
+      ]
+    },
+    {
+      "app_key": "THUNDERBIRD",
+      "app_id": 6,
+      "vocab_name": "Thunderbird",
+      "scope_name": "automation-thunderbird.scope",
+      "unit_name": "automation-thunderbird",
+      "workload_enabled": true,
+      "prediction_enabled": true,
+      "window_keywords": [
+        "thunderbird",
+        "PARP local message"
+      ],
+      "process_keywords": [
+        "thunderbird"
+      ]
+    },
+    {
+      "app_key": "EVINCE",
+      "app_id": 7,
+      "vocab_name": "Evince",
+      "scope_name": "automation-evince.scope",
+      "unit_name": "automation-evince",
+      "workload_enabled": true,
+      "prediction_enabled": true,
+      "window_keywords": [
+        "evince",
+        "document viewer",
+        "document-test",
+        "文档查看器"
+      ],
+      "process_keywords": [
+        "evince"
+      ]
+    },
+    {
+      "app_key": "FILES",
+      "app_id": 8,
+      "vocab_name": "Files",
+      "scope_name": "automation-files.scope",
+      "unit_name": "automation-files",
+      "workload_enabled": true,
+      "prediction_enabled": true,
+      "window_keywords": [
+        "nautilus",
+        "files",
+        "文件",
+        "lsapp-fixtures"
+      ],
+      "process_keywords": [
+        "nautilus",
+        "org.gnome.Nautilus"
+      ]
+    },
+    {
+      "app_key": "CALCULATOR",
+      "app_id": 9,
+      "vocab_name": "Calculator",
+      "scope_name": "automation-calculator.scope",
+      "unit_name": "automation-calculator",
+      "workload_enabled": true,
+      "prediction_enabled": true,
+      "window_keywords": [
+        "gnome-calculator",
+        "calculator",
+        "计算器"
+      ],
+      "process_keywords": [
+        "gnome-calculator"
+      ]
+    },
+    {
+      "app_key": "CALENDAR",
+      "app_id": 10,
+      "vocab_name": "Calendar",
+      "scope_name": "automation-calendar.scope",
+      "unit_name": "automation-calendar",
+      "workload_enabled": true,
+      "prediction_enabled": true,
+      "window_keywords": [
+        "gnome-calendar",
+        "calendar",
+        "日历"
+      ],
+      "process_keywords": [
+        "gnome-calendar"
+      ]
+    },
+    {
+      "app_key": "RHYTHMBOX",
+      "app_id": 11,
+      "vocab_name": "Rhythmbox",
+      "scope_name": "automation-rhythmbox.scope",
+      "unit_name": "automation-rhythmbox",
+      "workload_enabled": true,
+      "prediction_enabled": true,
+      "window_keywords": [
+        "rhythmbox",
+        "music",
+        "音乐"
+      ],
+      "process_keywords": [
+        "rhythmbox"
+      ]
+    },
+    {
+      "app_key": "IMAGE_VIEWER",
+      "app_id": 12,
+      "vocab_name": "ImageViewer",
+      "scope_name": "automation-image-viewer.scope",
+      "unit_name": "automation-image-viewer",
+      "workload_enabled": true,
+      "prediction_enabled": true,
+      "window_keywords": [
+        "eog",
+        "image viewer",
+        "image-test",
+        "图像查看器"
+      ],
+      "process_keywords": [
+        "eog"
+      ]
+    },
+    {
+      "app_key": "SHOTWELL",
+      "app_id": 13,
+      "vocab_name": "Shotwell",
+      "scope_name": "automation-shotwell.scope",
+      "unit_name": "automation-shotwell",
+      "workload_enabled": true,
+      "prediction_enabled": true,
+      "window_keywords": [
+        "shotwell",
+        "photo",
+        "照片"
+      ],
+      "process_keywords": [
+        "shotwell"
+      ]
+    },
+    {
+      "app_key": "SYSTEM_MONITOR",
+      "app_id": 14,
+      "vocab_name": "SystemMonitor",
+      "scope_name": "automation-system-monitor.scope",
+      "unit_name": "automation-system-monitor",
+      "workload_enabled": true,
+      "prediction_enabled": true,
+      "window_keywords": [
+        "gnome-system-monitor",
+        "system monitor",
+        "系统监视器"
+      ],
+      "process_keywords": [
+        "gnome-system-monitor"
+      ]
+    },
+    {
+      "app_key": "SOLITAIRE",
+      "app_id": 15,
+      "vocab_name": "Solitaire",
+      "scope_name": "automation-solitaire.scope",
+      "unit_name": "automation-solitaire",
+      "workload_enabled": true,
+      "prediction_enabled": true,
+      "window_keywords": [
+        "aisleriot",
+        "solitaire",
+        "klondike",
+        "纸牌"
+      ],
+      "process_keywords": [
+        "sol",
+        "aisleriot"
+      ]
+    },
+    {
+      "app_key": "FALKON",
+      "app_id": 16,
+      "vocab_name": "Falkon",
+      "scope_name": "lsapp30-falkon.scope",
+      "unit_name": "lsapp30-falkon",
+      "workload_enabled": true,
+      "prediction_enabled": true,
+      "window_keywords": [
+        "Falkon",
+        "Falkon Browser"
+      ],
+      "process_keywords": [
+        "falkon"
+      ]
+    },
+    {
+      "app_key": "KONQUEROR",
+      "app_id": 17,
+      "vocab_name": "Konqueror",
+      "scope_name": "lsapp30-konqueror.scope",
+      "unit_name": "lsapp30-konqueror",
+      "workload_enabled": true,
+      "prediction_enabled": true,
+      "window_keywords": [
+        "konqueror"
+      ],
+      "process_keywords": [
+        "konqueror"
+      ]
+    },
+    {
+      "app_key": "PIDGIN",
+      "app_id": 18,
+      "vocab_name": "Pidgin",
+      "scope_name": "lsapp30-pidgin.scope",
+      "unit_name": "lsapp30-pidgin",
+      "workload_enabled": true,
+      "prediction_enabled": true,
+      "window_keywords": [
+        "Pidgin"
+      ],
+      "process_keywords": [
+        "pidgin"
+      ]
+    },
+    {
+      "app_key": "GAJIM",
+      "app_id": 19,
+      "vocab_name": "Gajim",
+      "scope_name": "lsapp30-gajim.scope",
+      "unit_name": "lsapp30-gajim",
+      "workload_enabled": true,
+      "prediction_enabled": true,
+      "window_keywords": [
+        "Gajim",
+        "org.gajim.Gajim"
+      ],
+      "process_keywords": [
+        "gajim"
+      ]
+    },
+    {
+      "app_key": "DINO",
+      "app_id": 20,
+      "vocab_name": "Dino",
+      "scope_name": "lsapp30-dino.scope",
+      "unit_name": "lsapp30-dino",
+      "workload_enabled": true,
+      "prediction_enabled": true,
+      "window_keywords": [
+        "Dino-im",
+        "dino-im"
+      ],
+      "process_keywords": [
+        "dino-im"
+      ]
+    },
+    {
+      "app_key": "PSI_PLUS",
+      "app_id": 21,
+      "vocab_name": "PsiPlus",
+      "scope_name": "lsapp30-psi_plus.scope",
+      "unit_name": "lsapp30-psi_plus",
+      "workload_enabled": true,
+      "prediction_enabled": true,
+      "window_keywords": [
+        "Psi+",
+        "main"
+      ],
+      "process_keywords": [
+        "psi-plus"
+      ]
+    },
+    {
+      "app_key": "KAIDAN",
+      "app_id": 22,
+      "vocab_name": "Kaidan",
+      "scope_name": "lsapp30-kaidan.scope",
+      "unit_name": "lsapp30-kaidan",
+      "workload_enabled": true,
+      "prediction_enabled": true,
+      "window_keywords": [
+        "kaidan"
+      ],
+      "process_keywords": [
+        "kaidan"
+      ]
+    },
+    {
+      "app_key": "SOFTWARE",
+      "app_id": 23,
+      "vocab_name": "GNOMESoftware",
+      "scope_name": "lsapp30-software.scope",
+      "unit_name": "lsapp30-software",
+      "workload_enabled": true,
+      "prediction_enabled": true,
+      "window_keywords": [
+        "Org.gnome.Software",
+        "org.gnome.Software"
+      ],
+      "process_keywords": [
+        "gnome-software"
+      ]
+    },
+    {
+      "app_key": "EVOLUTION",
+      "app_id": 24,
+      "vocab_name": "Evolution",
+      "scope_name": "lsapp30-evolution.scope",
+      "unit_name": "lsapp30-evolution",
+      "workload_enabled": true,
+      "prediction_enabled": true,
+      "window_keywords": [
+        "Evolution",
+        "evolution"
+      ],
+      "process_keywords": [
+        "evolution"
+      ]
+    },
+    {
+      "app_key": "CLAWS_MAIL",
+      "app_id": 25,
+      "vocab_name": "ClawsMail",
+      "scope_name": "lsapp30-claws_mail.scope",
+      "unit_name": "lsapp30-claws_mail",
+      "workload_enabled": true,
+      "prediction_enabled": true,
+      "window_keywords": [
+        "Claws-mail",
+        "claws-mail"
+      ],
+      "process_keywords": [
+        "claws-mail"
+      ]
+    },
+    {
+      "app_key": "CLOCKS",
+      "app_id": 26,
+      "vocab_name": "GNOMEClocks",
+      "scope_name": "lsapp30-clocks.scope",
+      "unit_name": "lsapp30-clocks",
+      "workload_enabled": true,
+      "prediction_enabled": true,
+      "window_keywords": [
+        "Org.gnome.clocks",
+        "org.gnome.clocks"
+      ],
+      "process_keywords": [
+        "gnome-clocks"
+      ]
+    },
+    {
+      "app_key": "CONTACTS",
+      "app_id": 27,
+      "vocab_name": "GNOMEContacts",
+      "scope_name": "lsapp30-contacts.scope",
+      "unit_name": "lsapp30-contacts",
+      "workload_enabled": true,
+      "prediction_enabled": true,
+      "window_keywords": [
+        "Gnome-contacts",
+        "gnome-contacts"
+      ],
+      "process_keywords": [
+        "gnome-contacts"
+      ]
+    },
+    {
+      "app_key": "MARBLE",
+      "app_id": 28,
+      "vocab_name": "Marble",
+      "scope_name": "lsapp30-marble.scope",
+      "unit_name": "lsapp30-marble",
+      "workload_enabled": true,
+      "prediction_enabled": true,
+      "window_keywords": [
+        "marble"
+      ],
+      "process_keywords": [
+        "marble"
+      ]
+    },
+    {
+      "app_key": "MINES",
+      "app_id": 29,
+      "vocab_name": "GNOMEMines",
+      "scope_name": "lsapp30-mines.scope",
+      "unit_name": "lsapp30-mines",
+      "workload_enabled": true,
+      "prediction_enabled": true,
+      "window_keywords": [
+        "Gnome-mines",
+        "gnome-mines"
+      ],
+      "process_keywords": [
+        "gnome-mines"
+      ]
+    },
+    {
+      "app_key": "CONTROL_CENTER",
+      "app_id": 30,
+      "vocab_name": "GNOMEControlCenter",
+      "scope_name": "lsapp30-control_center.scope",
+      "unit_name": "lsapp30-control_center",
+      "workload_enabled": true,
+      "prediction_enabled": true,
+      "window_keywords": [
+        "Gnome-control-center",
+        "gnome-control-center"
+      ],
+      "process_keywords": [
+        "gnome-control-center"
+      ]
+    }
+  ],
+  "status": "standalone_gui_validated_not_active_requires_30_app_checkpoint"
+}

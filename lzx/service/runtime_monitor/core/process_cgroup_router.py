@@ -130,6 +130,19 @@ def _inside_slice(cgroup_path: str, target_slice: str) -> bool:
     return target_slice in [part for part in str(cgroup_path).split("/") if part]
 
 
+def _inside_primary_automation_scope(cgroup_path: str, app: str) -> bool:
+    """Keep an application inside an explicit experiment-owned app scope.
+
+    The real-PC runner launches each GUI in ``automation-<app>.scope`` below a
+    bounded experiment slice.  Moving that process to the resident service's
+    ordinary ``parp-<app>.slice`` would escape MemoryMax/OOM attribution.
+    Fixture aliases intentionally do not match this helper and retain their
+    existing routing behavior.
+    """
+    expected = f"automation-{_app_slug(app).replace('_', '-')}.scope"
+    return expected in [part for part in str(cgroup_path).split("/") if part]
+
+
 class SystemdProcessCgroupRouter:
     """把已有 LSTM App ID 的进程异步归入对应的 user-systemd App slice。
 
@@ -416,6 +429,15 @@ class SystemdProcessCgroupRouter:
                 target=target,
                 status="FOREIGN_UID",
                 detail=f"pid owner uid={snapshot.owner_uid}, expected={self.expected_uid}",
+                latency_start_ns=start_ns,
+            )
+        if _inside_primary_automation_scope(snapshot.cgroup_path, target.app):
+            return self._result(
+                request,
+                snapshot=snapshot,
+                target=target,
+                status="ALREADY_APP_SCOPED",
+                new_cgroup=snapshot.cgroup_path,
                 latency_start_ns=start_ns,
             )
         # 最常见的后续子进程会走到这个分支：根进程已经被迁入 App scope，

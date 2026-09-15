@@ -1,0 +1,63 @@
+{
+  "thresholds_s": [
+    3,
+    10,
+    30,
+    60,
+    180
+  ],
+  "kernel_bins": 8,
+  "bin_direction": "Bin0 hottest / most protected; Bin7 coldest / first reclaim",
+  "epochs": 20,
+  "batch_size": 2048,
+  "lr": 0.001,
+  "seed": 42,
+  "threads": 1,
+  "sampling_modes": [
+    "episode_weighted",
+    "one_query_per_episode"
+  ],
+  "coldness": "trapezoidal restricted mean survival time over [0,180] / 180",
+  "risk_aware": {
+    "risk30_hot": 0.5,
+    "risk180_hot": 0.8,
+    "hot_bins": [
+      0,
+      1
+    ],
+    "cold_bins": [
+      2,
+      7
+    ]
+  },
+  "gate": {
+    "bootstrap_replicates": 2000,
+    "bootstrap_seed": 20260912,
+    "poa": "paired user bootstrap delta lower95 > 0",
+    "dvr": "point delta <= 0 and upper95 <= 0 for both horizons, zero noninferiority margin",
+    "other": "CP1, CP3 or conditional observed victim median lower95 > 0",
+    "sampling_robustness": "same mapper must pass all conditions for both training samplers on episode metrics",
+    "support": "all paired gate comparisons use identical known outcomes; repeated old test is development, not untouched holdout"
+  },
+  "stop_after": "Gate-2 regardless of result; no runtime/kernel changes",
+  "baseline": "/home/lzx/Desktop/PARP/lzx-zr/experiments/slap_reentry/outputs/slap-reentry-20260911-v1",
+  "early_stopping": {
+    "patience": 4,
+    "min_epochs": 6,
+    "max_epochs": 20,
+    "criterion": "validation episode-balanced masked BCE"
+  },
+  "sampling_training_limits": {
+    "episode_weighted": {
+      "max_epochs": 20,
+      "min_epochs": 6,
+      "patience": 4
+    },
+    "one_query_per_episode": {
+      "max_epochs": 80,
+      "min_epochs": 12,
+      "patience": 8
+    }
+  },
+  "training_budget_note": "One-query cap/patience increased before any test evaluation after validation showed slower convergence and ~14x fewer optimizer steps per epoch; same seed, optimizer, labels and Gate criteria."
+}

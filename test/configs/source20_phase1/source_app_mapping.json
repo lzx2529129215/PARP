@@ -1,0 +1,108 @@
+{
+  "status": "phase1_integrated_with_workbook_operation_mapping",
+  "unknown_policy": "Keep original app identity and unknown/desktop boundaries; never delete unmapped events and join surrounding segments.",
+  "apps": [
+    {
+      "source_app": "浏览器",
+      "target_app_key": "FIREFOX",
+      "coverage": "basic"
+    },
+    {
+      "source_app": "海泰浏览器",
+      "target_app_key": "FALKON",
+      "coverage": "basic"
+    },
+    {
+      "source_app": "WPS",
+      "target_app_key": "WPS",
+      "coverage": "phase1"
+    },
+    {
+      "source_app": "文件管理器",
+      "target_app_key": "FILES",
+      "coverage": "basic"
+    },
+    {
+      "source_app": "图库",
+      "target_app_key": "SHOTWELL",
+      "coverage": "basic"
+    },
+    {
+      "source_app": "腾讯文档",
+      "target_app_key": "LIBREOFFICE",
+      "coverage": "local_editing_only"
+    },
+    {
+      "source_app": "应用中心",
+      "target_app_key": null,
+      "coverage": "unresolved_launcher_or_store"
+    },
+    {
+      "source_app": "桌面",
+      "target_app_key": null,
+      "coverage": "explicit_desktop_boundary"
+    },
+    {
+      "source_app": "应用市场",
+      "target_app_key": "SOFTWARE",
+      "coverage": "catalog_only"
+    },
+    {
+      "source_app": "悟空图像",
+      "target_app_key": "GIMP",
+      "coverage": "pending_operation_review"
+    },
+    {
+      "source_app": "腾讯会议",
+      "target_app_key": null,
+      "coverage": "phase2_excluded"
+    },
+    {
+      "source_app": "QQ音乐",
+      "target_app_key": "RHYTHMBOX",
+      "coverage": "local_playback_only"
+    },
+    {
+      "source_app": "抖音",
+      "target_app_key": "VLC",
+      "coverage": "local_playback_only"
+    },
+    {
+      "source_app": "小艺",
+      "target_app_key": null,
+      "coverage": "phase2_excluded"
+    },
+    {
+      "source_app": "飞书",
+      "target_app_key": "GAJIM",
+      "coverage": "chat_only"
+    },
+    {
+      "source_app": "好压",
+      "target_app_key": "FILE_ROLLER",
+      "coverage": "phase1"
+    },
+    {
+      "source_app": "备忘录",
+      "target_app_key": "MOUSEPAD",
+      "coverage": "phase1"
+    },
+    {
+      "source_app": "剪映",
+      "target_app_key": "SHOTCUT",
+      "coverage": "phase1"
+    },
+    {
+      "source_app": "虚拟机",
+      "target_app_key": null,
+      "coverage": "phase2_excluded"
+    },
+    {
+      "source_app": "企业微信",
+      "target_app_key": "KAIDAN",
+      "coverage": "chat_only"
+    }
+  ],
+  "operation_mapping": "../user_events_phase1/plan.json",
+  "replay_entrypoint": "test/test/user_events_replay.py"
+}

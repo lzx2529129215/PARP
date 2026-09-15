@@ -6,11 +6,55 @@
 
 文件与工作负载观测使用单独的 `parp-file-events@<uid>.service`。eBPF 在 syscall 进入/退出边沿捕获 `openat/openat2、mmap、read/pread、write/pwrite、lseek、fsync/fdatasync、access/faccessat*、rename*`，事件包含进入/退出 boot time、延迟、返回值、请求/返回字节、offset、file position；能解析到普通文件内核对象的事件还设置 `file_identity_valid=1` 并携带事件时刻的 `device+inode`。内核侧 `readFile()`、`accessFile()`、`evictFile()` 分别挂在 read 返回、`mm_filemap_get_pages` 和 `mm_filemap_delete_from_page_cache`；页缓存访问/删除携带 page offset/range。page fault、当前 App 上下文直接签发的 block I/O、`sched_switch` 计算的 off-CPU 也进入同一按 App 聚合链；只有启用 `kernel.sched_schedstats` 时 `sched_stat_iowait` 才额外给出精确 iowait。root helper 只监听 AppProcessIndex 实时同步的 PID，perf 事件在 Unix socket 上批量单向投递，没有逐事件 RPC。原始路径按 `--path-mode` 处理后只留在内存与即时 journal，不写长期文件；服务不再周期轮询 `/proc/<pid>/fd` 或 `/proc/<pid>/maps`。perf 丢失、事件序号缺口、helper 重启及心跳超时写入 `file_event_source.csv`，严格模式会结束当前 session。
 
+WPS 文件页训练数据使用独立的 `--file-event-profile page-access-window`：固定 1 秒读取并重置已注册文件页的 Page Idle 位，eBPF 双缓冲 Map 则按文件页去重直接访问/fault，并用 cache add/evict 审计短命页与 PFN 变化。大页集合由 root helper 通过 Runtime Monitor 创建的 `0600` 文件描述符直接写入版本化 CRC 二进制，不经过 JSON datagram。此模式不采匿名页、不做预测/预取/回收，并与 PageHotsetShadow、DAMON 和在线训练互斥。完整格式、试采门槛和运行命令见 [PAGE_ACCESS_DATASET.md](PAGE_ACCESS_DATASET.md)。
+
 每一条内核 `PROCESS_START/FORK` 都会进入常驻服务的 `RuntimeMonitorV0.createProcess()`。该入口用当前 `runtime_app_scope.service.json` 的同一套 AppMapper，只对 `prediction_enabled=true` 且已有固定 LSTM `app_id` 的进程提交迁移；未知进程不会创建新 ID。迁移由普通用户服务异步调用 user-systemd `StartTransientUnit(PIDs=[pid])`，目标结构为 `parp-<app>.slice/parp-route-<app>-p<pid>-s<starttime>.scope`；fixture leaf 会带 `-fixture-` 角色标记。每一条 `PROCESS_EXEC` 都进入 `exeProcess()`，按最终 `comm/exe/cgroup alias` 重新归类并复核迁移。启动和已审计事件缺口只复用一次 AppProcessIndex 基线，没有 5 秒 cgroup 树校对；steady-state 完全由 START/EXEC 边沿驱动。root connector helper 仍不写 cgroup。
 
 所有有效 `PROCESS_START/PROCESS_EXEC/PROCESS_EXIT` 分别调用 `createProcess()`、`exeProcess()`、`destroyProcess()`，共同维护唯一的 `AppProcessIndex`。FORK 时尚未识别的 launcher 可在 EXEC 时加入；PID 也可在 EXEC 时跨 App 移动或退出索引；EXIT 使用 `pid + start_time` 防止 PID 复用误删。服务只在启动时建立一次 `/proc` 基线，或在 helper 重启、序列缺口、overflow 时做一次离散重建；正常每秒采样只读取索引内 PID 的资源，不再枚举全系统 PID，也不再运行第二套 `LifecycleEventBuilder.app_pid_sets` 差分。三类事件仍完整写入 `process_events.csv`；stdout/journal 的 `EVENT_TRIGGER` 只为与固定 App ID 有关的进程打印，未知系统进程仅捕获、不打印。
 
 原生 X11/GNOME 事件是低延迟主路径；采样时钟只读取事件状态机快照。X11 窗口属性通过进程内持久 `python-xlib` 连接读取，不再周期启动 `xprop/xdotool`。事件触发的延迟属性重查与 GNOME/X11 重复通知经过同一状态机按 App/窗口去重，并继续沿 LSTM → `/dev/myfs` 路径提交。`lzx-note`
+
+鼠标/键盘由 `parp-input-events@<uid>.service` 使用系统 `libinput >= 1.19` 和
+`libudev` 监听 seat0 的 evdev 输入与设备热插拔。helper 阻塞等待 fd 就绪，
+不轮询键鼠、不启动每事件辅助进程，也不 grab 输入设备。普通用户 monitor
+通过 `/run/user/<uid>/parp-input-events.sock` 接收小批次消息并校验 root 凭据。
+主线程为每个 libinput 通知调用下列入口，只在前台快照 App 有已定义 ID 时
+打印 `EVENT_TRIGGER` 到 stdout/journal；未知 App 同样经过 hook，但不打印。
+
+| 函数 | 通知及字段 |
+| --- | --- |
+| `mouseClick(event)` | `MOUSE_CLICK`：按钮 `button/button_code`，`state=pressed/released`；距上次通过检查的点击边沿不足 1 秒时直接返回，不打印日志。 |
+| `mouseScroll(event)` | `MOUSE_SCROLL`：`scroll_source=wheel/finger/continuous`，纵横滚动量；滚轮 `*_v120=120` 为一格，正向为下/右。 |
+| `mouseMove(event)` | `MOUSE_MOVE`：相对 `dx/dy`、绝对归一化 `x_normalized/y_normalized`，`dragging/buttons_down`；触控板 swipe 另有 `phase/fingers`。 |
+| `keyPress(event)` | `KEY_PRESS`：Linux `key_code`、`state=pressed/released`；松开时记录 `held_ns`。 |
+
+输入 hook 本身不触发 LSTM，也不生成输入 CSV。键码不转成文本；libinput 不报告
+桌面自动连发，长按对应按下和松开两条事件。相对位移及滚动设置属于 helper
+独立 libinput 上下文，可能不同于 compositor 的加速/自然滚动设置；绝对位置
+是 [0,1] 设备坐标，不是屏幕像素。触控板支持以设备 libinput 能力为准。
+XTest/应用内部直接注入且未经过 evdev 的自动化输入不在此来源覆盖内。
+
+事件同时包含内核来源的 `monotonic_ns`、校准所得 `timestamp_ns`、设备、序号。
+`app/app_id/foreground_pid/window_id` 是接收时保存的前台上下文，明确标记
+`attribution=FOREGROUND_SNAPSHOT`，不能证明输入最终交给哪个窗口（尤其点击
+后台窗口、刚切换焦点时）。普通鼠标滑动与按住按钮拖动都调用 `mouseMove`。
+本机常驻配置默认开启；关闭可设置 `PARP_SERVICE_INPUT_EVENT_SOURCE=off`。
+独立运行 monitor.py 默认关闭，需显式添加 `--input-event-source libinput`
+和 `--direct-x11-events`。socket 可由 `PARP_SERVICE_INPUT_EVENT_SOCKET` 配置。
+
+点击入口使用事件的单调时间限流：首次通过，间隔不足 1 秒立即返回，恰好 1 秒
+允许通过；被跳过的事件不刷新计时。所有鼠标按钮和 App 共用该时钟，因此普通
+点击紧随按下的松开边沿也会被跳过。滚动、移动和键盘事件保持原来的处理方式。
+
+输入来源仍逐事件捕获并投递给 hook，点击的 1 秒检查在 `mouseClick()` 内执行。
+队列有界、每轮处理上限 256 条以让出主循环，积压丢失
+计数、序号缺口、helper 重启或心跳超时会通过 `inputEventSource` 日志报告；
+两秒心跳是来源健康通知，不采样键鼠，状态未变化时不反复输出日志。libinput
+自身丢失/调度告警见 root helper 的 journal，传输计数不代表硬件级零丢失保证。
+
+```bash
+journalctl --user -u parp-runtime-monitor.service -f -o cat | rg '"handler":"(mouseClick|mouseScroll|mouseMove|keyPress|inputEventSource)"'
+```
 
 服务本身不执行 `memory.reclaim`，也不修改 PARP/Tier2/effective-tier 开关；是否采用预测仍由内核编译开关和运行时实验开关决定。`/dev/myfs` 不存在、权限不足或输入不合法时，下沉会 fail-closed，事件监听和指标采集继续运行。
 

@@ -1,0 +1,89 @@
+{
+  "rounds": {
+    "native": {
+      "status": "SMOKE_PASS",
+      "segments": 20,
+      "operations": 609,
+      "row_694": [
+        {
+          "excel_row": 694,
+          "segment_index": 19,
+          "app": "WPS",
+          "event": "打开文件Excel_100M_1.xlsx",
+          "detail": {
+            "verification": "document_title",
+            "document": "/home/lzx/Desktop/PARP/test/outputs/oracle-wps-fixed-20260914-v1/native/source-03/fixtures/sheet.xlsx",
+            "gui": false,
+            "lifecycle_substitution": "native WPS relaunch with requested document",
+            "launch_mode": "components",
+            "command": [
+              "/home/lzx/Desktop/PARP/test/outputs/oracle-wps-fixed-20260914-v1/native/wps-runtime/et",
+              "/home/lzx/Desktop/PARP/test/outputs/oracle-wps-fixed-20260914-v1/native/source-03/fixtures/sheet.xlsx"
+            ]
+          },
+          "elapsed_s": 10.01645777496742,
+          "status": "COMPLETED"
+        }
+      ],
+      "wps_segfaults": [],
+      "kernel_readback_batches": 0,
+      "original_oem_unchanged": true
+    },
+    "oracle": {
+      "status": "SMOKE_PASS",
+      "segments": 20,
+      "operations": 609,
+      "row_694": [
+        {
+          "excel_row": 694,
+          "segment_index": 19,
+          "app": "WPS",
+          "event": "打开文件Excel_100M_1.xlsx",
+          "detail": {
+            "verification": "document_title",
+            "document": "/home/lzx/Desktop/PARP/test/outputs/oracle-wps-fixed-20260914-v1/oracle/source-03/fixtures/sheet.xlsx",
+            "gui": false,
+            "lifecycle_substitution": "native WPS relaunch with requested document",
+            "launch_mode": "components",
+            "command": [
+              "/home/lzx/Desktop/PARP/test/outputs/oracle-wps-fixed-20260914-v1/oracle/wps-runtime/et",
+              "/home/lzx/Desktop/PARP/test/outputs/oracle-wps-fixed-20260914-v1/oracle/source-03/fixtures/sheet.xlsx"
+            ]
+          },
+          "elapsed_s": 9.698622734984383,
+          "status": "COMPLETED"
+        }
+      ],
+      "wps_segfaults": [],
+      "kernel_readback_batches": 372,
+      "original_oem_unchanged": true
+    }
+  },
+  "tests_passed": 31,
+  "restored": true,
+  "restore_errors": [],
+  "controls_match": true,
+  "service": "active",
+  "owned_units": {
+    "oracle29609c70aa.slice": "inactive",
+    "parp30-29609c70-firefox.service": "inactive",
+    "parp30-29609c70-falkon.service": "inactive",
+    "parp30-29609c70-files.service": "inactive",
+    "parp30-29609c70-file_roller.service": "inactive",
+    "parp30-29609c70-file_roller-row208.service": "inactive",
+    "parp30-29609c70-file_roller-row218.service": "inactive",
+    "parp30-29609c70-wps.service": "inactive",
+    "parp30-29609c70-software.service": "inactive",
+    "parp30-29609c70-kaidan.service": "inactive",
+    "oraclea9c082b45b.slice": "inactive",
+    "parp30-a9c082b4-firefox.service": "inactive",
+    "parp30-a9c082b4-falkon.service": "inactive",
+    "parp30-a9c082b4-files.service": "inactive",
+    "parp30-a9c082b4-file_roller.service": "inactive",
+    "parp30-a9c082b4-file_roller-row208.service": "inactive",
+    "parp30-a9c082b4-file_roller-row218.service": "inactive",
+    "parp30-a9c082b4-wps.service": "inactive",
+    "parp30-a9c082b4-software.service": "inactive",
+    "parp30-a9c082b4-kaidan.service": "inactive"
+  }
+}

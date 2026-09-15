@@ -25,6 +25,25 @@ class PageHotsetMonitorIntegrationTests(unittest.TestCase):
                 "--file-event-profile", "page-hotset",
             ]), 2)
 
+    def test_page_access_profile_requires_fixed_one_second_ebpf_only_mode(self) -> None:
+        with redirect_stderr(StringIO()):
+            self.assertEqual(main([
+                "--file-event-profile", "page-access-window",
+            ]), 2)
+            self.assertEqual(main([
+                "--file-event-source", "ebpf",
+                "--file-event-profile", "page-access-window",
+                "--page-access-window-ms", "3000",
+            ]), 2)
+
+    def test_page_access_profile_rejects_online_training(self) -> None:
+        with redirect_stderr(StringIO()):
+            self.assertEqual(main([
+                "--file-event-source", "ebpf",
+                "--file-event-profile", "page-access-window",
+                "--enable-online-lstm",
+            ]), 2)
+
     def test_page_access_hook_reaches_observe_only_shadow_output(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             args = parse_args([

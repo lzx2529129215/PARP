@@ -1,0 +1,84 @@
+{
+  "apps": {
+    "WPS": {
+      "status": "GUI_ACCEPTANCE_PASS",
+      "operation": {
+        "operation": "append_and_save_docx",
+        "saved_token": "PARP_PHASE1_GUI_EDIT_20260912"
+      },
+      "process_count": 6,
+      "focus_switch_observed": true,
+      "cleanup_passed": true
+    },
+    "FILE_ROLLER": {
+      "status": "GUI_ACCEPTANCE_PASS",
+      "operation": {
+        "operation": "gui_extract_zip",
+        "payload_sha256": "6576aaf1c91ffe0b3d91b6fb04c41ce2b552917c51c65d840c0461a31d944d59"
+      },
+      "process_count": 20,
+      "focus_switch_observed": true,
+      "cleanup_passed": true
+    },
+    "MOUSEPAD": {
+      "status": "GUI_ACCEPTANCE_PASS",
+      "operation": {
+        "operation": "append_and_save_text",
+        "saved_token": "PARP_PHASE1_GUI_EDIT_20260912"
+      },
+      "process_count": 13,
+      "focus_switch_observed": true,
+      "cleanup_passed": true
+    },
+    "SHOTCUT": {
+      "status": "GUI_ACCEPTANCE_PASS",
+      "operation": {
+        "operation": "timeline_split_preview_save_export",
+        "split": {
+          "original_frames": [
+            0,
+            172
+          ],
+          "split_frames": [
+            [
+              0,
+              59
+            ],
+            [
+              60,
+              172
+            ]
+          ]
+        },
+        "export": {
+          "programs": [],
+          "streams": [
+            {
+              "codec_type": "video",
+              "width": 1920,
+              "height": 1080
+            },
+            {
+              "codec_type": "audio"
+            }
+          ],
+          "format": {
+            "duration": "5.782000"
+          }
+        }
+      },
+      "process_count": 3,
+      "focus_switch_observed": true,
+      "cleanup_passed": true
+    }
+  },
+  "full_phase1": true,
+  "prediction_tested": false,
+  "kernel_written": false,
+  "performance_tested": false,
+  "evidence_dir": "test/outputs/source20-phase1-20260912-final",
+  "verified_on": "2026-09-12",
+  "runner_sha256": "d1b157e4841c0d6aedb8054d8b97731a14ca7a5aa98c0bc26642f18defec6721",
+  "unit_tests": "4 passed",
+  "other_26_apps_retested": false
+}

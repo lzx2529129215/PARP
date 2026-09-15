@@ -127,7 +127,7 @@ def read_psi(path: Path) -> dict[str, float | int]:
 
 def load_config(path: Path) -> dict[str, Any]:
     value = read_json(path)
-    if "r8_multi_app_oom_survival" in value.get("scenarios", []):
+    if R8.R8_SCENARIOS.intersection(value.get("scenarios", [])):
         R8.validate_config(value)
         return value
     required = {
@@ -3155,7 +3155,7 @@ def run_one(
 
 def command_run(args: argparse.Namespace) -> int:
     config = load_config(args.config)
-    if "r8_multi_app_oom_survival" in config.get("scenarios", []):
+    if R8.R8_SCENARIOS.intersection(config.get("scenarios", [])):
         return R8.command_run(args)
     scenarios = config["scenarios"] if args.scenario == "all" else [args.scenario]
     root = Path(config["output_root"])
@@ -3244,12 +3244,17 @@ def parser() -> argparse.ArgumentParser:
             "r5_app_writeback_gate", "r6_app_serial_major_reuse",
             "r7_app_fairness_misprediction",
             "r8_multi_app_oom_survival",
+            "r8_llm_weight_load",
         ),
         default="all",
     )
     run.add_argument("--rounds", type=int, default=1)
     run.add_argument("--seed", type=int, default=20260828)
     run.add_argument("--keep-going", action="store_true")
+    run.add_argument(
+        "--resume-session", type=Path,
+        help="append fresh-seed attempts until the requested valid-round target is met",
+    )
     run.add_argument(
         "--replay-from", type=Path,
         help="Native session root whose per-round action-plan.json must match",
@@ -3261,7 +3266,25 @@ def parser() -> argparse.ArgumentParser:
     calibrate_r8.add_argument("--policy", choices=("native_kernel",), required=True)
     calibrate_r8.add_argument("--output", type=Path, required=True)
     calibrate_r8.add_argument("--baseline-from", type=Path)
+    calibrate_r8.add_argument(
+        "--resume-from", type=Path, action="append",
+        help="reuse completed artifacts from an interrupted calibration; repeat for multiple sources",
+    )
+    calibrate_r8.add_argument(
+        "--rerun-candidates-from", type=int, default=0, metavar="MIB",
+        help="with --resume-from, force fresh candidate rounds at and above this burst",
+    )
     calibrate_r8.set_defaults(func=R8.command_calibrate)
+
+    calibrate_r8_llm = sub.add_parser("calibrate-r8-llm")
+    calibrate_r8_llm.add_argument("--config", type=Path, required=True)
+    calibrate_r8_llm.add_argument("--policy", choices=("native_kernel",), required=True)
+    calibrate_r8_llm.add_argument("--output", type=Path, required=True)
+    calibrate_r8_llm.set_defaults(func=R8.command_calibrate_llm)
+
+    prune_r8 = sub.add_parser("prune-r8-assets")
+    prune_r8.add_argument("--root", type=Path, required=True)
+    prune_r8.set_defaults(func=R8.command_prune_outputs)
 
     report_r8 = sub.add_parser("report-r8")
     report_r8.add_argument("--native", type=Path, required=True)
@@ -3269,16 +3292,31 @@ def parser() -> argparse.ArgumentParser:
     report_r8.add_argument("--output", type=Path, required=True)
     report_r8.set_defaults(func=R8.command_report)
 
+    report_r8_llm = sub.add_parser("report-r8-llm")
+    report_r8_llm.add_argument("--native", type=Path, required=True)
+    report_r8_llm.add_argument("--bin", type=Path, required=True)
+    report_r8_llm.add_argument("--output", type=Path, required=True)
+    report_r8_llm.set_defaults(func=R8.command_report_llm)
+
     oom_exec = sub.add_parser("oom-score-exec")
     oom_exec.add_argument("--score", type=int, required=True)
     oom_exec.add_argument("command", nargs=argparse.REMAINDER)
     oom_exec.set_defaults(func=R8.command_oom_score_exec)
+
+    r8_publish = sub.add_parser("r8-publish-verified-switch")
+    r8_publish.add_argument("--app", required=True)
+    r8_publish.add_argument("--sequence", type=int, required=True)
+    r8_publish.add_argument("--title", default="")
+    r8_publish.add_argument("--class", dest="window_class", default="")
+    r8_publish.add_argument("--output", type=Path, required=True)
+    r8_publish.set_defaults(func=R8.command_publish_verified_switch)
 
     r8_snapshot = sub.add_parser("r8-snapshot")
     r8_snapshot.add_argument("--cgroup", type=Path, required=True)
     r8_snapshot.add_argument("--apps", required=True)
     r8_snapshot.add_argument("--label", required=True)
     r8_snapshot.add_argument("--output", type=Path, required=True)
+    r8_snapshot.add_argument("--include-llm", action="store_true")
     r8_snapshot.set_defaults(func=R8.command_snapshot)
 
     r8_gate = sub.add_parser("r8-workset-gate")
@@ -3302,6 +3340,12 @@ def parser() -> argparse.ArgumentParser:
     r8_pressure.add_argument("--committed-mib", type=int, required=True)
     r8_pressure.add_argument("--output", type=Path, required=True)
     r8_pressure.set_defaults(func=R8.command_pressure_record)
+
+    r8_llm_pressure = sub.add_parser("r8-llm-pressure-record")
+    r8_llm_pressure.add_argument("--config", type=Path, required=True)
+    r8_llm_pressure.add_argument("--state", type=Path, required=True)
+    r8_llm_pressure.add_argument("--output", type=Path, required=True)
+    r8_llm_pressure.set_defaults(func=R8.command_llm_pressure_record)
 
     snap = sub.add_parser("snapshot")
     snap.add_argument("--cgroup", type=Path, required=True)

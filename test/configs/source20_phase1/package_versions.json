@@ -1,0 +1,16 @@
+{
+  "verified_on": "2026-09-12",
+  "packages": {
+    "ffmpeg": "7:4.4.2-0ubuntu0.22.04.1",
+    "file-roller": "3.42.0-1",
+    "mousepad": "0.5.8-1",
+    "shotcut": "22.01.30+ds-1",
+    "wps-office": "11.1.0.11723.XA"
+  },
+  "new_packages": [
+    "mousepad",
+    "shotcut",
+    "ffmpeg"
+  ],
+  "package_dependencies": "installed via apt --no-install-recommends"
+}

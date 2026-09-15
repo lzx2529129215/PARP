@@ -1,0 +1,35 @@
+第 1 组（10 个应用段，9 次切换）
+Epiphany 浏览器（FIREFOX 键） → Falkon 浏览器 → Nautilus 文件管理器 → File Roller → Nautilus 文件管理器 → File Roller → Nautilus 文件管理器 → WPS Office → Nautilus 文件管理器 → WPS Office
+
+第 2 组（6 个应用段，5 次切换）
+GNOME Software → Epiphany 浏览器（FIREFOX 键） → WPS Office → Nautilus 文件管理器 → WPS Office → Kaidan（离线）
+
+第 3 组（5 个应用段，4 次切换）
+Epiphany 浏览器（FIREFOX 键） → WPS Office → Nautilus 文件管理器 → WPS Office → Falkon 浏览器
+
+第 4 组（6 个应用段，5 次切换）
+WPS Office → Nautilus 文件管理器 → WPS Office → GNOME 设置 → Nautilus 文件管理器 → Mousepad
+
+第 5 组（7 个应用段，6 次切换）
+Epiphany 浏览器（FIREFOX 键） → LibreOffice → Nautilus 文件管理器 → File Roller → Nautilus 文件管理器 → File Roller → Nautilus 文件管理器
+
+第 6 组（10 个应用段，9 次切换）
+Nautilus 文件管理器 → WPS Office → Nautilus 文件管理器 → WPS Office → Rhythmbox → Epiphany 浏览器（FIREFOX 键） → Falkon 浏览器 → LibreOffice → Nautilus 文件管理器 → LibreOffice
+
+第 7 组（5 个应用段，4 次切换）
+Rhythmbox → Falkon 浏览器 → Epiphany 浏览器（FIREFOX 键） → Nautilus 文件管理器 → EOG 图片查看器
+
+第 8 组（6 个应用段，5 次切换）
+Epiphany 浏览器（FIREFOX 键） → Nautilus 文件管理器 → File Roller → Nautilus 文件管理器 → File Roller → Nautilus 文件管理器
+
+第 9 组（12 个应用段，11 次切换）
+Rhythmbox → Epiphany 浏览器（FIREFOX 键） → Nautilus 文件管理器 → EOG 图片查看器 → Nautilus 文件管理器 → EOG 图片查看器 → Nautilus 文件管理器 → VLC → Nautilus 文件管理器 → Shotcut → Nautilus 文件管理器 → Shotcut
+
+第 10 组（5 个应用段，4 次切换）
+Epiphany 浏览器（FIREFOX 键） → Nautilus 文件管理器 → EOG 图片查看器 → Falkon 浏览器 → Kaidan（离线）
+
+第 11 组（5 个应用段，4 次切换）
+Epiphany 浏览器（FIREFOX 键） → WPS Office → Nautilus 文件管理器 → WPS Office → Falkon 浏览器
+
+第 12 组（9 个应用段，8 次切换）
+Epiphany 浏览器（FIREFOX 键） → Nautilus 文件管理器 → EOG 图片查看器 → Nautilus 文件管理器 → EOG 图片查看器 → Nautilus 文件管理器 → VLC → Nautilus 文件管理器 → GIMP

@@ -30,6 +30,10 @@ class GlobalProcessEventCollector:
     thread so the shared CSV writer remains single-threaded.
     """
 
+    SOURCE = "proc-connector"
+    EVENT_KIND = "PROCESS_EVENT"
+    THREAD_NAME = "runtime-monitor-process-events"
+
     def __init__(
         self,
         callback: Callable[[dict[str, Any]], None],
@@ -57,7 +61,7 @@ class GlobalProcessEventCollector:
         self._bind_socket()
         self._thread = threading.Thread(
             target=self._run,
-            name="runtime-monitor-process-events",
+            name=self.THREAD_NAME,
             daemon=True,
         )
         self._thread.start()
@@ -176,8 +180,8 @@ class GlobalProcessEventCollector:
                 continue
             if (
                 not isinstance(payload, dict)
-                or int(payload.get("protocol_version", 0) or 0) != PROTOCOL_VERSION
-                or payload.get("source") != "proc-connector"
+                or payload.get("protocol_version") != PROTOCOL_VERSION
+                or payload.get("source") != self.SOURCE
             ):
                 self.rejected_datagrams += 1
                 continue
@@ -186,7 +190,7 @@ class GlobalProcessEventCollector:
             # connector 订阅。只有内核 ACK 对应的 READY（或已经到达的真实进程
             # 事件）才能解除 monitor 的启动等待，避免把“有 helper、无事件源”
             # 误报为全系统覆盖已经就绪。
-            if payload.get("kind") == "PROCESS_EVENT" or (
+            if payload.get("kind") == self.EVENT_KIND or (
                 payload.get("kind") == "SOURCE_STATUS"
                 and payload.get("status") == "READY"
             ):

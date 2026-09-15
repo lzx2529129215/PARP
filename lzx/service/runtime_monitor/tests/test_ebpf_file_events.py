@@ -2,8 +2,11 @@ from __future__ import annotations
 
 import json
 import os
+import array
 import socket
+import stat
 import tempfile
+import threading
 import time
 import unittest
 from pathlib import Path
@@ -13,6 +16,84 @@ from runtime_monitor.collectors.ebpf_file_events import EBPFFileEventCollector
 
 
 class EBPFFileEventCollectorTests(unittest.TestCase):
+    def test_page_capture_passes_private_fds_and_finalizes_only_after_stop(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            event_socket = root / "events.sock"
+            control_socket = root / "control.sock"
+            control = socket.socket(socket.AF_UNIX, socket.SOCK_DGRAM)
+            control.bind(str(control_socket))
+            collector = EBPFFileEventCollector(
+                event_socket=event_socket,
+                control_socket=control_socket,
+                event_profile="page-access-window",
+                expected_uid=os.getuid(),
+            )
+            failures: list[str] = []
+
+            def responder() -> None:
+                sender = socket.socket(socket.AF_UNIX, socket.SOCK_DGRAM)
+                try:
+                    body, ancillary, _flags, _address = control.recvmsg(
+                        65536, socket.CMSG_SPACE(5 * array.array("i").itemsize)
+                    )
+                    payload = json.loads(body)
+                    rights = array.array("i")
+                    for level, kind, data in ancillary:
+                        if level == socket.SOL_SOCKET and kind == socket.SCM_RIGHTS:
+                            rights.frombytes(data[:len(data) - len(data) % rights.itemsize])
+                    if payload.get("command") != "START_PAGE_ACCESS_CAPTURE" or len(rights) != 5:
+                        failures.append("invalid START command or fd count")
+                        return
+                    contents = [
+                        b"windows", b"lifecycle", b"{}\n", b"valid\n",
+                        json.dumps({"capture_status": "COMPLETE"}).encode(),
+                    ]
+                    for fd, content in zip(rights, contents):
+                        values = os.fstat(fd)
+                        if stat.S_IMODE(values.st_mode) != 0o600:
+                            failures.append("output fd is not mode 0600")
+                        os.write(fd, content)
+                        os.close(fd)
+                    base = {
+                        "protocol_version": 1,
+                        "source": "ebpf-file-syscalls",
+                        "source_instance_id": "test-helper",
+                        "kind": "SOURCE_STATUS",
+                        "source_seq": 0,
+                    }
+                    sender.sendto(json.dumps({
+                        **base, "status": "PAGE_CAPTURE_READY",
+                    }).encode(), str(event_socket))
+                    stop = json.loads(control.recv(65536))
+                    if stop.get("command") != "STOP_PAGE_ACCESS_CAPTURE":
+                        failures.append("missing STOP command")
+                    sender.sendto(json.dumps({
+                        **base, "status": "PAGE_CAPTURE_STOPPED",
+                    }).encode(), str(event_socket))
+                finally:
+                    sender.close()
+
+            thread = threading.Thread(target=responder, daemon=True)
+            try:
+                collector.start()
+                thread.start()
+                dataset = root / "dataset"
+                self.assertTrue(collector.start_page_access_capture(
+                    output_dir=dataset, session_id="s1", target_app="WPS",
+                    app_id=1, timeout_s=2.0,
+                ))
+                self.assertTrue(collector.stop_page_access_capture(timeout_s=2.0))
+                thread.join(timeout=2.0)
+                self.assertFalse(failures)
+                self.assertFalse(list(dataset.glob("*.partial")))
+                self.assertTrue((dataset / "page_access_windows.bin").exists())
+                manifest = json.loads((dataset / "manifest.json").read_text())
+                self.assertIn("page_access_windows.bin", manifest["sha256"])
+            finally:
+                collector.stop()
+                control.close()
+
     def test_index_snapshot_and_authenticated_syscall_event(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)

@@ -1,0 +1,6 @@
+Reduced-A11y-CUA/
+reduced-git/
+__pycache__/
+*.partial
+
+corrupt_downloads/

@@ -1,0 +1,98 @@
+{
+  "schema_version": 1,
+  "description": "R8-LLM: 15 real offline GUI victims plus one pinned llama.cpp --no-mmap GGUF weight-load aggressor. No dummy allocator. lzx-note",
+  "output_root": "/home/lzx/Desktop/PARP/test/outputs/r8_llm_oom_survival",
+  "asset_root": "/home/lzx/Desktop/PARP/test/outputs/real_pc_assets_r8",
+  "slice": "parp-r8-llm-oom-survival.slice",
+  "apps": [
+    "FIREFOX", "THUNDERBIRD", "GIMP", "LIBREOFFICE", "AUDACITY",
+    "VLC", "EVINCE", "IMAGE_VIEWER", "RHYTHMBOX", "SHOTWELL", "FILES",
+    "CALCULATOR", "CALENDAR", "SYSTEM_MONITOR", "SOLITAIRE"
+  ],
+  "hot_apps": ["CALENDAR", "FIREFOX", "THUNDERBIRD", "VLC"],
+  "cold_apps": [
+    "GIMP", "LIBREOFFICE", "AUDACITY", "EVINCE", "IMAGE_VIEWER", "RHYTHMBOX", "SHOTWELL", "FILES",
+    "CALCULATOR", "SYSTEM_MONITOR", "SOLITAIRE"
+  ],
+  "trained_history": ["THUNDERBIRD", "FIREFOX", "THUNDERBIRD", "FIREFOX", "VLC"],
+  "trained_history_vocab": ["Thunderbird", "Firefox", "Thunderbird", "Firefox", "VLC"],
+  "expected_next_vocab": ["Calendar", "Firefox", "Thunderbird"],
+  "current_app": "VLC",
+  "current_vocab": "VLC",
+  "history_dwell_seconds": 1.5,
+  "pressure_mode": "llm_weight_load",
+  "pressure_mib": 0,
+  "reclaim_target_mib": 0,
+  "prediction_gate": {
+    "minimum_hot_probability": 0.04,
+    "maximum_cold_probability": 0.01,
+    "minimum_bindings": 8,
+    "timeout_seconds": 25
+  },
+  "safety": {
+    "min_memavailable_mib": 2048,
+    "psi_full_avg10_abort": 1.5,
+    "abort_consecutive_samples": 4,
+    "sample_interval_seconds": 0.1,
+    "max_round_seconds": 3000,
+    "trace_buffer_kb_per_cpu": 8192
+  },
+  "scenarios": ["r8_llm_weight_load"],
+  "r8_oom": {
+    "aggressor_app": "LLM",
+    "victim_apps": [
+      "FIREFOX", "THUNDERBIRD", "GIMP", "LIBREOFFICE", "AUDACITY", "VLC", "EVINCE", "IMAGE_VIEWER",
+      "RHYTHMBOX", "SHOTWELL", "FILES", "CALCULATOR", "CALENDAR", "SYSTEM_MONITOR", "SOLITAIRE"
+    ],
+    "memory_high": "infinity",
+    "memory_max_mib": 0,
+    "memory_swap_max_mib": 1024,
+    "memory_oom_group": true,
+    "aggressor_oom_score_adj": 0,
+    "victim_oom_score_adj": 1000,
+    "pressure_chunk_mib": 0,
+    "burst_mib": 0,
+    "startup_settle_seconds": 12.0,
+    "post_workset_settle_seconds": 5.0,
+    "pressure_hold_seconds": 20.0,
+    "working_set_minimum_mib": {"heavy": 128, "medium": 32, "light": 16},
+    "minimum_total_working_set_mib": 1536,
+    "calibration": {
+      "frozen": false,
+      "baseline_rounds": 3,
+      "candidate_rounds": 5,
+      "minimum_in_range_rounds": 4,
+      "seed": 20261001
+    }
+  },
+  "r8_llm": {
+    "status": "ready",
+    "runtime_kind": "llama_cpp_server",
+    "runtime_path": "/home/lzx/Desktop/PARP/test/tools/llama.cpp/build/bin/llama-server",
+    "runtime_source_tag": "v0.4.0",
+    "runtime_source_commit": "5266f24da75dc449bd56cbed7addb9c8e4a6a73e",
+    "model_path": "/home/lzx/Desktop/PARP/test/models/r8/qwen2.5-3b-instruct-q8_0.gguf",
+    "model_repository": "Qwen/Qwen2.5-3B-Instruct-GGUF",
+    "model_revision": "7dabda4d13d513e3e842b20f0d435c732f172cbe",
+    "model_filename": "qwen2.5-3b-instruct-q8_0.gguf",
+    "model_quantization": "Q8_0",
+    "runtime_sha256": "1af6cde610bd15f30127c7358d95a5553fb6b5c45058357ea22e88fa9b3ce3f7",
+    "gguf_sha256": "6dcc22694c8654b045ec40bbe350212b88893fd9010e8474bae5b19a43578ba1",
+    "model_size_bytes": 3616088480,
+    "minimum_model_bytes": 805306368,
+    "minimum_resident_delta_mib": 512,
+    "prompt": "PARP R8 deterministic inference: memory pressure validation token",
+    "context_length": 8192,
+    "threads": 2,
+    "n_predict": 1,
+    "temperature": 0,
+    "no_mmap": true,
+    "model_cache_state": "cold_fadvise_dontneed",
+    "maximum_cached_model_ratio": 0.05,
+    "load_timeout_seconds": 600,
+    "completion_timeout_seconds": 120,
+    "sample_interval_seconds": 0.1,
+    "port_base": 19000,
+    "port_span": 1000
+  }
+}

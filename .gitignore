@@ -9,6 +9,11 @@ __pycache__/
 # configurations, and curated Markdown reports in Git, not raw output.  # lzx-note
 /test/outputs/
 
+# R8-LLM pins these machine-local artifacts by SHA-256 in its JSON config.
+# Do not put the multi-gigabyte GGUF or compiled llama.cpp tree in Git.  # lzx-note
+/test/tools/llama.cpp/
+/test/models/r8/*.gguf
+
 # The boot-time monitor continuously writes bounded/rotated runtime captures;
 # those captures remain machine-local.  # lzx-note
 /lzx/service/outputs/

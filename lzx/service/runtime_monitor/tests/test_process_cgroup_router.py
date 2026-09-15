@@ -35,6 +35,67 @@ def make_fake_process(
 
 
 class ProcessCgroupRouterTests(unittest.TestCase):
+    def test_preserves_primary_automation_scope_for_memcg_experiments(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            proc_root = Path(tmp) / "proc"
+            proc_root.mkdir()
+            make_fake_process(
+                proc_root,
+                pid=245,
+                comm="eog",
+                exe_path="/usr/bin/eog",
+                cgroup_path=(
+                    "/user.slice/parp-r8-oom-survival.slice/"
+                    "automation-image-viewer.scope"
+                ),
+            )
+            mapper = AppMapper(
+                {"apps": {"IMAGE_VIEWER": {"keywords": ["eog"]}}},
+                target_apps=["IMAGE_VIEWER"],
+            )
+            commands: list[list[str]] = []
+            results: list[dict[str, object]] = []
+            ready = threading.Event()
+
+            def callback(result: dict[str, object]) -> None:
+                results.append(result)
+                ready.set()
+
+            def runner(command: list[str], **_kwargs: object) -> subprocess.CompletedProcess[str]:
+                commands.append(command)
+                return subprocess.CompletedProcess(command, 0, "ok", "")
+
+            router = SystemdProcessCgroupRouter(
+                mapper=mapper,
+                app_ids={"IMAGE_VIEWER": 12},
+                callback=callback,
+                proc_root=proc_root,
+                expected_uid=os.getuid(),
+                command_runner=runner,
+            )
+            router.start()
+            try:
+                identity = ProcessIdentity(
+                    pid=245,
+                    tgid=245,
+                    comm="eog",
+                    exe_path="/usr/bin/eog",
+                    cgroup_path=(
+                        "/user.slice/parp-r8-oom-survival.slice/"
+                        "automation-image-viewer.scope"
+                    ),
+                    start_time="12345",
+                )
+                self.assertTrue(router.submit_created_process(
+                    {"event_type": "PROCESS_START", "source_seq": 1}, identity,
+                    app="IMAGE_VIEWER",
+                ))
+                self.assertTrue(ready.wait(1.0))
+            finally:
+                router.stop()
+            self.assertEqual(results[0]["status"], "ALREADY_APP_SCOPED")
+            self.assertEqual(commands, [])
+
     def test_fixture_alias_is_routed_by_create_event_with_fixture_role(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             proc_root = Path(tmp) / "proc"

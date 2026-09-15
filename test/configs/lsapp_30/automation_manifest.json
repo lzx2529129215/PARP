@@ -1,0 +1,509 @@
+{
+  "status": "new_15_gui_smoke_pass_not_active",
+  "real_app_count": 30,
+  "vocab_size_with_special_tokens": 32,
+  "kernel_max_real_entries": 32,
+  "old_app_ids_preserved": true,
+  "old_executor_note": "Current FIREFOX scope launches Epiphany. No new Epiphany target is introduced; executable identity must be disclosed in GUI results.",
+  "shared_infrastructure": "Private loopback XMPP server with synthetic test accounts, isolated profiles and session buses. Infrastructure memory measured separately; no real service accounts.",
+  "acceptance": [
+    "owned content window identified",
+    "focus switches observed",
+    "at least one meaningful repeatable app-internal operation",
+    "all relevant child processes accounted for",
+    "foreground/cgroup/TTL checks pass",
+    "cleanup restores private test state"
+  ],
+  "apps": [
+    {
+      "app_key": "FIREFOX",
+      "runtime_app_id": 1,
+      "vocab_name": "Firefox",
+      "new": false,
+      "automation_status": "existing_scope; per-app acceptance still required"
+    },
+    {
+      "app_key": "LIBREOFFICE",
+      "runtime_app_id": 2,
+      "vocab_name": "LibreOffice",
+      "new": false,
+      "automation_status": "existing_scope; per-app acceptance still required"
+    },
+    {
+      "app_key": "VLC",
+      "runtime_app_id": 3,
+      "vocab_name": "VLC",
+      "new": false,
+      "automation_status": "existing_scope; per-app acceptance still required"
+    },
+    {
+      "app_key": "GIMP",
+      "runtime_app_id": 4,
+      "vocab_name": "GIMP",
+      "new": false,
+      "automation_status": "existing_scope; per-app acceptance still required"
+    },
+    {
+      "app_key": "AUDACITY",
+      "runtime_app_id": 5,
+      "vocab_name": "Audacity",
+      "new": false,
+      "automation_status": "existing_scope; per-app acceptance still required"
+    },
+    {
+      "app_key": "THUNDERBIRD",
+      "runtime_app_id": 6,
+      "vocab_name": "Thunderbird",
+      "new": false,
+      "automation_status": "existing_scope; per-app acceptance still required"
+    },
+    {
+      "app_key": "EVINCE",
+      "runtime_app_id": 7,
+      "vocab_name": "Evince",
+      "new": false,
+      "automation_status": "existing_scope; per-app acceptance still required"
+    },
+    {
+      "app_key": "FILES",
+      "runtime_app_id": 8,
+      "vocab_name": "Files",
+      "new": false,
+      "automation_status": "existing_scope; per-app acceptance still required"
+    },
+    {
+      "app_key": "CALCULATOR",
+      "runtime_app_id": 9,
+      "vocab_name": "Calculator",
+      "new": false,
+      "automation_status": "existing_scope; per-app acceptance still required"
+    },
+    {
+      "app_key": "CALENDAR",
+      "runtime_app_id": 10,
+      "vocab_name": "Calendar",
+      "new": false,
+      "automation_status": "existing_scope; per-app acceptance still required"
+    },
+    {
+      "app_key": "RHYTHMBOX",
+      "runtime_app_id": 11,
+      "vocab_name": "Rhythmbox",
+      "new": false,
+      "automation_status": "existing_scope; per-app acceptance still required"
+    },
+    {
+      "app_key": "IMAGE_VIEWER",
+      "runtime_app_id": 12,
+      "vocab_name": "ImageViewer",
+      "new": false,
+      "automation_status": "existing_scope; per-app acceptance still required"
+    },
+    {
+      "app_key": "SHOTWELL",
+      "runtime_app_id": 13,
+      "vocab_name": "Shotwell",
+      "new": false,
+      "automation_status": "existing_scope; per-app acceptance still required"
+    },
+    {
+      "app_key": "SYSTEM_MONITOR",
+      "runtime_app_id": 14,
+      "vocab_name": "SystemMonitor",
+      "new": false,
+      "automation_status": "existing_scope; per-app acceptance still required"
+    },
+    {
+      "app_key": "SOLITAIRE",
+      "runtime_app_id": 15,
+      "vocab_name": "Solitaire",
+      "new": false,
+      "automation_status": "existing_scope; per-app acceptance still required"
+    },
+    {
+      "app_key": "FALKON",
+      "runtime_app_id": 16,
+      "vocab_name": "Falkon",
+      "new": true,
+      "package": "falkon",
+      "binary": "falkon",
+      "installed_binary": "/usr/bin/falkon",
+      "source_apps": [
+        "Google Chrome",
+        "Samsung Internet Browser",
+        "Brave Browser"
+      ],
+      "relationship": "浏览器",
+      "planned_actions": "加载本地网页、滚动、查找、切换标签",
+      "fixture_backend": "local_file",
+      "automation_status": "gui_smoke_pass",
+      "verified_wm_classes": [
+        "Falkon",
+        "Falkon Browser"
+      ],
+      "evidence_dir": "test/outputs/lsapp-30-gui-20260910-v1/FALKON",
+      "launch_command": [
+        "falkon",
+        "file:///home/lzx/Desktop/PARP/test/outputs/lsapp-30-gui-20260910-v1/fixtures/browser.html"
+      ]
+    },
+    {
+      "app_key": "KONQUEROR",
+      "runtime_app_id": 17,
+      "vocab_name": "Konqueror",
+      "new": true,
+      "package": "konqueror",
+      "binary": "konqueror",
+      "installed_binary": "/usr/bin/konqueror",
+      "source_apps": [
+        "Google",
+        "Microsoft Bing Search"
+      ],
+      "relationship": "搜索和网页浏览",
+      "planned_actions": "在本地搜索页输入查询、打开结果、返回",
+      "fixture_backend": "local_file",
+      "automation_status": "gui_smoke_pass",
+      "verified_wm_classes": [
+        "konqueror"
+      ],
+      "evidence_dir": "test/outputs/lsapp-30-gui-20260910-v1/KONQUEROR",
+      "launch_command": [
+        "konqueror",
+        "file:///home/lzx/Desktop/PARP/test/outputs/lsapp-30-gui-20260910-v1/fixtures/browser.html"
+      ]
+    },
+    {
+      "app_key": "PIDGIN",
+      "runtime_app_id": 18,
+      "vocab_name": "Pidgin",
+      "new": true,
+      "package": "pidgin",
+      "binary": "pidgin",
+      "installed_binary": "/usr/bin/pidgin",
+      "source_apps": [
+        "Facebook Messenger",
+        "Messenger Lite",
+        "Discord"
+      ],
+      "relationship": "私聊和群聊",
+      "planned_actions": "本地XMPP会话切换、发送测试消息、滚动历史",
+      "fixture_backend": "local_xmpp",
+      "automation_status": "gui_smoke_pass",
+      "verified_wm_classes": [
+        "Pidgin"
+      ],
+      "evidence_dir": "test/outputs/lsapp-30-gui-20260910-v1/PIDGIN",
+      "launch_command": [
+        "pidgin",
+        "-c",
+        "/home/lzx/Desktop/PARP/test/outputs/lsapp-30-gui-20260910-v1/PIDGIN/purple"
+      ]
+    },
+    {
+      "app_key": "GAJIM",
+      "runtime_app_id": 19,
+      "vocab_name": "Gajim",
+      "new": true,
+      "package": "gajim",
+      "binary": "gajim",
+      "installed_binary": "/usr/bin/gajim",
+      "source_apps": [
+        "WhatsApp Messenger",
+        "imo"
+      ],
+      "relationship": "即时消息",
+      "planned_actions": "本地XMPP消息输入、查看历史、传输本地图片",
+      "fixture_backend": "local_xmpp",
+      "automation_status": "gui_smoke_pass",
+      "verified_wm_classes": [
+        "Gajim",
+        "org.gajim.Gajim"
+      ],
+      "evidence_dir": "test/outputs/lsapp-30-gui-20260910-v1/GAJIM",
+      "launch_command": [
+        "gajim"
+      ]
+    },
+    {
+      "app_key": "DINO",
+      "runtime_app_id": 20,
+      "vocab_name": "Dino",
+      "new": true,
+      "package": "dino-im",
+      "binary": "dino-im",
+      "installed_binary": "/usr/bin/dino-im",
+      "source_apps": [
+        "Telegram",
+        "Telegram X"
+      ],
+      "relationship": "即时消息",
+      "planned_actions": "本地XMPP切换会话、收发消息、浏览历史",
+      "fixture_backend": "local_xmpp",
+      "automation_status": "gui_smoke_pass",
+      "verified_wm_classes": [
+        "Dino-im",
+        "dino-im"
+      ],
+      "evidence_dir": "test/outputs/lsapp-30-gui-20260910-v1/DINO",
+      "launch_command": [
+        "dino-im"
+      ]
+    },
+    {
+      "app_key": "PSI_PLUS",
+      "runtime_app_id": 21,
+      "vocab_name": "PsiPlus",
+      "new": true,
+      "package": "psi-plus",
+      "binary": "psi-plus",
+      "installed_binary": "/usr/bin/psi-plus",
+      "source_apps": [
+        "Messages",
+        "Verizon Messages",
+        "Messaging",
+        "TextNow",
+        "Text One"
+      ],
+      "relationship": "文本消息",
+      "planned_actions": "本地XMPP文本会话；不模拟SMS网络",
+      "fixture_backend": "local_xmpp",
+      "automation_status": "gui_smoke_pass",
+      "verified_wm_classes": [
+        "Psi+",
+        "main"
+      ],
+      "evidence_dir": "test/outputs/lsapp-30-gui-20260910-v1/PSI_PLUS",
+      "launch_command": [
+        "psi-plus"
+      ]
+    },
+    {
+      "app_key": "KAIDAN",
+      "runtime_app_id": 22,
+      "vocab_name": "Kaidan",
+      "new": true,
+      "package": "kaidan",
+      "binary": "kaidan",
+      "installed_binary": "/usr/bin/kaidan",
+      "source_apps": [
+        "WeChat",
+        "Hangouts",
+        "Kik"
+      ],
+      "relationship": "即时消息",
+      "planned_actions": "本地XMPP会话、文本消息和图片浏览",
+      "fixture_backend": "local_xmpp",
+      "automation_status": "gui_smoke_pass",
+      "verified_wm_classes": [
+        "kaidan"
+      ],
+      "evidence_dir": "test/outputs/lsapp-30-gui-20260910-v1/KAIDAN",
+      "launch_command": [
+        "kaidan"
+      ]
+    },
+    {
+      "app_key": "SOFTWARE",
+      "runtime_app_id": 23,
+      "vocab_name": "GNOMESoftware",
+      "new": true,
+      "package": "gnome-software",
+      "binary": "gnome-software",
+      "installed_binary": "/usr/bin/gnome-software",
+      "source_apps": [
+        "Google Play Store"
+      ],
+      "relationship": "应用商店",
+      "planned_actions": "浏览已安装应用和预缓存详情；不安装卸载软件",
+      "fixture_backend": "local_catalog",
+      "automation_status": "gui_smoke_pass",
+      "verified_wm_classes": [
+        "Org.gnome.Software",
+        "org.gnome.Software"
+      ],
+      "evidence_dir": "test/outputs/lsapp-30-gui-20260910-v1/SOFTWARE",
+      "launch_command": [
+        "env",
+        "XDG_DATA_DIRS=/home/lzx/Desktop/PARP/test/outputs/lsapp-30-gui-20260910-v1/SOFTWARE/data:/usr/local/share:/usr/share",
+        "gnome-software",
+        "--verbose",
+        "--details=org.gnome.clocks.desktop"
+      ]
+    },
+    {
+      "app_key": "EVOLUTION",
+      "runtime_app_id": 24,
+      "vocab_name": "Evolution",
+      "new": true,
+      "package": "evolution",
+      "binary": "evolution",
+      "installed_binary": "/usr/bin/evolution",
+      "source_apps": [
+        "Samsung Email",
+        "Microsoft Outlook"
+      ],
+      "relationship": "邮件客户端",
+      "planned_actions": "导入本地邮件、切换文件夹、阅读和搜索",
+      "fixture_backend": "local_mail",
+      "automation_status": "gui_smoke_pass",
+      "verified_wm_classes": [
+        "Evolution",
+        "evolution"
+      ],
+      "evidence_dir": "test/outputs/lsapp-30-gui-20260910-v1/EVOLUTION",
+      "launch_command": [
+        "evolution",
+        "--offline"
+      ]
+    },
+    {
+      "app_key": "CLAWS_MAIL",
+      "runtime_app_id": 25,
+      "vocab_name": "ClawsMail",
+      "new": true,
+      "package": "claws-mail",
+      "binary": "claws-mail",
+      "installed_binary": "/usr/bin/claws-mail",
+      "source_apps": [
+        "Yahoo Mail",
+        "AOL"
+      ],
+      "relationship": "邮件客户端",
+      "planned_actions": "导入mbox、阅读邮件、搜索和切换文件夹",
+      "fixture_backend": "local_mail",
+      "automation_status": "gui_smoke_pass",
+      "verified_wm_classes": [
+        "Claws-mail",
+        "claws-mail"
+      ],
+      "evidence_dir": "test/outputs/lsapp-30-gui-20260910-v1/CLAWS_MAIL",
+      "launch_command": [
+        "claws-mail",
+        "--alternate-config-dir",
+        "/home/lzx/Desktop/PARP/test/outputs/lsapp-30-gui-20260910-v1/CLAWS_MAIL/claws",
+        "--offline"
+      ]
+    },
+    {
+      "app_key": "CLOCKS",
+      "runtime_app_id": 26,
+      "vocab_name": "GNOMEClocks",
+      "new": true,
+      "package": "gnome-clocks",
+      "binary": "gnome-clocks",
+      "installed_binary": "/usr/bin/gnome-clocks",
+      "source_apps": [
+        "Clock"
+      ],
+      "relationship": "时钟工具",
+      "planned_actions": "切换时钟页、启动停止秒表、设置后取消计时器",
+      "fixture_backend": "local_only",
+      "automation_status": "gui_smoke_pass",
+      "verified_wm_classes": [
+        "Org.gnome.clocks",
+        "org.gnome.clocks"
+      ],
+      "evidence_dir": "test/outputs/lsapp-30-gui-20260910-v1/CLOCKS",
+      "launch_command": [
+        "gnome-clocks"
+      ]
+    },
+    {
+      "app_key": "CONTACTS",
+      "runtime_app_id": 27,
+      "vocab_name": "GNOMEContacts",
+      "new": true,
+      "package": "gnome-contacts",
+      "binary": "gnome-contacts",
+      "installed_binary": "/usr/bin/gnome-contacts",
+      "source_apps": [
+        "Contacts"
+      ],
+      "relationship": "通讯录",
+      "planned_actions": "导入合成联系人、搜索、打开和编辑测试条目",
+      "fixture_backend": "local_contacts",
+      "automation_status": "gui_smoke_pass",
+      "verified_wm_classes": [
+        "Gnome-contacts",
+        "gnome-contacts"
+      ],
+      "evidence_dir": "test/outputs/lsapp-30-gui-20260910-v1/CONTACTS",
+      "launch_command": [
+        "gnome-contacts"
+      ]
+    },
+    {
+      "app_key": "MARBLE",
+      "runtime_app_id": 28,
+      "vocab_name": "Marble",
+      "new": true,
+      "package": "marble",
+      "binary": "marble",
+      "installed_binary": "/usr/bin/marble",
+      "source_apps": [
+        "Maps"
+      ],
+      "relationship": "地图浏览",
+      "planned_actions": "加载预置地图、平移缩放、查看已准备的地点",
+      "fixture_backend": "local_map",
+      "automation_status": "gui_smoke_pass",
+      "verified_wm_classes": [
+        "marble"
+      ],
+      "evidence_dir": "test/outputs/lsapp-30-gui-20260910-v1/MARBLE",
+      "launch_command": [
+        "marble",
+        "/home/lzx/Desktop/PARP/test/outputs/lsapp-30-gui-20260910-v1/fixtures/map.kml"
+      ]
+    },
+    {
+      "app_key": "MINES",
+      "runtime_app_id": 29,
+      "vocab_name": "GNOMEMines",
+      "new": true,
+      "package": "gnome-mines",
+      "binary": "gnome-mines",
+      "installed_binary": "/usr/games/gnome-mines",
+      "source_apps": [
+        "Minesweeper Classic (Mines)"
+      ],
+      "relationship": "扫雷游戏",
+      "planned_actions": "新建固定难度游戏、点击方格、重新开始",
+      "fixture_backend": "local_only",
+      "automation_status": "gui_smoke_pass",
+      "verified_wm_classes": [
+        "Gnome-mines",
+        "gnome-mines"
+      ],
+      "evidence_dir": "test/outputs/lsapp-30-gui-20260910-v1/MINES",
+      "launch_command": [
+        "/usr/games/gnome-mines"
+      ]
+    },
+    {
+      "app_key": "CONTROL_CENTER",
+      "runtime_app_id": 30,
+      "vocab_name": "GNOMEControlCenter",
+      "new": true,
+      "package": "gnome-control-center",
+      "binary": "gnome-control-center",
+      "installed_binary": "/usr/bin/gnome-control-center",
+      "source_apps": [
+        "Settings"
+      ],
+      "relationship": "系统设置界面",
+      "planned_actions": "导航显示/声音/系统信息页；不修改系统设置",
+      "fixture_backend": "local_only",
+      "automation_status": "gui_smoke_pass",
+      "verified_wm_classes": [
+        "Gnome-control-center",
+        "gnome-control-center"
+      ],
+      "evidence_dir": "test/outputs/lsapp-30-gui-20260910-v1/CONTROL_CENTER",
+      "launch_command": [
+        "gnome-control-center",
+        "info-overview"
+      ]
+    }
+  ]
+}

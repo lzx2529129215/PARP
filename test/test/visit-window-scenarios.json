@@ -1,0 +1,22 @@
+{
+  "schema_version": 1,
+  "model_type": "visit_window",
+  "apps": ["FIREFOX", "LIBREOFFICE", "THUNDERBIRD", "VLC", "GIMP", "EVINCE"],
+  "vocab_names": {"FIREFOX": "Firefox", "LIBREOFFICE": "LibreOffice", "THUNDERBIRD": "Thunderbird", "VLC": "VLC", "GIMP": "GIMP", "EVINCE": "Evince"},
+  "rounds": 3,
+  "seed": 20260910,
+  "warmup_s": 60,
+  "score_s": 360,
+  "followup_s": 181,
+  "observer_interval_s": 0.1,
+  "maximum_action_lateness_s": 3,
+  "hot_threshold": 0.9,
+  "cold_threshold": 0.2,
+  "scenarios": {
+    "v1_short_return": "30秒内频繁重访",
+    "v2_cold_retire": "长时间退出活跃集合",
+    "v3_medium_return": "30到180秒之间重访",
+    "v4_staggered_return": "多个后台应用分时返回",
+    "v5_active_set_shift": "使用习惯突然变化"
+  }
+}
