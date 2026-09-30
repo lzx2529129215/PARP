@@ -1,0 +1,19 @@
+﻿new_operation_id,application,operation_category,operation_name,description,atomic_steps,source_old_operation_ids,source_user_event,expected_memory_behavior,prerequisites,automation_status,notes,sequence_order
+REP001,PPT,Open,打开大型PPT演示文稿,从WPS首页提交固定PPT工作副本，并观测加载初期。,聚焦WPS首页 → Ctrl+O → 输入固定路径 → Enter → 等待标题稳定,1;2,Perf_WPS_0050 S2,文件读取、文件映射、解析和匿名对象分配。,WPS首页可见；固定PPT工作副本存在。,PASS,正式采集窗口测量提交后的前5秒；窗口外等待完整加载。,1
+REP002,PPT,Navigate,PPT页面代表性导航,在编辑器中前进两页并回退一页，替代20次连续上下滚动。,Home → PageDown → PageDown → PageUp,3-22,Perf_WPS_0050 S5;S6,重新访问不同幻灯片的已映射文件页、渲染缓存和UI对象。,REP001完成且PPT标题稳定。,PASS,保留单个双向导航语义。,2
+REP003,PPT,Slideshow,PPT放映会话,进入放映、前进三页、回退两页并退出，合并连续放映点击。,F5 → Next×3 → Prior×2 → Esc,23-34,Perf_WPS_0050 S3;S4,放映窗口创建、全屏渲染资源与幻灯片工作集切换。,PPT编辑器处于活动状态。,PASS,不再把每次单击作为独立operation。,3
+REP004,PPT,Insert,PPT插入文本框并输入文本,复用已验证的插入/文本框/相对位置动作，并输入固定短文本。,打开插入菜单 → 选择文本框 → 相对位置放置 → 输入固定文本,35-37,Perf_WPS_0020 S3; Perf_WPS_0050 S8,匿名页、COW、文本布局和UI渲染对象分配。,PPT编辑器处于活动状态。,PASS,固定ASCII文本避免输入法状态依赖。,4
+REP005,PPT,Save,保存PPT,保存当前PPT工作副本。,Ctrl+S → 返回编辑器,38,Perf_WPS_0050 S11;S14,文件写回、临时文件和缓存状态变化。,REP004完成；工作副本可写。,PASS,不覆盖参考原件。,5
+REP006,Excel,Open,打开大型Excel工作簿,从当前WPS组件提交固定Excel工作副本，观测加载初期。,当前WPS组件 → Ctrl+O → 输入固定路径 → Enter → 等待标题稳定,39;40,Perf_WPS_0060 S2,压缩包读取、工作表解析、文件映射和匿名计算对象分配。,PPT已保存；Excel工作副本存在。,PASS,正式采集窗口测量提交后的前5秒；窗口外等待完整加载。,6
+REP007,Excel,Navigate,Excel大范围单元格导航,跳至已用区域末端后返回首格，替代20次连续滚动。,Ctrl+End → Ctrl+Home,41-60,Perf_WPS_0060 S10;S11,大范围工作表工作集切换、单元格渲染与文件页复用。,REP006完成且Excel标题稳定。,PASS,保留一个大跨度导航操作。,7
+REP008,Excel,Calculate,Excel公式输入与计算,在D1输入固定公式并触发计算。,Ctrl+Home → 右移3格 → 输入=A1+B1 → Enter,,Perf_WPS_0060 S7; 已验证EXCEL_FORMULA_FILL,匿名计算对象、公式依赖图、单元格更新和COW。,A1/B1具有固定值；Excel工作副本可写。,PASS,来源为已验证pilot和真实用例表。,8
+REP009,Excel,Format,Excel单元格格式修改,选择公式单元格并应用加粗。,Ctrl+Home → 右移3格 → Ctrl+B,61;62,Perf_WPS_0060 S9,样式对象、共享格式表和UI重绘。,REP008完成。,PASS,旧62的立即取消加粗作为低价值逆操作删除。,9
+REP010,Excel,Filter,Excel筛选开关,在首行启用筛选，复用旧操作63的稳定快捷键。,Ctrl+Home → Ctrl+Shift+L,63,Perf_WPS_0060 S3;S4,列元数据、筛选UI对象和可见行状态更新。,Excel工作簿活动。,PASS,不伪造具体数据条件。,10
+REP011,Excel,Save,保存Excel工作簿,保存公式、格式和筛选状态。,Ctrl+S → 等待返回,,Perf_WPS_0060 S7;S9,压缩容器重写、文件缓存和临时文件变化。,REP008-REP010已完成；工作副本可写。,PASS,来源为真实用例和公式pilot。,11
+REP012,Word,Open,打开大型Word文档,从当前WPS组件提交固定Word工作副本，观测加载初期。,当前WPS组件 → Ctrl+O → 输入固定路径 → Enter → 等待标题稳定,64;65,Perf_WPS_0040 S2,文档包读取、图片资源映射、分页解析和匿名布局对象。,Excel已保存；Word工作副本存在。,PASS,正式采集窗口测量提交后的前5秒；窗口外等待完整加载。,12
+REP013,Word,Navigate,Word代表性翻页浏览,从文首向下三页再回退一页，替代20次连续滚动。,Ctrl+Home → PageDown×3 → PageUp,66-85,Perf_WPS_0040 S6;S10,分页渲染、图片工作集访问和文件/匿名页复用。,REP012完成且Word标题稳定。,PASS,保留单个双向翻页操作。,13
+REP014,Word,Edit,Word段落复制粘贴,选择首段、复制并粘贴，复现真实文本编辑用例。,Ctrl+Home → Ctrl+Shift+Down → Ctrl+C → End → Ctrl+V,,Perf_WPS_0040 S3,匿名页、COW、编辑缓冲区和布局重算。,Word工作副本活动且包含固定首段。,PASS,来源为真实用例表。,14
+REP015,Word,Insert,Word插入固定图片,在文末粘贴固定1MiB图片。,Ctrl+End → Enter → 准备固定图片剪贴板 → Ctrl+V,,Perf_WPS_0040 S4; 已验证WORD_INSERT_IMAGE,图片解码、文件读取、匿名图形对象与布局分配。,固定图片存在；Word工作副本可写。,PASS,复用已验证剪贴板辅助程序。,15
+REP016,Word,Find,Word查找并定位末页文本,查找固定文档中的末页标签并跳转。,Ctrl+F → 输入Telemetry page 12 → Enter → Esc,,Perf_WPS_0040 S8,文本索引扫描、文档定位和目标页工作集访问。,固定Word样本包含Telemetry page 12。,PASS,搜索词已从真实样本文档核验。,16
+REP017,Word,Save,保存Word文档,保存已完成文本、图片和定位操作的Word工作副本。,Ctrl+S → 返回编辑器,,Perf_WPS_0040 S5; 已验证WORD_INSERT_IMAGE保存步骤,文件写回、临时文件和缓存状态变化。,Word工作副本已修改且可写。,PASS,本机另存为对话框两种入口均验证失败；按规则用稳定保存替代。,17
+REP018,Word,Create,新建空白Word文档,从当前Writer会话新建空白文档。,Ctrl+N → 验证标题/窗口变化,,Perf_WPS_0020 S2; 已验证NEW_WORD,新文档模型、匿名对象、编辑与渲染初始化。,Writer会话活动。,PASS,放在序列末尾，避免影响后续前置状态。,18

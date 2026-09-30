@@ -1,0 +1,2 @@
+# The core collector, quick start, and WPS automation use only the Python standard library.
+# Install optional reporting dependencies in your own environment as needed.

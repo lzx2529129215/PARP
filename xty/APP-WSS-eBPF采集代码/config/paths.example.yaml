@@ -1,0 +1,5 @@
+# Documentation-only example; the shipped Python code uses CLI arguments and
+# environment variables, and does not require a YAML parser.
+samples_dir: /path/to/wps-samples
+wps_bin: wps
+collector_output_dir: ./runs
