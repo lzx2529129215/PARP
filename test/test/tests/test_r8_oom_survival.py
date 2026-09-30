@@ -15,6 +15,7 @@ RUNNER_PATH = ROOT / "test/test/parp-real-pc-experiment-lzx.py"
 ASSET_PATH = ROOT / "test/automation/create_real_pc_assets_lzx.py"
 CONFIG_PATH = ROOT / "test/test/parp-r8-oom-survival-config-lzx.json"
 LLM_CONFIG_PATH = ROOT / "test/test/parp-r8-llm-oom-survival-config-lzx.json"
+R12_CONFIG_PATH = ROOT / "test/test/parp-r12-current-oom-config-lzx.json"
 
 
 def load_module(name: str, path: Path):
@@ -63,6 +64,41 @@ def frozen_llm_config():
 
 
 class R8OOMSurvivalTests(unittest.TestCase):
+    def test_r12_scene_is_isolated_from_fifteen_app_r8_and_attributes_distinct_victims(self) -> None:
+        config = RUNNER.load_config(R12_CONFIG_PATH)
+        self.assertEqual(config["apps"], list(R8.R12_APPS))
+        self.assertEqual(set(config["r8_oom"]["victim_apps"]), set(R8.R12_APPS) - {"FIREFOX"})
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            (root / "fixtures").mkdir()
+            (root / "asset-manifest.json").write_text(json.dumps({
+                "assets": {"oom-pressure.html": {"sha256": "a" * 64}},
+            }), encoding="utf-8")
+            scenario, plan = R8.generate_scenario(
+                config, root, Path("/sys/fs/cgroup/fake"), 20260927,
+                "current_kernel", burst_mib=512, baseline_only=False,
+                adaptive_stop=True,
+            )
+            labels = [action.get("label", "") for action in scenario["actions"]]
+            self.assertEqual(sum(label.startswith("R8_LAUNCH_") for label in labels), 12)
+            self.assertIn("R12_PRESSURE_ALLOCATE", labels)
+            self.assertIn("R12_RECOVERY", labels)
+            self.assertTrue(plan["adaptive_stop"])
+            trace = root / "trace.txt"
+            trace.write_text(
+                "oom:oom_mark_victim: pid=101 comm=one oom_score_adj=500\n"
+                "oom:oom_mark_victim: pid=101 comm=one oom_score_adj=500\n"
+                "oom:oom_mark_victim: pid=102 comm=two oom_score_adj=500\n"
+                "oom:oom_mark_victim: pid=103 comm=browser oom_score_adj=0\n",
+                encoding="utf-8",
+            )
+            before = {"apps": {
+                "THUNDERBIRD": {"processes": [{"pid": 101}], "threads": []},
+                "GIMP": {"processes": [{"pid": 102}], "threads": []},
+                "FIREFOX": {"processes": [{"pid": 103}], "threads": []},
+            }}
+            self.assertEqual(R8._r12_victims(before, trace), {"THUNDERBIRD", "GIMP"})
+
     def test_llm_snapshot_records_live_scope_from_resident_pids(self) -> None:
         with mock.patch.object(R8, "_scope_path", return_value=Path("/fake/llm.scope")), \
              mock.patch.object(R8, "_scope_row", return_value={"valid": True, "pids": [101, 102]}):

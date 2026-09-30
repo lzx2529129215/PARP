@@ -3232,7 +3232,7 @@ def parser() -> argparse.ArgumentParser:
     sub = root.add_subparsers(dest="command", required=True)
     run = sub.add_parser("run")
     run.add_argument("--config", type=Path, default=CONFIG_DEFAULT)
-    run.add_argument("--policy", choices=("native_kernel", "parp_off", "bin_lstm", "bin_cold_lstm", "bin_workload_lstm"), required=True)
+    run.add_argument("--policy", choices=("native_kernel", "current_kernel", "parp_off", "bin_lstm", "bin_cold_lstm", "bin_workload_lstm"), required=True)
     run.add_argument(
         "--scenario",
         choices=(
@@ -3245,6 +3245,7 @@ def parser() -> argparse.ArgumentParser:
             "r7_app_fairness_misprediction",
             "r8_multi_app_oom_survival",
             "r8_llm_weight_load",
+            "r12_current_kernel_oom_baseline",
         ),
         default="all",
     )
@@ -3275,6 +3276,13 @@ def parser() -> argparse.ArgumentParser:
         help="with --resume-from, force fresh candidate rounds at and above this burst",
     )
     calibrate_r8.set_defaults(func=R8.command_calibrate)
+
+    calibrate_r12 = sub.add_parser("calibrate-r12")
+    calibrate_r12.add_argument("--config", type=Path, required=True)
+    calibrate_r12.add_argument("--policy", choices=("current_kernel",), required=True)
+    calibrate_r12.add_argument("--output", type=Path, required=True)
+    calibrate_r12.add_argument("--baseline-from", type=Path)
+    calibrate_r12.set_defaults(func=R8.command_calibrate_r12)
 
     calibrate_r8_llm = sub.add_parser("calibrate-r8-llm")
     calibrate_r8_llm.add_argument("--config", type=Path, required=True)
@@ -3340,6 +3348,25 @@ def parser() -> argparse.ArgumentParser:
     r8_pressure.add_argument("--committed-mib", type=int, required=True)
     r8_pressure.add_argument("--output", type=Path, required=True)
     r8_pressure.set_defaults(func=R8.command_pressure_record)
+
+    r12_pressure = sub.add_parser("r12-pressure")
+    r12_pressure.add_argument("--before", type=Path, required=True)
+    r12_pressure.add_argument("--trace", type=Path, required=True)
+    r12_pressure.add_argument("--cgroup", type=Path, required=True)
+    r12_pressure.add_argument("--maximum-mib", type=int, required=True)
+    r12_pressure.add_argument("--output", type=Path, required=True)
+    r12_pressure.add_argument("--adaptive-stop", action="store_true")
+    r12_pressure.set_defaults(func=R8.command_r12_pressure)
+
+    r12_recovery = sub.add_parser("r12-recovery")
+    r12_recovery.add_argument("--config", type=Path, required=True)
+    r12_recovery.add_argument("--cgroup", type=Path, required=True)
+    r12_recovery.add_argument("--before", type=Path, required=True)
+    r12_recovery.add_argument("--after", type=Path, required=True)
+    r12_recovery.add_argument("--trace", type=Path, required=True)
+    r12_recovery.add_argument("--run-dir", type=Path, required=True)
+    r12_recovery.add_argument("--output", type=Path, required=True)
+    r12_recovery.set_defaults(func=R8.command_r12_recovery)
 
     r8_llm_pressure = sub.add_parser("r8-llm-pressure-record")
     r8_llm_pressure.add_argument("--config", type=Path, required=True)

@@ -362,6 +362,25 @@ python3 test/test/parp-real-pc-experiment-lzx.py report-r8 \
 
 每轮会保存压力请求/提交字节、distinct victim 应用、`oom_group_kill`/`oom_kill`/`oom` 增量、每应用压力前后 cgroup/PID/window 状态、`mark_victim` PID 归因、未知或 slice 外 OOM 标记，以及 reclaim-bin 选择/扫描/回收计数。任何 trace 丢失、Firefox 死亡、未知 PID、宿主 OOM、无 trace 的应用消失、压力字节不一致或 bin-only 未真正打开 reclaim-bin 都使该轮无效。报告仅使用 10 个有效同 seed 配对；Native victim 总数少于 10 时为 `INCONCLUSIVE`，否则只有总 victim 应用数下降至少 30% 且 Bin 中位数不高于 Native 才为 `PASS`。<!-- lzx-note -->
 
+## R12：当前 PARP 内核的 12 应用 OOM 基线
+
+`parp-r12-current-oom-config-lzx.json` 复用 R8 的离线真实应用工作集与 Epiphany 页面内 64 MiB 逐批内存申请，只启动固定 12 个应用。独立的 `parp-r12-current-oom.slice` 设置有限 `MemoryMax` 和 1 GiB swap 上限；采集器留在 slice 外。正式轮要求加压前 12 个应用均有窗口和进程，压力源仍存活，且 3–4 个不同应用有 `mark_victim` 与 memcg OOM 计数证据。压力释放后逐应用记录窗口切换、输入和画面变化耗时。当前内核模式只读快照并保留原值，不调用 R8 的 `bin_apply` 全局策略写入。`environment.json` 记录实际 monitor 命令行，不能仅凭服务单元默认值判断 `/dev/myfs` 是否启用。
+
+```bash
+python3 test/test/parp-real-pc-experiment-lzx.py calibrate-r12 \
+  --config test/test/parp-r12-current-oom-config-lzx.json \
+  --policy current_kernel --output test/outputs/r12_current_kernel_oom/<校准目录>
+
+python3 test/test/parp-real-pc-experiment-lzx.py run \
+  --config test/outputs/r12_current_kernel_oom/<校准目录>/frozen-config.json \
+  --policy current_kernel --scenario r12_current_kernel_oom_baseline \
+  --rounds 1 --seed 20260927
+```
+
+校准先做一轮无压力工作集测量，再最多尝试三轮自适应申请；达到第三个不同应用 OOM 后停止增加申请，保持 20 秒。成功时冻结 `MemoryMax`、swap 上限和实际申请总量。后续 Native 使用同一冻结配置、seed 和当前内核输出的 action plan 作配对回放；Native 轮的 OOM 数可以不同。若校准或正式轮无效，保留日志并报告原因，不把该轮计为基线。
+
+四组对比沿用同一冻结配置。当前内核运行 `--rounds 4 --keep-going`，无效轮保留证据并继续尝试，直到取得 4 个不同 seed 的有效轮；第一轮 seed 为 `20260928`。Native 启动后沿用常驻 monitor 的 `PARP_SERVICE_ENABLE_MYFS=0`、`PARP_SERVICE_FILE_EVENT_SOURCE=off` 状态，执行 `--policy native_kernel --scenario r12_current_kernel_oom_baseline --rounds 4 --keep-going --replay-from <当前内核输出目录>`。回放只选当前内核的 4 个有效 seed，动作计划和压力总量必须一致；Native 自身 OOM 数允许不同，无效轮对同一 seed 最多重试八次。最后用 `parp-r12-compare-lzx.py --parp-session <当前内核输出目录> --native-session <Native输出目录> --output <报告目录>` 核对四个配对并计算算术平均。单次有效基线及其证据仍见当前内核输出目录的 `baseline-report.md`；四组结果仅描述本次实验，不作统计显著性结论。
+
 ## R8-LLM：真实模型权重加载峰值
 
 `parp-r8-llm-oom-survival-config-lzx.json` 是独立 profile：原有 15 个 GUI 都是 `oom_score_adj=500` 的 victim，第 16 个 `llm-aggressor.scope` 是唯一 score 0 压力源。压力器只接受本地、SHA-256 固定的 `llama-server` 和 GGUF，执行 `--no-mmap` 权重加载、`POSIX_FADV_DONTNEED` 冷缓存处理及固定 prompt 的 1-token 推理；加载完成后保持模型常驻，并以 100 ms 周期记录 cgroup 与 `smaps_rollup`。它不下载模型、不安装 runtime，也不允许 dummy allocator。<!-- lzx-note -->

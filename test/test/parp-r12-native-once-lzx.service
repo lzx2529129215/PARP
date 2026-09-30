@@ -1,0 +1,11 @@
+[Unit]
+Description=R12 four-pair Native replay after one-shot kernel boot
+
+[Service]
+Type=oneshot
+WorkingDirectory=/home/lzx/Desktop/PARP
+ExecStart=/usr/bin/python3 -u /home/lzx/Desktop/PARP/test/test/parp-r12-native-once-lzx.py
+TimeoutStartSec=infinity
+
+[Install]
+WantedBy=default.target

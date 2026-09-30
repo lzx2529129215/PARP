@@ -1591,8 +1591,20 @@ def setup_slice(config: dict[str, Any], variant: str = "observe") -> Path:
 
 def cleanup_slice(config: dict[str, Any]) -> None:
     slice_name = str(config["slice"])
+    # All measurements have finished before this call. GUI helpers can keep
+    # scopes alive for minutes on Native, so terminate the experiment cgroup
+    # before asking systemd to remove its slice and accounting properties.
+    run(["systemctl", "--user", "kill", "--kill-who=all", "--signal=SIGKILL", slice_name], timeout=15)
+    deadline = time.monotonic() + 30
+    while time.monotonic() < deadline:
+        tasks = run(["systemctl", "--user", "show", slice_name, "-p", "TasksCurrent", "--value"], timeout=5)
+        if tasks.stdout.strip() in {"0", "[not set]"}:
+            break
+        time.sleep(0.2)
+    else:
+        raise RuntimeError(f"experiment slice still has processes after SIGKILL: {slice_name}")
     run(["systemctl", "--user", "stop", KEEPER_UNIT], timeout=30)
-    run(["systemctl", "--user", "stop", slice_name], timeout=30)
+    run(["systemctl", "--user", "stop", slice_name], timeout=120)
     run(["systemctl", "--user", "revert", slice_name], timeout=30)
 
 

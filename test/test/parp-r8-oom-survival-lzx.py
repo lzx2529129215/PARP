@@ -29,11 +29,16 @@ from typing import Any
 MIB = 1024 * 1024
 SCENARIO = "r8_multi_app_oom_survival"
 LLM_SCENARIO = "r8_llm_weight_load"
-R8_SCENARIOS = frozenset({SCENARIO, LLM_SCENARIO})
+R12_SCENARIO = "r12_current_kernel_oom_baseline"
+R8_SCENARIOS = frozenset({SCENARIO, LLM_SCENARIO, R12_SCENARIO})
 HEAVY_APPS = frozenset({"FIREFOX", "THUNDERBIRD", "GIMP", "LIBREOFFICE", "AUDACITY"})
 MEDIUM_APPS = frozenset({"VLC", "EVINCE", "IMAGE_VIEWER", "RHYTHMBOX", "SHOTWELL", "FILES"})
 LIGHT_APPS = frozenset({"CALCULATOR", "CALENDAR", "SYSTEM_MONITOR", "SOLITAIRE"})
 ALL_R8_APPS = HEAVY_APPS | MEDIUM_APPS | LIGHT_APPS
+R12_APPS = (
+    "FIREFOX", "THUNDERBIRD", "GIMP", "LIBREOFFICE", "AUDACITY", "VLC",
+    "EVINCE", "IMAGE_VIEWER", "RHYTHMBOX", "FILES", "CALCULATOR", "CALENDAR",
+)
 
 TRAINED: Any = None
 ACCEPT: Any = None
@@ -164,7 +169,10 @@ def validate_config(config: dict[str, Any], *, require_frozen: bool = False) -> 
     scenario_name = configured_scenario(config)
     llm_mode = scenario_name == LLM_SCENARIO
     apps = list(config["apps"])
-    if len(apps) != 15 or set(apps) != ALL_R8_APPS:
+    if scenario_name == R12_SCENARIO:
+        if apps != list(R12_APPS):
+            raise ValueError("R12 requires the fixed 12 GUI applications in order")
+    elif len(apps) != 15 or set(apps) != ALL_R8_APPS:
         raise ValueError("R8 requires the exact 15 LSAPP GUI applications")
     if set(config["hot_apps"]) | set(config["cold_apps"]) != set(apps):
         raise ValueError("R8 hot/cold sets must cover every application")
@@ -203,17 +211,23 @@ def validate_config(config: dict[str, Any], *, require_frozen: bool = False) -> 
     tiers = _tiers(config)
     if tiers["heavy"] < 128 or tiers["medium"] < 32 or tiers["light"] < 16:
         raise ValueError("R8 working-set thresholds may not be lowered")
-    if int(r8.get("minimum_total_working_set_mib", 0)) < 1536:
-        raise ValueError("R8 aggregate working-set threshold must be at least 1536 MiB")
+    minimum_workset = 1024 if scenario_name == R12_SCENARIO else 1536
+    if int(r8.get("minimum_total_working_set_mib", 0)) < minimum_workset:
+        raise ValueError(f"aggregate working-set threshold must be at least {minimum_workset} MiB")
     calibration = r8.get("calibration", {})
-    if int(calibration.get("baseline_rounds", 0)) != 3 or int(calibration.get("candidate_rounds", 0)) != 5:
+    if scenario_name == R12_SCENARIO:
+        if int(calibration.get("baseline_rounds", 0)) != 1:
+            raise ValueError("R12 requires one no-pressure working-set measurement")
+        if int(r8.get("minimum_victims", 0)) != 3 or int(r8.get("maximum_victims", 0)) != 4:
+            raise ValueError("R12 requires 3-4 distinct OOM victim applications")
+    elif int(calibration.get("baseline_rounds", 0)) != 3 or int(calibration.get("candidate_rounds", 0)) != 5:
         raise ValueError("R8 calibration requires three baseline and five candidate rounds")
-    if not llm_mode and (
+    if scenario_name != R12_SCENARIO and not llm_mode and (
         int(calibration.get("burst_start_mib", 0)) != 512
         or int(calibration.get("burst_step_mib", 0)) != 128
     ):
         raise ValueError("R8 burst search must start at 512 MiB and step by 128 MiB")
-    if int(calibration.get("minimum_in_range_rounds", 0)) < 4:
+    if scenario_name != R12_SCENARIO and int(calibration.get("minimum_in_range_rounds", 0)) < 4:
         raise ValueError("R8 calibration requires at least four in-range OOM rounds")
     if llm_mode:
         if "r8_llm" not in config:
@@ -510,6 +524,7 @@ def snapshot(
 
 def _r8_specs(
     run_dir: Path, pressure_mib: int, seed: int, *, firefox_pressure: bool = True,
+    two_lanes: bool = False, r12_mail: bool = False,
 ) -> dict[str, Any]:
     _need_bound()
     specs = ACCEPT.app_specs(run_dir)
@@ -546,7 +561,7 @@ def _r8_specs(
     pressure_commands: list[list[str]] = []
     if firefox_pressure:
         pressure_commands.append(pressure_a_command)
-        if pressure_mib:
+        if pressure_mib or two_lanes:
             pressure_commands.append(pressure_b_command)
     dual_browser_script = " ".join(
         f"{shlex.join(command)} &" for command in pressure_commands
@@ -555,6 +570,14 @@ def _r8_specs(
         specs["FIREFOX"],
         command=shlex.join(["/bin/sh", "-c", dual_browser_script]),
     )
+    if r12_mail:
+        specs["THUNDERBIRD"] = dataclasses.replace(
+            specs["THUNDERBIRD"],
+            command=shlex.join([
+                "thunderbird", "--no-remote", "--profile", str(run_dir / "thunderbird-profile"),
+                "-file", str(fixture / "mail-test.eml"),
+            ]),
+        )
     files = fixture / "files-workload"
     file_manager = "nautilus" if ACCEPT.command_exists("nautilus") else "pcmanfm"
     files_command = (
@@ -645,9 +668,16 @@ def _switch(
         # pages as distinct private browser instances in one application
         # scope; filter by profile so title/class enumeration order cannot
         # direct workset input to the allocator page (or vice versa).
+        display = TRAINED.gui_environment().get("DISPLAY", ":0")
+        dimensions = subprocess.run(
+            ["xdpyinfo", "-display", display], text=True,
+            capture_output=True, check=False, timeout=5,
+        ).stdout
+        match = re.search(r"dimensions:\s*(\d+)x(\d+)", dimensions)
+        screen_height = int(match.group(2)) if match else 800
         window_contract.update({
             "minimum_foreground_width": 700,
-            "minimum_foreground_height": 500,
+            "minimum_foreground_height": min(500, max(280, int(screen_height * 0.72))),
             "dismiss_small_transient": True,
             "pid_cmdline_contains": pid_cmdline_contains or (
                 "firefox-pressure-profile"
@@ -657,9 +687,16 @@ def _switch(
     elif spec.key == "GIMP":
         # First-run/recovery dialogs use the same WM_CLASS as the content
         # window.  They cannot satisfy a native working-set action.
+        display = TRAINED.gui_environment().get("DISPLAY", ":0")
+        dimensions = subprocess.run(
+            ["xdpyinfo", "-display", display], text=True,
+            capture_output=True, check=False, timeout=5,
+        ).stdout
+        match = re.search(r"dimensions:\s*(\d+)x(\d+)", dimensions)
+        screen_height = int(match.group(2)) if match else 800
         window_contract.update({
             "minimum_foreground_width": 700,
-            "minimum_foreground_height": 500,
+            "minimum_foreground_height": min(500, max(280, int(screen_height * 0.72))),
             "dismiss_small_transient": True,
         })
     return [
@@ -758,7 +795,7 @@ def _evidence_action(arguments: list[str], label: str) -> dict[str, Any]:
 
 def generate_scenario(
     config: dict[str, Any], run_dir: Path, cgroup: Path, seed: int, policy: str,
-    *, burst_mib: int, baseline_only: bool,
+    *, burst_mib: int, baseline_only: bool, adaptive_stop: bool = False,
 ) -> tuple[dict[str, Any], dict[str, Any]]:
     """Build the R8-only GUI scenario and its static action-plan contract."""
     _need_bound()
@@ -767,7 +804,11 @@ def generate_scenario(
     apps = list(config["apps"])
     r8 = config["r8_oom"]
     aggressor = str(r8["aggressor_app"])
-    specs = _r8_specs(run_dir, burst_mib, seed, firefox_pressure=not llm_mode)
+    specs = _r8_specs(
+        run_dir, burst_mib, seed, firefox_pressure=not llm_mode,
+        two_lanes=scenario_name == R12_SCENARIO,
+        r12_mail=scenario_name == R12_SCENARIO,
+    )
     actions: list[dict[str, Any]] = [{
         "type": "trace_marker", "event_type": "R8_START", "status": "running",
         "label": "R8_START", "metadata": {"scenario": scenario_name, "seed": seed},
@@ -842,9 +883,10 @@ def generate_scenario(
         "--maximum-cold-probability", str(gate["maximum_cold_probability"]),
         "--minimum-bindings", str(gate["minimum_bindings"]), "--minimum-myfs-abi", "2",
         "--timeout", str(gate["timeout_seconds"]),
-        "--require-myfs" if policy == "bin_lstm" else "--no-require-myfs",
+        "--require-myfs" if policy in {"bin_lstm", "current_kernel"} else "--no-require-myfs",
     ]
-    actions.append(_evidence_action(gate_args, "R8_PREDICTION_GATE"))
+    if scenario_name != R12_SCENARIO:
+        actions.append(_evidence_action(gate_args, "R8_PREDICTION_GATE"))
     before = run_dir / "r8-before-pressure.json"
     actions.append(_runner_action([
         "r8-workset-gate", "--config", str(run_dir / "r8-config.json"), "--cgroup", str(cgroup),
@@ -905,6 +947,18 @@ def generate_scenario(
             "type": "wait", "seconds": float(r8["pressure_hold_seconds"]),
             "label": "R8_LLM_PRESSURE_HOLD",
         })
+    elif scenario_name == R12_SCENARIO:
+        actions.append({
+            "type": "trace_marker", "event_type": "R8_PRESSURE_START",
+            "status": "running", "label": "R12_PRESSURE_START",
+        })
+        actions.append(_runner_action([
+            "r12-pressure", "--before", str(before), "--trace", str(run_dir / "trace.txt"),
+            "--cgroup", str(cgroup), "--maximum-mib", str(burst_mib),
+            "--output", str(run_dir / "r8-pressure.json"),
+            *(["--adaptive-stop"] if adaptive_stop else []),
+        ], "R12_PRESSURE_ALLOCATE"))
+        actions.append({"type": "wait", "seconds": float(r8["pressure_hold_seconds"]), "label": "R12_PRESSURE_HOLD"})
     else:
         firefox = specs["FIREFOX"]
         pressure_firefox = dataclasses.replace(firefox, window_title="PARP R8")
@@ -963,6 +1017,13 @@ def generate_scenario(
         "--label", "after_pressure", "--output", str(after),
         *(["--include-llm"] if llm_mode and not baseline_only else []),
     ], "R8_SNAPSHOT_AFTER_PRESSURE"))
+    if scenario_name == R12_SCENARIO and not baseline_only:
+        actions.append(_runner_action([
+            "r12-recovery", "--config", str(run_dir / "r8-config.json"),
+            "--cgroup", str(cgroup), "--before", str(before), "--after", str(after),
+            "--trace", str(run_dir / "trace.txt"), "--run-dir", str(run_dir),
+            "--output", str(run_dir / "r12-recovery.json"),
+        ], "R12_RECOVERY"))
     actions.append({"type": "trace_marker", "event_type": "R8_COMPLETE", "status": "success", "label": "R8_COMPLETE"})
     scenario = {"name": scenario_name, "seed": seed, "actions": actions, "keep_alive_after_s": 0}
     llm_contract = {}
@@ -998,6 +1059,7 @@ def generate_scenario(
         "pressure_burst_mib": 0 if llm_mode else burst_mib,
         "firefox_pressure_window_mode": "disabled_llm_is_only_aggressor" if llm_mode else "same_scope_two_pressure_plus_workset_private_instances",
         "pressure_click_activates_target": not llm_mode,
+        "adaptive_stop": adaptive_stop,
         "pressure_chunk_order": [
             {
                 "index": index,
@@ -1173,6 +1235,14 @@ def command_workset_gate(args: Any) -> int:
     rows = payload["apps"]
     reasons: list[str] = []
     total = 0
+    if configured_scenario(config) == R12_SCENARIO:
+        specs = ACCEPT.app_specs(Path("/tmp/parp-r12-snapshot"))
+        for app in apps:
+            owned_window = _r12_app_window(args.cgroup, app, specs[app])
+            rows[app]["window_ids"] = [owned_window] if owned_window else []
+            rows[app]["window_alive"] = bool(owned_window)
+            if not owned_window:
+                reasons.append(f"{app}: no window owned by its experiment scope")
     for app in apps:
         row = rows[app]
         current = int(row.get("memory_current") or 0)
@@ -1196,7 +1266,7 @@ def command_workset_gate(args: Any) -> int:
             if process.get("oom_score_adj") != expected_score:
                 reasons.append(f"{app}: PID {process.get('pid')} OOM score mismatch")
     if total < int(config["r8_oom"]["minimum_total_working_set_mib"]) * MIB:
-        reasons.append("aggregate application working set below 1536 MiB gate")
+        reasons.append("aggregate application working set below configured gate")
     gate = {
         "schema_version": 1, "valid": not reasons, "reasons": reasons,
         "total_memory_current_bytes": total,
@@ -1268,6 +1338,406 @@ def command_pressure_record(args: Any) -> int:
     write_json(args.output, payload)
     print(args.output)
     return 0 if payload["pressure_complete"] else 10
+
+
+def _r12_window(profile: str) -> str | None:
+    found = subprocess.run(
+        ["xdotool", "search", "--onlyvisible", "--name", "PARP R8"],
+        text=True, capture_output=True, check=False, timeout=5,
+    )
+    for window_id in found.stdout.splitlines():
+        if not window_id.isdigit():
+            continue
+        prop = subprocess.run(
+            ["xprop", "-id", window_id, "_NET_WM_PID"],
+            text=True, capture_output=True, check=False, timeout=5,
+        )
+        match = re.search(r"=\s*(\d+)", prop.stdout)
+        if match:
+            try:
+                command = (Path("/proc") / match.group(1) / "cmdline").read_bytes().replace(b"\0", b" ").decode(errors="replace")
+            except OSError:
+                continue
+            if profile in command:
+                return window_id
+    return None
+
+
+def _r12_victims(before: dict[str, Any], trace_path: Path, aggressor: str = "FIREFOX") -> set[str]:
+    owners = _pid_map(before)
+    return {
+        str(owners[mark["pid"]]["app"])
+        for mark in _trace_victims(trace_path)
+        if mark["pid"] in owners and owners[mark["pid"]]["app"] != aggressor
+    }
+
+
+def _r12_press_window(window_id: str) -> None:
+    subprocess.run(["xdotool", "windowactivate", "--sync", window_id], check=True, timeout=5)
+    active = subprocess.run(
+        ["xdotool", "getactivewindow"], text=True, capture_output=True,
+        check=True, timeout=5,
+    ).stdout.strip()
+    if active != window_id:
+        raise RuntimeError(f"pressure window focus mismatch: expected {window_id}, active {active}")
+    # The R8 page has an explicit 'n' handler for the same 64 MiB operation.
+    # A centered click can land above the button on compact VM displays.
+    subprocess.run(["xdotool", "key", "--clearmodifiers", "n"], check=True, timeout=5)
+
+
+def _r12_pressure_lane_owned(cgroup: Path, window_id: str) -> bool:
+    prop = subprocess.run(
+        ["xprop", "-id", window_id, "_NET_WM_PID"],
+        text=True, capture_output=True, check=False, timeout=5,
+    )
+    match = re.search(r"=\s*(\d+)", prop.stdout)
+    if not match:
+        return False
+    try:
+        path = (Path("/proc") / match.group(1) / "cgroup").read_text(encoding="ascii")
+    except OSError:
+        return False
+    return f"/{cgroup.name}/automation-firefox.scope" in path
+
+
+def command_r12_pressure(args: Any) -> int:
+    """Touch 64 MiB per real browser click and stop at the third distinct OOM."""
+    before = read_json(args.before)
+    maximum = int(args.maximum_mib)
+    if maximum <= 0 or maximum % 64:
+        raise ValueError("R12 maximum pressure must be a positive multiple of 64 MiB")
+    lanes: dict[str, str] = {}
+    for lane in ("A", "B"):
+        profile = f"firefox-pressure-{lane.lower()}-profile"
+        deadline = time.monotonic() + 90
+        while time.monotonic() < deadline:
+            window = _r12_window(profile)
+            if window and "READY 0/" in subprocess.run(
+                ["xdotool", "getwindowname", window], text=True, capture_output=True,
+                check=False, timeout=5,
+            ).stdout:
+                lanes[lane] = window
+                break
+            time.sleep(0.2)
+        if lane not in lanes:
+            raise RuntimeError(f"R12 browser pressure lane {lane} did not become ready")
+        if not _r12_pressure_lane_owned(args.cgroup, lanes[lane]):
+            raise RuntimeError(f"R12 browser pressure lane {lane} left the Firefox experiment scope")
+    chunks: list[dict[str, Any]] = []
+    committed = 0
+    failure = ""
+    try:
+        for index in range(1, maximum // 64 + 1):
+            lane = "A" if index % 2 else "B"
+            window = lanes[lane]
+            target = ((index + 1) // 2 if lane == "A" else index // 2) * 64
+            previous_title = subprocess.run(
+                ["xdotool", "getwindowname", window], text=True, capture_output=True,
+                check=False, timeout=5,
+            ).stdout.strip()
+            _r12_press_window(window)
+            deadline = time.monotonic() + 90
+            fallback_at = time.monotonic() + 5
+            input_retries = 0
+            expected = f"PARP R8 ALLOCATED {target}/"
+            while time.monotonic() < deadline:
+                title = subprocess.run(
+                    ["xdotool", "getwindowname", window], text=True, capture_output=True,
+                    check=False, timeout=5,
+                ).stdout.strip()
+                if title.startswith(expected):
+                    break
+                if "FAILED" in title:
+                    raise RuntimeError(f"browser allocation failed: {title}")
+                if title != previous_title and title.startswith("PARP R8 ALLOCATED"):
+                    raise RuntimeError(f"browser allocation jumped past {target} MiB on lane {lane}: {title}")
+                if time.monotonic() >= fallback_at and input_retries < 2:
+                    current = read_int(args.cgroup / "memory.current") or 0
+                    cap = read_int(args.cgroup / "memory.max") or 0
+                    if title == previous_title and cap - current > 256 * MIB:
+                        _r12_press_window(window)
+                        input_retries += 1
+                    fallback_at = time.monotonic() + 5
+                time.sleep(0.05)
+            else:
+                raise RuntimeError(f"browser did not confirm {target} MiB on lane {lane}; last title: {title}")
+            committed += 64
+            time.sleep(0.3)
+            victims = _r12_victims(before, args.trace)
+            chunks.append({"index": index, "lane": lane, "committed_mib": committed,
+                           "input_retries": input_retries,
+                           "victims": sorted(victims), "timestamp_ns": time.time_ns()})
+            if len(victims) > 4 or (args.adaptive_stop and len(victims) >= 3):
+                break
+    except (RuntimeError, subprocess.SubprocessError, OSError) as exc:
+        failure = str(exc)
+    payload = {
+        "schema_version": 1, "pressure_requested_bytes": committed * MIB,
+        "pressure_committed_bytes": committed * MIB, "pressure_complete": committed > 0 and not failure,
+        "pressure_chunk_bytes": 64 * MIB, "maximum_bytes": maximum * MIB,
+        "adaptive_stop": bool(args.adaptive_stop), "victims_at_stop": sorted(_r12_victims(before, args.trace)),
+        "chunks": chunks, "failure": failure,
+    }
+    write_json(args.output, payload)
+    print(args.output)
+    return 0 if payload["pressure_complete"] else 10
+
+
+def _r12_app_window(cgroup: Path, app: str, spec: Any) -> str | None:
+    scope = f"automation-{app.lower().replace('_', '-')}.scope"
+    for window_id in _window_ids(spec.window_class):
+        if app == "THUNDERBIRD":
+            title = subprocess.run(
+                ["xdotool", "getwindowname", window_id], text=True,
+                capture_output=True, check=False, timeout=5,
+            ).stdout
+            if "PARP local message" not in title:
+                continue
+        prop = subprocess.run(
+            ["xprop", "-id", window_id, "_NET_WM_PID"],
+            text=True, capture_output=True, check=False, timeout=5,
+        )
+        match = re.search(r"=\s*(\d+)", prop.stdout)
+        if not match:
+            continue
+        try:
+            path = (Path("/proc") / match.group(1) / "cgroup").read_text(encoding="ascii")
+            command = (Path("/proc") / match.group(1) / "cmdline").read_bytes().replace(b"\0", b" ").decode(errors="replace")
+        except OSError:
+            continue
+        if app == "FIREFOX" and ("/firefox-profile" not in command or "firefox-pressure" in command):
+            continue
+        if f"/{cgroup.name}/{scope}" in path:
+            return window_id
+    return None
+
+
+def _r12_capture(window_id: str, path: Path) -> bool:
+    try:
+        result = subprocess.run(
+            ["import", "-window", window_id, str(path)],
+            check=False, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=15,
+        )
+        return result.returncode == 0 and path.is_file()
+    except (OSError, subprocess.TimeoutExpired):
+        return False
+
+
+def _r12_visual_change(before: Path, after: Path) -> float | None:
+    try:
+        from PIL import Image, ImageChops
+        with Image.open(before) as first, Image.open(after) as second:
+            left = first.convert("RGB")
+            right = second.convert("RGB")
+            if left.size != right.size:
+                return 1.0
+            difference = ImageChops.difference(left, right).convert("L")
+            histogram = difference.histogram()
+            return sum(histogram[12:]) / max(1, left.width * left.height)
+    except (OSError, ImportError):
+        return None
+
+
+def command_r12_recovery(args: Any) -> int:
+    config = read_json(args.config)
+    before = read_json(args.before)
+    after = read_json(args.after)
+    victims = _r12_victims(before, args.trace)
+    run_dir = args.run_dir
+    specs = _r8_specs(run_dir, 0, 0, firefox_pressure=False, r12_mail=True)
+    shots = run_dir / "recovery-screenshots"
+    shots.mkdir(parents=True, exist_ok=True)
+    released: list[str] = []
+    lane_ownership: dict[str, bool] = {}
+    for lane in ("A", "B"):
+        window = _r12_window(f"firefox-pressure-{lane.lower()}-profile")
+        lane_ownership[lane] = bool(window and _r12_pressure_lane_owned(args.cgroup, window))
+        if window:
+            subprocess.run(["xdotool", "windowclose", window], check=False, timeout=5)
+            released.append(window)
+    for window in released:
+        deadline = time.monotonic() + 5
+        while time.monotonic() < deadline:
+            still_open = subprocess.run(
+                ["xdotool", "getwindowname", window],
+                stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+                check=False, timeout=5,
+            ).returncode == 0
+            if not still_open:
+                break
+            time.sleep(0.1)
+        else:
+            # Closing a WebKit top-level window can leave its X client alive
+            # and focused. The pressure phase is finished, so terminate that
+            # window before testing the surviving workset browser.
+            subprocess.run(["xdotool", "windowkill", window], check=False, timeout=5)
+    limit = read_int(args.cgroup / "memory.max") or 0
+    deadline = time.monotonic() + 30
+    while limit and (read_int(args.cgroup / "memory.current") or 0) > int(limit * 0.8) and time.monotonic() < deadline:
+        time.sleep(0.25)
+    rows: dict[str, Any] = {}
+    env = TRAINED.gui_environment()
+    for app in config["apps"]:
+        spec = specs[app]
+        killed = app in victims
+        start_ns = time.monotonic_ns()
+        launch_error = ""
+        if killed:
+            unit = f"automation-{app.lower().replace('_', '-')}.scope"
+            # The GUI process may be OOM-killed while helper processes keep
+            # its scope active. Reusing the unit name then fails silently and
+            # makes a healthy relaunch look like an unresponsive application.
+            active = subprocess.run(
+                ["systemctl", "--user", "is-active", "--quiet", unit],
+                check=False, timeout=5,
+            ).returncode == 0
+            if active:
+                stopped = subprocess.run(
+                    ["systemctl", "--user", "stop", unit],
+                    text=True, capture_output=True, check=False, timeout=20,
+                )
+                if stopped.returncode != 0:
+                    launch_error = f"old scope stop failed: {stopped.stderr.strip()}"
+            subprocess.run(["systemctl", "--user", "reset-failed", unit], check=False, timeout=10)
+            command = [
+                "systemd-run", "--user", "--scope", f"--unit={unit}",
+                f"--slice={config['slice']}",
+                sys.executable, str(RUNNER), "oom-score-exec", "--score",
+                str(config["r8_oom"]["victim_oom_score_adj"]), "--", *shlex.split(spec.command),
+            ]
+            if not launch_error:
+                try:
+                    log = (run_dir / f"relaunch-{app.lower()}.log").open("w", encoding="utf-8")
+                    with log:
+                        process = subprocess.Popen(command, env=env, stdout=log, stderr=subprocess.STDOUT)
+                    time.sleep(0.5)
+                    if process.poll() not in (None, 0):
+                        launch_error = f"systemd-run exited {process.returncode}; see relaunch log"
+                except OSError as exc:
+                    launch_error = str(exc)
+        window = None
+        window_deadline = time.monotonic() + 45
+        while time.monotonic() < window_deadline:
+            window = _r12_app_window(args.cgroup, app, spec)
+            if window:
+                break
+            time.sleep(0.2)
+        responsive = False
+        change: float | None = None
+        direct_target = False
+        active_before = ""
+        if window:
+            first = shots / f"{app.lower()}-before.png"
+            second = shots / f"{app.lower()}-after.png"
+            try:
+                activated = subprocess.run(
+                    ["xdotool", "windowactivate", window], check=False, timeout=5,
+                ).returncode == 0
+                focus_deadline = time.monotonic() + 8
+                while activated and time.monotonic() < focus_deadline:
+                    active_before = subprocess.run(
+                        ["xdotool", "getactivewindow"], text=True, capture_output=True,
+                        check=False, timeout=5,
+                    ).stdout.strip()
+                    if active_before == window:
+                        break
+                    time.sleep(0.1)
+                else:
+                    activated = False
+            except subprocess.TimeoutExpired:
+                activated = False
+            if app == "FIREFOX" and not activated:
+                # A WebKit child can retain X focus after the pressure
+                # windows close. A real click in the workset page can return
+                # focus to its verified top-level window before reload.
+                try:
+                    subprocess.run(["xdotool", "windowraise", window], check=False, timeout=5)
+                    subprocess.run([
+                        "xdotool", "mousemove", "--window", window, "400", "220", "click", "1",
+                    ], check=False, timeout=5)
+                    focus_deadline = time.monotonic() + 5
+                    while time.monotonic() < focus_deadline:
+                        active_before = subprocess.run(
+                            ["xdotool", "getactivewindow"], text=True, capture_output=True,
+                            check=False, timeout=5,
+                        ).stdout.strip()
+                        if active_before == window:
+                            activated = True
+                            break
+                        time.sleep(0.1)
+                except (OSError, subprocess.TimeoutExpired):
+                    pass
+            time.sleep(0.3)
+            captured = _r12_capture(window, first)
+            if app == "FIREFOX":
+                # A WebKit content process can be reclaimed while the browser
+                # UI remains alive; reloading the local page tests both.
+                direct_target = not activated
+                command = ["xdotool", "key", "--clearmodifiers", "ctrl+r"]
+                if direct_target:
+                    command = ["xdotool", "key", "--window", window, "--clearmodifiers", "ctrl+r"]
+            elif app == "FILES":
+                command = ["xdotool", "key", "--clearmodifiers", "ctrl+l"]
+            elif app == "EVINCE":
+                command = ["xdotool", "mousemove", "--window", window, "110", "150",
+                           "click", "--repeat", "2", "--delay", "100", "1"]
+            elif app == "CALENDAR":
+                command = ["xdotool", "mousemove", "--window", window, "180", "22", "click", "1"]
+            else:
+                if activated and spec.operation_key == "Page_Down":
+                    subprocess.run(["xdotool", "key", "--clearmodifiers", "Home"], check=False, timeout=5)
+                    time.sleep(0.2)
+                command = ["xdotool", "key", "--clearmodifiers", spec.operation_key]
+            try:
+                typed = (activated or direct_target) and subprocess.run(command, check=False, timeout=5).returncode == 0
+            except (OSError, subprocess.TimeoutExpired):
+                typed = False
+            operation_ns = time.monotonic_ns()
+            response_ms: float | None = None
+            # The calculator appends one visible digit in its program view;
+            # this covers about 0.0259% of the window on the Native desktop.
+            minimum_change = 0.0002 if app == "CALCULATOR" else 0.0005
+            response_deadline = time.monotonic() + (15 if app == "FIREFOX" else 8)
+            while (activated or direct_target) and captured and time.monotonic() < response_deadline:
+                if _r12_capture(window, second):
+                    change = _r12_visual_change(first, second)
+                    if change is not None and change >= minimum_change:
+                        response_ms = (time.monotonic_ns() - operation_ns) / 1e6
+                        break
+                time.sleep(0.2)
+            try:
+                active = subprocess.run(
+                    ["xdotool", "getactivewindow"], text=True, capture_output=True,
+                    check=False, timeout=5,
+                ).stdout.strip()
+            except (OSError, subprocess.TimeoutExpired):
+                active = ""
+            responsive = typed and response_ms is not None and (
+                active == window or app == "EVINCE" or direct_target
+            )
+        else:
+            response_ms = None
+        rows[app] = {
+            "oom_victim": killed, "pre_pressure_alive": bool(before.get("apps", {}).get(app, {}).get("scope_alive")),
+            "after_pressure_alive": bool(after.get("apps", {}).get(app, {}).get("scope_alive")),
+            "relaunch_error": launch_error, "window_id": window,
+            "recovery_ms": (time.monotonic_ns() - start_ns) / 1e6,
+            "response_ms": response_ms, "visual_change_ratio": change,
+            "input_delivery": "direct_target" if direct_target else "active_window",
+            "focus_observed_window_id": active_before,
+            "responsive": responsive,
+        }
+    payload = {
+        "schema_version": 1,
+        "valid": all(row["responsive"] for row in rows.values()) and all(lane_ownership.values()),
+        "victims": sorted(victims), "pressure_windows_closed": released,
+        "pressure_lanes_alive_at_release": lane_ownership,
+        "memory_current_after_release": read_int(args.cgroup / "memory.current"),
+        "apps": rows,
+    }
+    write_json(args.output, payload)
+    print(args.output)
+    return 0 if payload["valid"] else 11
 
 
 def command_llm_pressure_record(args: Any) -> int:
@@ -1409,7 +1879,7 @@ def evaluate_result(
         prediction_gate = read_json(run_dir / "prediction-gate.json")
     except (FileNotFoundError, OSError, json.JSONDecodeError):
         prediction_gate = {}
-    if not prediction_gate.get("valid"):
+    if scenario_name != R12_SCENARIO and not prediction_gate.get("valid"):
         reasons.extend(prediction_gate.get("reasons", ["prediction gate invalid"]))
     if automation_rc != 0:
         reasons.append(f"automation returned {automation_rc}")
@@ -1467,7 +1937,11 @@ def evaluate_result(
     for app in config["apps"]:
         before_row = before.get("apps", {}).get(app, {})
         after_row = after.get("apps", {}).get(app, {})
-        survived = bool(after_row.get("scope_alive") or after_row.get("window_alive"))
+        # The desktop may contain unrelated windows of the same application.
+        # R12 survival must be proven by a PID in this application's scope.
+        survived = bool(after_row.get("scope_alive")) if scenario_name == R12_SCENARIO else bool(
+            after_row.get("scope_alive") or after_row.get("window_alive")
+        )
         disappeared = bool(before_row.get("scope_alive") and not survived)
         if disappeared and app not in victims:
             untraced_disappearances.append(app)
@@ -1490,7 +1964,10 @@ def evaluate_result(
     if not aggressor_survived:
         reasons.append(f"{aggressor_label} aggressor did not survive")
     if not baseline_only:
-        requested = int(config["r8_llm"]["model_size_bytes"]) if llm_mode else int(r8["burst_mib"]) * MIB
+        requested = int(config["r8_llm"]["model_size_bytes"]) if llm_mode else (
+            int(pressure.get("pressure_requested_bytes", 0)) if pressure.get("adaptive_stop")
+            else int(r8["burst_mib"]) * MIB
+        )
         if int(pressure.get("pressure_requested_bytes", -1)) != requested:
             reasons.append("pressure request does not equal the frozen aggressor contract")
         if not pressure.get("pressure_complete") or int(pressure.get("pressure_committed_bytes", -1)) != requested:
@@ -1525,6 +2002,23 @@ def evaluate_result(
             reasons.append("reclaim-bin policy_hits did not increase")
         if not baseline_only and int(bin_delta.get("subtree_selected", 0)) <= 0:
             reasons.append("reclaim-bin selected no cgroup subtree")
+    recovery: dict[str, Any] = {}
+    if scenario_name == R12_SCENARIO:
+        if not baseline_only:
+            if int(parent_before.get("oom", 0)) or int(parent_before.get("oom_kill", 0)):
+                reasons.append("OOM occurred before R12 pressure started")
+            if policy == "current_kernel" and not 3 <= len(victims) <= 4:
+                reasons.append(f"R12 requires 3-4 distinct OOM applications; got {len(victims)}")
+            if not all(before.get("apps", {}).get(app, {}).get("scope_alive") and
+                       before.get("apps", {}).get(app, {}).get("window_alive") for app in config["apps"]):
+                reasons.append("not all 12 applications were live before pressure")
+            try:
+                recovery = read_json(run_dir / "r12-recovery.json")
+            except (FileNotFoundError, OSError, json.JSONDecodeError):
+                reasons.append("R12 recovery evidence missing")
+            else:
+                if not recovery.get("valid"):
+                    reasons.append("R12 recovery incomplete")
     result = {
         "status": "VALID" if not reasons else "INVALID", "valid": not reasons,
         "invalid_reasons": list(dict.fromkeys(reasons)), "scenario": scenario_name, "policy": policy,
@@ -1549,6 +2043,7 @@ def evaluate_result(
             "peak_memory_delta_bytes": int(pressure.get("llm_peak_memory_delta_bytes", 0)),
         },
         "policy_before": policy_before, "policy_after": policy_after,
+        "recovery": recovery,
         "baseline_only": baseline_only,
     }
     write_json(run_dir / "r8-oom-result.json", result)
@@ -1565,7 +2060,7 @@ def _setup(config: dict[str, Any], *, memory_max_mib: int) -> dict[str, Any]:
     }
 
 
-def _restart_runtime_monitor_for_round(timeout_seconds: float = 30.0) -> dict[str, Any]:
+def _restart_runtime_monitor_for_round(timeout_seconds: float = 90.0) -> dict[str, Any]:
     """Give every R8 round an independent desktop/LSTM event session."""
     unit = "parp-runtime-monitor.service"
     restarted = ACCEPT.run(
@@ -1647,14 +2142,16 @@ def run_one(
     config: dict[str, Any], policy: str, seed: int, run_dir: Path,
     expected_plan: dict[str, Any] | None = None, *, baseline_only: bool = False,
     burst_override_mib: int | None = None, allow_unfrozen: bool = False,
+    adaptive_stop: bool = False,
 ) -> dict[str, Any]:
     _need_bound()
     run_dir = run_dir.resolve()
     validate_config(config, require_frozen=not allow_unfrozen)
     scenario_name = configured_scenario(config)
     llm_mode = scenario_name == LLM_SCENARIO
-    if policy not in {"native_kernel", "bin_lstm"}:
-        raise ValueError("R8 first phase supports native_kernel and bin_lstm only")
+    allowed = {"native_kernel", "bin_lstm", "current_kernel"} if scenario_name == R12_SCENARIO else {"native_kernel", "bin_lstm"}
+    if policy not in allowed:
+        raise ValueError(f"{scenario_name} does not support policy {policy}")
     run_dir.mkdir(parents=True, exist_ok=False)
     if llm_mode:
         llm_preflight = llm_asset_preflight(config)
@@ -1682,6 +2179,19 @@ def run_one(
         }
         write_json(run_dir / "run-result.json", result)
         return result
+    runtime_pid = int(runtime_reset.get("main_pid", 0) or 0)
+    try:
+        runtime_command = (Path("/proc") / str(runtime_pid) / "cmdline").read_bytes().replace(b"\0", b" ").decode(errors="replace")
+    except OSError:
+        runtime_command = ""
+    write_json(run_dir / "environment.json", {
+        "kernel_release": os.uname().release,
+        "kernel_cmdline": Path("/proc/cmdline").read_text(encoding="utf-8").strip(),
+        "runtime_monitor": runtime_reset,
+        "runtime_monitor_command": runtime_command,
+        "policy_before": ACCEPT.policy_state(),
+        "swap": Path("/proc/swaps").read_text(encoding="utf-8"),
+    })
     asset_manifest = prepare_assets(config, run_dir)
     write_json(run_dir / "asset-manifest.json", asset_manifest)
     # The in-scenario gate reads this immutable per-round copy, never a path
@@ -1724,7 +2234,7 @@ def run_one(
         prune_round_working_assets(run_dir)
         return result
     setup = _setup(config, memory_max_mib=memory_max_mib)
-    variant = "bin_apply" if policy == "bin_lstm" else "native"
+    variant = "bin_apply" if policy == "bin_lstm" else "observe" if policy == "current_kernel" else "native"
     original_policy: dict[str, Any] | None = None
     cgroup: Path | None = None
     automation: subprocess.Popen[Any] | None = None
@@ -1748,7 +2258,8 @@ def run_one(
         policy_before = ACCEPT.policy_state(cgroup)
         write_json(run_dir / "policy-before.json", policy_before)
         scenario, action_plan = generate_scenario(
-            config, run_dir, cgroup, seed, policy, burst_mib=burst_mib, baseline_only=baseline_only,
+            config, run_dir, cgroup, seed, policy, burst_mib=burst_mib,
+            baseline_only=baseline_only, adaptive_stop=adaptive_stop,
         )
         write_json(run_dir / "scenario.json", scenario)
         write_json(run_dir / "action-plan.json", action_plan)
@@ -1837,7 +2348,15 @@ def run_one(
             trace_output.close()
         if trace_error is not None:
             trace_error.close()
-        ACCEPT.cleanup_slice(setup)
+        try:
+            ACCEPT.cleanup_slice(setup)
+        except (OSError, RuntimeError, subprocess.TimeoutExpired) as exc:
+            cleanup_error = f"CLEANUP_ERROR:{type(exc).__name__}:{exc}"
+            abort_reason = f"{cleanup_error}; {abort_reason}" if abort_reason else cleanup_error
+            subprocess.run(
+                ["systemctl", "--user", "stop", "--no-block", str(setup["slice"])],
+                stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=False, timeout=10,
+            )
         if original_policy is not None:
             ACCEPT.restore_global_policy(original_policy)
     write_json(run_dir / "monitor.json", monitor)
@@ -1891,10 +2410,21 @@ def command_run(args: Any) -> int:
     used_seeds = {int(row["seed"]) for row in results if "seed" in row}
     while sum(1 for row in results if row.get("valid")) < int(args.rounds):
         if replay_seeds:
-            remaining = [seed for seed in replay_seeds if seed not in used_seeds]
+            completed_seeds = {
+                int(row["seed"]) for row in results
+                if row.get("valid") and "seed" in row
+            }
+            remaining = [seed for seed in replay_seeds if seed not in completed_seeds]
             if not remaining:
                 break
             seed = remaining[0]
+            if sum(1 for row in results if row.get("seed") == seed) >= 8:
+                results.append({
+                    "status": "BLOCKED", "valid": False, "scenario": scenario_name,
+                    "policy": args.policy, "seed": seed,
+                    "invalid_reasons": ["eight replay attempts for this seed were invalid"],
+                })
+                break
         else:
             seed = int(args.seed) + attempt
             attempt += 1
@@ -1908,7 +2438,7 @@ def command_run(args: Any) -> int:
             if native is None:
                 result = {
                     "status": "BLOCKED", "valid": False, "scenario": scenario_name, "policy": args.policy,
-                    "seed": seed, "invalid_reasons": ["no valid Native round with this seed for replay"],
+                    "seed": seed, "invalid_reasons": ["no valid reference round with this seed for replay"],
                 }
                 results.append(result)
                 break
@@ -1917,7 +2447,7 @@ def command_run(args: Any) -> int:
             except (FileNotFoundError, OSError, json.JSONDecodeError) as exc:
                 result = {
                     "status": "BLOCKED", "valid": False, "scenario": scenario_name, "policy": args.policy,
-                    "seed": seed, "invalid_reasons": [f"Native action plan unavailable: {exc}"],
+                    "seed": seed, "invalid_reasons": [f"reference action plan unavailable: {exc}"],
                 }
                 results.append(result)
                 break
@@ -1930,6 +2460,8 @@ def command_run(args: Any) -> int:
         result = run_one(config, args.policy, seed, run_dir, expected_plan=expected)
         results.append(result)
         print(f"status={result['status']} output={run_dir}", flush=True)
+        if any(str(reason).startswith("CLEANUP_ERROR:") for reason in result.get("invalid_reasons", [])):
+            break
         if not result.get("valid") and not args.keep_going:
             break
     summary = {
@@ -1942,6 +2474,94 @@ def command_run(args: Any) -> int:
     write_json(session / "summary.json", summary)
     print(session)
     return 0 if summary["status"] == "COMPLETE" else 1
+
+
+def command_calibrate_r12(args: Any) -> int:
+    """Calibrate on the running PARP kernel, then freeze the Native replay inputs."""
+    config = read_json(args.config)
+    validate_config(config)
+    if configured_scenario(config) != R12_SCENARIO or args.policy != "current_kernel":
+        raise ValueError("R12 calibration requires current_kernel and the R12 profile")
+    output = Path(args.output).resolve()
+    output.mkdir(parents=True, exist_ok=False)
+    write_json(output / "input-config.json", config)
+    baseline_from = getattr(args, "baseline_from", None)
+    if baseline_from:
+        previous = Path(baseline_from).resolve()
+        if canonical_sha256(read_json(previous / "input-config.json")) != canonical_sha256(config):
+            raise ValueError("R12 reused working-set config differs")
+        baseline = read_json(previous / "no-pressure-workset/run-result.json")
+        report_source = previous / "no-pressure-workset"
+    else:
+        baseline = run_one(
+            config, "current_kernel", int(config["r8_oom"]["calibration"]["seed"]),
+            output / "no-pressure-workset", baseline_only=True, allow_unfrozen=True,
+        )
+        report_source = output / "no-pressure-workset"
+    if not baseline.get("valid"):
+        write_json(output / "calibration-report.json", {"status": "BLOCKED", "reason": "no-pressure workset invalid", "baseline": baseline})
+        return 1
+    before = read_json(report_source / "r8-before-pressure.json")
+    monitor_samples = read_json(report_source / "monitor.json")
+    p95 = max(
+        int(before["cgroup"]["memory_current"]),
+        max((int(row.get("cgroup", {}).get("memory_current") or 0) for row in monitor_samples), default=0),
+    )
+    cap = memory_limit_cap_bytes(memtotal_mib())
+    # GUI process startup varies by hundreds of MiB across rounds. Leave
+    # enough room that applications finish their normal work before pressure.
+    maximum = memory_limit_from_p95(p95 + 1024 * MIB)
+    if maximum > cap:
+        write_json(output / "calibration-report.json", {
+            "status": "BLOCKED", "reason": "working-set memory limit exceeds host cap",
+            "requested_bytes": maximum, "host_cap_bytes": cap,
+        })
+        return 1
+    attempts: list[dict[str, Any]] = []
+    selected: dict[str, Any] | None = None
+    for index in range(3):
+        candidate = copy.deepcopy(config)
+        candidate["r8_oom"]["memory_max_mib"] = maximum // MIB
+        candidate["r8_oom"]["burst_mib"] = int(config["r8_oom"]["calibration"]["burst_max_mib"])
+        result = run_one(
+            candidate, "current_kernel", int(config["r8_oom"]["calibration"]["seed"]) + 100 + index,
+            output / f"adaptive-{index + 1:02d}", allow_unfrozen=True, adaptive_stop=True,
+        )
+        attempts.append(result)
+        count = int(result.get("distinct_oom_victim_apps", 0))
+        if result.get("valid") and 3 <= count <= 4:
+            selected = result
+            break
+        if result.get("host_or_unknown_oom") or not result.get("pressure_complete") or not result.get("aggressor_survived", True):
+            break
+        if 3 <= count <= 4:
+            # The pressure setting already met the OOM target; a recovery
+            # probe failure should not change the memory contract.
+            continue
+        maximum += (-128 if count < 3 else 128) * MIB
+        if maximum <= p95 or maximum > cap:
+            break
+    report: dict[str, Any] = {
+        "schema_version": 1, "status": "READY" if selected else "INCONCLUSIVE",
+        "baseline": baseline, "attempts": attempts, "working_set_bytes": p95,
+        "host_cap_bytes": cap,
+    }
+    if selected:
+        frozen = copy.deepcopy(config)
+        frozen["r8_oom"]["memory_max_mib"] = int(read_json(Path(selected["run_dir"]) / "r8-config.json")["r8_oom"]["memory_max_mib"])
+        frozen["r8_oom"]["burst_mib"] = int(selected["pressure_committed_bytes"]) // MIB
+        frozen_calibration = frozen["r8_oom"]["calibration"]
+        frozen_calibration["frozen"] = True
+        frozen_calibration["current_kernel_working_set_bytes"] = p95
+        frozen_calibration["calibration_run"] = str(selected["run_dir"])
+        frozen_calibration["frozen_config_sha256"] = canonical_sha256(frozen_config_contract(frozen))
+        validate_config(frozen, require_frozen=True)
+        write_json(output / "frozen-config.json", frozen)
+        report["frozen_config"] = str(output / "frozen-config.json")
+        report["frozen_config_sha256"] = frozen_calibration["frozen_config_sha256"]
+    write_json(output / "calibration-report.json", report)
+    print(output / "calibration-report.json")
+    return 0 if selected else 1
 
 
 def _nearest_rank_p95(values: list[int]) -> int:
