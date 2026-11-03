@@ -1,0 +1,24 @@
+{
+  "app": "gimp",
+  "source_file": "GIMP_30序列_启动分项补充版.xlsx",
+  "source_sha256": "e19d780a01b7d1cffc1a5b7b417467a4966e232414e8fdadb5572db199b8d7b9",
+  "records": 960,
+  "records_by_type": {
+    "实测 MEASURED": 192,
+    "模拟 SIMULATED": 768
+  },
+  "unavailable_fields": {
+    "wss": 0,
+    "pgfault": 24
+  },
+  "pressure_gib": [
+    0,
+    8,
+    12,
+    14
+  ],
+  "query": "current operation t -> t+1,t+2,t+3,t+4",
+  "pressure_semantics": "GiB; not memory.max-RSS",
+  "source_semantics": "Source total WSS and per-record total fault count replay; collection semantics not revalidated.",
+  "integer_policy": "Noninteger, missing, negative, nonfinite or overflowing targets are flagged unavailable, never rounded."
+}

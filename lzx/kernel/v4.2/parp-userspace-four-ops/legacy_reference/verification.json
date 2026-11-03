@@ -1,0 +1,34 @@
+{
+  "status": "passed",
+  "compiled_c_executed": true,
+  "compared_with_independent_excel": true,
+  "counts": {
+    "measured_future_positions_matched": 528,
+    "complete_four_step_queries": 480,
+    "padded_future_positions": 1200,
+    "partial_horizon_queries": 360,
+    "end_queries_all_minus_one": 120,
+    "simulated_future_positions_matched": 2112
+  },
+  "source_sha256": "e19d780a01b7d1cffc1a5b7b417467a4966e232414e8fdadb5572db199b8d7b9",
+  "source_unchanged": true,
+  "compiler": "C:\\Users\\Luoji\\AppData\\Local\\Temp\\parp_c_api_zig\\ziglang\\zig.exe",
+  "compile_flags": [
+    "-std=c99",
+    "-O2",
+    "-Wall",
+    "-Wextra",
+    "-Werror"
+  ],
+  "api_version": 3,
+  "future_operation_count": 4,
+  "output_values": 8,
+  "pressure_unit": "GiB; 0/8/12/14",
+  "supported_apps": [
+    "gimp"
+  ],
+  "app_name_case_insensitive": true,
+  "unknown_app_rejected_without_fallback": true,
+  "boundary_tests": "null/overlapping arrays, output canaries, invalid values, end/partial horizons padded with -1, signed outputs, early/late missing data, genuine zero, no partial writes; passed",
+  "kernel_build": "not performed; standalone C tested, kernel header uses __KERNEL__ types"
+}

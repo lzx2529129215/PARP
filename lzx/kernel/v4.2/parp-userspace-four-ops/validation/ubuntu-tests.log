@@ -1,0 +1,33 @@
+make: Entering directory '<project>'
+mkdir -p build
+cc -O2 -std=c11 -Wall -Wextra -Werror -shared -fPIC get_wss_predictor.c -o build/libwss_predictor.so
+cc -O2 -std=c11 -Wall -Wextra -Werror get_wss_predictor.c legacy_example.c -o build/lookup_example
+python3 scripts/verify_sources.py
+UNCHANGED_USERSPACE_CORE_OK: 6
+python3 run_operation_tests.py --cc "cc"
+Four-stage C contract tests passed.
+test_actual_library_cli_uses_bytes (test_operation_table.CWorkbookTableTest) ... ok
+test_c_errors_leave_outputs_unchanged (test_operation_table.CWorkbookTableTest) ... ok
+test_every_c_lookup_matches_python (test_operation_table.CWorkbookTableTest) ... ok
+test_early_late_gaps_missing_fields_and_genuine_zero (test_operation_table.OwnerErrorFixtureTest) ... ok
+test_all_future_slices_are_exact_bytes (test_operation_table.WorkbookTableTest) ... ok
+test_api_v3_errors_and_no_zero_filling (test_operation_table.WorkbookTableTest) ... ok
+test_imported_owner_files_unchanged_except_newlines (test_operation_table.WorkbookTableTest) ... ok
+test_no_compiler_query_cli (test_operation_table.WorkbookTableTest) ... ok
+test_source_totals_and_example (test_operation_table.WorkbookTableTest) ... ok
+test_supplied_c_data_matches_all_json_records (test_operation_table.WorkbookTableTest) ... ok
+test_query_and_stream_cli (test_operations.NativeLookupABITest) ... ok
+test_real_signed_c_abi_and_errors (test_operations.NativeLookupABITest) ... ok
+test_available_stages_and_ambiguous_faults (test_operations.OperationContractTest) ... ok
+test_suffix_and_signed_values (test_operations.OperationContractTest) ... ok
+test_explicit_phase_progress_and_expiry (test_operations.OperationControllerTest) ... ok
+test_high_admin_restore_and_limits (test_operations.OperationControllerTest) ... ok
+test_partial_reclaim_no_progress_and_refault (test_operations.OperationControllerTest) ... ok
+test_preview_no_writes_and_horizon_end (test_operations.OperationControllerTest) ... ok
+test_two_stages_immutable_budget_and_no_timer_transition (test_operations.OperationControllerTest) ... ok
+
+----------------------------------------------------------------------
+Ran 19 tests in 0.447s
+
+OK
+make: Leaving directory '<project>'

@@ -1,0 +1,13 @@
+{
+  "date": "2026-11-03",
+  "platform": "Linux/Ubuntu 22.04",
+  "kernel": "6.17.13-parp-ops-20261102",
+  "kernel_operations_master": 0,
+  "command": "make all test",
+  "returncode": 0,
+  "python_tests": 19,
+  "original_c_contract_tests": "passed",
+  "unchanged_userspace_core_files": 6,
+  "performance_claim": "No new peak-benefit claim; this validation tests build, lookup and behavior",
+  "log_normalization": "project absolute paths replaced with <project> only"
+}
