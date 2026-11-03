@@ -1,0 +1,150 @@
+{
+  "name": "parp-userspace-four-ops",
+  "packaged_date": "2026-11-03",
+  "baseline_frozen_at": "2026-11-01T13:09:47.085108+00:00",
+  "source_directory": "parp-wss-v5/src/tools/testing/selftests/parp_wss",
+  "core_modified": false,
+  "forecast_horizon": "next_four_actual_operations",
+  "unchanged_core": [
+    {
+      "path": "data/operation_table.json",
+      "sha256": "825ab6e04d9d1a2eb622f442b6b3f78c10a0a35050d4f4179038de0240db6670"
+    },
+    {
+      "path": "get_wss_predictor.c",
+      "sha256": "11887a68d36359576f86134aa4a684f3f16de01a5ea206538ef8c68a6499aa0d"
+    },
+    {
+      "path": "get_wss_predictor.h",
+      "sha256": "be7cc4b9b03a78dac09b4ce0ff72f6e7b44f4257d899e018697a95cb94d1b2bb"
+    },
+    {
+      "path": "gimp_lookup_data.h",
+      "sha256": "78d20b30067d985e9c49f2f52012e6fd709f2efc3003727d8655d61953a24da8"
+    },
+    {
+      "path": "operation_controller.py",
+      "sha256": "c4fb4234bd99ae4e741ebebdbcfc784d398e2c49197eb2eae0c6e37f1545e2b5"
+    },
+    {
+      "path": "operation_lookup.py",
+      "sha256": "b8d141743173cf7072c173a736f0fc5944c94808acc29d6dc9dee07941965ed8"
+    }
+  ],
+  "copied_files": [
+    {
+      "path": "data/legacy_lookup_import.json",
+      "sha256": "d2e51856e5cbf89a9aa82696df129e478d0e7954d439f5f7fd818120b8cce263"
+    },
+    {
+      "path": "data/operation_table.json",
+      "sha256": "825ab6e04d9d1a2eb622f442b6b3f78c10a0a35050d4f4179038de0240db6670"
+    },
+    {
+      "path": "get_wss_predictor.c",
+      "sha256": "11887a68d36359576f86134aa4a684f3f16de01a5ea206538ef8c68a6499aa0d"
+    },
+    {
+      "path": "get_wss_predictor.h",
+      "sha256": "be7cc4b9b03a78dac09b4ce0ff72f6e7b44f4257d899e018697a95cb94d1b2bb"
+    },
+    {
+      "path": "gimp_lookup_data.h",
+      "sha256": "78d20b30067d985e9c49f2f52012e6fd709f2efc3003727d8655d61953a24da8"
+    },
+    {
+      "path": "legacy_contract.c",
+      "sha256": "621a39e4e1ea9ee731cc953be483aebda1f1e79693423ac1736ac62fd44eed4e"
+    },
+    {
+      "path": "legacy_example.c",
+      "sha256": "9e674f590bd22217259c8cae0f35ddab8508bdbf34f9bb3ad921772b3a712958"
+    },
+    {
+      "path": "legacy_fixtures/fixture_data.h",
+      "sha256": "cba9a3e2a4877ef89bb5d3f2bafd590dcfb0401b3e1144e6e6a00b1f7569922c"
+    },
+    {
+      "path": "legacy_fixtures/test_fixture.c",
+      "sha256": "6f86e4695be1424e9f906d009924c5f1a33f21883e618b3214a0f8e682b7588c"
+    },
+    {
+      "path": "legacy_reference/README.md",
+      "sha256": "0f1866652003f2393b26d0d4ad72fc3c8ebe82690eebde7ad12f8f9fa08ef701"
+    },
+    {
+      "path": "legacy_reference/data_manifest.json",
+      "sha256": "767bfd7a530154e710297b191ef9364397af18852c296ac3ed77ad130546e0b5"
+    },
+    {
+      "path": "legacy_reference/verification.json",
+      "sha256": "311c246e3aaa07d2a2448659caaabefdff7bbe6b702f34cb876b9a3c913e5a41"
+    },
+    {
+      "path": "operation_controller.py",
+      "sha256": "c4fb4234bd99ae4e741ebebdbcfc784d398e2c49197eb2eae0c6e37f1545e2b5"
+    },
+    {
+      "path": "operation_lookup.py",
+      "sha256": "b8d141743173cf7072c173a736f0fc5944c94808acc29d6dc9dee07941965ed8"
+    },
+    {
+      "path": "run_operation_tests.py",
+      "sha256": "317b1949f5e54c87d0fb7abecaac04d7393c3d402fa19be6ddff6a5605ab14dc"
+    },
+    {
+      "path": "test_operation_fixture.c",
+      "sha256": "10e05ece7940b3addbaa5151710811f0359fb9352bfb243d0b9ffdcf6147ef1b"
+    },
+    {
+      "path": "test_operation_table.py",
+      "sha256": "75c50b2a0f906a92094cb251bb640b07735f88412a41f6a148f8a07f85b2cd5d"
+    },
+    {
+      "path": "test_operations.py",
+      "sha256": "e8e4892c60d0e33620d1bbf2f8a43ecb5ea252412a06a81475c8aa8a66f3665b"
+    },
+    {
+      "path": "wss_predictor_compat.h",
+      "sha256": "fb531323d4d3f7b28970d0cf5a0a7827b74f9b928be9be47381cfe93d5f3063b"
+    }
+  ],
+  "new_files": [
+    ".gitattributes",
+    ".gitignore",
+    "Makefile",
+    "README.md",
+    "docs/LOGIC.md",
+    "examples/events.md",
+    "scripts/verify_sources.py"
+  ],
+  "provenance_note": "legacy_reference verification is supplied historical evidence, not this package validation",
+  "delivery_added_files": [
+    ".gitattributes",
+    ".gitignore",
+    "LICENSES/GPL-2.0.txt",
+    "LICENSES/README.md",
+    "Makefile",
+    "README.md",
+    "SOURCE_MANIFEST.json",
+    "VALIDATION.md",
+    "docs/LOGIC.md",
+    "examples/events.md",
+    "scripts/verify_sources.py",
+    "validation/result.json",
+    "validation/ubuntu-tests.log"
+  ],
+  "validation": {
+    "date": "2026-11-03",
+    "platform": "Linux/Ubuntu 22.04",
+    "kernel": "6.17.13-parp-ops-20261102",
+    "kernel_operations_master": 0,
+    "command": "make all test",
+    "returncode": 0,
+    "python_tests": 19,
+    "original_c_contract_tests": "passed",
+    "unchanged_userspace_core_files": 6,
+    "performance_claim": "No new peak-benefit claim; this validation tests build, lookup and behavior",
+    "log_normalization": "project absolute paths replaced with <project> only"
+  }
+}

@@ -1,0 +1,69 @@
+{
+  "origin": "lookup_function_old",
+  "api_version": 3,
+  "wss_unit": "bytes",
+  "normalization": "CRLF to LF; ensure final LF; source directory unchanged",
+  "upstream_verification": "Owner-supplied report; not a result from this workspace",
+  "files": [
+    {
+      "source": "get_wss_predictor.c",
+      "destination": "get_wss_predictor.c",
+      "source_sha256": "11887a68d36359576f86134aa4a684f3f16de01a5ea206538ef8c68a6499aa0d",
+      "imported_sha256": "11887a68d36359576f86134aa4a684f3f16de01a5ea206538ef8c68a6499aa0d"
+    },
+    {
+      "source": "get_wss_predictor.h",
+      "destination": "get_wss_predictor.h",
+      "source_sha256": "be7cc4b9b03a78dac09b4ce0ff72f6e7b44f4257d899e018697a95cb94d1b2bb",
+      "imported_sha256": "be7cc4b9b03a78dac09b4ce0ff72f6e7b44f4257d899e018697a95cb94d1b2bb"
+    },
+    {
+      "source": "gimp_lookup_data.h",
+      "destination": "gimp_lookup_data.h",
+      "source_sha256": "e0d3181a070b854a26c2a73cb230489eba61d7eaa74d117039845228f5083b54",
+      "imported_sha256": "78d20b30067d985e9c49f2f52012e6fd709f2efc3003727d8655d61953a24da8"
+    },
+    {
+      "source": "test_contract.c",
+      "destination": "legacy_contract.c",
+      "source_sha256": "621a39e4e1ea9ee731cc953be483aebda1f1e79693423ac1736ac62fd44eed4e",
+      "imported_sha256": "621a39e4e1ea9ee731cc953be483aebda1f1e79693423ac1736ac62fd44eed4e"
+    },
+    {
+      "source": "tests/test_fixture.c",
+      "destination": "legacy_fixtures/test_fixture.c",
+      "source_sha256": "6f86e4695be1424e9f906d009924c5f1a33f21883e618b3214a0f8e682b7588c",
+      "imported_sha256": "6f86e4695be1424e9f906d009924c5f1a33f21883e618b3214a0f8e682b7588c"
+    },
+    {
+      "source": "tests/fixture_data.h",
+      "destination": "legacy_fixtures/fixture_data.h",
+      "source_sha256": "cba9a3e2a4877ef89bb5d3f2bafd590dcfb0401b3e1144e6e6a00b1f7569922c",
+      "imported_sha256": "cba9a3e2a4877ef89bb5d3f2bafd590dcfb0401b3e1144e6e6a00b1f7569922c"
+    },
+    {
+      "source": "example.c",
+      "destination": "legacy_example.c",
+      "source_sha256": "9e674f590bd22217259c8cae0f35ddab8508bdbf34f9bb3ad921772b3a712958",
+      "imported_sha256": "9e674f590bd22217259c8cae0f35ddab8508bdbf34f9bb3ad921772b3a712958"
+    },
+    {
+      "source": "README.md",
+      "destination": "legacy_reference/README.md",
+      "source_sha256": "b950dfdd247924e184c3b89ac517af9cd6280a23460e255fa457ddc826ddb50a",
+      "imported_sha256": "0f1866652003f2393b26d0d4ad72fc3c8ebe82690eebde7ad12f8f9fa08ef701"
+    },
+    {
+      "source": "data_manifest.json",
+      "destination": "legacy_reference/data_manifest.json",
+      "source_sha256": "eb63441125b748bb84de4c6819b2c01899f80a5ec2b3b3d25c5c042d3eba13d8",
+      "imported_sha256": "767bfd7a530154e710297b191ef9364397af18852c296ac3ed77ad130546e0b5"
+    },
+    {
+      "source": "verification.json",
+      "destination": "legacy_reference/verification.json",
+      "source_sha256": "9df2c45db99b16c7912682a5e11d9a98483ec1cdfa8eaa49bc49a923ea2e2e6c",
+      "imported_sha256": "311c246e3aaa07d2a2448659caaabefdff7bbe6b702f34cb876b9a3c913e5a41"
+    }
+  ]
+}
