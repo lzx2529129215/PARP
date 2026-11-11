@@ -1,0 +1,67 @@
+{
+  "snapshot_date": "2026-11-11",
+  "runtime_model_type": "rankprop42",
+  "kernel_prediction_model_version": 402,
+  "temporal_model": "RankProp v4.1",
+  "temporal_weights_retrained": false,
+  "files": {
+    "lzx/tool/operation_predictor/v4.1/train.py": {
+      "source_sha256": "202d9e82174313fc26bc21e606859207fd4985ca9b629d060667ee9d4e612deb",
+      "published_sha256": "4f102eca3b8a07a6adfcaf63065e640ed209f3fb03c85b9a1495c8ae8064ae91",
+      "bytes": 10106
+    },
+    "lzx/tool/operation_predictor/v4.1/predict.py": {
+      "source_sha256": "e9cbaaf6d05222685461742ea1f473034db491e552446e4be326dda68b5ad46f",
+      "published_sha256": "e9cbaaf6d05222685461742ea1f473034db491e552446e4be326dda68b5ad46f",
+      "bytes": 984
+    },
+    "lzx/tool/operation_predictor/v4.1/model/rankprop_v4_1.ts": {
+      "source_sha256": "f0b4af8419c5b8ed1afa6f0d8905f74048bb66e34f198c91997693f9bbb2832d",
+      "published_sha256": "f0b4af8419c5b8ed1afa6f0d8905f74048bb66e34f198c91997693f9bbb2832d",
+      "bytes": 106072
+    },
+    "lzx/tool/operation_predictor/v4.1/outputs/training.json": {
+      "source_sha256": "3cf0b69bd39e0322f5062676fd95153cb31a82904d27988e747050d8a3d25f1e",
+      "published_sha256": "3cf0b69bd39e0322f5062676fd95153cb31a82904d27988e747050d8a3d25f1e",
+      "bytes": 5636
+    },
+    "lzx/tool/operation_predictor/data/vocab/lsapp_expanded/app_vocab_duration.json": {
+      "source_sha256": "640f77ebe4bf142e43e0bb5b707fe0d6a49d1d360dca5304238bc2cca658ae3c",
+      "published_sha256": "640f77ebe4bf142e43e0bb5b707fe0d6a49d1d360dca5304238bc2cca658ae3c",
+      "bytes": 300
+    },
+    "lzx/service/runtime_monitor/predictor_rankprop41.py": {
+      "source_sha256": "8264b8a7d0a6cb41c1e82a3e64a2dea36ec6dac0cbfddbf101ebf0141a101e29",
+      "published_sha256": "8264b8a7d0a6cb41c1e82a3e64a2dea36ec6dac0cbfddbf101ebf0141a101e29",
+      "bytes": 3942
+    },
+    "lzx/service/runtime_monitor/core/resident_reuse.py": {
+      "source_sha256": "58b1b061983746eba1316152dd3faca34576509b40eeef5315efb8c8e6bd6450",
+      "published_sha256": "58b1b061983746eba1316152dd3faca34576509b40eeef5315efb8c8e6bd6450",
+      "bytes": 19819
+    },
+    "lzx/service/runtime_monitor/core/reclaim_types.py": {
+      "source_sha256": "44304b855b00f11e757f2fb683923f210cf1e377a6da4c01f2b732534d076488",
+      "published_sha256": "44304b855b00f11e757f2fb683923f210cf1e377a6da4c01f2b732534d076488",
+      "bytes": 1483
+    },
+    "lzx/service/runtime_monitor/core/collection_profile.py": {
+      "source_sha256": "575a2bbbaf439cfa82e5e76710cb99b798a7918c3feecb927eb17ae64e05f59e",
+      "published_sha256": "575a2bbbaf439cfa82e5e76710cb99b798a7918c3feecb927eb17ae64e05f59e",
+      "bytes": 1223
+    },
+    "lzx/service/runtime_monitor/core/workload_reserve.py": {
+      "source_sha256": "a38403cb82e1fcaeb11b30b2e19acccc527f2e9dffb585ee0c67fce8b1f41da0",
+      "published_sha256": "a38403cb82e1fcaeb11b30b2e19acccc527f2e9dffb585ee0c67fce8b1f41da0",
+      "bytes": 1550
+    }
+  },
+  "portability_adjustment": "v4.1/train.py resolves repository root from __file__",
+  "validation": {
+    "standalone_events": 8,
+    "standalone_matches_running_source": true,
+    "service_api_calls": 8,
+    "fusion_examples_passed": true,
+    "torch_version": "2.3.1+cpu"
+  }
+}

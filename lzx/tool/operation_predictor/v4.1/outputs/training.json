@@ -1,0 +1,201 @@
+{
+  "version": "v4.1",
+  "seed": 20261030,
+  "horizon": 16,
+  "context": 32,
+  "num_apps": 15,
+  "vocab": {
+    "Firefox": 0,
+    "LibreOffice": 1,
+    "VLC": 2,
+    "GIMP": 3,
+    "Audacity": 4,
+    "Thunderbird": 5,
+    "Evince": 6,
+    "Files": 7,
+    "Calculator": 8,
+    "Calendar": 9,
+    "Rhythmbox": 10,
+    "ImageViewer": 11,
+    "Shotwell": 12,
+    "SystemMonitor": 13,
+    "Solitaire": 14,
+    "<PAD>": 15,
+    "<UNKNOWN>": 16
+  },
+  "training_samples": 15803,
+  "validation_samples": 4117,
+  "test_samples": 2145,
+  "best_epoch": 9,
+  "validation": {
+    "n": 4117,
+    "optimal": 0.8183143065338839,
+    "early3": 0.06339567646344425,
+    "regret": 1.5397133835316978,
+    "loss": 1.4886437980822345
+  },
+  "test": {
+    "n": 2145,
+    "optimal": 0.7491841491841492,
+    "early3": 0.08997668997668998,
+    "regret": 2.1701631701631703,
+    "loss": 1.622325007231919
+  },
+  "export_max_error": 4.172325134277344e-07,
+  "history": [
+    {
+      "epoch": 1,
+      "train_loss": 1.8730773367565252,
+      "val": {
+        "n": 4117,
+        "optimal": 0.8027690065581734,
+        "early3": 0.06898226864221521,
+        "regret": 1.6767063395676463,
+        "loss": 1.6420513183884693
+      },
+      "seconds": 15.913069248199463
+    },
+    {
+      "epoch": 2,
+      "train_loss": 1.5436135015102652,
+      "val": {
+        "n": 4117,
+        "optimal": 0.7928102987612339,
+        "early3": 0.07213990769978139,
+        "regret": 1.7894097643915472,
+        "loss": 1.5632864980840093
+      },
+      "seconds": 22.41024661064148
+    },
+    {
+      "epoch": 3,
+      "train_loss": 1.4927026891394566,
+      "val": {
+        "n": 4117,
+        "optimal": 0.8039834831187758,
+        "early3": 0.06752489676949235,
+        "regret": 1.665290259897984,
+        "loss": 1.5328267919719003
+      },
+      "seconds": 31.061278104782104
+    },
+    {
+      "epoch": 4,
+      "train_loss": 1.473231061911165,
+      "val": {
+        "n": 4117,
+        "optimal": 0.8013116346854505,
+        "early3": 0.06971095457857664,
+        "regret": 1.7039106145251397,
+        "loss": 1.525564384092716
+      },
+      "seconds": 38.906675815582275
+    },
+    {
+      "epoch": 5,
+      "train_loss": 1.460734693210336,
+      "val": {
+        "n": 4117,
+        "optimal": 0.8100558659217877,
+        "early3": 0.06436725771192615,
+        "regret": 1.6140393490405636,
+        "loss": 1.5081413609760896
+      },
+      "seconds": 46.93874645233154
+    },
+    {
+      "epoch": 6,
+      "train_loss": 1.451806733542316,
+      "val": {
+        "n": 4117,
+        "optimal": 0.8141850862278358,
+        "early3": 0.06461015302404663,
+        "regret": 1.5880495506436725,
+        "loss": 1.5082819923877948
+      },
+      "seconds": 54.03398823738098
+    },
+    {
+      "epoch": 7,
+      "train_loss": 1.4439993384049934,
+      "val": {
+        "n": 4117,
+        "optimal": 0.8153995627884382,
+        "early3": 0.06485304833616712,
+        "regret": 1.579062424095215,
+        "loss": 1.5007523331489845
+      },
+      "seconds": 61.23579549789429
+    },
+    {
+      "epoch": 8,
+      "train_loss": 1.4364513607935794,
+      "val": {
+        "n": 4117,
+        "optimal": 0.8095700752975468,
+        "early3": 0.06461015302404663,
+        "regret": 1.6113675006072383,
+        "loss": 1.4995552981279126
+      },
+      "seconds": 71.01722550392151
+    },
+    {
+      "epoch": 9,
+      "train_loss": 1.4291534250479427,
+      "val": {
+        "n": 4117,
+        "optimal": 0.8183143065338839,
+        "early3": 0.06339567646344425,
+        "regret": 1.5397133835316978,
+        "loss": 1.4886437980822345
+      },
+      "seconds": 80.75546884536743
+    },
+    {
+      "epoch": 10,
+      "train_loss": 1.422777684747377,
+      "val": {
+        "n": 4117,
+        "optimal": 0.8127277143551129,
+        "early3": 0.0650959436482876,
+        "regret": 1.585134806898227,
+        "loss": 1.4876155898803816
+      },
+      "seconds": 92.83575773239136
+    },
+    {
+      "epoch": 11,
+      "train_loss": 1.4179417509101186,
+      "val": {
+        "n": 4117,
+        "optimal": 0.8146708768520767,
+        "early3": 0.0650959436482876,
+        "regret": 1.5703181928588779,
+        "loss": 1.4880103779875713
+      },
+      "seconds": 106.33398485183716
+    },
+    {
+      "epoch": 12,
+      "train_loss": 1.4131507590504557,
+      "val": {
+        "n": 4117,
+        "optimal": 0.8170998299732816,
+        "early3": 0.06461015302404663,
+        "regret": 1.5523439397619625,
+        "loss": 1.4881316926081494
+      },
+      "seconds": 116.83599400520325
+    }
+  ],
+  "architecture": "Compact Transformer distance distribution + candidate-set residual ranker; reconstructed training, not original v4 source",
+  "distance_definition": "Number of future APP_SWITCH events until candidate returns; class 17 = not returned in complete 16-switch window",
+  "candidate_policy": "Apps observed so far in current session remain resident; exclude current foreground",
+  "selection": "max validation optimal minus 0.1*early3; no test selection",
+  "split_session_overlap": 0,
+  "files": {
+    "/home/lzx/Desktop/PARP/lzx/tool/operation_predictor/data/lsapp_expanded/processed/app_lstm_duration_switch/train.csv": "6fd6980cd0aa44069bb9365e5384ee0940b1574bf51123e340480d77507b28a7",
+    "/home/lzx/Desktop/PARP/lzx/tool/operation_predictor/data/lsapp_expanded/processed/app_lstm_duration_switch/val.csv": "ba1a6c6ae3716865ef1afccfeba7d4d0ae45efe0a9985cd3b06b3f183dd51065",
+    "/home/lzx/Desktop/PARP/lzx/tool/operation_predictor/data/lsapp_expanded/processed/app_lstm_duration_switch/test.csv": "cfd69096cefda862005d99a6c915037ee699a7ad6ce3bf9981df7dc70e61793f"
+  }
+}
