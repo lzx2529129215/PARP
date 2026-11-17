@@ -1,0 +1,5 @@
+{"app": "gimp", "name": "memory.reclaim", "value": 8388608, "start_ns": 13508111551640, "end_ns": 13508207094606, "before_bytes": 1108107264, "after_bytes": 1101582336, "error": null}
+{"app": "gimp", "name": "memory.reclaim", "value": 16777216, "start_ns": 13508265996130, "end_ns": 13508304084461, "before_bytes": 1101582336, "after_bytes": 1088487424, "error": null}
+{"app": "gimp", "name": "memory.reclaim", "value": 33554432, "start_ns": 13508407132354, "end_ns": 13508456234989, "before_bytes": 1088487424, "after_bytes": 1056043008, "error": null}
+{"app": "gimp", "name": "memory.reclaim", "value": 7929856, "start_ns": 13508508550469, "end_ns": 13508516971445, "before_bytes": 1056043008, "after_bytes": 1048256512, "error": null}
+{"app": "gimp", "name": "memory.reclaim", "value": 458752, "start_ns": 13512144774747, "end_ns": 13512150479160, "before_bytes": 1049456640, "after_bytes": 1048956928, "error": null}
