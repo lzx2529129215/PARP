@@ -1,0 +1,2 @@
+{"app": "firefox", "name": "memory.reclaim", "value": 8388608, "start_ns": 14532589958645, "end_ns": 14532591457221, "before_bytes": 985595904, "after_bytes": 976883712, "error": null}
+{"app": "firefox", "name": "memory.reclaim", "value": 7892992, "start_ns": 14532696583878, "end_ns": 14532698293765, "before_bytes": 977141760, "after_bytes": 968757248, "error": null}
