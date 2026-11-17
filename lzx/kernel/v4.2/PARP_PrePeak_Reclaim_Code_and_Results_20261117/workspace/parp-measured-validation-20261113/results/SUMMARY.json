@@ -1,0 +1,900 @@
+{
+ "status": "COMPLETE",
+ "formal_trials": 6,
+ "sources_unchanged": true,
+ "scenes": {
+  "stable": {
+   "off": {
+    "tag": "formal-stable-off-180867f6",
+    "enabled": false,
+    "calls": {
+     "high": 0,
+     "reclaim": 0,
+     "paused": 0,
+     "resumed": 0
+    },
+    "first_growth_required_MiB": 236.06640625,
+    "pre_growth_net_release_MiB": 21.4375,
+    "pre_growth_gap_MiB": 214.62890625,
+    "pre_growth_kernel_pgsteal_MiB": 0.0,
+    "peak_response_median_ms": 70.28306549999999,
+    "peak_response_max_ms": 304.268699,
+    "pgfault": {
+     "gimp": 1029129,
+     "libreoffice": 16513,
+     "firefox": 85807,
+     "krita": 548
+    },
+    "pgmajfault": {
+     "gimp": 814,
+     "libreoffice": 59,
+     "firefox": 1514,
+     "krita": 411
+    },
+    "task_ms": {
+     "gimp": 12130.491187000001,
+     "libreoffice": 1419.5194049999998,
+     "firefox": 3616.8399550000004
+    },
+    "old_revisit_ms": {},
+    "protection_pause_seconds": {
+     "gimp": 0,
+     "libreoffice": 0,
+     "firefox": 0
+    },
+    "kernel_write_seconds": {
+     "gimp": 0,
+     "libreoffice": 0,
+     "firefox": 0
+    },
+    "online_prediction_calls": 55,
+    "prediction_requirement_range_MiB": [
+     0.0,
+     473.64453125
+    ],
+    "compressed_pages_observed": {
+     "gimp": true,
+     "libreoffice": true,
+     "firefox": true,
+     "krita": true
+    },
+    "numeric_inputs_logged": 165,
+    "service_errors": [],
+    "cleanup": {
+     "complete": true,
+     "remaining": {
+      "background": [],
+      "libreoffice": [],
+      "firefox": [],
+      "foreground": []
+     },
+     "terminated_owned_pids": []
+    }
+   },
+   "on": {
+    "tag": "formal-stable-on-e2cfe592",
+    "enabled": true,
+    "calls": {
+     "high": 6,
+     "reclaim": 0,
+     "paused": 3,
+     "resumed": 3
+    },
+    "first_growth_required_MiB": 254.7734375,
+    "pre_growth_net_release_MiB": 272.296875,
+    "pre_growth_gap_MiB": 0.0,
+    "pre_growth_kernel_pgsteal_MiB": 259.09765625,
+    "peak_response_median_ms": 93.62067350000001,
+    "peak_response_max_ms": 286.162556,
+    "pgfault": {
+     "gimp": 1029480,
+     "libreoffice": 13514,
+     "firefox": 84350,
+     "krita": 98
+    },
+    "pgmajfault": {
+     "gimp": 1108,
+     "libreoffice": 0,
+     "firefox": 0,
+     "krita": 0
+    },
+    "task_ms": {
+     "gimp": 12320.286103000002,
+     "libreoffice": 1264.4457979999997,
+     "firefox": 3802.003037
+    },
+    "old_revisit_ms": {},
+    "protection_pause_seconds": {
+     "gimp": 1.6027330000000006,
+     "libreoffice": 1.6027330000000006,
+     "firefox": 1.6027330000000006
+    },
+    "kernel_write_seconds": {
+     "gimp": 0.552487027,
+     "libreoffice": 0,
+     "firefox": 0
+    },
+    "online_prediction_calls": 53,
+    "prediction_requirement_range_MiB": [
+     0.0,
+     266.6484375
+    ],
+    "compressed_pages_observed": {
+     "gimp": true,
+     "libreoffice": false,
+     "firefox": false,
+     "krita": false
+    },
+    "numeric_inputs_logged": 159,
+    "service_errors": [],
+    "cleanup": {
+     "complete": true,
+     "remaining": {
+      "background": [],
+      "libreoffice": [],
+      "firefox": [],
+      "foreground": []
+     },
+     "terminated_owned_pids": []
+    }
+   },
+   "fault_check": {
+    "gimp": {
+     "baseline": 1029129,
+     "current": 1029480,
+     "additional": 351,
+     "relative_growth": 0.00034106511428596414,
+     "within_trial_limit": true,
+     "relative_trial_limit": 0.1,
+     "absolute_limit_when_zero": null,
+     "needs_absolute_limit": false
+    },
+    "libreoffice": {
+     "baseline": 16513,
+     "current": 13514,
+     "additional": -2999,
+     "relative_growth": -0.18161448555683402,
+     "within_trial_limit": true,
+     "relative_trial_limit": 0.1,
+     "absolute_limit_when_zero": null,
+     "needs_absolute_limit": false
+    },
+    "firefox": {
+     "baseline": 85807,
+     "current": 84350,
+     "additional": -1457,
+     "relative_growth": -0.01697996666938595,
+     "within_trial_limit": true,
+     "relative_trial_limit": 0.1,
+     "absolute_limit_when_zero": null,
+     "needs_absolute_limit": false
+    },
+    "krita": {
+     "baseline": 548,
+     "current": 98,
+     "additional": -450,
+     "relative_growth": -0.8211678832116789,
+     "within_trial_limit": true,
+     "relative_trial_limit": 0.1,
+     "absolute_limit_when_zero": null,
+     "needs_absolute_limit": false
+    },
+    "all_apps": {
+     "baseline": 1131997,
+     "current": 1127442,
+     "additional": -4555,
+     "relative_growth": -0.00402386225405191,
+     "within_trial_limit": true,
+     "relative_trial_limit": 0.1,
+     "absolute_limit_when_zero": null,
+     "needs_absolute_limit": false
+    }
+   },
+   "all_apps_within_10_percent": true,
+   "first_growth_space_ready": true
+  },
+  "turnover": {
+   "off": {
+    "tag": "formal-turnover-off-6a5b92f8",
+    "enabled": false,
+    "calls": {
+     "high": 0,
+     "reclaim": 0,
+     "paused": 0,
+     "resumed": 0
+    },
+    "first_growth_required_MiB": 238.0390625,
+    "pre_growth_net_release_MiB": 21.2109375,
+    "pre_growth_gap_MiB": 216.828125,
+    "pre_growth_kernel_pgsteal_MiB": 0.0,
+    "peak_response_median_ms": 116.0842925,
+    "peak_response_max_ms": 197.96437,
+    "pgfault": {
+     "gimp": 1032128,
+     "libreoffice": 16422,
+     "firefox": 85538,
+     "krita": 530
+    },
+    "pgmajfault": {
+     "gimp": 827,
+     "libreoffice": 83,
+     "firefox": 1490,
+     "krita": 403
+    },
+    "task_ms": {
+     "gimp": 16895.498456,
+     "libreoffice": 1330.9809870000001,
+     "firefox": 3170.5154299999995
+    },
+    "old_revisit_ms": {},
+    "protection_pause_seconds": {
+     "gimp": 0,
+     "libreoffice": 0,
+     "firefox": 0
+    },
+    "kernel_write_seconds": {
+     "gimp": 0,
+     "libreoffice": 0,
+     "firefox": 0
+    },
+    "online_prediction_calls": 53,
+    "prediction_requirement_range_MiB": [
+     0.0,
+     408.7421875
+    ],
+    "compressed_pages_observed": {
+     "gimp": true,
+     "libreoffice": true,
+     "firefox": true,
+     "krita": true
+    },
+    "numeric_inputs_logged": 156,
+    "service_errors": [],
+    "cleanup": {
+     "complete": true,
+     "remaining": {
+      "background": [],
+      "libreoffice": [],
+      "firefox": [],
+      "foreground": []
+     },
+     "terminated_owned_pids": []
+    }
+   },
+   "on": {
+    "tag": "formal-turnover-on-361635e1",
+    "enabled": true,
+    "calls": {
+     "high": 7,
+     "reclaim": 0,
+     "paused": 0,
+     "resumed": 0
+    },
+    "first_growth_required_MiB": 227.921875,
+    "pre_growth_net_release_MiB": 251.40625,
+    "pre_growth_gap_MiB": 0.0,
+    "pre_growth_kernel_pgsteal_MiB": 259.09765625,
+    "peak_response_median_ms": 116.0465795,
+    "peak_response_max_ms": 217.367091,
+    "pgfault": {
+     "gimp": 1029484,
+     "libreoffice": 14127,
+     "firefox": 84180,
+     "krita": 99
+    },
+    "pgmajfault": {
+     "gimp": 1074,
+     "libreoffice": 30,
+     "firefox": 0,
+     "krita": 0
+    },
+    "task_ms": {
+     "gimp": 16378.996839,
+     "libreoffice": 1528.9468729999999,
+     "firefox": 3953.198291
+    },
+    "old_revisit_ms": {},
+    "protection_pause_seconds": {
+     "gimp": 0,
+     "libreoffice": 0,
+     "firefox": 0
+    },
+    "kernel_write_seconds": {
+     "gimp": 0.5956927630000001,
+     "libreoffice": 0.100901196,
+     "firefox": 0
+    },
+    "online_prediction_calls": 51,
+    "prediction_requirement_range_MiB": [
+     0.0,
+     301.2109375
+    ],
+    "compressed_pages_observed": {
+     "gimp": true,
+     "libreoffice": true,
+     "firefox": false,
+     "krita": false
+    },
+    "numeric_inputs_logged": 150,
+    "service_errors": [],
+    "cleanup": {
+     "complete": true,
+     "remaining": {
+      "background": [],
+      "libreoffice": [],
+      "firefox": [],
+      "foreground": []
+     },
+     "terminated_owned_pids": [
+      55779
+     ]
+    }
+   },
+   "fault_check": {
+    "gimp": {
+     "baseline": 1032128,
+     "current": 1029484,
+     "additional": -2644,
+     "relative_growth": -0.002561697773919514,
+     "within_trial_limit": true,
+     "relative_trial_limit": 0.1,
+     "absolute_limit_when_zero": null,
+     "needs_absolute_limit": false
+    },
+    "libreoffice": {
+     "baseline": 16422,
+     "current": 14127,
+     "additional": -2295,
+     "relative_growth": -0.13975155279503104,
+     "within_trial_limit": true,
+     "relative_trial_limit": 0.1,
+     "absolute_limit_when_zero": null,
+     "needs_absolute_limit": false
+    },
+    "firefox": {
+     "baseline": 85538,
+     "current": 84180,
+     "additional": -1358,
+     "relative_growth": -0.015875984942364797,
+     "within_trial_limit": true,
+     "relative_trial_limit": 0.1,
+     "absolute_limit_when_zero": null,
+     "needs_absolute_limit": false
+    },
+    "krita": {
+     "baseline": 530,
+     "current": 99,
+     "additional": -431,
+     "relative_growth": -0.8132075471698114,
+     "within_trial_limit": true,
+     "relative_trial_limit": 0.1,
+     "absolute_limit_when_zero": null,
+     "needs_absolute_limit": false
+    },
+    "all_apps": {
+     "baseline": 1134618,
+     "current": 1127890,
+     "additional": -6728,
+     "relative_growth": -0.005929749043290341,
+     "within_trial_limit": true,
+     "relative_trial_limit": 0.1,
+     "absolute_limit_when_zero": null,
+     "needs_absolute_limit": false
+    }
+   },
+   "all_apps_within_10_percent": true,
+   "first_growth_space_ready": true
+  },
+  "revisit": {
+   "off": {
+    "tag": "formal-revisit-off-5df6a134",
+    "enabled": false,
+    "calls": {
+     "high": 0,
+     "reclaim": 0,
+     "paused": 0,
+     "resumed": 0
+    },
+    "first_growth_required_MiB": 227.16015625,
+    "pre_growth_net_release_MiB": 6.9765625,
+    "pre_growth_gap_MiB": 220.18359375,
+    "pre_growth_kernel_pgsteal_MiB": 0.0,
+    "peak_response_median_ms": 112.15949,
+    "peak_response_max_ms": 186.43075,
+    "pgfault": {
+     "gimp": 1047653,
+     "libreoffice": 47636,
+     "firefox": 218449,
+     "krita": 360
+    },
+    "pgmajfault": {
+     "gimp": 3725,
+     "libreoffice": 77,
+     "firefox": 1410,
+     "krita": 246
+    },
+    "task_ms": {
+     "gimp": 23153.788482,
+     "libreoffice": 2015.6105820000002,
+     "firefox": 5889.702331
+    },
+    "old_revisit_ms": {
+     "libreoffice": 807.407322,
+     "firefox": 1649.742839,
+     "gimp": 6204.12447
+    },
+    "protection_pause_seconds": {
+     "gimp": 0,
+     "libreoffice": 0,
+     "firefox": 0
+    },
+    "kernel_write_seconds": {
+     "gimp": 0,
+     "libreoffice": 0,
+     "firefox": 0
+    },
+    "online_prediction_calls": 57,
+    "prediction_requirement_range_MiB": [
+     0.0,
+     445.578125
+    ],
+    "compressed_pages_observed": {
+     "gimp": true,
+     "libreoffice": true,
+     "firefox": true,
+     "krita": true
+    },
+    "numeric_inputs_logged": 168,
+    "service_errors": [],
+    "cleanup": {
+     "complete": true,
+     "remaining": {
+      "background": [],
+      "libreoffice": [],
+      "firefox": [],
+      "foreground": []
+     },
+     "terminated_owned_pids": [
+      56788
+     ]
+    }
+   },
+   "on": {
+    "tag": "formal-revisit-on-1a7c42a5",
+    "enabled": true,
+    "calls": {
+     "high": 7,
+     "reclaim": 2,
+     "paused": 5,
+     "resumed": 5
+    },
+    "first_growth_required_MiB": 253.6640625,
+    "pre_growth_net_release_MiB": 299.90625,
+    "pre_growth_gap_MiB": 0.0,
+    "pre_growth_kernel_pgsteal_MiB": 291.60546875,
+    "peak_response_median_ms": 94.83011450000001,
+    "peak_response_max_ms": 205.775785,
+    "pgfault": {
+     "gimp": 1089918,
+     "libreoffice": 48286,
+     "firefox": 217413,
+     "krita": 99
+    },
+    "pgmajfault": {
+     "gimp": 10810,
+     "libreoffice": 232,
+     "firefox": 0,
+     "krita": 0
+    },
+    "task_ms": {
+     "gimp": 23502.531095,
+     "libreoffice": 2314.359109,
+     "firefox": 5061.905400000001
+    },
+    "old_revisit_ms": {
+     "libreoffice": 878.848609,
+     "firefox": 1869.403986,
+     "gimp": 6822.631821
+    },
+    "protection_pause_seconds": {
+     "gimp": 4.024511,
+     "libreoffice": 4.040374999999999,
+     "firefox": 1.9653449999999992
+    },
+    "kernel_write_seconds": {
+     "gimp": 0.601954905,
+     "libreoffice": 0.099342523,
+     "firefox": 0.003972777
+    },
+    "online_prediction_calls": 55,
+    "prediction_requirement_range_MiB": [
+     0.0,
+     253.80078125
+    ],
+    "compressed_pages_observed": {
+     "gimp": true,
+     "libreoffice": true,
+     "firefox": false,
+     "krita": false
+    },
+    "numeric_inputs_logged": 162,
+    "service_errors": [],
+    "cleanup": {
+     "complete": true,
+     "remaining": {
+      "background": [],
+      "libreoffice": [],
+      "firefox": [],
+      "foreground": []
+     },
+     "terminated_owned_pids": [
+      57797
+     ]
+    }
+   },
+   "fault_check": {
+    "gimp": {
+     "baseline": 1047653,
+     "current": 1089918,
+     "additional": 42265,
+     "relative_growth": 0.040342556170793194,
+     "within_trial_limit": true,
+     "relative_trial_limit": 0.1,
+     "absolute_limit_when_zero": null,
+     "needs_absolute_limit": false
+    },
+    "libreoffice": {
+     "baseline": 47636,
+     "current": 48286,
+     "additional": 650,
+     "relative_growth": 0.013645142329330758,
+     "within_trial_limit": true,
+     "relative_trial_limit": 0.1,
+     "absolute_limit_when_zero": null,
+     "needs_absolute_limit": false
+    },
+    "firefox": {
+     "baseline": 218449,
+     "current": 217413,
+     "additional": -1036,
+     "relative_growth": -0.004742525715384369,
+     "within_trial_limit": true,
+     "relative_trial_limit": 0.1,
+     "absolute_limit_when_zero": null,
+     "needs_absolute_limit": false
+    },
+    "krita": {
+     "baseline": 360,
+     "current": 99,
+     "additional": -261,
+     "relative_growth": -0.725,
+     "within_trial_limit": true,
+     "relative_trial_limit": 0.1,
+     "absolute_limit_when_zero": null,
+     "needs_absolute_limit": false
+    },
+    "all_apps": {
+     "baseline": 1314098,
+     "current": 1355716,
+     "additional": 41618,
+     "relative_growth": 0.03167039292351103,
+     "within_trial_limit": true,
+     "relative_trial_limit": 0.1,
+     "absolute_limit_when_zero": null,
+     "needs_absolute_limit": false
+    }
+   },
+   "all_apps_within_10_percent": true,
+   "first_growth_space_ready": true
+  }
+ },
+ "safety": {
+  "status": "COMPLETE",
+  "calibration_sha256": "501706eeb42ddde806d5acfb7e318dd56b85f821823a7120df447bf1a02ca0f1",
+  "selected": {
+   "gimp": {
+    "high": {
+     "app": "gimp",
+     "method": "high",
+     "retained_rss_bytes": 906596352,
+     "retained_cgroup_bytes": 852414464,
+     "requested_bytes": 268435456,
+     "observed_net_release_bytes": 255700992,
+     "baseline_pgfault": 1028186,
+     "current_pgfault": 1093255,
+     "baseline_task_ms": 25926.449773,
+     "current_task_ms": 24610.260986999998,
+     "baseline_path": "/home/qi/krita-code-share-20261101/parp-measured-validation-20261113/results/trials/baseline-combined-off-e9a44731/result.json",
+     "baseline_sha256": "ca425bcdc819960c9c9cd12f99f8dc419e2cced956e075da6c661339a3ff5084",
+     "trial_path": "/home/qi/krita-code-share-20261101/parp-measured-validation-20261113/results/trials/calibration-combined-off-139745a3/result.json",
+     "trial_sha256": "04acd243c16fe3376b109639a1f289fca038ca383b56dbc40448565c04707e5d",
+     "workload_key": "combined-old-and-new-hot-plus-old-document-revisit",
+     "compression_enabled": true,
+     "compressed_pages_observed": true
+    },
+    "reclaim": {
+     "app": "gimp",
+     "method": "reclaim",
+     "retained_rss_bytes": 908136448,
+     "retained_cgroup_bytes": 854016000,
+     "requested_bytes": 268435456,
+     "observed_net_release_bytes": 254119936,
+     "baseline_pgfault": 1028186,
+     "current_pgfault": 1089896,
+     "baseline_task_ms": 25926.449773,
+     "current_task_ms": 24618.904408000002,
+     "baseline_path": "/home/qi/krita-code-share-20261101/parp-measured-validation-20261113/results/trials/baseline-combined-off-e9a44731/result.json",
+     "baseline_sha256": "ca425bcdc819960c9c9cd12f99f8dc419e2cced956e075da6c661339a3ff5084",
+     "trial_path": "/home/qi/krita-code-share-20261101/parp-measured-validation-20261113/results/trials/calibration-combined-off-20bedae5/result.json",
+     "trial_sha256": "5faa17441c72febfac246d524f96ef50a2e541a564a55d62a95b6049b0f52d86",
+     "workload_key": "combined-old-and-new-hot-plus-old-document-revisit",
+     "compression_enabled": true,
+     "compressed_pages_observed": true
+    }
+   },
+   "libreoffice": {
+    "high": {
+     "app": "libreoffice",
+     "method": "high",
+     "retained_rss_bytes": 369672192,
+     "retained_cgroup_bytes": 271208448,
+     "requested_bytes": 8388608,
+     "observed_net_release_bytes": 8929280,
+     "baseline_pgfault": 47331,
+     "current_pgfault": 47515,
+     "baseline_task_ms": 2827.9590829999997,
+     "current_task_ms": 2166.82019,
+     "baseline_path": "/home/qi/krita-code-share-20261101/parp-measured-validation-20261113/results/trials/baseline-combined-off-e7f19d3b/result.json",
+     "baseline_sha256": "d955b644106fb503650275932eaf352400479e5aa2d8450761ca4f0f4eaca7ea",
+     "trial_path": "/home/qi/krita-code-share-20261101/parp-measured-validation-20261113/results/trials/calibration-combined-off-ae8ce7bb/result.json",
+     "trial_sha256": "68d568c0131121fd05d566781bd65e5de5a983c4dc597b40dada203ae572c12f",
+     "workload_key": "combined-old-and-new-hot-plus-old-document-revisit",
+     "compression_enabled": true,
+     "compressed_pages_observed": true
+    },
+    "reclaim": {
+     "app": "libreoffice",
+     "method": "reclaim",
+     "retained_rss_bytes": 355348480,
+     "retained_cgroup_bytes": 262479872,
+     "requested_bytes": 33554432,
+     "observed_net_release_bytes": 23420928,
+     "baseline_pgfault": 47331,
+     "current_pgfault": 46649,
+     "baseline_task_ms": 2827.9590829999997,
+     "current_task_ms": 2189.976163,
+     "baseline_path": "/home/qi/krita-code-share-20261101/parp-measured-validation-20261113/results/trials/baseline-combined-off-e7f19d3b/result.json",
+     "baseline_sha256": "d955b644106fb503650275932eaf352400479e5aa2d8450761ca4f0f4eaca7ea",
+     "trial_path": "/home/qi/krita-code-share-20261101/parp-measured-validation-20261113/results/trials/calibration-combined-off-4cec9673/result.json",
+     "trial_sha256": "96afbe2cbf498e1c8a773614f5aa3f4e42b4f4ae75c074dbe40b69ee9ba577d6",
+     "workload_key": "combined-old-and-new-hot-plus-old-document-revisit",
+     "compression_enabled": true,
+     "compressed_pages_observed": true
+    }
+   },
+   "firefox": {
+    "high": {
+     "app": "firefox",
+     "method": "high",
+     "retained_rss_bytes": 1665921024,
+     "retained_cgroup_bytes": 907526144,
+     "requested_bytes": 134217728,
+     "observed_net_release_bytes": 101736448,
+     "baseline_pgfault": 250514,
+     "current_pgfault": 254373,
+     "baseline_task_ms": 7386.249986,
+     "current_task_ms": 8135.314714,
+     "baseline_path": "/home/qi/krita-code-share-20261101/parp-measured-validation-20261113/results/trials/baseline-combined-off-e7f19d3b/result.json",
+     "baseline_sha256": "d955b644106fb503650275932eaf352400479e5aa2d8450761ca4f0f4eaca7ea",
+     "trial_path": "/home/qi/krita-code-share-20261101/parp-measured-validation-20261113/results/trials/calibration-combined-off-c8875e2b/result.json",
+     "trial_sha256": "51d34f34635963eedc4612a3debbb2b1c6d6be06c74b7af88af925ecd87062f2",
+     "workload_key": "combined-old-and-new-hot-plus-old-document-revisit",
+     "compression_enabled": true,
+     "compressed_pages_observed": true
+    },
+    "reclaim": {
+     "app": "firefox",
+     "method": "reclaim",
+     "retained_rss_bytes": 1640615936,
+     "retained_cgroup_bytes": 913592320,
+     "requested_bytes": 33554432,
+     "observed_net_release_bytes": 40820736,
+     "baseline_pgfault": 250514,
+     "current_pgfault": 251215,
+     "baseline_task_ms": 7386.249986,
+     "current_task_ms": 7523.004696,
+     "baseline_path": "/home/qi/krita-code-share-20261101/parp-measured-validation-20261113/results/trials/baseline-combined-off-e7f19d3b/result.json",
+     "baseline_sha256": "d955b644106fb503650275932eaf352400479e5aa2d8450761ca4f0f4eaca7ea",
+     "trial_path": "/home/qi/krita-code-share-20261101/parp-measured-validation-20261113/results/trials/calibration-combined-off-87d8896e/result.json",
+     "trial_sha256": "26606335af164b7e329eb8daa745b670ed4d40dc53be3a89a1dbb3cfb65ab25a",
+     "workload_key": "combined-old-and-new-hot-plus-old-document-revisit",
+     "compression_enabled": true,
+     "compressed_pages_observed": true
+    }
+   }
+  },
+  "scope_checks": {
+   "gimp": {
+    "high": [
+     {
+      "trial_sha256": "20eec88b7714bd9faa5378279d1773c115b80220d9a33b344112a610bb27f5b4",
+      "allowed_absolute_extra": 102817.3,
+      "paired_extra": 741,
+      "scope_approved": true
+     },
+     {
+      "trial_sha256": "6cd5e8be3c3780bb74ff2c3f1721d3106994f28bac41e6f58376ba227d87d2fd",
+      "allowed_absolute_extra": 102817.3,
+      "paired_extra": 4688,
+      "scope_approved": true
+     },
+     {
+      "trial_sha256": "ee7973924f03393a1e71899e2c9c9f07c93774c4701fab9634ca89ba94efb2eb",
+      "allowed_absolute_extra": 102817.3,
+      "paired_extra": 13161,
+      "scope_approved": true
+     },
+     {
+      "trial_sha256": "022cf91aeddb0db9689df1828f0be786a89780c383500db308771497ec8d1b14",
+      "allowed_absolute_extra": 102817.3,
+      "paired_extra": 34721,
+      "scope_approved": true
+     },
+     {
+      "trial_sha256": "04acd243c16fe3376b109639a1f289fca038ca383b56dbc40448565c04707e5d",
+      "allowed_absolute_extra": 102817.3,
+      "paired_extra": 65069,
+      "scope_approved": true
+     }
+    ],
+    "reclaim": [
+     {
+      "trial_sha256": "6a4691336b3d19b71b179f3519e75ab1478b06e99130313b9ac24f58f05a9f88",
+      "allowed_absolute_extra": 102817.3,
+      "paired_extra": 758,
+      "scope_approved": true
+     },
+     {
+      "trial_sha256": "76cf92781021dc51c1d47ed7da021ca7a2ff96b85b4248ace11eb59abbc848e9",
+      "allowed_absolute_extra": 102817.3,
+      "paired_extra": 4311,
+      "scope_approved": true
+     },
+     {
+      "trial_sha256": "237ca33c8a5565138ab32b081bf383147f56cc204a2f03a0b29b08ffbe1a7bd5",
+      "allowed_absolute_extra": 102817.3,
+      "paired_extra": 12549,
+      "scope_approved": true
+     },
+     {
+      "trial_sha256": "b2446fec2f53e5f17d41f413d64765c7612efe377d128cc43b5c0cf789ef9321",
+      "allowed_absolute_extra": 102817.3,
+      "paired_extra": 28969,
+      "scope_approved": true
+     },
+     {
+      "trial_sha256": "5faa17441c72febfac246d524f96ef50a2e541a564a55d62a95b6049b0f52d86",
+      "allowed_absolute_extra": 102817.3,
+      "paired_extra": 61710,
+      "scope_approved": true
+     }
+    ]
+   },
+   "libreoffice": {
+    "high": [
+     {
+      "trial_sha256": "68d568c0131121fd05d566781bd65e5de5a983c4dc597b40dada203ae572c12f",
+      "allowed_absolute_extra": 1563.5,
+      "paired_extra": 184,
+      "scope_approved": true
+     },
+     {
+      "trial_sha256": "8177d9127e26ada4268caa5362e82d8c411b5d6cc5814ccebe3844263d1331a3",
+      "allowed_absolute_extra": 1563.5,
+      "paired_extra": -2062,
+      "scope_approved": true
+     }
+    ],
+    "reclaim": [
+     {
+      "trial_sha256": "2b16d2698c3749a727f0165134f45f039a8124e1eb3af8e70ffe4696e392c15d",
+      "allowed_absolute_extra": 1563.5,
+      "paired_extra": 267,
+      "scope_approved": true
+     },
+     {
+      "trial_sha256": "43f3af55ea4b364300c739bc6be742a026983543926e771064da7c4e5c4df7d5",
+      "allowed_absolute_extra": 1563.5,
+      "paired_extra": 422,
+      "scope_approved": true
+     },
+     {
+      "trial_sha256": "96afbe2cbf498e1c8a773614f5aa3f4e42b4f4ae75c074dbe40b69ee9ba577d6",
+      "allowed_absolute_extra": 1563.5,
+      "paired_extra": -682,
+      "scope_approved": true
+     },
+     {
+      "trial_sha256": "7b34b1feaf2e1e8b6bd18f0a2b396cd4f25182828b857b2ee08ac1d62a741f3a",
+      "allowed_absolute_extra": 1563.5,
+      "paired_extra": 9562,
+      "scope_approved": false
+     }
+    ]
+   },
+   "firefox": {
+    "high": [
+     {
+      "trial_sha256": "dab2f00f5bb716aa2d019c663f3836172935ea30b06f375435fe10e9e7e2b0a5",
+      "allowed_absolute_extra": 8423.4,
+      "paired_extra": -416,
+      "scope_approved": true
+     },
+     {
+      "trial_sha256": "c4fc418ef3da913c653e80fd0491092072e3ca6f65f81988021d80a4ebb4ce1b",
+      "allowed_absolute_extra": 8423.4,
+      "paired_extra": 963,
+      "scope_approved": true
+     },
+     {
+      "trial_sha256": "43d0792e9afdd7c1441c8f15129ca7d6a908308330debfa619a3776ea1847a5f",
+      "allowed_absolute_extra": 8423.4,
+      "paired_extra": 1794,
+      "scope_approved": true
+     },
+     {
+      "trial_sha256": "51d34f34635963eedc4612a3debbb2b1c6d6be06c74b7af88af925ecd87062f2",
+      "allowed_absolute_extra": 8423.4,
+      "paired_extra": 3859,
+      "scope_approved": true
+     }
+    ],
+    "reclaim": [
+     {
+      "trial_sha256": "f71bc369863263a02aa1cbd237974988ef43b019a7bbd99d67c313acc8e91ddb",
+      "allowed_absolute_extra": 8423.4,
+      "paired_extra": 302,
+      "scope_approved": true
+     },
+     {
+      "trial_sha256": "26606335af164b7e329eb8daa745b670ed4d40dc53be3a89a1dbb3cfb65ab25a",
+      "allowed_absolute_extra": 8423.4,
+      "paired_extra": 701,
+      "scope_approved": true
+     },
+     {
+      "trial_sha256": "7ffc10f5c3f408f2d1f77fdad76a7c18455117705dd31a9112c1cc61ffb45eef",
+      "allowed_absolute_extra": 8423.4,
+      "paired_extra": 3358,
+      "scope_approved": true
+     }
+    ]
+   }
+  },
+  "context": "same combined task paired against its controls; additionally cap extra faults by smallest reference-task allowance"
+ },
+ "limitations": [
+  "four-app fixed-capacity test domain; not physical 16GiB exhaustion",
+  "measured future replay, not a trained model",
+  "one pair per scenario; not a statistical optimum",
+  "Referenced WSS uses the original shared-file lower-bound convention"
+ ],
+ "final_state": {
+  "formal_complete": true,
+  "sources_unchanged": true,
+  "remaining_test_cgroups": [],
+  "live_owned_displays": [],
+  "parent_high": "max",
+  "parent_max": "max",
+  "kernel": "6.17.13",
+  "guard": {
+   "status": "RESTORED",
+   "zswap": "N",
+   "pid": 18567
+  },
+  "zswap_restored_to": "N"
+ },
+ "host_min_GiB_formal": 3.9266510009765625,
+ "host_min_GiB_calibration": 3.2860069274902344,
+ "calibration_levels": 23
+}

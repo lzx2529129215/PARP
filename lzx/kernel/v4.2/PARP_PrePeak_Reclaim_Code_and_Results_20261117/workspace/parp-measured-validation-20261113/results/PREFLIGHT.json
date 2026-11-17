@@ -1,0 +1,78 @@
+{
+ "status": "PASS",
+ "unit_test_output": ".........................\n----------------------------------------------------------------------\nRan 25 tests in 0.011s\n\nOK\n",
+ "approved_points": {
+  "gimp": {
+   "high": {
+    "actual_attempt_cap_bytes": 159383552,
+    "maximum_net_allowance_bytes": 159383552,
+    "retained_rss_bytes": 906596352,
+    "retained_cgroup_bytes": 852414464,
+    "baseline_pgfault": 1028186,
+    "current_pgfault": 1093255
+   },
+   "reclaim": {
+    "actual_attempt_cap_bytes": 268435456,
+    "maximum_net_allowance_bytes": 254119936,
+    "retained_rss_bytes": 908136448,
+    "retained_cgroup_bytes": 854016000,
+    "baseline_pgfault": 1028186,
+    "current_pgfault": 1089896
+   }
+  },
+  "libreoffice": {
+   "high": {
+    "actual_attempt_cap_bytes": 8388608,
+    "maximum_net_allowance_bytes": 8388608,
+    "retained_rss_bytes": 369672192,
+    "retained_cgroup_bytes": 271208448,
+    "baseline_pgfault": 47331,
+    "current_pgfault": 47515
+   },
+   "reclaim": {
+    "actual_attempt_cap_bytes": 33554432,
+    "maximum_net_allowance_bytes": 23420928,
+    "retained_rss_bytes": 355348480,
+    "retained_cgroup_bytes": 262479872,
+    "baseline_pgfault": 47331,
+    "current_pgfault": 46649
+   }
+  },
+  "firefox": {
+   "high": {
+    "actual_attempt_cap_bytes": 75206656,
+    "maximum_net_allowance_bytes": 75206656,
+    "retained_rss_bytes": 1665921024,
+    "retained_cgroup_bytes": 907526144,
+    "baseline_pgfault": 250514,
+    "current_pgfault": 254373
+   },
+   "reclaim": {
+    "actual_attempt_cap_bytes": 32956416,
+    "maximum_net_allowance_bytes": 32956416,
+    "retained_rss_bytes": 1640615936,
+    "retained_cgroup_bytes": 913592320,
+    "baseline_pgfault": 250514,
+    "current_pgfault": 251215
+   }
+  }
+ },
+ "previews": {
+  "stable": {
+   "real_numeric_inputs": 36,
+   "online_forecasts": 12,
+   "kernel_writes": 0
+  },
+  "turnover": {
+   "real_numeric_inputs": 33,
+   "online_forecasts": 12,
+   "kernel_writes": 0
+  },
+  "revisit": {
+   "real_numeric_inputs": 36,
+   "online_forecasts": 12,
+   "kernel_writes": 0
+  }
+ },
+ "native_memory_policy_executed": false
+}
