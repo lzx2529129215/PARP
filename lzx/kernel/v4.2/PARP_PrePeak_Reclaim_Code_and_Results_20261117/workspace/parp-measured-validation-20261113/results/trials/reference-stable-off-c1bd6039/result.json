@@ -1,0 +1,84 @@
+{
+ "tag": "reference-stable-off-c1bd6039",
+ "run_id": "c1bd603995c64118",
+ "stage": "reference",
+ "scenario": "stable",
+ "enabled": false,
+ "root": "/home/qi/parp-measured-trial-c1bd6039",
+ "base": "/sys/fs/cgroup/user.slice/user-1000.slice/user@1000.service/parp-measured-2a4865116cc0",
+ "status": "FAILED",
+ "trained_predictors_called": false,
+ "original_controller_modified": false,
+ "safety_floor": "native calibration evidence required for formal execution",
+ "pressure_scope": "one isolated cgroup containing four native applications; not physical-machine exhaustion",
+ "zswap": "Y",
+ "kernel": "6.17.13",
+ "operations": [
+  {
+   "app": "gimp",
+   "kind": "warm_hot",
+   "start_ns": 9328507317523,
+   "end_ns": 9329584235133,
+   "elapsed_ms": 1076.91761,
+   "pgfault": 65,
+   "pgmajfault": 0,
+   "error": null
+  },
+  {
+   "app": "libreoffice",
+   "kind": "warm_hot",
+   "start_ns": 9329584496327,
+   "end_ns": 9329586400254,
+   "elapsed_ms": 1.903927,
+   "pgfault": 0,
+   "pgmajfault": 0,
+   "error": null
+  },
+  {
+   "app": "firefox",
+   "kind": "warm_hot",
+   "start_ns": 9329586589327,
+   "end_ns": 9329949316950,
+   "elapsed_ms": 362.727623,
+   "pgfault": 16785,
+   "pgmajfault": 0,
+   "error": null
+  }
+ ],
+ "cold_preset": {
+  "gimp": "old-image layers 3..15 not touched before revisit",
+  "libreoffice": "old rows 100..79999 not read before revisit",
+  "firefox": "old canvas 1..7 not read before revisit",
+  "meaning": "scripted cold objects; eligible bytes bounded by measured safety, not RSS percentages"
+ },
+ "error": "RuntimeError(\"collector incomplete: ValueError('dictionary update sequence element #59 has length 1; 2 is required')\")",
+ "cleanup": {
+  "complete": true,
+  "remaining": {
+   "background": [],
+   "libreoffice": [],
+   "firefox": [],
+   "foreground": []
+  },
+  "terminated_owned_pids": [
+   17618,
+   17795,
+   17798,
+   17958,
+   17988,
+   18097,
+   18104,
+   18184,
+   18195,
+   18202,
+   18211,
+   18258,
+   18298,
+   18305,
+   18355,
+   18363,
+   18381,
+   17628
+  ]
+ }
+}

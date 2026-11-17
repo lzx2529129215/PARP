@@ -1,0 +1,28 @@
+{
+  "base": "parp-measured-validation-20261113",
+  "controller_files": {
+    "adapters.py": "02e7edacc912b11c0b054962194f6e99a07ac9b064c7fc41be53ef4d74d5e3d9",
+    "coordinator.py": "11eaa4f598731f1338e6f64da281c173cb5288fc0b05e137efa36da371bf5f74",
+    "executor.py": "c0f8e27f3a7cd59f61408e701bc1987726d4123f986a2e5eb689e1178c23f8bf",
+    "faults.py": "3e7ff27aac2cf75059254088807a1768c811771f0a78ad73d94c56a753c375c7",
+    "native.py": "9b14655b61edb0d6ae7e0ad375b396730264cf8ef815bc7c1dae49886af3c7d4",
+    "plan.py": "5eb7ed7f4758dd0b90e3874bebcd9affa1b7f17a4cd4de97c805769b1dde4c1a",
+    "replay_forecast.py": "9b30a0a25526a8f0ad850d4048d4058bdb3683d843c4c28ba5a1b8fd7a270245",
+    "safety_store.py": "4c6f9948d84b620e72519d7a1d346c812c92c3089982c0cdc9d4117d1fb6cdaa",
+    "signals.py": "52fdc181b8605af31683aa92240290073d36e9d08e0d976f84c1efc796f0e7f3",
+    "test_measured.py": "8ca86005d3b840f713b0720129c60e31ceecb9b76c4ea7e296165be7081db0c8",
+    "workflow.py": "140743fd24b469a8d54e0fd76dacc565a7a13e924adc00c8bae07bf528337c6a"
+  },
+  "measurement_sources": "passive collector and task counters from parp-userspace-aligned-20261115",
+  "native_workload_sources": {
+    "native_apps.py": "670aa5cacf48581b94d6576b80064f13f200417628dfb9436ed65ed91edc6bda",
+    "foreground_probe.py": "77ab3d795ec9202a5e83a6891472775c5892ad4dc8d266b0e33aaee7cc838402"
+  },
+  "measurement_patches": {
+    "foreground_probe.py": {
+      "original_sha256": "77ab3d795ec9202a5e83a6891472775c5892ad4dc8d266b0e33aaee7cc838402",
+      "patched_sha256": "d75a3f3e6c49097c362333493b659f99fd206badf1f64fead9efbb0eca35d9a1",
+      "reason": "Use existing wait_until_ns to prevent negative sleep race; workload and dispatch cadence unchanged"
+    }
+  }
+}
