@@ -1,0 +1,3 @@
+{"app": "libreoffice", "name": "memory.reclaim", "value": 8388608, "start_ns": 14064133976866, "end_ns": 14064202163917, "before_bytes": 285900800, "after_bytes": 279855104, "error": null}
+{"app": "libreoffice", "name": "memory.reclaim", "value": 16777216, "start_ns": 14064254804795, "end_ns": 14064332857811, "before_bytes": 279855104, "after_bytes": 267849728, "error": null}
+{"app": "libreoffice", "name": "memory.reclaim", "value": 8388608, "start_ns": 14064387702635, "end_ns": 14064407022731, "before_bytes": 267849728, "after_bytes": 261517312, "error": null}

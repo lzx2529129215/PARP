@@ -1,0 +1,3 @@
+{"app": "gimp", "name": "memory.high", "value": 1099730944, "start_ns": 12961928729405, "end_ns": 12962012478554, "before_bytes": 1108119552, "after_bytes": 1097457664, "error": null}
+{"app": "gimp", "name": "memory.high", "value": 1095630848, "start_ns": 12962118551183, "end_ns": 12962126428976, "before_bytes": 1097457664, "after_bytes": 1095245824, "error": null}
+{"app": "gimp", "name": "memory.high", "value": "max", "start_ns": 12963923753801, "end_ns": 12963923773759, "before_bytes": 1095069696, "after_bytes": 1095069696, "error": null}
