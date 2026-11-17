@@ -1,0 +1,4 @@
+{"app": "firefox", "name": "memory.reclaim", "value": 8388608, "start_ns": 14687573629582, "end_ns": 14687574991781, "before_bytes": 994516992, "after_bytes": 986066944, "error": null}
+{"app": "firefox", "name": "memory.reclaim", "value": 16777216, "start_ns": 14687733390374, "end_ns": 14687735008849, "before_bytes": 986329088, "after_bytes": 969007104, "error": null}
+{"app": "firefox", "name": "memory.reclaim", "value": 33554432, "start_ns": 14687839044943, "end_ns": 14687946339134, "before_bytes": 969007104, "after_bytes": 943693824, "error": null}
+{"app": "firefox", "name": "memory.reclaim", "value": 8388608, "start_ns": 14687999834471, "end_ns": 14688023202259, "before_bytes": 943693824, "after_bytes": 937263104, "error": null}
