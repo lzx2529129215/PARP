@@ -1,0 +1,7 @@
+{"app": "libreoffice", "name": "memory.high", "value": 377331712, "start_ns": 364316083195027, "end_ns": 364316083227628, "before_bytes": 294240256, "after_bytes": 294240256, "error": null, "error_errno": null, "previous_limit": null}
+{"app": "libreoffice", "name": "memory.reclaim", "value": 8388608, "start_ns": 364316093429184, "end_ns": 364316142600833, "before_bytes": 294240256, "after_bytes": 288165888, "error": null, "error_errno": null}
+{"app": "libreoffice", "name": "memory.reclaim", "value": 15712256, "start_ns": 364316240438021, "end_ns": 364316282316308, "before_bytes": 288165888, "after_bytes": 277102592, "error": null, "error_errno": null}
+{"app": "libreoffice", "name": "memory.reclaim", "value": 4382720, "start_ns": 364316382808478, "end_ns": 364316397981171, "before_bytes": 277102592, "after_bytes": 273989632, "error": null, "error_errno": null}
+{"app": "libreoffice", "name": "memory.reclaim", "value": 1269760, "start_ns": 364316537444335, "end_ns": 364316542446386, "before_bytes": 273989632, "after_bytes": 272805888, "error": null, "error_errno": null}
+{"app": "libreoffice", "name": "memory.reclaim", "value": 143360, "start_ns": 364316899292744, "end_ns": 364316899841501, "before_bytes": 272752640, "after_bytes": 272564224, "error": null, "error_errno": null}
+{"app": "libreoffice", "name": "memory.high", "value": "max", "start_ns": 364318044563904, "end_ns": 364318044588653, "before_bytes": 273522688, "after_bytes": 273522688, "error": null, "error_errno": null, "previous_limit": 377331712}
