@@ -1,0 +1,7 @@
+{"app": "gimp", "name": "memory.high", "value": 1099722752, "start_ns": 15449339355777, "end_ns": 15449438535146, "before_bytes": 1108111360, "after_bytes": 1097150464, "error": null}
+{"app": "gimp", "name": "memory.high", "value": 1080373248, "start_ns": 15449465996933, "end_ns": 15449504966050, "before_bytes": 1097150464, "after_bytes": 1078394880, "error": null}
+{"app": "gimp", "name": "memory.high", "value": 1044840448, "start_ns": 15449584385110, "end_ns": 15449752681086, "before_bytes": 1078394880, "after_bytes": 1016467456, "error": null}
+{"app": "gimp", "name": "memory.high", "value": 982913024, "start_ns": 15449757834523, "end_ns": 15449848685107, "before_bytes": 1016467456, "after_bytes": 958054400, "error": null}
+{"app": "gimp", "name": "memory.high", "value": 924499968, "start_ns": 15449881164082, "end_ns": 15449964742226, "before_bytes": 958054400, "after_bytes": 902995968, "error": null}
+{"app": "gimp", "name": "memory.high", "value": 869441536, "start_ns": 15450000596979, "end_ns": 15450115401093, "before_bytes": 902995968, "after_bytes": 850944000, "error": null}
+{"app": "gimp", "name": "memory.high", "value": "max", "start_ns": 15450117614724, "end_ns": 15450117630183, "before_bytes": 850944000, "after_bytes": 850944000, "error": null}

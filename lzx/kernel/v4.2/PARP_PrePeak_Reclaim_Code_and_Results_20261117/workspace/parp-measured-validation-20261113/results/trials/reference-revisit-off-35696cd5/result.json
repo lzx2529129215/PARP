@@ -1,0 +1,53 @@
+{
+ "tag": "reference-revisit-off-35696cd5",
+ "run_id": "35696cd5c5bc4e9c",
+ "stage": "reference",
+ "scenario": "revisit",
+ "enabled": false,
+ "root": "/home/qi/parp-measured-trial-35696cd5",
+ "base": "/sys/fs/cgroup/user.slice/user-1000.slice/user@1000.service/parp-measured-75ab956b796a",
+ "status": "FAILED",
+ "trained_predictors_called": false,
+ "original_controller_modified": false,
+ "safety_floor": "native calibration evidence required for formal execution",
+ "pressure_scope": "one isolated cgroup containing four native applications; not physical-machine exhaustion",
+ "zswap": "Y",
+ "kernel": "6.17.13",
+ "operations": [],
+ "cold_preset": {
+  "gimp": "old-image layers 3..15 not touched before revisit",
+  "libreoffice": "old rows 100..79999 not read before revisit",
+  "firefox": "old canvas 1..7 not read before revisit",
+  "meaning": "scripted cold objects; eligible bytes bounded by measured safety, not RSS percentages"
+ },
+ "error": "RuntimeError('/home/qi/parp-measured-trial-35696cd5/foreground/ready.json helper exited')",
+ "cleanup": {
+  "complete": true,
+  "remaining": {
+   "background": [],
+   "libreoffice": [],
+   "firefox": [],
+   "foreground": []
+  },
+  "terminated_owned_pids": [
+   22226,
+   22401,
+   22406,
+   22572,
+   22601,
+   22678,
+   22683,
+   22762,
+   22772,
+   22778,
+   22786,
+   22830,
+   22868,
+   22876,
+   22909,
+   22926,
+   22929,
+   22233
+  ]
+ }
+}
