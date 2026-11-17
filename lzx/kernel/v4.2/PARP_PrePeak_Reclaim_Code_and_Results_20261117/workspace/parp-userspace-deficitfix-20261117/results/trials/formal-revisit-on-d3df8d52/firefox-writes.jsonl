@@ -1,0 +1,2 @@
+{"app": "firefox", "name": "memory.high", "value": 1052372992, "start_ns": 364729557163120, "end_ns": 364729557307357, "before_bytes": 1022279680, "after_bytes": 1022279680, "error": null, "error_errno": null, "previous_limit": null}
+{"app": "firefox", "name": "memory.high", "value": "max", "start_ns": 364744769263979, "end_ns": 364744769302128, "before_bytes": 1052254208, "after_bytes": 1052254208, "error": null, "error_errno": null, "previous_limit": 1052372992}

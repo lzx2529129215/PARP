@@ -1,0 +1,9 @@
+{"app": "gimp", "name": "memory.high", "value": 1613508608, "start_ns": 364729558149253, "end_ns": 364729558216781, "before_bytes": 1108414464, "after_bytes": 1108414464, "error": null, "error_errno": null, "previous_limit": null}
+{"app": "gimp", "name": "memory.reclaim", "value": 8388608, "start_ns": 364729562406408, "end_ns": 364729601636666, "before_bytes": 1108414464, "after_bytes": 1102094336, "error": null, "error_errno": null}
+{"app": "gimp", "name": "memory.reclaim", "value": 16777216, "start_ns": 364729685658471, "end_ns": 364729737646756, "before_bytes": 1102094336, "after_bytes": 1089261568, "error": null, "error_errno": null}
+{"app": "gimp", "name": "memory.reclaim", "value": 33554432, "start_ns": 364729827179089, "end_ns": 364729881686110, "before_bytes": 1089261568, "after_bytes": 1056555008, "error": null, "error_errno": null}
+{"app": "gimp", "name": "memory.reclaim", "value": 33554432, "start_ns": 364729953829894, "end_ns": 364730006302704, "before_bytes": 1056555008, "after_bytes": 1023938560, "error": null, "error_errno": null}
+{"app": "gimp", "name": "memory.reclaim", "value": 33554432, "start_ns": 364730115913903, "end_ns": 364730187109328, "before_bytes": 1023909888, "after_bytes": 991399936, "error": null, "error_errno": null}
+{"app": "gimp", "name": "memory.reclaim", "value": 33554432, "start_ns": 364730261817477, "end_ns": 364730338781822, "before_bytes": 991399936, "after_bytes": 958980096, "error": null, "error_errno": null}
+{"app": "gimp", "name": "memory.reclaim", "value": 33554432, "start_ns": 364730408973554, "end_ns": 364730454178725, "before_bytes": 958980096, "after_bytes": 926347264, "error": null, "error_errno": null}
+{"app": "gimp", "name": "memory.high", "value": "max", "start_ns": 364731487570477, "end_ns": 364731490055796, "before_bytes": 927133696, "after_bytes": 927657984, "error": null, "error_errno": null, "previous_limit": 1613508608}

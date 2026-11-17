@@ -1,0 +1,2 @@
+{"app": "libreoffice", "name": "memory.high", "value": 377331712, "start_ns": 364729555405741, "end_ns": 364729555785101, "before_bytes": 277102592, "after_bytes": 277102592, "error": null, "error_errno": null, "previous_limit": null}
+{"app": "libreoffice", "name": "memory.high", "value": "max", "start_ns": 364753118665829, "end_ns": 364753118691837, "before_bytes": 323235840, "after_bytes": 323235840, "error": null, "error_errno": null, "previous_limit": 377331712}
