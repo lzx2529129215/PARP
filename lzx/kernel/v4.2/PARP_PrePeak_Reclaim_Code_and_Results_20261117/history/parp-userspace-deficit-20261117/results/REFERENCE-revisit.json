@@ -1,0 +1,6 @@
+{
+ "path": "results/trials/reference-revisit-off-1c273199/result.json",
+ "sha256": "2cfab89c8a88aa2d1cbff15b42a5b9126d7e4ac8a641ae688e64c70daf96436d",
+ "reference_mode": "unclipped_demand",
+ "minimum_initial_gap_bytes": 67108864
+}

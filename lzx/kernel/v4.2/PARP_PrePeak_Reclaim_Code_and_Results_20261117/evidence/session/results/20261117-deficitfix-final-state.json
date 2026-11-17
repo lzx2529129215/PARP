@@ -1,0 +1,15 @@
+{
+  "job": "20261117-deficitfix-final-state",
+  "argv": [
+    "python3",
+    "-B",
+    "-c",
+    "import json,os\nfrom pathlib import Path\np=Path('/sys/fs/cgroup/user.slice/user-1000.slice/user@1000.service')\ns={'guard':json.loads(Path('/home/qi/parp-measured-lab-20261113/guard_status.json').read_text()),'zswap':Path('/sys/module/zswap/parameters/enabled').read_text().strip(),'experiment_cgroups':[str(x)for x in p.glob('parp-measured-*')],'high':(p/'memory.high').read_text().strip(),'max':(p/'memory.max').read_text().strip()}\nassert s['guard']['status']=='RESTORED'and s['zswap']=='N'and not s['experiment_cgroups'],s\nPath('results/FINAL_STATE-20261117.json').write_text(json.dumps(s,indent=2))\nprint(json.dumps(s))"
+  ],
+  "returncode": 0,
+  "started_ns": 1794911573896900176,
+  "ended_ns": 1794911574026449951,
+  "log": "logs/20261117-deficitfix-final-state.log",
+  "preserved_process": false,
+  "frozen_files_verified": 10
+}

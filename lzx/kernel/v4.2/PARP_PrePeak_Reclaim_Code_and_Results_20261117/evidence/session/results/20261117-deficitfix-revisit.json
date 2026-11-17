@@ -1,0 +1,16 @@
+{
+  "job": "20261117-deficitfix-revisit",
+  "argv": [
+    "python3",
+    "-u",
+    "-B",
+    "-c",
+    "import json,os,time\nfrom pathlib import Path\nprint('WAITING_FOR_LOCAL_COLLECTOR',flush=True)\nuntil=time.monotonic()+600\nwhile time.monotonic()<until:\n    p=Path('/home/qi/parp-measured-lab-20261113/guard_status.json')\n    if p.exists() and json.loads(p.read_text()).get('status')=='ACTIVE' and Path('/sys/module/zswap/parameters/enabled').read_text().strip()=='Y':break\n    time.sleep(.5)\nelse:raise RuntimeError('local collector not started')\nassert not list(Path('/sys/fs/cgroup/user.slice/user-1000.slice/user@1000.service').glob('parp-measured-*'))\nos.execvp('python3',['python3','-u','-B','run_total.py','--scenario','revisit','--scope','per_app','--reference-limit-mib','6144','--target-gap-mib','256','--minimum-gap-mib','64','--reuse-reference-json','results/trials/reference-revisit-off-1c273199/result.json'])\n"
+  ],
+  "returncode": 0,
+  "started_ns": 1794910521741074442,
+  "ended_ns": 1794911374832071024,
+  "log": "logs/20261117-deficitfix-revisit.log",
+  "preserved_process": false,
+  "frozen_files_verified": 10
+}

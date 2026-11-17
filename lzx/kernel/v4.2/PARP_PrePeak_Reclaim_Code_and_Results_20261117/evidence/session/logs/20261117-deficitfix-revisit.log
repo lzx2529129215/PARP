@@ -1,0 +1,139 @@
+WAITING_FOR_LOCAL_COLLECTOR
+TOTAL_REFERENCE_START revisit
+REUSED_UNCLIPPED_REFERENCE reference-revisit-off-1c273199
+DEFICIT_SETUP {'test_limit_MiB': 3854.0, 'demand_growth_MiB': 886.28515625, 'target_gap_MiB': 256, 'minimum_gap_MiB': 64}
+TOTAL_START 1 baseline
+PREPARING baseline-revisit-off-a747fd88
+GIMP_LOADED baseline-revisit-off-a747fd88
+CALC_LOADED baseline-revisit-off-a747fd88
+FIREFOX_LOADED baseline-revisit-off-a747fd88
+DEFICIT_ADMITTED baseline-revisit-off-a747fd88 {"demand_growth_bytes": 929337344, "initial_free_bytes": 762916864, "initial_gap_bytes": 166420480, "required_minimum_gap_bytes": 67108864, "passed": true}
+PEAK_STARTED baseline-revisit-off-a747fd88
+PEAK_SPACE_CHECK baseline-revisit-off-a747fd88 {"unfilled_bytes": 167313408, "enabled": false, "prepeak_net_drop_bytes": -892928}
+COMPLETE baseline-revisit-off-a747fd88
+TOTAL_END 1 baseline
+TOTAL_START 2 calibration
+PREPARING calibration-revisit-on-cfc0a617
+GIMP_LOADED calibration-revisit-on-cfc0a617
+CALC_LOADED calibration-revisit-on-cfc0a617
+FIREFOX_LOADED calibration-revisit-on-cfc0a617
+DEFICIT_ADMITTED calibration-revisit-on-cfc0a617 {"demand_growth_bytes": 929337344, "initial_free_bytes": 708829184, "initial_gap_bytes": 220508160, "required_minimum_gap_bytes": 67108864, "passed": true}
+RUNTIME_TARGET_UNFILLED calibration-revisit-on-cfc0a617 {"time_s": 1.9716627279412933, "event": "release_deadline", "unfilled_bytes": 34840576, "deadline_s": 1.954391338978894, "inflight_apps": []}
+PROTECTION_EVENT calibration-revisit-on-cfc0a617 {"time_s": 2.135193, "event": "paused", "app": "gimp", "reason": "feedback", "used_bytes": 192937984}
+PEAK_STARTED calibration-revisit-on-cfc0a617
+PEAK_SPACE_CHECK calibration-revisit-on-cfc0a617 {"unfilled_bytes": 0, "enabled": true, "prepeak_net_drop_bytes": 251228160}
+PROTECTION_EVENT calibration-revisit-on-cfc0a617 {"time_s": 8.343295, "event": "paused", "app": "gimp", "reason": "feedback", "used_bytes": 192937984}
+PROTECTION_EVENT calibration-revisit-on-cfc0a617 {"time_s": 8.346295, "event": "paused", "app": "firefox", "reason": "feedback", "used_bytes": 0}
+PROTECTION_EVENT calibration-revisit-on-cfc0a617 {"time_s": 11.48897, "event": "paused", "app": "firefox", "reason": "feedback", "used_bytes": 0}
+PROTECTION_EVENT calibration-revisit-on-cfc0a617 {"time_s": 22.81035, "event": "paused", "app": "libreoffice", "reason": "feedback", "used_bytes": 6979584}
+PROTECTION_EVENT calibration-revisit-on-cfc0a617 {"time_s": 23.818275, "event": "terminated", "app": "libreoffice", "reason": "severe_feedback", "used_bytes": 6979584, "remaining_bytes": 26574848, "cleanup_errors": []}
+PROTECTION_EVENT calibration-revisit-on-cfc0a617 {"time_s": 28.995073, "event": "terminated", "app": "gimp", "reason": "severe_feedback", "used_bytes": 192937984, "remaining_bytes": 75497472, "cleanup_errors": []}
+COMPLETE calibration-revisit-on-cfc0a617
+TOTAL_END 2 calibration
+TOTAL_START 3 calibration
+PREPARING calibration-revisit-on-d7fe3cb6
+GIMP_LOADED calibration-revisit-on-d7fe3cb6
+CALC_LOADED calibration-revisit-on-d7fe3cb6
+FIREFOX_LOADED calibration-revisit-on-d7fe3cb6
+DEFICIT_ADMITTED calibration-revisit-on-d7fe3cb6 {"demand_growth_bytes": 929337344, "initial_free_bytes": 688230400, "initial_gap_bytes": 241106944, "required_minimum_gap_bytes": 67108864, "passed": true}
+RUNTIME_TARGET_UNFILLED calibration-revisit-on-d7fe3cb6 {"time_s": 1.9603925209958106, "event": "release_deadline", "unfilled_bytes": 72724480, "deadline_s": 1.954391338978894, "inflight_apps": []}
+PROTECTION_EVENT calibration-revisit-on-d7fe3cb6 {"time_s": 2.049617, "event": "paused", "app": "gimp", "reason": "feedback", "used_bytes": 159383552}
+PROTECTION_EVENT calibration-revisit-on-d7fe3cb6 {"time_s": 2.051082, "event": "paused", "app": "libreoffice", "reason": "feedback", "used_bytes": 29896704}
+PROTECTION_EVENT calibration-revisit-on-d7fe3cb6 {"time_s": 3.112633, "event": "terminated", "app": "firefox", "reason": "severe_feedback", "used_bytes": 0, "remaining_bytes": 75206656, "cleanup_errors": []}
+RUNTIME_TARGET_UNFILLED calibration-revisit-on-d7fe3cb6 {"time_s": 3.518896978988778, "event": "release_deadline", "unfilled_bytes": 11116544, "deadline_s": 3.4767425889731385, "inflight_apps": []}
+RUNTIME_TARGET_UNFILLED calibration-revisit-on-d7fe3cb6 {"time_s": 6.441758368979208, "event": "release_deadline", "unfilled_bytes": 12181504, "deadline_s": 6.422785536968149, "inflight_apps": []}
+PEAK_STARTED calibration-revisit-on-d7fe3cb6
+PEAK_SPACE_CHECK calibration-revisit-on-d7fe3cb6 {"unfilled_bytes": 8908800, "enabled": true, "prepeak_net_drop_bytes": 232198144}
+PROTECTION_EVENT calibration-revisit-on-d7fe3cb6 {"time_s": 8.264542, "event": "paused", "app": "gimp", "reason": "feedback", "used_bytes": 159383552}
+PROTECTION_EVENT calibration-revisit-on-d7fe3cb6 {"time_s": 8.185404, "event": "paused", "app": "libreoffice", "reason": "feedback", "used_bytes": 29896704}
+PROTECTION_EVENT calibration-revisit-on-d7fe3cb6 {"time_s": 29.800943, "event": "terminated", "app": "gimp", "reason": "severe_feedback", "used_bytes": 159383552, "remaining_bytes": 109051904, "cleanup_errors": []}
+COMPLETE calibration-revisit-on-d7fe3cb6
+TOTAL_END 3 calibration
+TOTAL_START 4 baseline
+PREPARING baseline-revisit-off-8f8fe723
+GIMP_LOADED baseline-revisit-off-8f8fe723
+CALC_LOADED baseline-revisit-off-8f8fe723
+FIREFOX_LOADED baseline-revisit-off-8f8fe723
+DEFICIT_ADMITTED baseline-revisit-off-8f8fe723 {"demand_growth_bytes": 929337344, "initial_free_bytes": 676151296, "initial_gap_bytes": 253186048, "required_minimum_gap_bytes": 67108864, "passed": true}
+PEAK_STARTED baseline-revisit-off-8f8fe723
+PEAK_SPACE_CHECK baseline-revisit-off-8f8fe723 {"unfilled_bytes": 250896384, "enabled": false, "prepeak_net_drop_bytes": 2289664}
+COMPLETE baseline-revisit-off-8f8fe723
+TOTAL_END 4 baseline
+TOTAL_START 5 baseline
+PREPARING baseline-revisit-off-ef3aa2a2
+GIMP_LOADED baseline-revisit-off-ef3aa2a2
+CALC_LOADED baseline-revisit-off-ef3aa2a2
+FIREFOX_LOADED baseline-revisit-off-ef3aa2a2
+DEFICIT_ADMITTED baseline-revisit-off-ef3aa2a2 {"demand_growth_bytes": 929337344, "initial_free_bytes": 720068608, "initial_gap_bytes": 209268736, "required_minimum_gap_bytes": 67108864, "passed": true}
+PEAK_STARTED baseline-revisit-off-ef3aa2a2
+PEAK_SPACE_CHECK baseline-revisit-off-ef3aa2a2 {"unfilled_bytes": 210448384, "enabled": false, "prepeak_net_drop_bytes": -1179648}
+COMPLETE baseline-revisit-off-ef3aa2a2
+TOTAL_END 5 baseline
+TOTAL_START 6 calibration
+PREPARING calibration-revisit-on-d2a97d56
+GIMP_LOADED calibration-revisit-on-d2a97d56
+CALC_LOADED calibration-revisit-on-d2a97d56
+FIREFOX_LOADED calibration-revisit-on-d2a97d56
+DEFICIT_ADMITTED calibration-revisit-on-d2a97d56 {"demand_growth_bytes": 929337344, "initial_free_bytes": 707461120, "initial_gap_bytes": 221876224, "required_minimum_gap_bytes": 67108864, "passed": true}
+PROTECTION_EVENT calibration-revisit-on-d2a97d56 {"time_s": 2.027011, "event": "paused", "app": "gimp", "reason": "feedback", "used_bytes": 159383552}
+RUNTIME_TARGET_UNFILLED calibration-revisit-on-d2a97d56 {"time_s": 2.018675521016121, "event": "release_deadline", "unfilled_bytes": 72155136, "deadline_s": 1.954391338978894, "inflight_apps": []}
+RUNTIME_TARGET_UNFILLED calibration-revisit-on-d2a97d56 {"time_s": 3.792402014019899, "event": "release_deadline", "unfilled_bytes": 48463872, "deadline_s": 3.4767425889731385, "inflight_apps": []}
+RUNTIME_TARGET_UNFILLED calibration-revisit-on-d2a97d56 {"time_s": 6.47194194199983, "event": "release_deadline", "unfilled_bytes": 45535232, "deadline_s": 6.422785536968149, "inflight_apps": []}
+PEAK_STARTED calibration-revisit-on-d2a97d56
+PEAK_SPACE_CHECK calibration-revisit-on-d2a97d56 {"unfilled_bytes": 44400640, "enabled": true, "prepeak_net_drop_bytes": 177475584}
+PROTECTION_EVENT calibration-revisit-on-d2a97d56 {"time_s": 8.245368, "event": "paused", "app": "gimp", "reason": "feedback", "used_bytes": 159383552}
+PROTECTION_EVENT calibration-revisit-on-d2a97d56 {"time_s": 15.440926, "event": "terminated", "app": "firefox", "reason": "severe_feedback", "used_bytes": 0, "remaining_bytes": 75206656, "cleanup_errors": []}
+PROTECTION_EVENT calibration-revisit-on-d2a97d56 {"time_s": 22.63538, "event": "paused", "app": "libreoffice", "reason": "feedback", "used_bytes": 0}
+PROTECTION_EVENT calibration-revisit-on-d2a97d56 {"time_s": 29.760383, "event": "terminated", "app": "gimp", "reason": "repeated_feedback", "used_bytes": 159383552, "remaining_bytes": 109051904, "cleanup_errors": []}
+COMPLETE calibration-revisit-on-d2a97d56
+TOTAL_END 6 calibration
+TOTAL_START 7 formal
+PREPARING formal-revisit-on-ac337a1f
+GIMP_LOADED formal-revisit-on-ac337a1f
+CALC_LOADED formal-revisit-on-ac337a1f
+FIREFOX_LOADED formal-revisit-on-ac337a1f
+DEFICIT_ADMITTED formal-revisit-on-ac337a1f {"demand_growth_bytes": 929337344, "initial_free_bytes": 712179712, "initial_gap_bytes": 217157632, "required_minimum_gap_bytes": 67108864, "passed": true}
+RUNTIME_TARGET_UNFILLED formal-revisit-on-ac337a1f {"time_s": 1.9729704100172967, "event": "release_deadline", "unfilled_bytes": 38416384, "deadline_s": 1.954391338978894, "inflight_apps": []}
+PROTECTION_EVENT formal-revisit-on-ac337a1f {"time_s": 2.130284, "event": "paused", "app": "gimp", "reason": "feedback", "used_bytes": 192937984}
+RUNTIME_TARGET_UNFILLED formal-revisit-on-ac337a1f {"time_s": 3.7621933940099552, "event": "release_deadline", "unfilled_bytes": 4853760, "deadline_s": 3.4767425889731385, "inflight_apps": []}
+RUNTIME_TARGET_UNFILLED formal-revisit-on-ac337a1f {"time_s": 6.448878626979422, "event": "release_deadline", "unfilled_bytes": 4718592, "deadline_s": 6.422785536968149, "inflight_apps": []}
+PEAK_STARTED formal-revisit-on-ac337a1f
+PEAK_SPACE_CHECK formal-revisit-on-ac337a1f {"unfilled_bytes": 3260416, "enabled": true, "prepeak_net_drop_bytes": 213897216}
+PROTECTION_EVENT formal-revisit-on-ac337a1f {"time_s": 8.222896, "event": "paused", "app": "gimp", "reason": "feedback", "used_bytes": 192937984}
+PROTECTION_EVENT formal-revisit-on-ac337a1f {"time_s": 14.346158, "event": "paused", "app": "firefox", "reason": "feedback", "used_bytes": 0}
+PROTECTION_EVENT formal-revisit-on-ac337a1f {"time_s": 15.376972, "event": "terminated", "app": "firefox", "reason": "severe_feedback", "used_bytes": 0, "remaining_bytes": 75206656, "cleanup_errors": []}
+PROTECTION_EVENT formal-revisit-on-ac337a1f {"time_s": 22.657589, "event": "paused", "app": "libreoffice", "reason": "feedback", "used_bytes": 0}
+PROTECTION_EVENT formal-revisit-on-ac337a1f {"time_s": 28.819472, "event": "terminated", "app": "gimp", "reason": "severe_feedback", "used_bytes": 192937984, "remaining_bytes": 75497472, "cleanup_errors": []}
+COMPLETE formal-revisit-on-ac337a1f
+TOTAL_END 7 formal
+TOTAL_START 8 formal
+PREPARING formal-revisit-on-d3df8d52
+GIMP_LOADED formal-revisit-on-d3df8d52
+CALC_LOADED formal-revisit-on-d3df8d52
+FIREFOX_LOADED formal-revisit-on-d3df8d52
+DEFICIT_ADMITTED formal-revisit-on-d3df8d52 {"demand_growth_bytes": 929337344, "initial_free_bytes": 742903808, "initial_gap_bytes": 186433536, "required_minimum_gap_bytes": 67108864, "passed": true}
+PROTECTION_EVENT formal-revisit-on-d3df8d52 {"time_s": 2.009775, "event": "paused", "app": "gimp", "reason": "feedback", "used_bytes": 192937984}
+RUNTIME_TARGET_UNFILLED formal-revisit-on-d3df8d52 {"time_s": 2.0022317770053633, "event": "release_deadline", "unfilled_bytes": 9936896, "deadline_s": 1.954391338978894, "inflight_apps": []}
+PEAK_STARTED formal-revisit-on-d3df8d52
+PEAK_SPACE_CHECK formal-revisit-on-d3df8d52 {"unfilled_bytes": 0, "enabled": true, "prepeak_net_drop_bytes": 219684864}
+PROTECTION_EVENT formal-revisit-on-d3df8d52 {"time_s": 8.117809, "event": "paused", "app": "gimp", "reason": "feedback", "used_bytes": 192937984}
+PROTECTION_EVENT formal-revisit-on-d3df8d52 {"time_s": 15.291543, "event": "terminated", "app": "firefox", "reason": "severe_feedback", "used_bytes": 0, "remaining_bytes": 75206656, "cleanup_errors": []}
+PROTECTION_EVENT formal-revisit-on-d3df8d52 {"time_s": 23.641178, "event": "paused", "app": "libreoffice", "reason": "feedback", "used_bytes": 0}
+COMPLETE formal-revisit-on-d3df8d52
+TOTAL_END 8 formal
+TOTAL_START 9 formal
+PREPARING formal-revisit-on-5b42c79e
+GIMP_LOADED formal-revisit-on-5b42c79e
+CALC_LOADED formal-revisit-on-5b42c79e
+FIREFOX_LOADED formal-revisit-on-5b42c79e
+DEFICIT_ADMITTED formal-revisit-on-5b42c79e {"demand_growth_bytes": 929337344, "initial_free_bytes": 732860416, "initial_gap_bytes": 196476928, "required_minimum_gap_bytes": 67108864, "passed": true}
+RUNTIME_TARGET_UNFILLED formal-revisit-on-5b42c79e {"time_s": 1.9746940540499054, "event": "release_deadline", "unfilled_bytes": 17485824, "deadline_s": 1.954391338978894, "inflight_apps": []}
+PROTECTION_EVENT formal-revisit-on-5b42c79e {"time_s": 2.043878, "event": "paused", "app": "gimp", "reason": "feedback", "used_bytes": 192937984}
+PEAK_STARTED formal-revisit-on-5b42c79e
+PEAK_SPACE_CHECK formal-revisit-on-5b42c79e {"unfilled_bytes": 0, "enabled": true, "prepeak_net_drop_bytes": 208142336}
+PROTECTION_EVENT formal-revisit-on-5b42c79e {"time_s": 8.153513, "event": "paused", "app": "gimp", "reason": "feedback", "used_bytes": 192937984}
+PROTECTION_EVENT formal-revisit-on-5b42c79e {"time_s": 14.41705, "event": "terminated", "app": "firefox", "reason": "severe_feedback", "used_bytes": 0, "remaining_bytes": 75206656, "cleanup_errors": []}
+PROTECTION_EVENT formal-revisit-on-5b42c79e {"time_s": 22.594264, "event": "paused", "app": "libreoffice", "reason": "feedback", "used_bytes": 0}
+PROTECTION_EVENT formal-revisit-on-5b42c79e {"time_s": 29.589799, "event": "terminated", "app": "gimp", "reason": "severe_feedback", "used_bytes": 192937984, "remaining_bytes": 75497472, "cleanup_errors": []}
+COMPLETE formal-revisit-on-5b42c79e
+TOTAL_END 9 formal

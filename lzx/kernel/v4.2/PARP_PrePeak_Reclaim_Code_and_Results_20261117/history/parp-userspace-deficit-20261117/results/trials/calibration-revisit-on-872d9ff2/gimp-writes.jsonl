@@ -1,0 +1,10 @@
+{"app": "gimp", "name": "memory.high", "value": 1613508608, "start_ns": 362599921845961, "end_ns": 362599921874773, "before_bytes": 1108430848, "after_bytes": 1108430848, "error": null, "error_errno": null, "previous_limit": null}
+{"app": "gimp", "name": "memory.reclaim", "value": 8388608, "start_ns": 362599928474503, "end_ns": 362599988249687, "before_bytes": 1108430848, "after_bytes": 1101959168, "error": null, "error_errno": null}
+{"app": "gimp", "name": "memory.reclaim", "value": 16777216, "start_ns": 362600077625144, "end_ns": 362600138332675, "before_bytes": 1101959168, "after_bytes": 1089126400, "error": null, "error_errno": null}
+{"app": "gimp", "name": "memory.reclaim", "value": 33554432, "start_ns": 362600223949204, "end_ns": 362600274066561, "before_bytes": 1089126400, "after_bytes": 1056419840, "error": null, "error_errno": null}
+{"app": "gimp", "name": "memory.reclaim", "value": 33554432, "start_ns": 362600354436273, "end_ns": 362600396645875, "before_bytes": 1056419840, "after_bytes": 1023803392, "error": null, "error_errno": null}
+{"app": "gimp", "name": "memory.reclaim", "value": 33554432, "start_ns": 362600527641179, "end_ns": 362600587739814, "before_bytes": 1023623168, "after_bytes": 991375360, "error": null, "error_errno": null}
+{"app": "gimp", "name": "memory.reclaim", "value": 31141888, "start_ns": 362600671307811, "end_ns": 362600732947482, "before_bytes": 991178752, "after_bytes": 961077248, "error": null, "error_errno": null}
+{"app": "gimp", "name": "memory.high", "value": "max", "start_ns": 362601901872145, "end_ns": 362601901900687, "before_bytes": 962367488, "after_bytes": 962367488, "error": null, "error_errno": null, "previous_limit": 1613508608}
+{"app": "gimp", "name": "memory.high", "value": 1613508608, "start_ns": 362605192425087, "end_ns": 362605192454092, "before_bytes": 962772992, "after_bytes": 962772992, "error": null, "error_errno": null, "previous_limit": null}
+{"app": "gimp", "name": "memory.high", "value": "max", "start_ns": 362605195175030, "end_ns": 362605195214989, "before_bytes": 962772992, "after_bytes": 962772992, "error": null, "error_errno": null, "previous_limit": 1613508608}
