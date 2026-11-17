@@ -1,0 +1,46 @@
+{
+  "frozen_at": "2026-11-01T13:09:47.085108+00:00",
+  "instruction": "提前回收逻辑严格不能改",
+  "files": [
+    {
+      "path": "parp-wss-v5\\src\\mm\\parp\\core\\wss_policy.c",
+      "sha256": "47312e4c30506e4e95c2152e6b814a829bf5f05783a658b8629e34eec11d87cf"
+    },
+    {
+      "path": "parp-wss-v5\\src\\mm\\parp\\core\\wss_control.c",
+      "sha256": "86a657d15f482b8c1a8b3d7ee0ecb23580cebedcdb1a4dd147e767b89785ebf8"
+    },
+    {
+      "path": "parp-wss-v5\\src\\include\\linux\\parp_wss.h",
+      "sha256": "9d41b72fa0c545419f12262a1cf58834d65b81fe5579b893f687ff2fea2e126f"
+    },
+    {
+      "path": "parp-wss-v5\\src\\include\\linux\\parp_tier2.h",
+      "sha256": "cf9cbba6b0c1a06eea1b2fddc66396bdd8b89183c6509f34a4bebc274aa60289"
+    },
+    {
+      "path": "parp-wss-v5\\src\\tools\\testing\\selftests\\parp_wss\\operation_controller.py",
+      "sha256": "c4fb4234bd99ae4e741ebebdbcfc784d398e2c49197eb2eae0c6e37f1545e2b5"
+    },
+    {
+      "path": "parp-wss-v5\\src\\tools\\testing\\selftests\\parp_wss\\operation_lookup.py",
+      "sha256": "b8d141743173cf7072c173a736f0fc5944c94808acc29d6dc9dee07941965ed8"
+    },
+    {
+      "path": "parp-wss-v5\\src\\tools\\testing\\selftests\\parp_wss\\get_wss_predictor.c",
+      "sha256": "11887a68d36359576f86134aa4a684f3f16de01a5ea206538ef8c68a6499aa0d"
+    },
+    {
+      "path": "parp-wss-v5\\src\\tools\\testing\\selftests\\parp_wss\\get_wss_predictor.h",
+      "sha256": "be7cc4b9b03a78dac09b4ce0ff72f6e7b44f4257d899e018697a95cb94d1b2bb"
+    },
+    {
+      "path": "parp-wss-v5\\src\\tools\\testing\\selftests\\parp_wss\\gimp_lookup_data.h",
+      "sha256": "78d20b30067d985e9c49f2f52012e6fd709f2efc3003727d8655d61953a24da8"
+    },
+    {
+      "path": "parp-wss-v5\\src\\tools\\testing\\selftests\\parp_wss\\data\\operation_table.json",
+      "sha256": "825ab6e04d9d1a2eb622f442b6b3f78c10a0a35050d4f4179038de0240db6670"
+    }
+  ]
+}

@@ -1,0 +1,229 @@
+[
+ {
+  "scene": "stable",
+  "pause_reasons": {
+   "gimp": [
+    {
+     "time_s": 8.70505,
+     "event": "paused",
+     "app": "gimp",
+     "reason": "foreground_response",
+     "used_bytes": 159383552
+    }
+   ],
+   "libreoffice": [
+    {
+     "time_s": 8.70505,
+     "event": "paused",
+     "app": "libreoffice",
+     "reason": "foreground_response",
+     "used_bytes": 0
+    }
+   ],
+   "firefox": [
+    {
+     "time_s": 8.70505,
+     "event": "paused",
+     "app": "firefox",
+     "reason": "foreground_response",
+     "used_bytes": 0
+    }
+   ]
+  },
+  "ops": [
+   {
+    "app": "libreoffice",
+    "kind": "peak_new_data",
+    "elapsed_ms": 1234.73715,
+    "pgfault": 13499,
+    "pgmajfault": 0,
+    "start_s": 8.014165171000059,
+    "during_pause": false
+   },
+   {
+    "app": "firefox",
+    "kind": "peak_new_data",
+    "elapsed_ms": 1359.367808,
+    "pgfault": 16404,
+    "pgmajfault": 0,
+    "start_s": 8.01989369200055,
+    "during_pause": false
+   },
+   {
+    "app": "gimp",
+    "kind": "peak_new_data",
+    "elapsed_ms": 7540.233032,
+    "pgfault": 1028961,
+    "pgmajfault": 652,
+    "start_s": 8.01301385700026,
+    "during_pause": false
+   }
+  ],
+  "slow_frame": {
+   "phase_s": 8.001232617,
+   "latency_ms": 286.162556,
+   "nearby_1s_wait_fraction": {
+    "cpu_pressure": 0.4582610335201768,
+    "io_pressure": 0.0,
+    "memory_pressure": 0.0
+   }
+  }
+ },
+ {
+  "scene": "turnover",
+  "pause_reasons": {
+   "gimp": [],
+   "libreoffice": [],
+   "firefox": []
+  },
+  "ops": [
+   {
+    "app": "firefox",
+    "kind": "peak_new_data",
+    "elapsed_ms": 1347.882194,
+    "pgfault": 16395,
+    "pgmajfault": 0,
+    "start_s": 8.060813432999566,
+    "during_pause": false
+   },
+   {
+    "app": "libreoffice",
+    "kind": "peak_new_data",
+    "elapsed_ms": 1505.53353,
+    "pgfault": 14094,
+    "pgmajfault": 0,
+    "start_s": 8.060883657999511,
+    "during_pause": false
+   },
+   {
+    "app": "gimp",
+    "kind": "peak_new_data",
+    "elapsed_ms": 7830.211643,
+    "pgfault": 1028939,
+    "pgmajfault": 602,
+    "start_s": 8.05585097400035,
+    "during_pause": false
+   }
+  ],
+  "slow_frame": {
+   "phase_s": 9.004371629,
+   "latency_ms": 217.367091,
+   "nearby_1s_wait_fraction": {
+    "cpu_pressure": 0.1748536433317906,
+    "io_pressure": 0.0,
+    "memory_pressure": 0.0
+   }
+  }
+ },
+ {
+  "scene": "revisit",
+  "pause_reasons": {
+   "gimp": [
+    {
+     "time_s": 9.336979,
+     "event": "paused",
+     "app": "gimp",
+     "reason": "feedback",
+     "used_bytes": 159383552
+    },
+    {
+     "time_s": 23.937581,
+     "event": "paused",
+     "app": "gimp",
+     "reason": "foreground_response",
+     "used_bytes": 159383552
+    }
+   ],
+   "libreoffice": [
+    {
+     "time_s": 8.288442,
+     "event": "paused",
+     "app": "libreoffice",
+     "reason": "feedback",
+     "used_bytes": 8388608
+    },
+    {
+     "time_s": 23.937581,
+     "event": "paused",
+     "app": "libreoffice",
+     "reason": "foreground_response",
+     "used_bytes": 8388608
+    }
+   ],
+   "firefox": [
+    {
+     "time_s": 23.937581,
+     "event": "paused",
+     "app": "firefox",
+     "reason": "foreground_response",
+     "used_bytes": 18878464
+    }
+   ]
+  },
+  "ops": [
+   {
+    "app": "firefox",
+    "kind": "peak_new_data",
+    "elapsed_ms": 1376.212717,
+    "pgfault": 16389,
+    "pgmajfault": 0,
+    "start_s": 8.044245650999073,
+    "during_pause": false
+   },
+   {
+    "app": "libreoffice",
+    "kind": "peak_new_data",
+    "elapsed_ms": 1390.518091,
+    "pgfault": 16490,
+    "pgmajfault": 138,
+    "start_s": 8.044105648999903,
+    "during_pause": false
+   },
+   {
+    "app": "gimp",
+    "kind": "peak_new_data",
+    "elapsed_ms": 7950.709936,
+    "pgfault": 1028972,
+    "pgmajfault": 612,
+    "start_s": 8.04452513400065,
+    "during_pause": false
+   },
+   {
+    "app": "libreoffice",
+    "kind": "old_document_revisit",
+    "elapsed_ms": 878.848609,
+    "pgfault": 31695,
+    "pgmajfault": 0,
+    "start_s": 22.000228244000027,
+    "during_pause": false
+   },
+   {
+    "app": "firefox",
+    "kind": "old_document_revisit",
+    "elapsed_ms": 1869.403986,
+    "pgfault": 133076,
+    "pgmajfault": 0,
+    "start_s": 22.000404665999667,
+    "during_pause": false
+   },
+   {
+    "app": "gimp",
+    "kind": "old_document_revisit",
+    "elapsed_ms": 6822.631821,
+    "pgfault": 60400,
+    "pgmajfault": 9739,
+    "start_s": 22.21786638499907,
+    "during_pause": false
+   }
+  ],
+  "slow_frame": {
+   "phase_s": 11.000854929,
+   "latency_ms": 205.775785,
+   "nearby_1s_wait_fraction": {
+    "cpu_pressure": 0.23494958420895623,
+    "io_pressure": 0.0,
+    "memory_pressure": 0.0
+   }
+  }
+ }
+]

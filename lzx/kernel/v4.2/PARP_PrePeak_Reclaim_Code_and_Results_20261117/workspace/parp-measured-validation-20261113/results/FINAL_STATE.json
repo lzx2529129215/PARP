@@ -1,0 +1,15 @@
+{
+ "formal_complete": true,
+ "sources_unchanged": true,
+ "remaining_test_cgroups": [],
+ "live_owned_displays": [],
+ "parent_high": "max",
+ "parent_max": "max",
+ "kernel": "6.17.13",
+ "guard": {
+  "status": "RESTORED",
+  "zswap": "N",
+  "pid": 18567
+ },
+ "zswap_restored_to": "N"
+}

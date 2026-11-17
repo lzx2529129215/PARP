@@ -1,0 +1,2053 @@
+{
+  "date": "2026-11-17",
+  "latest_code": "workspace/parp-userspace-deficitfix-20261117",
+  "source_original": "D:\\C\\Desktop\\华为项目\\代码\\parp-userspace-deficitfix-20261117",
+  "files": [
+    {
+      "path": "01_代码逻辑说明.md",
+      "bytes": 9751,
+      "sha256": "003096bf323f9060d6826d9c2c8a420b850f8dad0e9b38e47289bffb99e99411"
+    },
+    {
+      "path": "02_运行与验证.md",
+      "bytes": 4543,
+      "sha256": "41ef745afc953d9b8fe5599f01b60628ae347bc27ed186be96e499f8e6256a8e"
+    },
+    {
+      "path": "03_环境与依赖.md",
+      "bytes": 2681,
+      "sha256": "171bb4448b4561c5ce0026c3eb0d2122c127e81ffdb64ccd9cfbca6075069ba3"
+    },
+    {
+      "path": "evidence/host/host-latest.json",
+      "bytes": 101,
+      "sha256": "2d5029c3ab107e81da40ee6c5b10b3a7ae30a17ebf08376b8cac8330429a7fce"
+    },
+    {
+      "path": "evidence/host/host-memory.jsonl",
+      "bytes": 60506,
+      "sha256": "cd684ed20da066d71e500d097c3503ae8220740ed95d1f2cf67b393923c8c2ce"
+    },
+    {
+      "path": "evidence/host/HOST_STOP",
+      "bytes": 17,
+      "sha256": "309a5a8096508c2ed933f99157a023db660c34c315119963ac3eb93000c34895"
+    },
+    {
+      "path": "evidence/host/latest-trial.json",
+      "bytes": 200,
+      "sha256": "10a939cdbe647c208a4d04bac7333bd4ff8f88816fa419468de1f6c1f5f95f98"
+    },
+    {
+      "path": "evidence/session/logs/20261117-deficitfix-final-state.log",
+      "bytes": 132,
+      "sha256": "bc7c6395d1775db8d4b3281fd335938a8171eb35d23f91a2b7f6166f128a4c44"
+    },
+    {
+      "path": "evidence/session/logs/20261117-deficitfix-revisit.log",
+      "bytes": 13779,
+      "sha256": "9f27d838827db7d4014fc5c8c6d0595a715ca9186fdedcc2f88446ea1c8c42cf"
+    },
+    {
+      "path": "evidence/session/logs/20261117-deficitfix-stop-session.log",
+      "bytes": 121,
+      "sha256": "89446eafd5bc35191362631a95bd4bb7f284f4850e2c3af9bad46f1b1bb50c03"
+    },
+    {
+      "path": "evidence/session/results/20261117-deficitfix-final-state.json",
+      "bytes": 939,
+      "sha256": "65c5f6f99b2ef2dfa9ea59b3abb76c4c0488c425d12348f88e5e3461f9c74fcc"
+    },
+    {
+      "path": "evidence/session/results/20261117-deficitfix-revisit.json",
+      "bytes": 1144,
+      "sha256": "160b165cdb892f260a578e850102d2768a6fa24f8a9df01ebbef771fdaea9d7f"
+    },
+    {
+      "path": "history/parp-userspace-deficit-20261117/controller/adapters.py",
+      "bytes": 2521,
+      "sha256": "3b4e30a47c55053cacc24fa58c8757eaf552b5ac10625752e566472648d65629"
+    },
+    {
+      "path": "history/parp-userspace-deficit-20261117/controller/coordinator.py",
+      "bytes": 8177,
+      "sha256": "2c5891d24addae9878cb510a5fb419f54cb2167cf46691ee9e9a1b38f6b586f1"
+    },
+    {
+      "path": "history/parp-userspace-deficit-20261117/controller/executor.py",
+      "bytes": 19487,
+      "sha256": "4d2b1e759a85bb499126e5d1bfe29bc98a7c16ace8c2e3371c6339615de1ae8f"
+    },
+    {
+      "path": "history/parp-userspace-deficit-20261117/controller/faults.py",
+      "bytes": 1259,
+      "sha256": "3e7ff27aac2cf75059254088807a1768c811771f0a78ad73d94c56a753c375c7"
+    },
+    {
+      "path": "history/parp-userspace-deficit-20261117/controller/native.py",
+      "bytes": 4262,
+      "sha256": "9b14655b61edb0d6ae7e0ad375b396730264cf8ef815bc7c1dae49886af3c7d4"
+    },
+    {
+      "path": "history/parp-userspace-deficit-20261117/controller/plan.py",
+      "bytes": 16853,
+      "sha256": "1908cc9fc2ad31a73edac3c21193e027445b5aa2a4be8a95c42321734b8a5c2c"
+    },
+    {
+      "path": "history/parp-userspace-deficit-20261117/controller/prepeak_timing.py",
+      "bytes": 7183,
+      "sha256": "a5bcfe9e8f947ec874b6896bf1a2dead5dfbe32cb565aa99ac0775e9a9cfddc1"
+    },
+    {
+      "path": "history/parp-userspace-deficit-20261117/controller/replay_forecast.py",
+      "bytes": 2814,
+      "sha256": "9b30a0a25526a8f0ad850d4048d4058bdb3683d843c4c28ba5a1b8fd7a270245"
+    },
+    {
+      "path": "history/parp-userspace-deficit-20261117/controller/safety_store.py",
+      "bytes": 2153,
+      "sha256": "4c6f9948d84b620e72519d7a1d346c812c92c3089982c0cdc9d4117d1fb6cdaa"
+    },
+    {
+      "path": "history/parp-userspace-deficit-20261117/controller/sequence_policy.py",
+      "bytes": 2452,
+      "sha256": "616ad43caf518b8f040626ded1480d09431ed9a23f6678d0ed89c5b367566b71"
+    },
+    {
+      "path": "history/parp-userspace-deficit-20261117/controller/signals.py",
+      "bytes": 2409,
+      "sha256": "52fdc181b8605af31683aa92240290073d36e9d08e0d976f84c1efc796f0e7f3"
+    },
+    {
+      "path": "history/parp-userspace-deficit-20261117/controller/test_measured.py",
+      "bytes": 8994,
+      "sha256": "8ca86005d3b840f713b0720129c60e31ceecb9b76c4ea7e296165be7081db0c8"
+    },
+    {
+      "path": "history/parp-userspace-deficit-20261117/controller/test_prepeak_timing.py",
+      "bytes": 8935,
+      "sha256": "c7cf4a374100be7b588eb24bdd82e1d85c9bbeb9d90e571d61f8bd8cd40b439d"
+    },
+    {
+      "path": "history/parp-userspace-deficit-20261117/controller/test_sequence_policy.py",
+      "bytes": 9281,
+      "sha256": "39bd076c04ca6a0be04feb5a93cbb45a0724595995878e66db99ced1161f364f"
+    },
+    {
+      "path": "history/parp-userspace-deficit-20261117/controller/workflow.py",
+      "bytes": 1813,
+      "sha256": "140743fd24b469a8d54e0fd76dacc565a7a13e924adc00c8bae07bf528337c6a"
+    },
+    {
+      "path": "history/parp-userspace-deficit-20261117/demand_reference.py",
+      "bytes": 2567,
+      "sha256": "c8665c4a5b53ed3d47b2a513ef52402e7f82c598c1e84e091fb1df76e4735232"
+    },
+    {
+      "path": "history/parp-userspace-deficit-20261117/execution_contract.py",
+      "bytes": 4262,
+      "sha256": "d6a2945be220e6089052733bc8d3cabd0457dd3118a60362e76434e0f186aef9"
+    },
+    {
+      "path": "history/parp-userspace-deficit-20261117/inputs_bundle.py",
+      "bytes": 1061,
+      "sha256": "2af0c479873e7018cd1691adf5cb2dbae3d78e7f16e045ec5b229d6980769a11"
+    },
+    {
+      "path": "history/parp-userspace-deficit-20261117/lab/cg_enter.py",
+      "bytes": 881,
+      "sha256": "99dc7e1af27ad162bd6a0d121bc01269d040d57c1d5ae61fde4895e360508cf8"
+    },
+    {
+      "path": "history/parp-userspace-deficit-20261117/lab/firefox-install.json",
+      "bytes": 527,
+      "sha256": "0e797d35ea142568b3da8b3835e39771cce1f373579e9a53ba3d44466a1d96e5"
+    },
+    {
+      "path": "history/parp-userspace-deficit-20261117/lab/foreground_probe.py",
+      "bytes": 6127,
+      "sha256": "d75a3f3e6c49097c362333493b659f99fd206badf1f64fead9efbb0eca35d9a1"
+    },
+    {
+      "path": "history/parp-userspace-deficit-20261117/lab/harness_contracts.py",
+      "bytes": 1561,
+      "sha256": "b2f57eb5c186ded8eaf933b3424077677494c7f01164857f4838a6ee5c3d8fc9"
+    },
+    {
+      "path": "history/parp-userspace-deficit-20261117/lab/host_watch.py",
+      "bytes": 2043,
+      "sha256": "4e5feecca600a65e2f7e31fe95f16572d57ce345c4df56744c29869138747ff0"
+    },
+    {
+      "path": "history/parp-userspace-deficit-20261117/lab/native_apps.py",
+      "bytes": 8414,
+      "sha256": "670aa5cacf48581b94d6576b80064f13f200417628dfb9436ed65ed91edc6bda"
+    },
+    {
+      "path": "history/parp-userspace-deficit-20261117/lab/online_service.py",
+      "bytes": 19867,
+      "sha256": "ff9524bbe96303646218656c97addd448dfc55bb31aeab4685862fec5a648f3a"
+    },
+    {
+      "path": "history/parp-userspace-deficit-20261117/lab/reference.py",
+      "bytes": 2801,
+      "sha256": "90a0e4fe7b2b47bf31291148dfddf153a3b31d01c0cf441245d547a6292ce152"
+    },
+    {
+      "path": "history/parp-userspace-deficit-20261117/lab/root_guard.py",
+      "bytes": 10121,
+      "sha256": "da8edafed2a3ea00e0bfed2d2db127cca77c11f6b7d6cc9db58952de6f4cd4a3"
+    },
+    {
+      "path": "history/parp-userspace-deficit-20261117/lab/shared_service.py",
+      "bytes": 7926,
+      "sha256": "44a8c3f3f5de46f0f93ced45ec84fdbcba834c2455321b46d6256969d8a6ed8a"
+    },
+    {
+      "path": "history/parp-userspace-deficit-20261117/lab/suite.py",
+      "bytes": 25512,
+      "sha256": "df308182361de6300accd6a1a0df0dfd24926562a98068c1ec3d909c4b7bc43a"
+    },
+    {
+      "path": "history/parp-userspace-deficit-20261117/lab/task_faults.py",
+      "bytes": 2210,
+      "sha256": "3cddc98c1459b7a51b3bfe5a53aa70dd78e81c5e8604277c934ea347b282ad69"
+    },
+    {
+      "path": "history/parp-userspace-deficit-20261117/lab/telemetry.py",
+      "bytes": 3042,
+      "sha256": "221870af8129a5731b58c9fe69acb6594d6f574250eb3bfe7f94595fa68f1e25"
+    },
+    {
+      "path": "history/parp-userspace-deficit-20261117/prepare_guest.py",
+      "bytes": 1120,
+      "sha256": "cc57cfe526ec470a28f1a3ade79c56d27fb2514982bfd8ac1f78e72fd6dc011c"
+    },
+    {
+      "path": "history/parp-userspace-deficit-20261117/restart_vm_collector.sh",
+      "bytes": 881,
+      "sha256": "b0f871eefd7dfcea8bdc85940f60b9b59e03a301f84f03eab2cc24d89f4518d8"
+    },
+    {
+      "path": "history/parp-userspace-deficit-20261117/results/guest-channel-20261117-174637.log",
+      "bytes": 365,
+      "sha256": "1a6f0cb08f84a58639c9b9ce05118c11cd15fbb24de673d4479d1ba4b981edb5"
+    },
+    {
+      "path": "history/parp-userspace-deficit-20261117/results/REFERENCE-revisit.json",
+      "bytes": 231,
+      "sha256": "84c576fa1ecb91eb67616a67da5c2d667b7f75810eee9506cc91c0fb0c210901"
+    },
+    {
+      "path": "history/parp-userspace-deficit-20261117/results/RESTORE-revisit.json",
+      "bytes": 90,
+      "sha256": "5c28195169bf9dbcb55ff10a280e815f5313b778d57708c2cb72a403a6d1a49a"
+    },
+    {
+      "path": "history/parp-userspace-deficit-20261117/results/RUN-revisit.json",
+      "bytes": 2457842,
+      "sha256": "7aef48563f4ed2a8ed94b52f7d57aa8ee09853b2242dd4d56cb616cedc10c34d"
+    },
+    {
+      "path": "history/parp-userspace-deficit-20261117/results/trials/baseline-revisit-off-ff9cd5ca/occupancy.jsonl",
+      "bytes": 186587,
+      "sha256": "26e556987abb2292b89f5c501ceba61b1c70742e34db261710e2e933c3944c81"
+    },
+    {
+      "path": "history/parp-userspace-deficit-20261117/results/trials/baseline-revisit-off-ff9cd5ca/result.json",
+      "bytes": 830223,
+      "sha256": "2491869089bb11963ab1ab0e7c4a1784f1345232c31c7d801913598f4721e236"
+    },
+    {
+      "path": "history/parp-userspace-deficit-20261117/results/trials/baseline-revisit-off-ff9cd5ca/root-telemetry.jsonl",
+      "bytes": 328607,
+      "sha256": "3f105a9bb6118fc3a0e043080cac085de2ba3045263d1bdb838716de6bd3ffa6"
+    },
+    {
+      "path": "history/parp-userspace-deficit-20261117/results/trials/calibration-revisit-on-19d21914/result.json",
+      "bytes": 19154,
+      "sha256": "acc21a99d1054c18ac1eaabd5e8b582ee5311d5394cb6b6693197cdbcc05e032"
+    },
+    {
+      "path": "history/parp-userspace-deficit-20261117/results/trials/calibration-revisit-on-19d21914/root-telemetry.jsonl",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "history/parp-userspace-deficit-20261117/results/trials/calibration-revisit-on-872d9ff2/firefox-writes.jsonl",
+      "bytes": 467,
+      "sha256": "c164d501cbfc9fe175467ea42daba228f946f6f58a3e4f28de422245112fd65f"
+    },
+    {
+      "path": "history/parp-userspace-deficit-20261117/results/trials/calibration-revisit-on-872d9ff2/gimp-writes.jsonl",
+      "bytes": 2164,
+      "sha256": "cfd31d5dc8865b65deffd2f0b3caa06ee7f55cabf28c8d1d36c5c60e675711af"
+    },
+    {
+      "path": "history/parp-userspace-deficit-20261117/results/trials/calibration-revisit-on-872d9ff2/libreoffice-writes.jsonl",
+      "bytes": 471,
+      "sha256": "8ea6b7667e6af4e6e69eb72956d6cd3920bcc810e1c623783df3a8f205200eac"
+    },
+    {
+      "path": "history/parp-userspace-deficit-20261117/results/trials/calibration-revisit-on-872d9ff2/occupancy.jsonl",
+      "bytes": 183360,
+      "sha256": "f60025c59bb67fa3e55c4ae350e592630a8bb696be1420934e120bb6288fb035"
+    },
+    {
+      "path": "history/parp-userspace-deficit-20261117/results/trials/calibration-revisit-on-872d9ff2/result.json",
+      "bytes": 835931,
+      "sha256": "1763ad1ead1c629dcb06f5c21c08851735cfdffe73cf666f41397604175ab089"
+    },
+    {
+      "path": "history/parp-userspace-deficit-20261117/results/trials/calibration-revisit-on-872d9ff2/root-telemetry.jsonl",
+      "bytes": 329883,
+      "sha256": "32a2ee49098f2c2b6c00ea94f341cd4ed98b674c9cc44897cde3b3f461a0e61c"
+    },
+    {
+      "path": "history/parp-userspace-deficit-20261117/results/trials/reference-revisit-off-1c273199/occupancy.jsonl",
+      "bytes": 202398,
+      "sha256": "d45f295bff096f89a53cea97162f2df78365514c7dd0f9eee0f94d2e4c6e59b7"
+    },
+    {
+      "path": "history/parp-userspace-deficit-20261117/results/trials/reference-revisit-off-1c273199/result.json",
+      "bytes": 610957,
+      "sha256": "2cfab89c8a88aa2d1cbff15b42a5b9126d7e4ac8a641ae688e64c70daf96436d"
+    },
+    {
+      "path": "history/parp-userspace-deficit-20261117/results/trials/reference-revisit-off-1c273199/root-telemetry.jsonl",
+      "bytes": 357127,
+      "sha256": "98008f48063d4c520c52b80f5338910dd009fe0367a22c56221929f9f8b5bd7c"
+    },
+    {
+      "path": "history/parp-userspace-deficit-20261117/run_total.py",
+      "bytes": 9539,
+      "sha256": "e2b723d03c03febe1104aedcceeb7687b040c5d8dc5bf4d40f6d9441850b3ba5"
+    },
+    {
+      "path": "history/parp-userspace-deficit-20261117/SOURCE_BASELINE.json",
+      "bytes": 1763,
+      "sha256": "1f6528b760cbd0a05775d47261fdf328189225b06970562f8e0f64db48d86a89"
+    },
+    {
+      "path": "history/parp-userspace-deficit-20261117/start_vm_experiment.sh",
+      "bytes": 1111,
+      "sha256": "9b9dff7189909f91b7500123ee5033ad9ecb30f6856ba0484d722f35386c4d7f"
+    },
+    {
+      "path": "history/parp-userspace-deficit-20261117/tests/test_demand_reference.py",
+      "bytes": 2371,
+      "sha256": "7408e7f561996c9a2ac33e794b91ea10a649f63a4cad5e17a7e9923dfdf46ae9"
+    },
+    {
+      "path": "history/parp-userspace-deficit-20261117/tests/test_probe_timing.py",
+      "bytes": 1440,
+      "sha256": "7a83bb039059336197ce3478615bc5d140ddda71ef5ad3e14c6388727d15cec6"
+    },
+    {
+      "path": "history/parp-userspace-deficit-20261117/tests/test_qualification.py",
+      "bytes": 3762,
+      "sha256": "8819eb23d0c350da72d91ab5ddf006e4fd2427de9e7f6800d0e2cccc32e53f72"
+    },
+    {
+      "path": "history/parp-userspace-deficit-20261117/tests/test_same_service.py",
+      "bytes": 9817,
+      "sha256": "680f779721e0061a906d60e9f65b0628e557888ececfc168ec6bfcae2363c299"
+    },
+    {
+      "path": "history/parp-userspace-deficit-20261117/tests/test_total_faults.py",
+      "bytes": 4634,
+      "sha256": "c1ae6134869768a6e0e5111564922b0d7d8451125654293560858558ddfaf6ae"
+    },
+    {
+      "path": "history/parp-userspace-deficit-20261117/total_faults.py",
+      "bytes": 5564,
+      "sha256": "48cb8c8de82148936b4d8690501c573c6819609b75c4ce1162d9b70f27bd9a94"
+    },
+    {
+      "path": "history/parp-userspace-deficit-20261117/total_profiles.py",
+      "bytes": 3756,
+      "sha256": "2ec0f3d73465467a748358f23dead49b252102639da734185f07aa00134745e4"
+    },
+    {
+      "path": "history/说明.md",
+      "bytes": 947,
+      "sha256": "6dc23aafb216de63f808f2f34d7f98b33361ce1459f45a88520e7f9301f54744"
+    },
+    {
+      "path": "README.md",
+      "bytes": 3255,
+      "sha256": "2ce20153698785a1116555ff831ae98ccb1a86becf408db25758d379072286eb"
+    },
+    {
+      "path": "summaries/实验结果.md",
+      "bytes": 5242,
+      "sha256": "3db841c96df279c9943f1bf5c9096045729dbf5b7b431d5345f940f1771ecec7"
+    },
+    {
+      "path": "summaries/汇总指标.json",
+      "bytes": 6708,
+      "sha256": "09e3e6c2cfc27c5abd8f2697cfd6a8fc5c65748458904abd99d1f31b0cf59709"
+    },
+    {
+      "path": "summaries/逐轮结果.json",
+      "bytes": 43030,
+      "sha256": "fe745df776f877ef01e1817dcf1851d36e223511867fb1c81aebf7443b7b7a9d"
+    },
+    {
+      "path": "tools/peak_metrics.py",
+      "bytes": 7204,
+      "sha256": "9d5534e446cb804dcd5e2b226ff7e37ee5683e0218761f34af4074fdda877c79"
+    },
+    {
+      "path": "tools/prepare_fresh_run.py",
+      "bytes": 1297,
+      "sha256": "fa9d61877e0e953c286c7f47e68f3b57cdebb2a3a7a1fadcd69d24b0effe488c"
+    },
+    {
+      "path": "tools/summarize_results.py",
+      "bytes": 10238,
+      "sha256": "d53fb72acb3c1b9b6318492e6eefd1b1bae72a8e422f2b23f620220be5751438"
+    },
+    {
+      "path": "tools/verify_bundle.py",
+      "bytes": 1518,
+      "sha256": "ab498e23a0420b3661c8b3356514cd36a8782df5c509b80e61c06def98633115"
+    },
+    {
+      "path": "validation.json",
+      "bytes": 517,
+      "sha256": "b5329dd9e46fd234626dad07d994bd176a5b6426c4390441f9334e7c22ab64ed"
+    },
+    {
+      "path": "workspace/foreground_krita_gui/.gitignore",
+      "bytes": 54,
+      "sha256": "98fd92ff8df7be5b27da95148e555e84ba29058bbc907d63c05a40f2aef028eb"
+    },
+    {
+      "path": "workspace/foreground_krita_gui/assets/ASSETS_README.txt",
+      "bytes": 490,
+      "sha256": "a2edecb161b9b7caa2486df28b5f8651e5c672ec27c40f291413c98fe7679413"
+    },
+    {
+      "path": "workspace/foreground_krita_gui/configs/gui.json",
+      "bytes": 1377,
+      "sha256": "d8538e320f0b6680cfb6352d303ad2375ef4cd34a6af7f9532eda255ce37cd87"
+    },
+    {
+      "path": "workspace/foreground_krita_gui/DEPLOY.md",
+      "bytes": 5422,
+      "sha256": "07088368869c5dfc62f7ea9dfd99568490c7651a9d76cb0dd0c48345c649c3e9"
+    },
+    {
+      "path": "workspace/foreground_krita_gui/FILELIST.txt",
+      "bytes": 1450,
+      "sha256": "bc7791d34b55ec94b2c658f4ba94ac9a2635f0fe7f065fc196e9a94907d2c4eb"
+    },
+    {
+      "path": "workspace/foreground_krita_gui/oomlab_krita_gui/__init__.py",
+      "bytes": 77,
+      "sha256": "304eee2be5f5b10f6da4290e6b5cdb1f4b3ce69e6eeebb6622890840a2d54ab3"
+    },
+    {
+      "path": "workspace/foreground_krita_gui/oomlab_krita_gui/asset_inspector.py",
+      "bytes": 2495,
+      "sha256": "c88b6e6830e3ffb031624c343dff4e1bd11f0f7ec92cdac62b892035caa08737"
+    },
+    {
+      "path": "workspace/foreground_krita_gui/oomlab_krita_gui/cli.py",
+      "bytes": 3470,
+      "sha256": "1ca0eff984ecb8604c9c594a73a65fbffb84d5e5f04f2999457959d95fe61d80"
+    },
+    {
+      "path": "workspace/foreground_krita_gui/oomlab_krita_gui/config.py",
+      "bytes": 3473,
+      "sha256": "0155aa4cbbaca7242c195b07c500e798b888c3a02128ec963f222528c94a2ac6"
+    },
+    {
+      "path": "workspace/foreground_krita_gui/oomlab_krita_gui/environment.py",
+      "bytes": 2081,
+      "sha256": "cd34f2e067bbd1dbebce2cc298c9b8aea219bbd6c81dc77847c44aa8f326dc4e"
+    },
+    {
+      "path": "workspace/foreground_krita_gui/oomlab_krita_gui/gui_controller.py",
+      "bytes": 15107,
+      "sha256": "1f324faba153f5d4414e40c33f29f66f7ad43abc6dd04dbcd3b9e431c47fbf18"
+    },
+    {
+      "path": "workspace/foreground_krita_gui/oomlab_krita_gui/process_manager.py",
+      "bytes": 5251,
+      "sha256": "fd880f908a9f8aebcc05416e207d58801d8b922a8db4d7d7c96d20c76e1f1354"
+    },
+    {
+      "path": "workspace/foreground_krita_gui/oomlab_krita_gui/report.py",
+      "bytes": 3375,
+      "sha256": "47cb9b34f1f7da214211d9ac65a1eca8c1e7811ccb703ce79fe64d7ac40af4fe"
+    },
+    {
+      "path": "workspace/foreground_krita_gui/oomlab_krita_gui/state_machine.py",
+      "bytes": 3224,
+      "sha256": "519b705f2af69680d332c7564e51849a8b6965a3789e0bf990cbb22d44717c32"
+    },
+    {
+      "path": "workspace/foreground_krita_gui/oomlab_krita_gui/visual_verifier.py",
+      "bytes": 4201,
+      "sha256": "7e6278fc88815fa34dca8498df9c368b749f5e8be6d60bf46bb02fcd14337f7f"
+    },
+    {
+      "path": "workspace/foreground_krita_gui/oomlab_krita_gui/window_manager.py",
+      "bytes": 5661,
+      "sha256": "bdfa05ff5f45e15d7a51464b9545cf072d1f5a076ee0fb0d658d55e3fd1dae13"
+    },
+    {
+      "path": "workspace/foreground_krita_gui/README.md",
+      "bytes": 10337,
+      "sha256": "719afaa83f830ff87275d91d39988b39316e1cf3b151ec04b8b0bb6d85038f3f"
+    },
+    {
+      "path": "workspace/foreground_krita_gui/requirements.txt",
+      "bytes": 58,
+      "sha256": "6caf5b81ff61ddacd91105b06ecd5789d24aa7785749a40e5a8742b118e0f3a9"
+    },
+    {
+      "path": "workspace/foreground_krita_gui/scripts/build_bundle.py",
+      "bytes": 1861,
+      "sha256": "b029a81e850c00e63d6fa18d721c68b76a9a526d7e38c7b3687bced99925d260"
+    },
+    {
+      "path": "workspace/foreground_krita_gui/scripts/check_env.sh",
+      "bytes": 143,
+      "sha256": "d49e56cb1ee050b6e2d734b0795273f0e78e023bb317aa4e9f4aea8896c24e27"
+    },
+    {
+      "path": "workspace/foreground_krita_gui/scripts/report.sh",
+      "bytes": 140,
+      "sha256": "19738a379679072fa1dc0c3dae0f8c604ca85bc0b70b7b54fb28fb0ae8461619"
+    },
+    {
+      "path": "workspace/foreground_krita_gui/scripts/run_gui.sh",
+      "bytes": 137,
+      "sha256": "0f941cd2489db6fce8ab425330936aa86281f9b6550ccca1bf56b8981b52e273"
+    },
+    {
+      "path": "workspace/foreground_krita_gui/scripts/test.sh",
+      "bytes": 137,
+      "sha256": "f0d845d44f5eaf1a24dd40bfd17537d302a02acec875917e0124f7e0f7a7d82b"
+    },
+    {
+      "path": "workspace/foreground_krita_gui/SHA256SUMS",
+      "bytes": 3463,
+      "sha256": "cd9d83df615083a05b8160168f136c9d325a92785faa70d66fd740069ace4c34"
+    },
+    {
+      "path": "workspace/foreground_krita_gui/tests/test_config.py",
+      "bytes": 733,
+      "sha256": "e40f3ea778c7fdbf4568442e151dff562ea26e4bf58359f3aea9230f5ad36223"
+    },
+    {
+      "path": "workspace/foreground_krita_gui/tests/test_gui_logic.py",
+      "bytes": 7734,
+      "sha256": "d516b68d3c4c080991cb2eb92bd463026f530165b9207823654124284bed2314"
+    },
+    {
+      "path": "workspace/foreground_krita_gui/tests/test_ocr_scale.py",
+      "bytes": 1159,
+      "sha256": "b24896fae215635423861adb3ffef1c4422ea25e62b1546bb5f293cb5ed25818"
+    },
+    {
+      "path": "workspace/foreground_krita_gui/tests/test_preflight.py",
+      "bytes": 2573,
+      "sha256": "7e674e2ab32e409a1d8b7df938b6ad48be1c8d42489e67537317c697d71c8799"
+    },
+    {
+      "path": "workspace/foreground_krita_gui/tests/test_qt_environment.py",
+      "bytes": 7369,
+      "sha256": "6d1663871dd3a5e327d2b99a5e2368fd9d02ce4d1f38c57089c2234d454afa4a"
+    },
+    {
+      "path": "workspace/foreground_krita_gui/tests/test_state_machine.py",
+      "bytes": 4472,
+      "sha256": "8cc605991fef7725f474bed944cce56549a0d93cb63910e00d897921ce13984f"
+    },
+    {
+      "path": "workspace/foreground_krita_gui/tests/test_verification.py",
+      "bytes": 3902,
+      "sha256": "bb8c66f83478229d52677393d8209363cd91f0813d4d55146f2677ef49ea9585"
+    },
+    {
+      "path": "workspace/foreground_krita_gui/VALIDATION.md",
+      "bytes": 5287,
+      "sha256": "390e965966b616b6c62918368cd3db22d2cd035091382df1fc35fd03a3a559f4"
+    },
+    {
+      "path": "workspace/krita-vm-acceptance/cg_exec.py",
+      "bytes": 869,
+      "sha256": "3793442ada58293b1edcddfc1098b512664c91236b59cac7dfb28d1a55685921"
+    },
+    {
+      "path": "workspace/krita-vm-acceptance/guest_session.py",
+      "bytes": 7702,
+      "sha256": "eebedee30e11adb5ef2e2ad42814044e9f9fac07232f4f45c2e96efbe27ddab4"
+    },
+    {
+      "path": "workspace/krita-vm-acceptance/reclaim-frozen-before.json",
+      "bytes": 1948,
+      "sha256": "70137dd47a1066fb83d69597257242a8a82d738211b78fc6cb26b1b9c20f85d2"
+    },
+    {
+      "path": "workspace/krita-vm-acceptance/userspace-peak-20261103/peak_gui.py",
+      "bytes": 13059,
+      "sha256": "b0dd66822298cbebe85f5c6fb0aa9f92ab8accc4edeced378da8f2db5fe35a21"
+    },
+    {
+      "path": "workspace/oracle-realapps-validation-20261110/gimp_native.py",
+      "bytes": 5679,
+      "sha256": "dd846a3f5399cb3ea6e3c6f7c91dc72182c2360f254536e35096a9d0de97a0de"
+    },
+    {
+      "path": "workspace/oracle-realapps-validation-20261110/interaction_gui.py",
+      "bytes": 14813,
+      "sha256": "1d1923d9b6b8807a918c31593ed5c95583ece8a5a101501beb5e381a54f262ee"
+    },
+    {
+      "path": "workspace/oracle-realapps-validation-20261110/prepare.py",
+      "bytes": 3505,
+      "sha256": "851d8b3f1e25e3c0a8364ec66138167e74c9f777bb8cd093f77e0d0764ce588b"
+    },
+    {
+      "path": "workspace/parp-measured-validation-20261113/controller/adapters.py",
+      "bytes": 2193,
+      "sha256": "02e7edacc912b11c0b054962194f6e99a07ac9b064c7fc41be53ef4d74d5e3d9"
+    },
+    {
+      "path": "workspace/parp-measured-validation-20261113/controller/coordinator.py",
+      "bytes": 7751,
+      "sha256": "11eaa4f598731f1338e6f64da281c173cb5288fc0b05e137efa36da371bf5f74"
+    },
+    {
+      "path": "workspace/parp-measured-validation-20261113/controller/executor.py",
+      "bytes": 13814,
+      "sha256": "c0f8e27f3a7cd59f61408e701bc1987726d4123f986a2e5eb689e1178c23f8bf"
+    },
+    {
+      "path": "workspace/parp-measured-validation-20261113/controller/faults.py",
+      "bytes": 1259,
+      "sha256": "3e7ff27aac2cf75059254088807a1768c811771f0a78ad73d94c56a753c375c7"
+    },
+    {
+      "path": "workspace/parp-measured-validation-20261113/controller/native.py",
+      "bytes": 4262,
+      "sha256": "9b14655b61edb0d6ae7e0ad375b396730264cf8ef815bc7c1dae49886af3c7d4"
+    },
+    {
+      "path": "workspace/parp-measured-validation-20261113/controller/plan.py",
+      "bytes": 14148,
+      "sha256": "5eb7ed7f4758dd0b90e3874bebcd9affa1b7f17a4cd4de97c805769b1dde4c1a"
+    },
+    {
+      "path": "workspace/parp-measured-validation-20261113/controller/replay_forecast.py",
+      "bytes": 2814,
+      "sha256": "9b30a0a25526a8f0ad850d4048d4058bdb3683d843c4c28ba5a1b8fd7a270245"
+    },
+    {
+      "path": "workspace/parp-measured-validation-20261113/controller/safety_store.py",
+      "bytes": 2153,
+      "sha256": "4c6f9948d84b620e72519d7a1d346c812c92c3089982c0cdc9d4117d1fb6cdaa"
+    },
+    {
+      "path": "workspace/parp-measured-validation-20261113/controller/signals.py",
+      "bytes": 2409,
+      "sha256": "52fdc181b8605af31683aa92240290073d36e9d08e0d976f84c1efc796f0e7f3"
+    },
+    {
+      "path": "workspace/parp-measured-validation-20261113/controller/test_measured.py",
+      "bytes": 8994,
+      "sha256": "8ca86005d3b840f713b0720129c60e31ceecb9b76c4ea7e296165be7081db0c8"
+    },
+    {
+      "path": "workspace/parp-measured-validation-20261113/controller/workflow.py",
+      "bytes": 1813,
+      "sha256": "140743fd24b469a8d54e0fd76dacc565a7a13e924adc00c8bae07bf528337c6a"
+    },
+    {
+      "path": "workspace/parp-measured-validation-20261113/lab/calibrate.py",
+      "bytes": 6888,
+      "sha256": "bb118524dd36da68804768cb0cf475b2eae3ade326f5afbc820f5fd8a0dd9a5f"
+    },
+    {
+      "path": "workspace/parp-measured-validation-20261113/lab/cg_enter.py",
+      "bytes": 881,
+      "sha256": "99dc7e1af27ad162bd6a0d121bc01269d040d57c1d5ae61fde4895e360508cf8"
+    },
+    {
+      "path": "workspace/parp-measured-validation-20261113/lab/firefox-install.json",
+      "bytes": 527,
+      "sha256": "0e797d35ea142568b3da8b3835e39771cce1f373579e9a53ba3d44466a1d96e5"
+    },
+    {
+      "path": "workspace/parp-measured-validation-20261113/lab/foreground_probe.py",
+      "bytes": 6169,
+      "sha256": "77ab3d795ec9202a5e83a6891472775c5892ad4dc8d266b0e33aaee7cc838402"
+    },
+    {
+      "path": "workspace/parp-measured-validation-20261113/lab/formal.py",
+      "bytes": 8612,
+      "sha256": "4db836fae6004cdc772e6021b09574be559f47495f79909ba3b744009809d85f"
+    },
+    {
+      "path": "workspace/parp-measured-validation-20261113/lab/host-latest.json",
+      "bytes": 101,
+      "sha256": "e1a937cb5fc941dfc30f724932698009fcf5d0dae4579a902256fb6677d5b62e"
+    },
+    {
+      "path": "workspace/parp-measured-validation-20261113/lab/host-memory.jsonl",
+      "bytes": 369480,
+      "sha256": "e7cb011caaf07453a825cfe5ee22433d681809ca80fa66727e0924d8b8619041"
+    },
+    {
+      "path": "workspace/parp-measured-validation-20261113/lab/HOST_STOP",
+      "bytes": 11,
+      "sha256": "5e1f8562208322ba8dbd7567515383ac6ebf909de2eca4b674a5bfa781adcae4"
+    },
+    {
+      "path": "workspace/parp-measured-validation-20261113/lab/host_watch.py",
+      "bytes": 1505,
+      "sha256": "4323444f42218c5685a241f4dc0c531be60e2af8d7f6c4ea8022021f149630b8"
+    },
+    {
+      "path": "workspace/parp-measured-validation-20261113/lab/latest-trial.json",
+      "bytes": 199,
+      "sha256": "27c679d63f6634a2ad8198fa535ee454b4bf81be923c4cd1593b6418f1e5260e"
+    },
+    {
+      "path": "workspace/parp-measured-validation-20261113/lab/native_apps.py",
+      "bytes": 8414,
+      "sha256": "670aa5cacf48581b94d6576b80064f13f200417628dfb9436ed65ed91edc6bda"
+    },
+    {
+      "path": "workspace/parp-measured-validation-20261113/lab/online_service.py",
+      "bytes": 12854,
+      "sha256": "984c168e34c40807d8e44589a16a4dc3a139084c5e16e538abc6f1c48d14f5c6"
+    },
+    {
+      "path": "workspace/parp-measured-validation-20261113/lab/reference.py",
+      "bytes": 2801,
+      "sha256": "90a0e4fe7b2b47bf31291148dfddf153a3b31d01c0cf441245d547a6292ce152"
+    },
+    {
+      "path": "workspace/parp-measured-validation-20261113/lab/root_guard.py",
+      "bytes": 9567,
+      "sha256": "c47b3740e21a6fae9a08522efb8017a5a859c2cc4a59665e6cc889c9dd2e7914"
+    },
+    {
+      "path": "workspace/parp-measured-validation-20261113/lab/suite.py",
+      "bytes": 18672,
+      "sha256": "4d480d6798e54ed25543fd2fbb861468fd29d70256ef18ed88582454f26068c0"
+    },
+    {
+      "path": "workspace/parp-measured-validation-20261113/lab/summarize.py",
+      "bytes": 4579,
+      "sha256": "f7a9d98b7b848ad23b520d2f49a7e4641cd566024d48e73bd234ff9c9e5134c4"
+    },
+    {
+      "path": "workspace/parp-measured-validation-20261113/lab/telemetry.py",
+      "bytes": 2038,
+      "sha256": "04a33ea239d825bf3564d93dd4ee7d511a32b26f8fba5756fec45b749087c0b4"
+    },
+    {
+      "path": "workspace/parp-measured-validation-20261113/README.md",
+      "bytes": 3061,
+      "sha256": "9bf3c5558a6c4110fc5bdc06b35352c15f2c19ae639f7b5f3e9d88c3eca2b7f6"
+    },
+    {
+      "path": "workspace/parp-measured-validation-20261113/results/APPROVED_SAFETY.json",
+      "bytes": 10977,
+      "sha256": "2909c88ac96d9f6100b9bb1aad217558169d2f0a582233b59b092c137b6c9fb9"
+    },
+    {
+      "path": "workspace/parp-measured-validation-20261113/results/CALIBRATION-preparation-1794558839.json",
+      "bytes": 1037,
+      "sha256": "a6f07cf2ec3057c301e93e8d444f9116b1a55ff933f144e4d16db66940eb6bfc"
+    },
+    {
+      "path": "workspace/parp-measured-validation-20261113/results/CALIBRATION-preparation-1794559447.json",
+      "bytes": 1485,
+      "sha256": "2fa95d16a43110d6c9289274bb6ba92dd48651fa8cfbbc0d20e78c4dfe53c4dd"
+    },
+    {
+      "path": "workspace/parp-measured-validation-20261113/results/CALIBRATION.json",
+      "bytes": 39485,
+      "sha256": "501706eeb42ddde806d5acfb7e318dd56b85f821823a7120df447bf1a02ca0f1"
+    },
+    {
+      "path": "workspace/parp-measured-validation-20261113/results/COST_DIAGNOSTICS.json",
+      "bytes": 4578,
+      "sha256": "ed2d76e4cf76004944cdd9ea0ffad6e155cab76eaa269ebb56664e58b2f1c400"
+    },
+    {
+      "path": "workspace/parp-measured-validation-20261113/results/FINAL_STATE.json",
+      "bytes": 280,
+      "sha256": "f959f164998f6863f99a000b90391b87035c3f692eea0f04eb8c4f6113d834bf"
+    },
+    {
+      "path": "workspace/parp-measured-validation-20261113/results/FORMAL.json",
+      "bytes": 4320743,
+      "sha256": "e0cbf7aac5ac85a734367fd125ecec37d6df28f54f56291a6dcc5511c3f46b21"
+    },
+    {
+      "path": "workspace/parp-measured-validation-20261113/results/PREFLIGHT.json",
+      "bytes": 2098,
+      "sha256": "4adc3a821748e66260566ad75b7842944596010df3fbdea1d4fb7bda4f550be3"
+    },
+    {
+      "path": "workspace/parp-measured-validation-20261113/results/SUMMARY.json",
+      "bytes": 26941,
+      "sha256": "c28aa9711c1389da94b694e9c31d177ede81270b67dd15fa88d783cd9f5d5934"
+    },
+    {
+      "path": "workspace/parp-measured-validation-20261113/results/trials/baseline-combined-off-e7f19d3b/occupancy.jsonl",
+      "bytes": 45079,
+      "sha256": "e5f26de4c11a89ad2f228601ccd42cdc758af08041a226e19b23fda8767f0ed5"
+    },
+    {
+      "path": "workspace/parp-measured-validation-20261113/results/trials/baseline-combined-off-e7f19d3b/result.json",
+      "bytes": 485588,
+      "sha256": "d955b644106fb503650275932eaf352400479e5aa2d8450761ca4f0f4eaca7ea"
+    },
+    {
+      "path": "workspace/parp-measured-validation-20261113/results/trials/baseline-combined-off-e7f19d3b/root-telemetry.jsonl",
+      "bytes": 313001,
+      "sha256": "d0119e636509f8b41c0a76092fc095f536a069c1e481bfb19d9afc52f34fab31"
+    },
+    {
+      "path": "workspace/parp-measured-validation-20261113/results/trials/baseline-combined-off-e9a44731/occupancy.jsonl",
+      "bytes": 46608,
+      "sha256": "8b8af82bce073faf343ace4488a52db4a7cf96355699f517d0794d58ec49d4be"
+    },
+    {
+      "path": "workspace/parp-measured-validation-20261113/results/trials/baseline-combined-off-e9a44731/result.json",
+      "bytes": 499118,
+      "sha256": "ca425bcdc819960c9c9cd12f99f8dc419e2cced956e075da6c661339a3ff5084"
+    },
+    {
+      "path": "workspace/parp-measured-validation-20261113/results/trials/baseline-combined-off-e9a44731/root-telemetry.jsonl",
+      "bytes": 323561,
+      "sha256": "eff56fb29dc7b05826d67676753d2bc956f98679ebbd16775eaf8216e5698a72"
+    },
+    {
+      "path": "workspace/parp-measured-validation-20261113/results/trials/calibration-combined-off-0b85857a/gimp-writes.jsonl",
+      "bytes": 1286,
+      "sha256": "140770ef36729a68850e31e54a9147b4bd4a726c39d58fc13e2bdf751b317764"
+    },
+    {
+      "path": "workspace/parp-measured-validation-20261113/results/trials/calibration-combined-off-0b85857a/occupancy.jsonl",
+      "bytes": 44530,
+      "sha256": "3985e07349e3a4822226fa471c5fd3157ad6c137217a2210a4e3a244fe8c90b3"
+    },
+    {
+      "path": "workspace/parp-measured-validation-20261113/results/trials/calibration-combined-off-0b85857a/result.json",
+      "bytes": 497772,
+      "sha256": "b2446fec2f53e5f17d41f413d64765c7612efe377d128cc43b5c0cf789ef9321"
+    },
+    {
+      "path": "workspace/parp-measured-validation-20261113/results/trials/calibration-combined-off-0b85857a/root-telemetry.jsonl",
+      "bytes": 315275,
+      "sha256": "e55fd67c1656cad4bd7cc43650b8ae5f664028b093d130b64dff20b0e8161c48"
+    },
+    {
+      "path": "workspace/parp-measured-validation-20261113/results/trials/calibration-combined-off-139745a3/gimp-writes.jsonl",
+      "bytes": 1273,
+      "sha256": "a435e82c8ffd1900ebb2dbced616b5c0740160fefd253e46927025456a8318cc"
+    },
+    {
+      "path": "workspace/parp-measured-validation-20261113/results/trials/calibration-combined-off-139745a3/occupancy.jsonl",
+      "bytes": 44410,
+      "sha256": "83ee2c86264ff31b4fe6dbc5ed708e90f565b0db128760c89c02eb6b28f001d6"
+    },
+    {
+      "path": "workspace/parp-measured-validation-20261113/results/trials/calibration-combined-off-139745a3/result.json",
+      "bytes": 498028,
+      "sha256": "04acd243c16fe3376b109639a1f289fca038ca383b56dbc40448565c04707e5d"
+    },
+    {
+      "path": "workspace/parp-measured-validation-20261113/results/trials/calibration-combined-off-139745a3/root-telemetry.jsonl",
+      "bytes": 315199,
+      "sha256": "a0e2bb19f5572e5c1739f01b92de68696ff9872a32fca436aa4cc8bbd83b4454"
+    },
+    {
+      "path": "workspace/parp-measured-validation-20261113/results/trials/calibration-combined-off-144d2b09/libreoffice-writes.jsonl",
+      "bytes": 560,
+      "sha256": "8a94602dc8cfcfbe99a2942b0fadeb1ccd36dd86d7e00497bfb19be6f9437e62"
+    },
+    {
+      "path": "workspace/parp-measured-validation-20261113/results/trials/calibration-combined-off-144d2b09/occupancy.jsonl",
+      "bytes": 45243,
+      "sha256": "52fc808cb925a239f931b17d69b9d3325bfb10485e5d3bd9ac23f06524da057c"
+    },
+    {
+      "path": "workspace/parp-measured-validation-20261113/results/trials/calibration-combined-off-144d2b09/result.json",
+      "bytes": 494919,
+      "sha256": "8177d9127e26ada4268caa5362e82d8c411b5d6cc5814ccebe3844263d1331a3"
+    },
+    {
+      "path": "workspace/parp-measured-validation-20261113/results/trials/calibration-combined-off-144d2b09/root-telemetry.jsonl",
+      "bytes": 315118,
+      "sha256": "12fd6a720df5cd5af40ab5bcbdd1f5dce1fad13e275673a3a11cb175f3929b68"
+    },
+    {
+      "path": "workspace/parp-measured-validation-20261113/results/trials/calibration-combined-off-1acf4aec/libreoffice-writes.jsonl",
+      "bytes": 189,
+      "sha256": "50b4dc1de246381abe6d776ee4cb0185a0aac1769f78eab7777a7aa9356a5d27"
+    },
+    {
+      "path": "workspace/parp-measured-validation-20261113/results/trials/calibration-combined-off-1acf4aec/occupancy.jsonl",
+      "bytes": 46884,
+      "sha256": "0756f15a0a6c455552ab71307a746959612fd5ddc6c0b0f4466df0e0b1823908"
+    },
+    {
+      "path": "workspace/parp-measured-validation-20261113/results/trials/calibration-combined-off-1acf4aec/result.json",
+      "bytes": 520721,
+      "sha256": "2b16d2698c3749a727f0165134f45f039a8124e1eb3af8e70ffe4696e392c15d"
+    },
+    {
+      "path": "workspace/parp-measured-validation-20261113/results/trials/calibration-combined-off-1acf4aec/root-telemetry.jsonl",
+      "bytes": 335861,
+      "sha256": "71381ea4b4d2102bab31d410214dc6c64ec23a2cc968586f31cce6835d2b1433"
+    },
+    {
+      "path": "workspace/parp-measured-validation-20261113/results/trials/calibration-combined-off-20bedae5/gimp-writes.jsonl",
+      "bytes": 2019,
+      "sha256": "07aa7d13323c75ac43d0689bd0a11b1c0b7927c77fcbcc28f5960d6bc2571dcf"
+    },
+    {
+      "path": "workspace/parp-measured-validation-20261113/results/trials/calibration-combined-off-20bedae5/occupancy.jsonl",
+      "bytes": 44414,
+      "sha256": "ed94970b31eea9dfdf1b2c47df08953c784bdaf9c786b1537c8115de3a968300"
+    },
+    {
+      "path": "workspace/parp-measured-validation-20261113/results/trials/calibration-combined-off-20bedae5/result.json",
+      "bytes": 497259,
+      "sha256": "5faa17441c72febfac246d524f96ef50a2e541a564a55d62a95b6049b0f52d86"
+    },
+    {
+      "path": "workspace/parp-measured-validation-20261113/results/trials/calibration-combined-off-20bedae5/root-telemetry.jsonl",
+      "bytes": 315309,
+      "sha256": "f747601706424bf974f4a52ee5a3fc7f303bc8aae787196c066caec17ab407e2"
+    },
+    {
+      "path": "workspace/parp-measured-validation-20261113/results/trials/calibration-combined-off-2ad34539/gimp-writes.jsonl",
+      "bytes": 736,
+      "sha256": "ea8e2c40f0dca926d349f17cccc973713612f79b3d3b90b85c1a3ea6be4eee93"
+    },
+    {
+      "path": "workspace/parp-measured-validation-20261113/results/trials/calibration-combined-off-2ad34539/occupancy.jsonl",
+      "bytes": 44502,
+      "sha256": "3bc326a1ce407ea68c5d6a33c9d428d1914baba072d02a84a40cb18f51ed5534"
+    },
+    {
+      "path": "workspace/parp-measured-validation-20261113/results/trials/calibration-combined-off-2ad34539/result.json",
+      "bytes": 494449,
+      "sha256": "76cf92781021dc51c1d47ed7da021ca7a2ff96b85b4248ace11eb59abbc848e9"
+    },
+    {
+      "path": "workspace/parp-measured-validation-20261113/results/trials/calibration-combined-off-2ad34539/root-telemetry.jsonl",
+      "bytes": 315070,
+      "sha256": "d14cea5f746101e970dbbfc6aa7a1d57610020ec260c845bbdde41eb5a17f256"
+    },
+    {
+      "path": "workspace/parp-measured-validation-20261113/results/trials/calibration-combined-off-3333fc90/gimp-writes.jsonl",
+      "bytes": 547,
+      "sha256": "873b9481f63dd349f259e0bda64e92e125aa23199550a686c1c450278a20dc9d"
+    },
+    {
+      "path": "workspace/parp-measured-validation-20261113/results/trials/calibration-combined-off-3333fc90/occupancy.jsonl",
+      "bytes": 45385,
+      "sha256": "3c02d268ff9f43535b7409b78da1f5cd418629f0aa653089860070310c42dd95"
+    },
+    {
+      "path": "workspace/parp-measured-validation-20261113/results/trials/calibration-combined-off-3333fc90/result.json",
+      "bytes": 493679,
+      "sha256": "6cd5e8be3c3780bb74ff2c3f1721d3106994f28bac41e6f58376ba227d87d2fd"
+    },
+    {
+      "path": "workspace/parp-measured-validation-20261113/results/trials/calibration-combined-off-3333fc90/root-telemetry.jsonl",
+      "bytes": 315345,
+      "sha256": "4765ed4c5ff7b9bb70e88f4fb311b5daf56a80a0efefbd5f47aa396fe847c73d"
+    },
+    {
+      "path": "workspace/parp-measured-validation-20261113/results/trials/calibration-combined-off-486e4a73/gimp-writes.jsonl",
+      "bytes": 547,
+      "sha256": "dcbd24d44cadb021df30e6c12a9707251758b0706c972fb47aef05f3e667e3b7"
+    },
+    {
+      "path": "workspace/parp-measured-validation-20261113/results/trials/calibration-combined-off-486e4a73/occupancy.jsonl",
+      "bytes": 44937,
+      "sha256": "9c958ca4cb681231bfe33ed04a3481da352149f7bd9c1cdea6afd839b06a6f05"
+    },
+    {
+      "path": "workspace/parp-measured-validation-20261113/results/trials/calibration-combined-off-486e4a73/result.json",
+      "bytes": 495684,
+      "sha256": "20eec88b7714bd9faa5378279d1773c115b80220d9a33b344112a610bb27f5b4"
+    },
+    {
+      "path": "workspace/parp-measured-validation-20261113/results/trials/calibration-combined-off-486e4a73/root-telemetry.jsonl",
+      "bytes": 315233,
+      "sha256": "c2e62009ddf2d9cd6e03c8f401cdc7ddef98bc9cc5be7478eddc90dea920753b"
+    },
+    {
+      "path": "workspace/parp-measured-validation-20261113/results/trials/calibration-combined-off-4cec9673/libreoffice-writes.jsonl",
+      "bytes": 568,
+      "sha256": "8eaa4da25ab97122231025a3c09499b0858ad488d29e4a783792fa919d7b4007"
+    },
+    {
+      "path": "workspace/parp-measured-validation-20261113/results/trials/calibration-combined-off-4cec9673/occupancy.jsonl",
+      "bytes": 45749,
+      "sha256": "ee96a712a0dbe081ed9f72c5542f6e400465ac07f22929a3e1a2b3f570bd8731"
+    },
+    {
+      "path": "workspace/parp-measured-validation-20261113/results/trials/calibration-combined-off-4cec9673/result.json",
+      "bytes": 509138,
+      "sha256": "96afbe2cbf498e1c8a773614f5aa3f4e42b4f4ae75c074dbe40b69ee9ba577d6"
+    },
+    {
+      "path": "workspace/parp-measured-validation-20261113/results/trials/calibration-combined-off-4cec9673/root-telemetry.jsonl",
+      "bytes": 325760,
+      "sha256": "465e62eb0b432f943a1383f13a680d78d5822b0b70f177f57bf7b70201c4998c"
+    },
+    {
+      "path": "workspace/parp-measured-validation-20261113/results/trials/calibration-combined-off-4eab4f4c/gimp-writes.jsonl",
+      "bytes": 911,
+      "sha256": "ef64285f8696dc74fac4336ffb9131468d3bbd0949aa5acff26192acb34ff21d"
+    },
+    {
+      "path": "workspace/parp-measured-validation-20261113/results/trials/calibration-combined-off-4eab4f4c/occupancy.jsonl",
+      "bytes": 45164,
+      "sha256": "404e4b5f56ff5c41ef77cd3b30b3f08eb085ec2f80d266fc9a646dfa43576871"
+    },
+    {
+      "path": "workspace/parp-measured-validation-20261113/results/trials/calibration-combined-off-4eab4f4c/result.json",
+      "bytes": 495191,
+      "sha256": "022cf91aeddb0db9689df1828f0be786a89780c383500db308771497ec8d1b14"
+    },
+    {
+      "path": "workspace/parp-measured-validation-20261113/results/trials/calibration-combined-off-4eab4f4c/root-telemetry.jsonl",
+      "bytes": 315286,
+      "sha256": "f55126637f1803367286a846a6fee031830ee715bfeb039d7ee67c3db2a99e89"
+    },
+    {
+      "path": "workspace/parp-measured-validation-20261113/results/trials/calibration-combined-off-69ab2d9b/gimp-writes.jsonl",
+      "bytes": 731,
+      "sha256": "617974714583d490a6f1d3daa0d74a5ef2482dc93093e5aac34b7975477cb07b"
+    },
+    {
+      "path": "workspace/parp-measured-validation-20261113/results/trials/calibration-combined-off-69ab2d9b/occupancy.jsonl",
+      "bytes": 45236,
+      "sha256": "4512241a7b044b24716770927fdbee53f649fb5cd6ca95bbae8b641fb0c3396f"
+    },
+    {
+      "path": "workspace/parp-measured-validation-20261113/results/trials/calibration-combined-off-69ab2d9b/result.json",
+      "bytes": 496872,
+      "sha256": "ee7973924f03393a1e71899e2c9c9f07c93774c4701fab9634ca89ba94efb2eb"
+    },
+    {
+      "path": "workspace/parp-measured-validation-20261113/results/trials/calibration-combined-off-69ab2d9b/root-telemetry.jsonl",
+      "bytes": 315471,
+      "sha256": "cc42898e8cfda41cc976bcc164b35286438635ae0910849ddd867fcf5f994c4f"
+    },
+    {
+      "path": "workspace/parp-measured-validation-20261113/results/trials/calibration-combined-off-6b7af0db/firefox-writes.jsonl",
+      "bytes": 548,
+      "sha256": "6e350069b57ec54298008b531a9cf9dbf058e321d9e6c4e54ccf35344c03b0b2"
+    },
+    {
+      "path": "workspace/parp-measured-validation-20261113/results/trials/calibration-combined-off-6b7af0db/occupancy.jsonl",
+      "bytes": 45521,
+      "sha256": "b193c29764adeace78df2e6f78943864741aeede8560c34903d382ed6255c7f2"
+    },
+    {
+      "path": "workspace/parp-measured-validation-20261113/results/trials/calibration-combined-off-6b7af0db/result.json",
+      "bytes": 494969,
+      "sha256": "c4fc418ef3da913c653e80fd0491092072e3ca6f65f81988021d80a4ebb4ce1b"
+    },
+    {
+      "path": "workspace/parp-measured-validation-20261113/results/trials/calibration-combined-off-6b7af0db/root-telemetry.jsonl",
+      "bytes": 315650,
+      "sha256": "45b9391dc9333e8635f6d16a8c10a7698e616b21d129919110a471eb26543473"
+    },
+    {
+      "path": "workspace/parp-measured-validation-20261113/results/trials/calibration-combined-off-87d8896e/firefox-writes.jsonl",
+      "bytes": 923,
+      "sha256": "aa98b0d2dbb4f6dc6448e840e68f79b79a2fbd16497b67c02994011f4a226b62"
+    },
+    {
+      "path": "workspace/parp-measured-validation-20261113/results/trials/calibration-combined-off-87d8896e/occupancy.jsonl",
+      "bytes": 44438,
+      "sha256": "eebfe233bb6d557efa808280602aeb45488e0094f7c70a2995b74033ff846d9d"
+    },
+    {
+      "path": "workspace/parp-measured-validation-20261113/results/trials/calibration-combined-off-87d8896e/result.json",
+      "bytes": 491537,
+      "sha256": "26606335af164b7e329eb8daa745b670ed4d40dc53be3a89a1dbb3cfb65ab25a"
+    },
+    {
+      "path": "workspace/parp-measured-validation-20261113/results/trials/calibration-combined-off-87d8896e/root-telemetry.jsonl",
+      "bytes": 312864,
+      "sha256": "63849bf36ee0e0ad578bee7072786549aa6d2845e9729ecb4984a61392116dd0"
+    },
+    {
+      "path": "workspace/parp-measured-validation-20261113/results/trials/calibration-combined-off-9b9d004e/firefox-writes.jsonl",
+      "bytes": 549,
+      "sha256": "1af0969ba3c05b05c225763e23c9ea835cb5656513d1a65abd92bddcafc5bd2d"
+    },
+    {
+      "path": "workspace/parp-measured-validation-20261113/results/trials/calibration-combined-off-9b9d004e/occupancy.jsonl",
+      "bytes": 46293,
+      "sha256": "e6754ccb02e5c52c15f8da093f535821fe36eb135605a1954f4ec5e51ed9f2be"
+    },
+    {
+      "path": "workspace/parp-measured-validation-20261113/results/trials/calibration-combined-off-9b9d004e/result.json",
+      "bytes": 508927,
+      "sha256": "dab2f00f5bb716aa2d019c663f3836172935ea30b06f375435fe10e9e7e2b0a5"
+    },
+    {
+      "path": "workspace/parp-measured-validation-20261113/results/trials/calibration-combined-off-9b9d004e/root-telemetry.jsonl",
+      "bytes": 325595,
+      "sha256": "2bf06f6dffc166ac020100e497f6f3926342dd4cd3f8a34e43a94b8a895324a0"
+    },
+    {
+      "path": "workspace/parp-measured-validation-20261113/results/trials/calibration-combined-off-a624f455/gimp-writes.jsonl",
+      "bytes": 921,
+      "sha256": "91f31bbc3379a16d68c26fcebf13ddc7e24f11ac7ef1aadc69f42691a4c8de36"
+    },
+    {
+      "path": "workspace/parp-measured-validation-20261113/results/trials/calibration-combined-off-a624f455/occupancy.jsonl",
+      "bytes": 45227,
+      "sha256": "ea42f9c639cbe480acddb458247df8049d8dd0d6f2cf20e8f27a6d6f08b42eb9"
+    },
+    {
+      "path": "workspace/parp-measured-validation-20261113/results/trials/calibration-combined-off-a624f455/result.json",
+      "bytes": 495871,
+      "sha256": "237ca33c8a5565138ab32b081bf383147f56cc204a2f03a0b29b08ffbe1a7bd5"
+    },
+    {
+      "path": "workspace/parp-measured-validation-20261113/results/trials/calibration-combined-off-a624f455/root-telemetry.jsonl",
+      "bytes": 315281,
+      "sha256": "9fa7779495137f7521382be154ac91e280f2c37c600578e50b12ae432a414b4b"
+    },
+    {
+      "path": "workspace/parp-measured-validation-20261113/results/trials/calibration-combined-off-ad813edd/firefox-writes.jsonl",
+      "bytes": 732,
+      "sha256": "b3bf93acc294577c350a8d70aa5c1f39f845e729e1e8729829ed4f7c603d4f9f"
+    },
+    {
+      "path": "workspace/parp-measured-validation-20261113/results/trials/calibration-combined-off-ad813edd/occupancy.jsonl",
+      "bytes": 44867,
+      "sha256": "f8a221715d5aa54f8472071a8d6d21b0501f79159ce527665dc2030d6526166f"
+    },
+    {
+      "path": "workspace/parp-measured-validation-20261113/results/trials/calibration-combined-off-ad813edd/result.json",
+      "bytes": 497017,
+      "sha256": "43d0792e9afdd7c1441c8f15129ca7d6a908308330debfa619a3776ea1847a5f"
+    },
+    {
+      "path": "workspace/parp-measured-validation-20261113/results/trials/calibration-combined-off-ad813edd/root-telemetry.jsonl",
+      "bytes": 315770,
+      "sha256": "3d6510c58d62caa4c4aa33e473501681c473a8d20ac9b956e9e8f841856d4f88"
+    },
+    {
+      "path": "workspace/parp-measured-validation-20261113/results/trials/calibration-combined-off-ae8ce7bb/libreoffice-writes.jsonl",
+      "bytes": 372,
+      "sha256": "99f6ec7d9462e93b7e4a8fb3803c6fbf81589dac1ac831a47cbad58a12c64308"
+    },
+    {
+      "path": "workspace/parp-measured-validation-20261113/results/trials/calibration-combined-off-ae8ce7bb/occupancy.jsonl",
+      "bytes": 47799,
+      "sha256": "b0689db21cd52bd15b0a3adb1f6bac456ef0783b5ee3cd97d004fe73bdef02be"
+    },
+    {
+      "path": "workspace/parp-measured-validation-20261113/results/trials/calibration-combined-off-ae8ce7bb/result.json",
+      "bytes": 521537,
+      "sha256": "68d568c0131121fd05d566781bd65e5de5a983c4dc597b40dada203ae572c12f"
+    },
+    {
+      "path": "workspace/parp-measured-validation-20261113/results/trials/calibration-combined-off-ae8ce7bb/root-telemetry.jsonl",
+      "bytes": 335918,
+      "sha256": "e2696f1245977e3cc8e2841b33643fbb2651368059366b90044bd7707e2e7d17"
+    },
+    {
+      "path": "workspace/parp-measured-validation-20261113/results/trials/calibration-combined-off-b0292456/libreoffice-writes.jsonl",
+      "bytes": 758,
+      "sha256": "4380a2252c69f7a23b23faa9adcd2a3dc7161fa850e6e079b1718c906800c51c"
+    },
+    {
+      "path": "workspace/parp-measured-validation-20261113/results/trials/calibration-combined-off-b0292456/occupancy.jsonl",
+      "bytes": 45085,
+      "sha256": "c8810f3b23137a050bd1c8bc5fb258702545578007e482dfebcc570a103b02c2"
+    },
+    {
+      "path": "workspace/parp-measured-validation-20261113/results/trials/calibration-combined-off-b0292456/result.json",
+      "bytes": 491397,
+      "sha256": "7b34b1feaf2e1e8b6bd18f0a2b396cd4f25182828b857b2ee08ac1d62a741f3a"
+    },
+    {
+      "path": "workspace/parp-measured-validation-20261113/results/trials/calibration-combined-off-b0292456/root-telemetry.jsonl",
+      "bytes": 315352,
+      "sha256": "9de0719989361945c6e4515d7b08c408f3c73b79c58ef3d89de6bcf3f4e87a2f"
+    },
+    {
+      "path": "workspace/parp-measured-validation-20261113/results/trials/calibration-combined-off-c6b715dd/firefox-writes.jsonl",
+      "bytes": 370,
+      "sha256": "559ae4323a4cf2b8974853780c88fc6930a2c11c9b791cd65589c58f403b6cba"
+    },
+    {
+      "path": "workspace/parp-measured-validation-20261113/results/trials/calibration-combined-off-c6b715dd/occupancy.jsonl",
+      "bytes": 44940,
+      "sha256": "9b5ebe36f49a8f57774614a7eb83877c8e3af49a3a0571cb653703c3ce725b41"
+    },
+    {
+      "path": "workspace/parp-measured-validation-20261113/results/trials/calibration-combined-off-c6b715dd/result.json",
+      "bytes": 491132,
+      "sha256": "f71bc369863263a02aa1cbd237974988ef43b019a7bbd99d67c313acc8e91ddb"
+    },
+    {
+      "path": "workspace/parp-measured-validation-20261113/results/trials/calibration-combined-off-c6b715dd/root-telemetry.jsonl",
+      "bytes": 313388,
+      "sha256": "14d3c66f25633bb8cf0dfdbd500e3f7de54c706cff71c4b7833ab23533bc3d21"
+    },
+    {
+      "path": "workspace/parp-measured-validation-20261113/results/trials/calibration-combined-off-c8875e2b/firefox-writes.jsonl",
+      "bytes": 920,
+      "sha256": "9878f89518c5652e8a69cdf95535253491c35d3c29ce6430708e33c2ba6061fc"
+    },
+    {
+      "path": "workspace/parp-measured-validation-20261113/results/trials/calibration-combined-off-c8875e2b/occupancy.jsonl",
+      "bytes": 43664,
+      "sha256": "1629a96e924c14975fb426be985643396b8d83011e5602234ccc9fc7cc0b33fa"
+    },
+    {
+      "path": "workspace/parp-measured-validation-20261113/results/trials/calibration-combined-off-c8875e2b/result.json",
+      "bytes": 483084,
+      "sha256": "51d34f34635963eedc4612a3debbb2b1c6d6be06c74b7af88af925ecd87062f2"
+    },
+    {
+      "path": "workspace/parp-measured-validation-20261113/results/trials/calibration-combined-off-c8875e2b/root-telemetry.jsonl",
+      "bytes": 305540,
+      "sha256": "b6a5218759b30569bccdda3a2d69f32efed28acde28d3680bb5fe6a3688be12f"
+    },
+    {
+      "path": "workspace/parp-measured-validation-20261113/results/trials/calibration-combined-off-c8925dd8/libreoffice-writes.jsonl",
+      "bytes": 378,
+      "sha256": "0044ec4042f8d29bd8f408ea32fe8212d5a73169d31d88f8faf84a09da7549cf"
+    },
+    {
+      "path": "workspace/parp-measured-validation-20261113/results/trials/calibration-combined-off-c8925dd8/occupancy.jsonl",
+      "bytes": 48240,
+      "sha256": "c5bdf51a3d8aa24a485626a2c842dba83420c611967d85590fc9a5c895ff99ba"
+    },
+    {
+      "path": "workspace/parp-measured-validation-20261113/results/trials/calibration-combined-off-c8925dd8/result.json",
+      "bytes": 522073,
+      "sha256": "43f3af55ea4b364300c739bc6be742a026983543926e771064da7c4e5c4df7d5"
+    },
+    {
+      "path": "workspace/parp-measured-validation-20261113/results/trials/calibration-combined-off-c8925dd8/root-telemetry.jsonl",
+      "bytes": 335804,
+      "sha256": "9358052a3f8d23382d8616f42304da91fb7b45e83e1a33650c242fc3a4368625"
+    },
+    {
+      "path": "workspace/parp-measured-validation-20261113/results/trials/calibration-combined-off-dae71076/gimp-writes.jsonl",
+      "bytes": 549,
+      "sha256": "8d1be69afce67ec0faf6296e4a39512076a3ce8cbf53ba1ccc3bd9934a60943e"
+    },
+    {
+      "path": "workspace/parp-measured-validation-20261113/results/trials/calibration-combined-off-dae71076/occupancy.jsonl",
+      "bytes": 46140,
+      "sha256": "c2e9a6c5d85f5747d6dfb8b4ce924a92d500ac87aed16e84b0b8ae426330951f"
+    },
+    {
+      "path": "workspace/parp-measured-validation-20261113/results/trials/calibration-combined-off-dae71076/result.json",
+      "bytes": 509858,
+      "sha256": "6a4691336b3d19b71b179f3519e75ab1478b06e99130313b9ac24f58f05a9f88"
+    },
+    {
+      "path": "workspace/parp-measured-validation-20261113/results/trials/calibration-combined-off-dae71076/root-telemetry.jsonl",
+      "bytes": 325449,
+      "sha256": "25d3df83b87eba7e2854a80f80ed8eca711e25f1f22784b74fba2e4290844c99"
+    },
+    {
+      "path": "workspace/parp-measured-validation-20261113/results/trials/calibration-combined-off-e6052444/firefox-writes.jsonl",
+      "bytes": 742,
+      "sha256": "96d159835c6c69560c5227c7d1ec7e383be5bb040640acda8a5cc7153354806c"
+    },
+    {
+      "path": "workspace/parp-measured-validation-20261113/results/trials/calibration-combined-off-e6052444/occupancy.jsonl",
+      "bytes": 45581,
+      "sha256": "74df833f3cf79cfc656d335bbaa70ae84a21d7b67367e1f9350c64a008b07539"
+    },
+    {
+      "path": "workspace/parp-measured-validation-20261113/results/trials/calibration-combined-off-e6052444/result.json",
+      "bytes": 492588,
+      "sha256": "7ffc10f5c3f408f2d1f77fdad76a7c18455117705dd31a9112c1cc61ffb45eef"
+    },
+    {
+      "path": "workspace/parp-measured-validation-20261113/results/trials/calibration-combined-off-e6052444/root-telemetry.jsonl",
+      "bytes": 315781,
+      "sha256": "b37970d9b485a68fc0c58b7fdd48815a0fc9bf3ade615e74880016ce0f2ea04a"
+    },
+    {
+      "path": "workspace/parp-measured-validation-20261113/results/trials/formal-revisit-off-5df6a134/occupancy.jsonl",
+      "bytes": 42439,
+      "sha256": "df612d0145145f4344a053c05336b4d92550f07df574f132f32fe990562bd25f"
+    },
+    {
+      "path": "workspace/parp-measured-validation-20261113/results/trials/formal-revisit-off-5df6a134/result.json",
+      "bytes": 664315,
+      "sha256": "601446a25588b87b7b996e98b582a4ac655044e2506661930ccc8ff4dd75bbde"
+    },
+    {
+      "path": "workspace/parp-measured-validation-20261113/results/trials/formal-revisit-off-5df6a134/root-telemetry.jsonl",
+      "bytes": 297174,
+      "sha256": "6bb8c3f2cd186bf967a5cea6e4fa680830e389f46d0a9ea30eb3a2d8c91ff0bd"
+    },
+    {
+      "path": "workspace/parp-measured-validation-20261113/results/trials/formal-revisit-on-1a7c42a5/firefox-writes.jsonl",
+      "bytes": 375,
+      "sha256": "bb9abd11101335aff7a41fe74ab06416468d79ec0e43264e462a27ff53cd8abd"
+    },
+    {
+      "path": "workspace/parp-measured-validation-20261113/results/trials/formal-revisit-on-1a7c42a5/gimp-writes.jsonl",
+      "bytes": 1273,
+      "sha256": "d4f70e09e7aa114a403c835517ec181a189058490b1609ac6300b291ba63705d"
+    },
+    {
+      "path": "workspace/parp-measured-validation-20261113/results/trials/formal-revisit-on-1a7c42a5/libreoffice-writes.jsonl",
+      "bytes": 372,
+      "sha256": "5117edc4a604b8b3fe7c6eb0700a80f673adb53de77222b1cfc711e71dfb0bc1"
+    },
+    {
+      "path": "workspace/parp-measured-validation-20261113/results/trials/formal-revisit-on-1a7c42a5/occupancy.jsonl",
+      "bytes": 42614,
+      "sha256": "3730b4b69eb607a7797c75f40d49eeeb80a4ed76a6300038b582bd736b450fd5"
+    },
+    {
+      "path": "workspace/parp-measured-validation-20261113/results/trials/formal-revisit-on-1a7c42a5/result.json",
+      "bytes": 715782,
+      "sha256": "7a1ddcc36ca20e7a2fe9dc239c4d1d760e81063ea1638201bee4be1eea78bb47"
+    },
+    {
+      "path": "workspace/parp-measured-validation-20261113/results/trials/formal-revisit-on-1a7c42a5/root-telemetry.jsonl",
+      "bytes": 307260,
+      "sha256": "9cce69530d036845c0a7555a223938ad29c359e7b87035c80fdaef43ffe535aa"
+    },
+    {
+      "path": "workspace/parp-measured-validation-20261113/results/trials/formal-stable-off-180867f6/occupancy.jsonl",
+      "bytes": 39978,
+      "sha256": "b0b49822ea0e62af4833fab7257f953aba46597de538b10c3184c541d8bbbe81"
+    },
+    {
+      "path": "workspace/parp-measured-validation-20261113/results/trials/formal-stable-off-180867f6/result.json",
+      "bytes": 639398,
+      "sha256": "ea56f569e22f0a89ad2ec857e0e8327000ba0fdca27bb5a2b57045b5d6782ebf"
+    },
+    {
+      "path": "workspace/parp-measured-validation-20261113/results/trials/formal-stable-off-180867f6/root-telemetry.jsonl",
+      "bytes": 286782,
+      "sha256": "2468c265c8aab3c65740fc50406c92d76f44a737b61b4bfde91948d0b9e4f10c"
+    },
+    {
+      "path": "workspace/parp-measured-validation-20261113/results/trials/formal-stable-on-e2cfe592/gimp-writes.jsonl",
+      "bytes": 1273,
+      "sha256": "91ea21d474f5e0369bf57b8744c4d5fdc235940ff4445d587722fe401433c71b"
+    },
+    {
+      "path": "workspace/parp-measured-validation-20261113/results/trials/formal-stable-on-e2cfe592/occupancy.jsonl",
+      "bytes": 39740,
+      "sha256": "6bd138f1eeb975fa346db5f6223a85b94425bb4dca9405338c309c2b6b766a25"
+    },
+    {
+      "path": "workspace/parp-measured-validation-20261113/results/trials/formal-stable-on-e2cfe592/result.json",
+      "bytes": 666392,
+      "sha256": "90c5f3019059162a45154080968f7146238184cdde65942f0727cba63b34af0d"
+    },
+    {
+      "path": "workspace/parp-measured-validation-20261113/results/trials/formal-stable-on-e2cfe592/root-telemetry.jsonl",
+      "bytes": 284529,
+      "sha256": "841255fbbba523189a476591ba7f04b2ee79fe06b9096a74995d6192159b38e6"
+    },
+    {
+      "path": "workspace/parp-measured-validation-20261113/results/trials/formal-turnover-off-6a5b92f8/occupancy.jsonl",
+      "bytes": 39693,
+      "sha256": "5b69d47bb0f5c2e6e4874aa26260a19c51d3d2daec783c2a089001823d1015b0"
+    },
+    {
+      "path": "workspace/parp-measured-validation-20261113/results/trials/formal-turnover-off-6a5b92f8/result.json",
+      "bytes": 636527,
+      "sha256": "300f01014d972d91c92cbeb27a4e97934fd84a56ba9586a66497d96664833b4f"
+    },
+    {
+      "path": "workspace/parp-measured-validation-20261113/results/trials/formal-turnover-off-6a5b92f8/root-telemetry.jsonl",
+      "bytes": 286329,
+      "sha256": "4dc32e8b321d8e2c215d8de361dbef1397d753ea3e7174b02c5610b72d70a45e"
+    },
+    {
+      "path": "workspace/parp-measured-validation-20261113/results/trials/formal-turnover-on-361635e1/gimp-writes.jsonl",
+      "bytes": 1273,
+      "sha256": "6523ed8d8a7a3fd1cd37ebd8d5f824922a84d220e53d6686f451304b305beeb7"
+    },
+    {
+      "path": "workspace/parp-measured-validation-20261113/results/trials/formal-turnover-on-361635e1/libreoffice-writes.jsonl",
+      "bytes": 372,
+      "sha256": "1007bb57047ddb182a9cf7178fbda33984e63636ca5c7d1cf02c1feb7a6531be"
+    },
+    {
+      "path": "workspace/parp-measured-validation-20261113/results/trials/formal-turnover-on-361635e1/occupancy.jsonl",
+      "bytes": 39735,
+      "sha256": "73b8f55df59178c44a369bc2a41302f5c89a023bad5bb37e15de37d15cdd20d6"
+    },
+    {
+      "path": "workspace/parp-measured-validation-20261113/results/trials/formal-turnover-on-361635e1/result.json",
+      "bytes": 666869,
+      "sha256": "81bebd28f9fe532b68aefe55d9a642e2bee926043d294208e1a71ed4cc92d279"
+    },
+    {
+      "path": "workspace/parp-measured-validation-20261113/results/trials/formal-turnover-on-361635e1/root-telemetry.jsonl",
+      "bytes": 284692,
+      "sha256": "2d7dc1391e9b0162b1ee4637f05cf0ff4eb20cddd6fbcd155cc85b52cd294ac6"
+    },
+    {
+      "path": "workspace/parp-measured-validation-20261113/results/trials/reference-revisit-off-35696cd5/failure.png",
+      "bytes": 156610,
+      "sha256": "99221c1ac927f36296687e96d7b1ae7b271f9a209afd51a3d514b24396aed8b5"
+    },
+    {
+      "path": "workspace/parp-measured-validation-20261113/results/trials/reference-revisit-off-35696cd5/result.json",
+      "bytes": 1396,
+      "sha256": "fe5cb930eb21722a7896f7010be8a1a789741ac403b06b09c97c2165c4cb87e6"
+    },
+    {
+      "path": "workspace/parp-measured-validation-20261113/results/trials/reference-revisit-off-c8f4f841/occupancy.jsonl",
+      "bytes": 42220,
+      "sha256": "8c39d232fe467ae8cedc63fed8615e78c9785c0e3570a2796a2a4180847f9288"
+    },
+    {
+      "path": "workspace/parp-measured-validation-20261113/results/trials/reference-revisit-off-c8f4f841/result.json",
+      "bytes": 459429,
+      "sha256": "67002c7b9abd20ee809fcd8eef21c9c65b6b7f63e57a6df6867b302ba3afc5ae"
+    },
+    {
+      "path": "workspace/parp-measured-validation-20261113/results/trials/reference-revisit-off-c8f4f841/root-telemetry.jsonl",
+      "bytes": 291600,
+      "sha256": "03a8d054b8fef85294de09e83443b7592f0a2fe46912f6c35d50ad79be2757cd"
+    },
+    {
+      "path": "workspace/parp-measured-validation-20261113/results/trials/reference-stable-off-3e3ab7c2/occupancy.jsonl",
+      "bytes": 39881,
+      "sha256": "594db381e6fda947ff73f73dabb325a8998dcbf22cc403a40d0ec755ae67e003"
+    },
+    {
+      "path": "workspace/parp-measured-validation-20261113/results/trials/reference-stable-off-3e3ab7c2/result.json",
+      "bytes": 433550,
+      "sha256": "94d2406ce44a834e08125ee4bf91df81fad78c659ec59cacf06fc21827138f68"
+    },
+    {
+      "path": "workspace/parp-measured-validation-20261113/results/trials/reference-stable-off-3e3ab7c2/root-telemetry.jsonl",
+      "bytes": 270545,
+      "sha256": "e6be82afff4bec9a8cd8d9ae8cc79b6a28eb5315f1f407fe6b0591f1df92663c"
+    },
+    {
+      "path": "workspace/parp-measured-validation-20261113/results/trials/reference-stable-off-c1bd6039/result.json",
+      "bytes": 2012,
+      "sha256": "8de66ff4e69c79a658d5288df5c10a007a1b824b12b46ffa9a2e774bcd57c8dd"
+    },
+    {
+      "path": "workspace/parp-measured-validation-20261113/results/trials/reference-stable-off-c3a9e1fc/occupancy.jsonl",
+      "bytes": 40110,
+      "sha256": "58015e7d3517b9b8b38e438f401832407f8beefab3d80a62df17477c9b130b33"
+    },
+    {
+      "path": "workspace/parp-measured-validation-20261113/results/trials/reference-stable-off-c3a9e1fc/result.json",
+      "bytes": 444377,
+      "sha256": "3518e3e13314f02d95f1734d51669f7b4deb17e622c5f620426bf6a816c380d1"
+    },
+    {
+      "path": "workspace/parp-measured-validation-20261113/results/trials/reference-stable-off-c3a9e1fc/root-telemetry.jsonl",
+      "bytes": 281044,
+      "sha256": "15b07ad157cb871b9f2e2d51c81a5a76bcf467b6c4f611c3f36146c599e28b44"
+    },
+    {
+      "path": "workspace/parp-measured-validation-20261113/results/trials/reference-turnover-off-6d93097f/occupancy.jsonl",
+      "bytes": 39799,
+      "sha256": "80aa22239f2fd593d9eb94bb779c79c09757673ba67b6502fbbd015927c95eef"
+    },
+    {
+      "path": "workspace/parp-measured-validation-20261113/results/trials/reference-turnover-off-6d93097f/result.json",
+      "bytes": 448855,
+      "sha256": "c2c016a1bae97447be94d0bd4752493133731ef88fa276327ec2a7fb7e3d13db"
+    },
+    {
+      "path": "workspace/parp-measured-validation-20261113/results/trials/reference-turnover-off-6d93097f/root-telemetry.jsonl",
+      "bytes": 281310,
+      "sha256": "39e396b3b35faf2397b696a2d6b47d109e457a768c003a6e5733f7f0ffe04815"
+    },
+    {
+      "path": "workspace/parp-measured-validation-20261113/results/trials/reference-turnover-off-8f854865/occupancy.jsonl",
+      "bytes": 39980,
+      "sha256": "016472e6f3479fcfa9d900eaa504d4f8148250a38254457663aa112e92c3c195"
+    },
+    {
+      "path": "workspace/parp-measured-validation-20261113/results/trials/reference-turnover-off-8f854865/result.json",
+      "bytes": 430470,
+      "sha256": "a70de307d7af04b27fa6e882f81b343a38a45bf7d5797f66e83bb4c990cb79b3"
+    },
+    {
+      "path": "workspace/parp-measured-validation-20261113/results/trials/reference-turnover-off-8f854865/root-telemetry.jsonl",
+      "bytes": 270619,
+      "sha256": "e239d2aca888f3989fe7f7731df9abc1052837d80ba950f68adca44a306f2e37"
+    },
+    {
+      "path": "workspace/parp-userspace-deficitfix-20261117/controller/adapters.py",
+      "bytes": 2521,
+      "sha256": "3b4e30a47c55053cacc24fa58c8757eaf552b5ac10625752e566472648d65629"
+    },
+    {
+      "path": "workspace/parp-userspace-deficitfix-20261117/controller/coordinator.py",
+      "bytes": 8177,
+      "sha256": "2c5891d24addae9878cb510a5fb419f54cb2167cf46691ee9e9a1b38f6b586f1"
+    },
+    {
+      "path": "workspace/parp-userspace-deficitfix-20261117/controller/executor.py",
+      "bytes": 19766,
+      "sha256": "2d71beea94628242b91aa57606bea8d2496c5f1a68ea350b6380be4449ca9c6f"
+    },
+    {
+      "path": "workspace/parp-userspace-deficitfix-20261117/controller/faults.py",
+      "bytes": 1259,
+      "sha256": "3e7ff27aac2cf75059254088807a1768c811771f0a78ad73d94c56a753c375c7"
+    },
+    {
+      "path": "workspace/parp-userspace-deficitfix-20261117/controller/native.py",
+      "bytes": 4262,
+      "sha256": "9b14655b61edb0d6ae7e0ad375b396730264cf8ef815bc7c1dae49886af3c7d4"
+    },
+    {
+      "path": "workspace/parp-userspace-deficitfix-20261117/controller/plan.py",
+      "bytes": 16853,
+      "sha256": "1908cc9fc2ad31a73edac3c21193e027445b5aa2a4be8a95c42321734b8a5c2c"
+    },
+    {
+      "path": "workspace/parp-userspace-deficitfix-20261117/controller/prepeak_timing.py",
+      "bytes": 7183,
+      "sha256": "a5bcfe9e8f947ec874b6896bf1a2dead5dfbe32cb565aa99ac0775e9a9cfddc1"
+    },
+    {
+      "path": "workspace/parp-userspace-deficitfix-20261117/controller/replay_forecast.py",
+      "bytes": 2814,
+      "sha256": "9b30a0a25526a8f0ad850d4048d4058bdb3683d843c4c28ba5a1b8fd7a270245"
+    },
+    {
+      "path": "workspace/parp-userspace-deficitfix-20261117/controller/safety_store.py",
+      "bytes": 2153,
+      "sha256": "4c6f9948d84b620e72519d7a1d346c812c92c3089982c0cdc9d4117d1fb6cdaa"
+    },
+    {
+      "path": "workspace/parp-userspace-deficitfix-20261117/controller/sequence_policy.py",
+      "bytes": 2452,
+      "sha256": "616ad43caf518b8f040626ded1480d09431ed9a23f6678d0ed89c5b367566b71"
+    },
+    {
+      "path": "workspace/parp-userspace-deficitfix-20261117/controller/signals.py",
+      "bytes": 2409,
+      "sha256": "52fdc181b8605af31683aa92240290073d36e9d08e0d976f84c1efc796f0e7f3"
+    },
+    {
+      "path": "workspace/parp-userspace-deficitfix-20261117/controller/test_measured.py",
+      "bytes": 8994,
+      "sha256": "8ca86005d3b840f713b0720129c60e31ceecb9b76c4ea7e296165be7081db0c8"
+    },
+    {
+      "path": "workspace/parp-userspace-deficitfix-20261117/controller/test_prepeak_timing.py",
+      "bytes": 9564,
+      "sha256": "b5dfc8373c6fe8e024e8f78712353029ee36c15d50389dcce157cc2e68960401"
+    },
+    {
+      "path": "workspace/parp-userspace-deficitfix-20261117/controller/test_sequence_policy.py",
+      "bytes": 9281,
+      "sha256": "39bd076c04ca6a0be04feb5a93cbb45a0724595995878e66db99ced1161f364f"
+    },
+    {
+      "path": "workspace/parp-userspace-deficitfix-20261117/controller/workflow.py",
+      "bytes": 1813,
+      "sha256": "140743fd24b469a8d54e0fd76dacc565a7a13e924adc00c8bae07bf528337c6a"
+    },
+    {
+      "path": "workspace/parp-userspace-deficitfix-20261117/demand_reference.py",
+      "bytes": 2567,
+      "sha256": "c8665c4a5b53ed3d47b2a513ef52402e7f82c598c1e84e091fb1df76e4735232"
+    },
+    {
+      "path": "workspace/parp-userspace-deficitfix-20261117/execution_contract.py",
+      "bytes": 4262,
+      "sha256": "d6a2945be220e6089052733bc8d3cabd0457dd3118a60362e76434e0f186aef9"
+    },
+    {
+      "path": "workspace/parp-userspace-deficitfix-20261117/inputs_bundle.py",
+      "bytes": 1061,
+      "sha256": "2af0c479873e7018cd1691adf5cb2dbae3d78e7f16e045ec5b229d6980769a11"
+    },
+    {
+      "path": "workspace/parp-userspace-deficitfix-20261117/lab/cg_enter.py",
+      "bytes": 881,
+      "sha256": "99dc7e1af27ad162bd6a0d121bc01269d040d57c1d5ae61fde4895e360508cf8"
+    },
+    {
+      "path": "workspace/parp-userspace-deficitfix-20261117/lab/firefox-install.json",
+      "bytes": 527,
+      "sha256": "0e797d35ea142568b3da8b3835e39771cce1f373579e9a53ba3d44466a1d96e5"
+    },
+    {
+      "path": "workspace/parp-userspace-deficitfix-20261117/lab/foreground_probe.py",
+      "bytes": 6127,
+      "sha256": "d75a3f3e6c49097c362333493b659f99fd206badf1f64fead9efbb0eca35d9a1"
+    },
+    {
+      "path": "workspace/parp-userspace-deficitfix-20261117/lab/harness_contracts.py",
+      "bytes": 1561,
+      "sha256": "b2f57eb5c186ded8eaf933b3424077677494c7f01164857f4838a6ee5c3d8fc9"
+    },
+    {
+      "path": "workspace/parp-userspace-deficitfix-20261117/lab/host_watch.py",
+      "bytes": 2043,
+      "sha256": "4e5feecca600a65e2f7e31fe95f16572d57ce345c4df56744c29869138747ff0"
+    },
+    {
+      "path": "workspace/parp-userspace-deficitfix-20261117/lab/native_apps.py",
+      "bytes": 8414,
+      "sha256": "670aa5cacf48581b94d6576b80064f13f200417628dfb9436ed65ed91edc6bda"
+    },
+    {
+      "path": "workspace/parp-userspace-deficitfix-20261117/lab/online_service.py",
+      "bytes": 20917,
+      "sha256": "730054cd4c3bc7501e096c8ca9d522ce0bb4a24f7afbfbb260872c4ee836adc9"
+    },
+    {
+      "path": "workspace/parp-userspace-deficitfix-20261117/lab/reference.py",
+      "bytes": 2801,
+      "sha256": "90a0e4fe7b2b47bf31291148dfddf153a3b31d01c0cf441245d547a6292ce152"
+    },
+    {
+      "path": "workspace/parp-userspace-deficitfix-20261117/lab/root_guard.py",
+      "bytes": 10121,
+      "sha256": "da8edafed2a3ea00e0bfed2d2db127cca77c11f6b7d6cc9db58952de6f4cd4a3"
+    },
+    {
+      "path": "workspace/parp-userspace-deficitfix-20261117/lab/shared_service.py",
+      "bytes": 7926,
+      "sha256": "44a8c3f3f5de46f0f93ced45ec84fdbcba834c2455321b46d6256969d8a6ed8a"
+    },
+    {
+      "path": "workspace/parp-userspace-deficitfix-20261117/lab/suite.py",
+      "bytes": 26053,
+      "sha256": "53620cbbc640a066c4db5634ff4653fbf34481ab14ce9fab633164a88802ee4f"
+    },
+    {
+      "path": "workspace/parp-userspace-deficitfix-20261117/lab/task_faults.py",
+      "bytes": 2210,
+      "sha256": "3cddc98c1459b7a51b3bfe5a53aa70dd78e81c5e8604277c934ea347b282ad69"
+    },
+    {
+      "path": "workspace/parp-userspace-deficitfix-20261117/lab/telemetry.py",
+      "bytes": 3042,
+      "sha256": "221870af8129a5731b58c9fe69acb6594d6f574250eb3bfe7f94595fa68f1e25"
+    },
+    {
+      "path": "workspace/parp-userspace-deficitfix-20261117/prepare_guest.py",
+      "bytes": 1120,
+      "sha256": "cc57cfe526ec470a28f1a3ade79c56d27fb2514982bfd8ac1f78e72fd6dc011c"
+    },
+    {
+      "path": "workspace/parp-userspace-deficitfix-20261117/restart_vm_collector.sh",
+      "bytes": 875,
+      "sha256": "ab4aecccbf31e9ec6d41ff0a66d5df25f1cad9037e635884b399d8e9effebe31"
+    },
+    {
+      "path": "workspace/parp-userspace-deficitfix-20261117/results/collector-session.stop",
+      "bytes": 17,
+      "sha256": "309a5a8096508c2ed933f99157a023db660c34c315119963ac3eb93000c34895"
+    },
+    {
+      "path": "workspace/parp-userspace-deficitfix-20261117/results/FINAL_STATE-20261117.json",
+      "bytes": 159,
+      "sha256": "b76448708365004870636f6d687d097992292ae37261ce68d83b012a2836f17c"
+    },
+    {
+      "path": "workspace/parp-userspace-deficitfix-20261117/results/REFERENCE-revisit.json",
+      "bytes": 231,
+      "sha256": "84c576fa1ecb91eb67616a67da5c2d667b7f75810eee9506cc91c0fb0c210901"
+    },
+    {
+      "path": "workspace/parp-userspace-deficitfix-20261117/results/RESTORE-revisit.json",
+      "bytes": 90,
+      "sha256": "008d26e3a852df01b46b60c059b0b5762454d9f83fba09a5582c9e017fbf8a4f"
+    },
+    {
+      "path": "workspace/parp-userspace-deficitfix-20261117/results/RUN-revisit.json",
+      "bytes": 8840555,
+      "sha256": "57152ceecb5cc8631e6fc9d846bb5a6f9f8971badf2d037eea5b0a4019d4af1f"
+    },
+    {
+      "path": "workspace/parp-userspace-deficitfix-20261117/results/SESSION_STOP-20261117.json",
+      "bytes": 130,
+      "sha256": "c243654a138d4704d00133202e3072cf3c8a744b65f4e7470621a14c17971b0c"
+    },
+    {
+      "path": "workspace/parp-userspace-deficitfix-20261117/results/TOTAL_QUALIFICATION-revisit.json",
+      "bytes": 17784,
+      "sha256": "f5b8cd32834138168352cf92e4e81d38e1c68ebee3f20ec0c66a4317445655d8"
+    },
+    {
+      "path": "workspace/parp-userspace-deficitfix-20261117/results/trials/baseline-revisit-off-8f8fe723/occupancy.jsonl",
+      "bytes": 192284,
+      "sha256": "7190c7f49a54ec26a62f39e5bbd82d331248350906e23ec1b76078fe39c49151"
+    },
+    {
+      "path": "workspace/parp-userspace-deficitfix-20261117/results/trials/baseline-revisit-off-8f8fe723/result.json",
+      "bytes": 853855,
+      "sha256": "fa679e04faee5b12de53967fe8d3ab3562511c6473e61caa0985aab5b4909f7b"
+    },
+    {
+      "path": "workspace/parp-userspace-deficitfix-20261117/results/trials/baseline-revisit-off-8f8fe723/root-telemetry.jsonl",
+      "bytes": 340897,
+      "sha256": "6f6af47233ad8a5366146b31b852485dc96da5cffbde03b8e0fdf4286479254a"
+    },
+    {
+      "path": "workspace/parp-userspace-deficitfix-20261117/results/trials/baseline-revisit-off-a747fd88/occupancy.jsonl",
+      "bytes": 184045,
+      "sha256": "b89bd5e98e670b50d59f7486fa5e4d6d2f0083c4ce80b9f75331ab8270a359e5"
+    },
+    {
+      "path": "workspace/parp-userspace-deficitfix-20261117/results/trials/baseline-revisit-off-a747fd88/result.json",
+      "bytes": 829483,
+      "sha256": "87dd781322dd1342352fc46505923a9e19fa5ed408f3753e20b5c5176aac51ef"
+    },
+    {
+      "path": "workspace/parp-userspace-deficitfix-20261117/results/trials/baseline-revisit-off-a747fd88/root-telemetry.jsonl",
+      "bytes": 329071,
+      "sha256": "f7d6a2ab0280994a4c2ff022274bca63d6bcf63b028bfdea4952ba848d688f4b"
+    },
+    {
+      "path": "workspace/parp-userspace-deficitfix-20261117/results/trials/baseline-revisit-off-ef3aa2a2/occupancy.jsonl",
+      "bytes": 180815,
+      "sha256": "c6cb2ca2957e21bf12bd952b5ae4d88f639dfeb7bc5308ead6af01d54a7eed4d"
+    },
+    {
+      "path": "workspace/parp-userspace-deficitfix-20261117/results/trials/baseline-revisit-off-ef3aa2a2/result.json",
+      "bytes": 809884,
+      "sha256": "86591a840845ff465c162263e5415651148e448b571fcf328b177fb0fbc16f75"
+    },
+    {
+      "path": "workspace/parp-userspace-deficitfix-20261117/results/trials/baseline-revisit-off-ef3aa2a2/root-telemetry.jsonl",
+      "bytes": 317562,
+      "sha256": "1140f748ec1b782a930a11e1701ca4ba44bc2015f8c5d3139a3957378ae0e49e"
+    },
+    {
+      "path": "workspace/parp-userspace-deficitfix-20261117/results/trials/calibration-revisit-on-cfc0a617/firefox-writes.jsonl",
+      "bytes": 469,
+      "sha256": "aeb29e45eef4d826f272cd7dda4c359df833ab5bae43d436bd9e69fa838a3a9b"
+    },
+    {
+      "path": "workspace/parp-userspace-deficitfix-20261117/results/trials/calibration-revisit-on-cfc0a617/gimp-writes.jsonl",
+      "bytes": 1911,
+      "sha256": "bc9a351e1f7f3c78ccec36a4e477fac166364d829f25495e132480bcab5928a2"
+    },
+    {
+      "path": "workspace/parp-userspace-deficitfix-20261117/results/trials/calibration-revisit-on-cfc0a617/libreoffice-writes.jsonl",
+      "bytes": 1316,
+      "sha256": "4b0252ebf98dac61b46b808f7f35026048bec2e9c97e0246e5c6566ccdc90689"
+    },
+    {
+      "path": "workspace/parp-userspace-deficitfix-20261117/results/trials/calibration-revisit-on-cfc0a617/occupancy.jsonl",
+      "bytes": 184263,
+      "sha256": "1e0c574517e34ea823de5fa581d7d239c1cf9ea9af6efb9b4a298177c8a849f1"
+    },
+    {
+      "path": "workspace/parp-userspace-deficitfix-20261117/results/trials/calibration-revisit-on-cfc0a617/result.json",
+      "bytes": 863116,
+      "sha256": "291c38bfc07e079476d970cc7dda53c14408089831214836209e10e60c61665b"
+    },
+    {
+      "path": "workspace/parp-userspace-deficitfix-20261117/results/trials/calibration-revisit-on-cfc0a617/root-telemetry.jsonl",
+      "bytes": 330987,
+      "sha256": "aea11bd41efb9afc00d02d17b9ab754c8611e1bffd317459d74230230a448b7a"
+    },
+    {
+      "path": "workspace/parp-userspace-deficitfix-20261117/results/trials/calibration-revisit-on-d2a97d56/firefox-writes.jsonl",
+      "bytes": 467,
+      "sha256": "42c276a1aca4dd5c44af4dc3162f60be560b85c4739d8974f7101ab9bf2cbfab"
+    },
+    {
+      "path": "workspace/parp-userspace-deficitfix-20261117/results/trials/calibration-revisit-on-d2a97d56/gimp-writes.jsonl",
+      "bytes": 1707,
+      "sha256": "4be33a0416f70c59e05d5ecc73dc23cbb52c95aa7a2ed0df82abe4edcb3bda88"
+    },
+    {
+      "path": "workspace/parp-userspace-deficitfix-20261117/results/trials/calibration-revisit-on-d2a97d56/libreoffice-writes.jsonl",
+      "bytes": 471,
+      "sha256": "aa42cf61854b2aa69003f683472d90bc2abf17030a0f09c45e1aa811977654ef"
+    },
+    {
+      "path": "workspace/parp-userspace-deficitfix-20261117/results/trials/calibration-revisit-on-d2a97d56/occupancy.jsonl",
+      "bytes": 186262,
+      "sha256": "0a393ff6b86b4cce8118cff914ea5b3210953b1dc110fc82a5449c581a676842"
+    },
+    {
+      "path": "workspace/parp-userspace-deficitfix-20261117/results/trials/calibration-revisit-on-d2a97d56/result.json",
+      "bytes": 849792,
+      "sha256": "f2207d507d345f5ba6fe67e752d1863a45b4c5b64aee7f6095cf87a9e3817bc5"
+    },
+    {
+      "path": "workspace/parp-userspace-deficitfix-20261117/results/trials/calibration-revisit-on-d2a97d56/root-telemetry.jsonl",
+      "bytes": 329611,
+      "sha256": "84d42d457fefc910a3028fb1ca75ca1e6ac4789511674c19fd64f043b3cf7264"
+    },
+    {
+      "path": "workspace/parp-userspace-deficitfix-20261117/results/trials/calibration-revisit-on-d7fe3cb6/firefox-writes.jsonl",
+      "bytes": 467,
+      "sha256": "6d7b8b3d3f328fddc723b93570612ede651d124fb5be7a397fddf4b709d0b92b"
+    },
+    {
+      "path": "workspace/parp-userspace-deficitfix-20261117/results/trials/calibration-revisit-on-d7fe3cb6/gimp-writes.jsonl",
+      "bytes": 1705,
+      "sha256": "9eee867631a6b174f6ba641c75e13f8882e5a574f7c2914fb7c22dfee03bf13a"
+    },
+    {
+      "path": "workspace/parp-userspace-deficitfix-20261117/results/trials/calibration-revisit-on-d7fe3cb6/libreoffice-writes.jsonl",
+      "bytes": 1531,
+      "sha256": "6ff9ba6815025c010aa473a8fdab78dccd57751abd781076fc5063d568f1c56a"
+    },
+    {
+      "path": "workspace/parp-userspace-deficitfix-20261117/results/trials/calibration-revisit-on-d7fe3cb6/occupancy.jsonl",
+      "bytes": 182929,
+      "sha256": "8ffddbd9f097e82cdc166189ace5f7172d3014a057b1fad887995968d7a5b90e"
+    },
+    {
+      "path": "workspace/parp-userspace-deficitfix-20261117/results/trials/calibration-revisit-on-d7fe3cb6/result.json",
+      "bytes": 853986,
+      "sha256": "36fe7d32d8734f09cbf270259206e3666b30d4aa3c5635dce32647c6235a0d6a"
+    },
+    {
+      "path": "workspace/parp-userspace-deficitfix-20261117/results/trials/calibration-revisit-on-d7fe3cb6/root-telemetry.jsonl",
+      "bytes": 332145,
+      "sha256": "47da4ea2e8769430f49b89df9cca93492fd32dc2921a46750d7b63ab620a2e01"
+    },
+    {
+      "path": "workspace/parp-userspace-deficitfix-20261117/results/trials/formal-revisit-on-5b42c79e/firefox-writes.jsonl",
+      "bytes": 469,
+      "sha256": "2e02019d09f3bb834c4d917c3c5d49f9ab6b3bd3737e0af195eef9bf60df1fa9"
+    },
+    {
+      "path": "workspace/parp-userspace-deficitfix-20261117/results/trials/formal-revisit-on-5b42c79e/gimp-writes.jsonl",
+      "bytes": 2374,
+      "sha256": "7f24fda54b83a15431f1a45f25df42855d78141a960103070c8f1532c52eeed1"
+    },
+    {
+      "path": "workspace/parp-userspace-deficitfix-20261117/results/trials/formal-revisit-on-5b42c79e/libreoffice-writes.jsonl",
+      "bytes": 471,
+      "sha256": "48e73b0655cd1bf99570d6ca18211b2fb05b305258c965ee26b07196ef894677"
+    },
+    {
+      "path": "workspace/parp-userspace-deficitfix-20261117/results/trials/formal-revisit-on-5b42c79e/occupancy.jsonl",
+      "bytes": 183098,
+      "sha256": "d80777b7d7a202b39a60ad908408096bde10f64da5a5a52373585542d7f96284"
+    },
+    {
+      "path": "workspace/parp-userspace-deficitfix-20261117/results/trials/formal-revisit-on-5b42c79e/result.json",
+      "bytes": 851174,
+      "sha256": "f002beb936fc7c4c6f2b47fd972e38c1d1f7e024353d2c601cb9cc3782c4596d"
+    },
+    {
+      "path": "workspace/parp-userspace-deficitfix-20261117/results/trials/formal-revisit-on-5b42c79e/root-telemetry.jsonl",
+      "bytes": 328841,
+      "sha256": "d5c98731a59df721d4dc0e8fdd156b26a03f0c8c2ee9aa92f3ee5d25ccd761f6"
+    },
+    {
+      "path": "workspace/parp-userspace-deficitfix-20261117/results/trials/formal-revisit-on-ac337a1f/firefox-writes.jsonl",
+      "bytes": 469,
+      "sha256": "06d33a6725f3eb40eabd6bcf6bcb6982a993a278ed6ecfe5eaa0f8d87998615a"
+    },
+    {
+      "path": "workspace/parp-userspace-deficitfix-20261117/results/trials/formal-revisit-on-ac337a1f/gimp-writes.jsonl",
+      "bytes": 1913,
+      "sha256": "9da71649c839a5c8c76b6f1d4f2f63df81116d7083be5d5021b37eb0bb96c1d7"
+    },
+    {
+      "path": "workspace/parp-userspace-deficitfix-20261117/results/trials/formal-revisit-on-ac337a1f/libreoffice-writes.jsonl",
+      "bytes": 471,
+      "sha256": "7b0ed3ad46ec912f6b2b9d893eaf4cde852d3e37ef6c39be774d44b43f8cfe3f"
+    },
+    {
+      "path": "workspace/parp-userspace-deficitfix-20261117/results/trials/formal-revisit-on-ac337a1f/occupancy.jsonl",
+      "bytes": 182432,
+      "sha256": "9adf963525d7ea929e9fceba446605503db51154b8e23454c161e72e69422dda"
+    },
+    {
+      "path": "workspace/parp-userspace-deficitfix-20261117/results/trials/formal-revisit-on-ac337a1f/result.json",
+      "bytes": 852366,
+      "sha256": "75e7d2e4b2077af9d53194882260498849051fe743f3c5ef978677cdc6d4e17e"
+    },
+    {
+      "path": "workspace/parp-userspace-deficitfix-20261117/results/trials/formal-revisit-on-ac337a1f/root-telemetry.jsonl",
+      "bytes": 330564,
+      "sha256": "670ac3f49aee51103d291dfbf0126655147ece7b9c5ec0db1325d18b2b5bd004"
+    },
+    {
+      "path": "workspace/parp-userspace-deficitfix-20261117/results/trials/formal-revisit-on-d3df8d52/firefox-writes.jsonl",
+      "bytes": 469,
+      "sha256": "e2af985f289373e7d42cd95915bebcd4f4acb572bce319c489cf5ea2e2ba6aa0"
+    },
+    {
+      "path": "workspace/parp-userspace-deficitfix-20261117/results/trials/formal-revisit-on-d3df8d52/gimp-writes.jsonl",
+      "bytes": 1911,
+      "sha256": "3b1374a420e4966899f8fe6815c1f01f5a0b17155afec1824503a5b7ea95d92b"
+    },
+    {
+      "path": "workspace/parp-userspace-deficitfix-20261117/results/trials/formal-revisit-on-d3df8d52/libreoffice-writes.jsonl",
+      "bytes": 471,
+      "sha256": "7b2514b9b90884b7acdff3ae018bbba54e6cb5beed80a46d75a04fc454d54777"
+    },
+    {
+      "path": "workspace/parp-userspace-deficitfix-20261117/results/trials/formal-revisit-on-d3df8d52/occupancy.jsonl",
+      "bytes": 176759,
+      "sha256": "8c3a2e980c2a64512119126afef8cc0d0dbcfcd446c0bb2e3ceb00936568168c"
+    },
+    {
+      "path": "workspace/parp-userspace-deficitfix-20261117/results/trials/formal-revisit-on-d3df8d52/result.json",
+      "bytes": 830545,
+      "sha256": "0965f562570db9995977748803953fc2fa5e65b0dcadd667b9630c8a6c200935"
+    },
+    {
+      "path": "workspace/parp-userspace-deficitfix-20261117/results/trials/formal-revisit-on-d3df8d52/root-telemetry.jsonl",
+      "bytes": 318201,
+      "sha256": "5776f110a808a57453510640c572093bc5b378b2c74cf3d03c0a7070bb765431"
+    },
+    {
+      "path": "workspace/parp-userspace-deficitfix-20261117/results/trials/reference-revisit-off-1c273199/occupancy.jsonl",
+      "bytes": 202398,
+      "sha256": "d45f295bff096f89a53cea97162f2df78365514c7dd0f9eee0f94d2e4c6e59b7"
+    },
+    {
+      "path": "workspace/parp-userspace-deficitfix-20261117/results/trials/reference-revisit-off-1c273199/result.json",
+      "bytes": 610957,
+      "sha256": "2cfab89c8a88aa2d1cbff15b42a5b9126d7e4ac8a641ae688e64c70daf96436d"
+    },
+    {
+      "path": "workspace/parp-userspace-deficitfix-20261117/run_total.py",
+      "bytes": 10440,
+      "sha256": "b056ecc5e689a6a091f931ede06c98aa5639cd582b17b5eebf2e4b88b7688a77"
+    },
+    {
+      "path": "workspace/parp-userspace-deficitfix-20261117/SOURCE_BASELINE.json",
+      "bytes": 1763,
+      "sha256": "1f6528b760cbd0a05775d47261fdf328189225b06970562f8e0f64db48d86a89"
+    },
+    {
+      "path": "workspace/parp-userspace-deficitfix-20261117/start_vm_experiment.sh",
+      "bytes": 1111,
+      "sha256": "9b9dff7189909f91b7500123ee5033ad9ecb30f6856ba0484d722f35386c4d7f"
+    },
+    {
+      "path": "workspace/parp-userspace-deficitfix-20261117/tests/test_demand_reference.py",
+      "bytes": 2371,
+      "sha256": "7408e7f561996c9a2ac33e794b91ea10a649f63a4cad5e17a7e9923dfdf46ae9"
+    },
+    {
+      "path": "workspace/parp-userspace-deficitfix-20261117/tests/test_probe_timing.py",
+      "bytes": 1440,
+      "sha256": "7a83bb039059336197ce3478615bc5d140ddda71ef5ad3e14c6388727d15cec6"
+    },
+    {
+      "path": "workspace/parp-userspace-deficitfix-20261117/tests/test_qualification.py",
+      "bytes": 3762,
+      "sha256": "8819eb23d0c350da72d91ab5ddf006e4fd2427de9e7f6800d0e2cccc32e53f72"
+    },
+    {
+      "path": "workspace/parp-userspace-deficitfix-20261117/tests/test_same_service.py",
+      "bytes": 9817,
+      "sha256": "680f779721e0061a906d60e9f65b0628e557888ececfc168ec6bfcae2363c299"
+    },
+    {
+      "path": "workspace/parp-userspace-deficitfix-20261117/tests/test_total_faults.py",
+      "bytes": 4634,
+      "sha256": "c1ae6134869768a6e0e5111564922b0d7d8451125654293560858558ddfaf6ae"
+    },
+    {
+      "path": "workspace/parp-userspace-deficitfix-20261117/total_faults.py",
+      "bytes": 5564,
+      "sha256": "48cb8c8de82148936b4d8690501c573c6819609b75c4ce1162d9b70f27bd9a94"
+    },
+    {
+      "path": "workspace/parp-userspace-deficitfix-20261117/total_profiles.py",
+      "bytes": 3756,
+      "sha256": "2ec0f3d73465467a748358f23dead49b252102639da734185f07aa00134745e4"
+    },
+    {
+      "path": "workspace/parp-userspace-four-ops/operation_controller.py",
+      "bytes": 18664,
+      "sha256": "c4fb4234bd99ae4e741ebebdbcfc784d398e2c49197eb2eae0c6e37f1545e2b5"
+    },
+    {
+      "path": "workspace/parp-userspace-four-ops/operation_lookup.py",
+      "bytes": 6382,
+      "sha256": "b8d141743173cf7072c173a736f0fc5944c94808acc29d6dc9dee07941965ed8"
+    },
+    {
+      "path": "workspace/parp-wss-v5/src/include/linux/parp_tier2.h",
+      "bytes": 8040,
+      "sha256": "cf9cbba6b0c1a06eea1b2fddc66396bdd8b89183c6509f34a4bebc274aa60289"
+    },
+    {
+      "path": "workspace/parp-wss-v5/src/include/linux/parp_wss.h",
+      "bytes": 3411,
+      "sha256": "9d41b72fa0c545419f12262a1cf58834d65b81fe5579b893f687ff2fea2e126f"
+    },
+    {
+      "path": "workspace/parp-wss-v5/src/mm/parp/core/wss_control.c",
+      "bytes": 21893,
+      "sha256": "86a657d15f482b8c1a8b3d7ee0ecb23580cebedcdb1a4dd147e767b89785ebf8"
+    },
+    {
+      "path": "workspace/parp-wss-v5/src/mm/parp/core/wss_policy.c",
+      "bytes": 7098,
+      "sha256": "47312e4c30506e4e95c2152e6b814a829bf5f05783a658b8629e34eec11d87cf"
+    },
+    {
+      "path": "workspace/parp-wss-v5/src/tools/testing/selftests/parp_wss/data/operation_table.json",
+      "bytes": 260721,
+      "sha256": "825ab6e04d9d1a2eb622f442b6b3f78c10a0a35050d4f4179038de0240db6670"
+    },
+    {
+      "path": "workspace/parp-wss-v5/src/tools/testing/selftests/parp_wss/get_wss_predictor.c",
+      "bytes": 4576,
+      "sha256": "11887a68d36359576f86134aa4a684f3f16de01a5ea206538ef8c68a6499aa0d"
+    },
+    {
+      "path": "workspace/parp-wss-v5/src/tools/testing/selftests/parp_wss/get_wss_predictor.h",
+      "bytes": 2230,
+      "sha256": "be7cc4b9b03a78dac09b4ce0ff72f6e7b44f4257d899e018697a95cb94d1b2bb"
+    },
+    {
+      "path": "workspace/parp-wss-v5/src/tools/testing/selftests/parp_wss/gimp_lookup_data.h",
+      "bytes": 44779,
+      "sha256": "78d20b30067d985e9c49f2f52012e6fd709f2efc3003727d8655d61953a24da8"
+    },
+    {
+      "path": "workspace/parp-wss-v5/src/tools/testing/selftests/parp_wss/operation_controller.py",
+      "bytes": 18664,
+      "sha256": "c4fb4234bd99ae4e741ebebdbcfc784d398e2c49197eb2eae0c6e37f1545e2b5"
+    },
+    {
+      "path": "workspace/parp-wss-v5/src/tools/testing/selftests/parp_wss/operation_lookup.py",
+      "bytes": 6382,
+      "sha256": "b8d141743173cf7072c173a736f0fc5944c94808acc29d6dc9dee07941965ed8"
+    }
+  ],
+  "manifest_self_excluded": true
+}

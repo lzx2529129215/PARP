@@ -1,0 +1,921 @@
+{
+ "status": "COMPLETE",
+ "started_wall_s": 1794559447.3887558,
+ "references": {
+  "stable": "/home/qi/krita-code-share-20261101/parp-measured-validation-20261113/results/trials/reference-stable-off-c3a9e1fc/result.json",
+  "turnover": "/home/qi/krita-code-share-20261101/parp-measured-validation-20261113/results/trials/reference-turnover-off-8f854865/result.json",
+  "revisit": "/home/qi/krita-code-share-20261101/parp-measured-validation-20261113/results/trials/reference-revisit-off-c8f4f841/result.json"
+ },
+ "baselines": [
+  "/home/qi/krita-code-share-20261101/parp-measured-validation-20261113/results/trials/baseline-combined-off-e7f19d3b/result.json",
+  "/home/qi/krita-code-share-20261101/parp-measured-validation-20261113/results/trials/baseline-combined-off-e9a44731/result.json"
+ ],
+ "points": {
+  "gimp": {
+   "high": [
+    {
+     "point": {
+      "app": "gimp",
+      "method": "high",
+      "retained_rss_bytes": 1158369280,
+      "retained_cgroup_bytes": 1094959104,
+      "requested_bytes": 16777216,
+      "observed_net_release_bytes": 13160448,
+      "baseline_pgfault": 1028186,
+      "current_pgfault": 1028927,
+      "baseline_task_ms": 25926.449773,
+      "current_task_ms": 24892.705229,
+      "baseline_path": "/home/qi/krita-code-share-20261101/parp-measured-validation-20261113/results/trials/baseline-combined-off-e9a44731/result.json",
+      "baseline_sha256": "ca425bcdc819960c9c9cd12f99f8dc419e2cced956e075da6c661339a3ff5084",
+      "trial_path": "/home/qi/krita-code-share-20261101/parp-measured-validation-20261113/results/trials/calibration-combined-off-486e4a73/result.json",
+      "trial_sha256": "20eec88b7714bd9faa5378279d1773c115b80220d9a33b344112a610bb27f5b4",
+      "workload_key": "combined-old-and-new-hot-plus-old-document-revisit",
+      "compression_enabled": true,
+      "compressed_pages_observed": true
+     },
+     "fault_check": {
+      "baseline": 1028186,
+      "current": 1028927,
+      "additional": 741,
+      "relative_growth": 0.000720686723997409,
+      "within_trial_limit": true,
+      "relative_trial_limit": 0.1,
+      "absolute_limit_when_zero": null,
+      "needs_absolute_limit": false
+     },
+     "task_duration_growth": -0.039872198201103104
+    },
+    {
+     "point": {
+      "app": "gimp",
+      "method": "high",
+      "retained_rss_bytes": 1142198272,
+      "retained_cgroup_bytes": 1080049664,
+      "requested_bytes": 33554432,
+      "observed_net_release_bytes": 28086272,
+      "baseline_pgfault": 1028186,
+      "current_pgfault": 1032874,
+      "baseline_task_ms": 25926.449773,
+      "current_task_ms": 25171.632996,
+      "baseline_path": "/home/qi/krita-code-share-20261101/parp-measured-validation-20261113/results/trials/baseline-combined-off-e9a44731/result.json",
+      "baseline_sha256": "ca425bcdc819960c9c9cd12f99f8dc419e2cced956e075da6c661339a3ff5084",
+      "trial_path": "/home/qi/krita-code-share-20261101/parp-measured-validation-20261113/results/trials/calibration-combined-off-3333fc90/result.json",
+      "trial_sha256": "6cd5e8be3c3780bb74ff2c3f1721d3106994f28bac41e6f58376ba227d87d2fd",
+      "workload_key": "combined-old-and-new-hot-plus-old-document-revisit",
+      "compression_enabled": true,
+      "compressed_pages_observed": true
+     },
+     "fault_check": {
+      "baseline": 1028186,
+      "current": 1032874,
+      "additional": 4688,
+      "relative_growth": 0.004559486318623284,
+      "within_trial_limit": true,
+      "relative_trial_limit": 0.1,
+      "absolute_limit_when_zero": null,
+      "needs_absolute_limit": false
+     },
+     "task_duration_growth": -0.029113773139354815
+    },
+    {
+     "point": {
+      "app": "gimp",
+      "method": "high",
+      "retained_rss_bytes": 1107791872,
+      "retained_cgroup_bytes": 1046523904,
+      "requested_bytes": 67108864,
+      "observed_net_release_bytes": 61849600,
+      "baseline_pgfault": 1028186,
+      "current_pgfault": 1041347,
+      "baseline_task_ms": 25926.449773,
+      "current_task_ms": 25105.886018999998,
+      "baseline_path": "/home/qi/krita-code-share-20261101/parp-measured-validation-20261113/results/trials/baseline-combined-off-e9a44731/result.json",
+      "baseline_sha256": "ca425bcdc819960c9c9cd12f99f8dc419e2cced956e075da6c661339a3ff5084",
+      "trial_path": "/home/qi/krita-code-share-20261101/parp-measured-validation-20261113/results/trials/calibration-combined-off-69ab2d9b/result.json",
+      "trial_sha256": "ee7973924f03393a1e71899e2c9c9f07c93774c4701fab9634ca89ba94efb2eb",
+      "workload_key": "combined-old-and-new-hot-plus-old-document-revisit",
+      "compression_enabled": true,
+      "compressed_pages_observed": true
+     },
+     "fault_check": {
+      "baseline": 1028186,
+      "current": 1041347,
+      "additional": 13161,
+      "relative_growth": 0.012800213190998515,
+      "within_trial_limit": true,
+      "relative_trial_limit": 0.1,
+      "absolute_limit_when_zero": null,
+      "needs_absolute_limit": false
+     },
+     "task_duration_growth": -0.03164967672722174
+    },
+    {
+     "point": {
+      "app": "gimp",
+      "method": "high",
+      "retained_rss_bytes": 1019363328,
+      "retained_cgroup_bytes": 961241088,
+      "requested_bytes": 134217728,
+      "observed_net_release_bytes": 147140608,
+      "baseline_pgfault": 1028186,
+      "current_pgfault": 1062907,
+      "baseline_task_ms": 25926.449773,
+      "current_task_ms": 24986.946474,
+      "baseline_path": "/home/qi/krita-code-share-20261101/parp-measured-validation-20261113/results/trials/baseline-combined-off-e9a44731/result.json",
+      "baseline_sha256": "ca425bcdc819960c9c9cd12f99f8dc419e2cced956e075da6c661339a3ff5084",
+      "trial_path": "/home/qi/krita-code-share-20261101/parp-measured-validation-20261113/results/trials/calibration-combined-off-4eab4f4c/result.json",
+      "trial_sha256": "022cf91aeddb0db9689df1828f0be786a89780c383500db308771497ec8d1b14",
+      "workload_key": "combined-old-and-new-hot-plus-old-document-revisit",
+      "compression_enabled": true,
+      "compressed_pages_observed": true
+     },
+     "fault_check": {
+      "baseline": 1028186,
+      "current": 1062907,
+      "additional": 34721,
+      "relative_growth": 0.03376918184063973,
+      "within_trial_limit": true,
+      "relative_trial_limit": 0.1,
+      "absolute_limit_when_zero": null,
+      "needs_absolute_limit": false
+     },
+     "task_duration_growth": -0.0362372521971136
+    },
+    {
+     "point": {
+      "app": "gimp",
+      "method": "high",
+      "retained_rss_bytes": 906596352,
+      "retained_cgroup_bytes": 852414464,
+      "requested_bytes": 268435456,
+      "observed_net_release_bytes": 255700992,
+      "baseline_pgfault": 1028186,
+      "current_pgfault": 1093255,
+      "baseline_task_ms": 25926.449773,
+      "current_task_ms": 24610.260986999998,
+      "baseline_path": "/home/qi/krita-code-share-20261101/parp-measured-validation-20261113/results/trials/baseline-combined-off-e9a44731/result.json",
+      "baseline_sha256": "ca425bcdc819960c9c9cd12f99f8dc419e2cced956e075da6c661339a3ff5084",
+      "trial_path": "/home/qi/krita-code-share-20261101/parp-measured-validation-20261113/results/trials/calibration-combined-off-139745a3/result.json",
+      "trial_sha256": "04acd243c16fe3376b109639a1f289fca038ca383b56dbc40448565c04707e5d",
+      "workload_key": "combined-old-and-new-hot-plus-old-document-revisit",
+      "compression_enabled": true,
+      "compressed_pages_observed": true
+     },
+     "fault_check": {
+      "baseline": 1028186,
+      "current": 1093255,
+      "additional": 65069,
+      "relative_growth": 0.06328524216435548,
+      "within_trial_limit": true,
+      "relative_trial_limit": 0.1,
+      "absolute_limit_when_zero": null,
+      "needs_absolute_limit": false
+     },
+     "task_duration_growth": -0.050766255986606
+    }
+   ],
+   "reclaim": [
+    {
+     "point": {
+      "app": "gimp",
+      "method": "reclaim",
+      "retained_rss_bytes": 1159901184,
+      "retained_cgroup_bytes": 1098657792,
+      "requested_bytes": 16777216,
+      "observed_net_release_bytes": 9486336,
+      "baseline_pgfault": 1028186,
+      "current_pgfault": 1028944,
+      "baseline_task_ms": 25926.449773,
+      "current_task_ms": 25632.341043,
+      "baseline_path": "/home/qi/krita-code-share-20261101/parp-measured-validation-20261113/results/trials/baseline-combined-off-e9a44731/result.json",
+      "baseline_sha256": "ca425bcdc819960c9c9cd12f99f8dc419e2cced956e075da6c661339a3ff5084",
+      "trial_path": "/home/qi/krita-code-share-20261101/parp-measured-validation-20261113/results/trials/calibration-combined-off-dae71076/result.json",
+      "trial_sha256": "6a4691336b3d19b71b179f3519e75ab1478b06e99130313b9ac24f58f05a9f88",
+      "workload_key": "combined-old-and-new-hot-plus-old-document-revisit",
+      "compression_enabled": true,
+      "compressed_pages_observed": true
+     },
+     "fault_check": {
+      "baseline": 1028186,
+      "current": 1028944,
+      "additional": 758,
+      "relative_growth": 0.0007372206974224508,
+      "within_trial_limit": true,
+      "relative_trial_limit": 0.1,
+      "absolute_limit_when_zero": null,
+      "needs_absolute_limit": false
+     },
+     "task_duration_growth": -0.011343964660610273
+    },
+    {
+     "point": {
+      "app": "gimp",
+      "method": "reclaim",
+      "retained_rss_bytes": 1143943168,
+      "retained_cgroup_bytes": 1081479168,
+      "requested_bytes": 33554432,
+      "observed_net_release_bytes": 26660864,
+      "baseline_pgfault": 1028186,
+      "current_pgfault": 1032497,
+      "baseline_task_ms": 25926.449773,
+      "current_task_ms": 24558.733932,
+      "baseline_path": "/home/qi/krita-code-share-20261101/parp-measured-validation-20261113/results/trials/baseline-combined-off-e9a44731/result.json",
+      "baseline_sha256": "ca425bcdc819960c9c9cd12f99f8dc419e2cced956e075da6c661339a3ff5084",
+      "trial_path": "/home/qi/krita-code-share-20261101/parp-measured-validation-20261113/results/trials/calibration-combined-off-2ad34539/result.json",
+      "trial_sha256": "76cf92781021dc51c1d47ed7da021ca7a2ff96b85b4248ace11eb59abbc848e9",
+      "workload_key": "combined-old-and-new-hot-plus-old-document-revisit",
+      "compression_enabled": true,
+      "compressed_pages_observed": true
+     },
+     "fault_check": {
+      "baseline": 1028186,
+      "current": 1032497,
+      "additional": 4311,
+      "relative_growth": 0.0041928211432561814,
+      "within_trial_limit": true,
+      "relative_trial_limit": 0.1,
+      "absolute_limit_when_zero": null,
+      "needs_absolute_limit": false
+     },
+     "task_duration_growth": -0.05275368795091839
+    },
+    {
+     "point": {
+      "app": "gimp",
+      "method": "reclaim",
+      "retained_rss_bytes": 1110712320,
+      "retained_cgroup_bytes": 1048956928,
+      "requested_bytes": 67108864,
+      "observed_net_release_bytes": 59150336,
+      "baseline_pgfault": 1028186,
+      "current_pgfault": 1040735,
+      "baseline_task_ms": 25926.449773,
+      "current_task_ms": 25438.757483999998,
+      "baseline_path": "/home/qi/krita-code-share-20261101/parp-measured-validation-20261113/results/trials/baseline-combined-off-e9a44731/result.json",
+      "baseline_sha256": "ca425bcdc819960c9c9cd12f99f8dc419e2cced956e075da6c661339a3ff5084",
+      "trial_path": "/home/qi/krita-code-share-20261101/parp-measured-validation-20261113/results/trials/calibration-combined-off-a624f455/result.json",
+      "trial_sha256": "237ca33c8a5565138ab32b081bf383147f56cc204a2f03a0b29b08ffbe1a7bd5",
+      "workload_key": "combined-old-and-new-hot-plus-old-document-revisit",
+      "compression_enabled": true,
+      "compressed_pages_observed": true
+     },
+     "fault_check": {
+      "baseline": 1028186,
+      "current": 1040735,
+      "additional": 12549,
+      "relative_growth": 0.012204990147697012,
+      "within_trial_limit": true,
+      "relative_trial_limit": 0.1,
+      "absolute_limit_when_zero": null,
+      "needs_absolute_limit": false
+     },
+     "task_duration_growth": -0.01881060821169156
+    },
+    {
+     "point": {
+      "app": "gimp",
+      "method": "reclaim",
+      "retained_rss_bytes": 1042898944,
+      "retained_cgroup_bytes": 984440832,
+      "requested_bytes": 134217728,
+      "observed_net_release_bytes": 123940864,
+      "baseline_pgfault": 1028186,
+      "current_pgfault": 1057155,
+      "baseline_task_ms": 25926.449773,
+      "current_task_ms": 24631.26168,
+      "baseline_path": "/home/qi/krita-code-share-20261101/parp-measured-validation-20261113/results/trials/baseline-combined-off-e9a44731/result.json",
+      "baseline_sha256": "ca425bcdc819960c9c9cd12f99f8dc419e2cced956e075da6c661339a3ff5084",
+      "trial_path": "/home/qi/krita-code-share-20261101/parp-measured-validation-20261113/results/trials/calibration-combined-off-0b85857a/result.json",
+      "trial_sha256": "b2446fec2f53e5f17d41f413d64765c7612efe377d128cc43b5c0cf789ef9321",
+      "workload_key": "combined-old-and-new-hot-plus-old-document-revisit",
+      "compression_enabled": true,
+      "compressed_pages_observed": true
+     },
+     "fault_check": {
+      "baseline": 1028186,
+      "current": 1057155,
+      "additional": 28969,
+      "relative_growth": 0.02817486330294324,
+      "within_trial_limit": true,
+      "relative_trial_limit": 0.1,
+      "absolute_limit_when_zero": null,
+      "needs_absolute_limit": false
+     },
+     "task_duration_growth": -0.049956245623294704
+    },
+    {
+     "point": {
+      "app": "gimp",
+      "method": "reclaim",
+      "retained_rss_bytes": 908136448,
+      "retained_cgroup_bytes": 854016000,
+      "requested_bytes": 268435456,
+      "observed_net_release_bytes": 254119936,
+      "baseline_pgfault": 1028186,
+      "current_pgfault": 1089896,
+      "baseline_task_ms": 25926.449773,
+      "current_task_ms": 24618.904408000002,
+      "baseline_path": "/home/qi/krita-code-share-20261101/parp-measured-validation-20261113/results/trials/baseline-combined-off-e9a44731/result.json",
+      "baseline_sha256": "ca425bcdc819960c9c9cd12f99f8dc419e2cced956e075da6c661339a3ff5084",
+      "trial_path": "/home/qi/krita-code-share-20261101/parp-measured-validation-20261113/results/trials/calibration-combined-off-20bedae5/result.json",
+      "trial_sha256": "5faa17441c72febfac246d524f96ef50a2e541a564a55d62a95b6049b0f52d86",
+      "workload_key": "combined-old-and-new-hot-plus-old-document-revisit",
+      "compression_enabled": true,
+      "compressed_pages_observed": true
+     },
+     "fault_check": {
+      "baseline": 1028186,
+      "current": 1089896,
+      "additional": 61710,
+      "relative_growth": 0.06001832353290164,
+      "within_trial_limit": true,
+      "relative_trial_limit": 0.1,
+      "absolute_limit_when_zero": null,
+      "needs_absolute_limit": false
+     },
+     "task_duration_growth": -0.05043287362705884
+    }
+   ]
+  },
+  "libreoffice": {
+   "high": [
+    {
+     "point": {
+      "app": "libreoffice",
+      "method": "high",
+      "retained_rss_bytes": 369672192,
+      "retained_cgroup_bytes": 271208448,
+      "requested_bytes": 8388608,
+      "observed_net_release_bytes": 8929280,
+      "baseline_pgfault": 47331,
+      "current_pgfault": 47515,
+      "baseline_task_ms": 2827.9590829999997,
+      "current_task_ms": 2166.82019,
+      "baseline_path": "/home/qi/krita-code-share-20261101/parp-measured-validation-20261113/results/trials/baseline-combined-off-e7f19d3b/result.json",
+      "baseline_sha256": "d955b644106fb503650275932eaf352400479e5aa2d8450761ca4f0f4eaca7ea",
+      "trial_path": "/home/qi/krita-code-share-20261101/parp-measured-validation-20261113/results/trials/calibration-combined-off-ae8ce7bb/result.json",
+      "trial_sha256": "68d568c0131121fd05d566781bd65e5de5a983c4dc597b40dada203ae572c12f",
+      "workload_key": "combined-old-and-new-hot-plus-old-document-revisit",
+      "compression_enabled": true,
+      "compressed_pages_observed": true
+     },
+     "fault_check": {
+      "baseline": 47331,
+      "current": 47515,
+      "additional": 184,
+      "relative_growth": 0.00388751558175403,
+      "within_trial_limit": true,
+      "relative_trial_limit": 0.1,
+      "absolute_limit_when_zero": null,
+      "needs_absolute_limit": false
+     },
+     "task_duration_growth": -0.23378658375022887
+    },
+    {
+     "point": {
+      "app": "libreoffice",
+      "method": "high",
+      "retained_rss_bytes": 369504256,
+      "retained_cgroup_bytes": 272842752,
+      "requested_bytes": 16777216,
+      "observed_net_release_bytes": 13336576,
+      "baseline_pgfault": 47331,
+      "current_pgfault": 45269,
+      "baseline_task_ms": 2827.9590829999997,
+      "current_task_ms": 2230.220092,
+      "baseline_path": "/home/qi/krita-code-share-20261101/parp-measured-validation-20261113/results/trials/baseline-combined-off-e7f19d3b/result.json",
+      "baseline_sha256": "d955b644106fb503650275932eaf352400479e5aa2d8450761ca4f0f4eaca7ea",
+      "trial_path": "/home/qi/krita-code-share-20261101/parp-measured-validation-20261113/results/trials/calibration-combined-off-144d2b09/result.json",
+      "trial_sha256": "8177d9127e26ada4268caa5362e82d8c411b5d6cc5814ccebe3844263d1331a3",
+      "workload_key": "combined-old-and-new-hot-plus-old-document-revisit",
+      "compression_enabled": true,
+      "compressed_pages_observed": true
+     },
+     "fault_check": {
+      "baseline": 47331,
+      "current": 45269,
+      "additional": -2062,
+      "relative_growth": -0.043565527878134835,
+      "within_trial_limit": true,
+      "relative_trial_limit": 0.1,
+      "absolute_limit_when_zero": null,
+      "needs_absolute_limit": false
+     },
+     "task_duration_growth": -0.2113676235958467
+    }
+   ],
+   "reclaim": [
+    {
+     "point": {
+      "app": "libreoffice",
+      "method": "reclaim",
+      "retained_rss_bytes": 373706752,
+      "retained_cgroup_bytes": 274087936,
+      "requested_bytes": 8388608,
+      "observed_net_release_bytes": 6082560,
+      "baseline_pgfault": 47331,
+      "current_pgfault": 47598,
+      "baseline_task_ms": 2827.9590829999997,
+      "current_task_ms": 2743.897846,
+      "baseline_path": "/home/qi/krita-code-share-20261101/parp-measured-validation-20261113/results/trials/baseline-combined-off-e7f19d3b/result.json",
+      "baseline_sha256": "d955b644106fb503650275932eaf352400479e5aa2d8450761ca4f0f4eaca7ea",
+      "trial_path": "/home/qi/krita-code-share-20261101/parp-measured-validation-20261113/results/trials/calibration-combined-off-1acf4aec/result.json",
+      "trial_sha256": "2b16d2698c3749a727f0165134f45f039a8124e1eb3af8e70ffe4696e392c15d",
+      "workload_key": "combined-old-and-new-hot-plus-old-document-revisit",
+      "compression_enabled": true,
+      "compressed_pages_observed": true
+     },
+     "fault_check": {
+      "baseline": 47331,
+      "current": 47598,
+      "additional": 267,
+      "relative_growth": 0.005641123153958294,
+      "within_trial_limit": true,
+      "relative_trial_limit": 0.1,
+      "absolute_limit_when_zero": null,
+      "needs_absolute_limit": false
+     },
+     "task_duration_growth": -0.029725054193791456
+    },
+    {
+     "point": {
+      "app": "libreoffice",
+      "method": "reclaim",
+      "retained_rss_bytes": 365219840,
+      "retained_cgroup_bytes": 267993088,
+      "requested_bytes": 16777216,
+      "observed_net_release_bytes": 11997184,
+      "baseline_pgfault": 47331,
+      "current_pgfault": 47753,
+      "baseline_task_ms": 2827.9590829999997,
+      "current_task_ms": 2733.955694,
+      "baseline_path": "/home/qi/krita-code-share-20261101/parp-measured-validation-20261113/results/trials/baseline-combined-off-e7f19d3b/result.json",
+      "baseline_sha256": "d955b644106fb503650275932eaf352400479e5aa2d8450761ca4f0f4eaca7ea",
+      "trial_path": "/home/qi/krita-code-share-20261101/parp-measured-validation-20261113/results/trials/calibration-combined-off-c8925dd8/result.json",
+      "trial_sha256": "43f3af55ea4b364300c739bc6be742a026983543926e771064da7c4e5c4df7d5",
+      "workload_key": "combined-old-and-new-hot-plus-old-document-revisit",
+      "compression_enabled": true,
+      "compressed_pages_observed": true
+     },
+     "fault_check": {
+      "baseline": 47331,
+      "current": 47753,
+      "additional": 422,
+      "relative_growth": 0.008915932475544569,
+      "within_trial_limit": true,
+      "relative_trial_limit": 0.1,
+      "absolute_limit_when_zero": null,
+      "needs_absolute_limit": false
+     },
+     "task_duration_growth": -0.0332407175072269
+    },
+    {
+     "point": {
+      "app": "libreoffice",
+      "method": "reclaim",
+      "retained_rss_bytes": 355348480,
+      "retained_cgroup_bytes": 262479872,
+      "requested_bytes": 33554432,
+      "observed_net_release_bytes": 23420928,
+      "baseline_pgfault": 47331,
+      "current_pgfault": 46649,
+      "baseline_task_ms": 2827.9590829999997,
+      "current_task_ms": 2189.976163,
+      "baseline_path": "/home/qi/krita-code-share-20261101/parp-measured-validation-20261113/results/trials/baseline-combined-off-e7f19d3b/result.json",
+      "baseline_sha256": "d955b644106fb503650275932eaf352400479e5aa2d8450761ca4f0f4eaca7ea",
+      "trial_path": "/home/qi/krita-code-share-20261101/parp-measured-validation-20261113/results/trials/calibration-combined-off-4cec9673/result.json",
+      "trial_sha256": "96afbe2cbf498e1c8a773614f5aa3f4e42b4f4ae75c074dbe40b69ee9ba577d6",
+      "workload_key": "combined-old-and-new-hot-plus-old-document-revisit",
+      "compression_enabled": true,
+      "compressed_pages_observed": true
+     },
+     "fault_check": {
+      "baseline": 47331,
+      "current": 46649,
+      "additional": -682,
+      "relative_growth": -0.014409161014979611,
+      "within_trial_limit": true,
+      "relative_trial_limit": 0.1,
+      "absolute_limit_when_zero": null,
+      "needs_absolute_limit": false
+     },
+     "task_duration_growth": -0.2255983560141206
+    },
+    {
+     "point": {
+      "app": "libreoffice",
+      "method": "reclaim",
+      "retained_rss_bytes": 315858944,
+      "retained_cgroup_bytes": 238940160,
+      "requested_bytes": 67108864,
+      "observed_net_release_bytes": 41263104,
+      "baseline_pgfault": 47331,
+      "current_pgfault": 56893,
+      "baseline_task_ms": 2827.9590829999997,
+      "current_task_ms": 2244.053777,
+      "baseline_path": "/home/qi/krita-code-share-20261101/parp-measured-validation-20261113/results/trials/baseline-combined-off-e7f19d3b/result.json",
+      "baseline_sha256": "d955b644106fb503650275932eaf352400479e5aa2d8450761ca4f0f4eaca7ea",
+      "trial_path": "/home/qi/krita-code-share-20261101/parp-measured-validation-20261113/results/trials/calibration-combined-off-b0292456/result.json",
+      "trial_sha256": "7b34b1feaf2e1e8b6bd18f0a2b396cd4f25182828b857b2ee08ac1d62a741f3a",
+      "workload_key": "combined-old-and-new-hot-plus-old-document-revisit",
+      "compression_enabled": true,
+      "compressed_pages_observed": true
+     },
+     "fault_check": {
+      "baseline": 47331,
+      "current": 56893,
+      "additional": 9562,
+      "relative_growth": 0.20202404343876107,
+      "within_trial_limit": false,
+      "relative_trial_limit": 0.1,
+      "absolute_limit_when_zero": null,
+      "needs_absolute_limit": false
+     },
+     "task_duration_growth": -0.20647586788298655
+    }
+   ]
+  },
+  "firefox": {
+   "high": [
+    {
+     "point": {
+      "app": "firefox",
+      "method": "high",
+      "retained_rss_bytes": 1798737920,
+      "retained_cgroup_bytes": 986025984,
+      "requested_bytes": 16777216,
+      "observed_net_release_bytes": 19972096,
+      "baseline_pgfault": 250514,
+      "current_pgfault": 250098,
+      "baseline_task_ms": 7386.249986,
+      "current_task_ms": 7835.134205,
+      "baseline_path": "/home/qi/krita-code-share-20261101/parp-measured-validation-20261113/results/trials/baseline-combined-off-e7f19d3b/result.json",
+      "baseline_sha256": "d955b644106fb503650275932eaf352400479e5aa2d8450761ca4f0f4eaca7ea",
+      "trial_path": "/home/qi/krita-code-share-20261101/parp-measured-validation-20261113/results/trials/calibration-combined-off-9b9d004e/result.json",
+      "trial_sha256": "dab2f00f5bb716aa2d019c663f3836172935ea30b06f375435fe10e9e7e2b0a5",
+      "workload_key": "combined-old-and-new-hot-plus-old-document-revisit",
+      "compression_enabled": true,
+      "compressed_pages_observed": true
+     },
+     "fault_check": {
+      "baseline": 250514,
+      "current": 250098,
+      "additional": -416,
+      "relative_growth": -0.0016605858355221664,
+      "within_trial_limit": true,
+      "relative_trial_limit": 0.1,
+      "absolute_limit_when_zero": null,
+      "needs_absolute_limit": false
+     },
+     "task_duration_growth": 0.0607729524252254
+    },
+    {
+     "point": {
+      "app": "firefox",
+      "method": "high",
+      "retained_rss_bytes": 1763639296,
+      "retained_cgroup_bytes": 942235648,
+      "requested_bytes": 33554432,
+      "observed_net_release_bytes": 49696768,
+      "baseline_pgfault": 250514,
+      "current_pgfault": 251477,
+      "baseline_task_ms": 7386.249986,
+      "current_task_ms": 7654.188352,
+      "baseline_path": "/home/qi/krita-code-share-20261101/parp-measured-validation-20261113/results/trials/baseline-combined-off-e7f19d3b/result.json",
+      "baseline_sha256": "d955b644106fb503650275932eaf352400479e5aa2d8450761ca4f0f4eaca7ea",
+      "trial_path": "/home/qi/krita-code-share-20261101/parp-measured-validation-20261113/results/trials/calibration-combined-off-6b7af0db/result.json",
+      "trial_sha256": "c4fc418ef3da913c653e80fd0491092072e3ca6f65f81988021d80a4ebb4ce1b",
+      "workload_key": "combined-old-and-new-hot-plus-old-document-revisit",
+      "compression_enabled": true,
+      "compressed_pages_observed": true
+     },
+     "fault_check": {
+      "baseline": 250514,
+      "current": 251477,
+      "additional": 963,
+      "relative_growth": 0.0038440965375188614,
+      "within_trial_limit": true,
+      "relative_trial_limit": 0.1,
+      "absolute_limit_when_zero": null,
+      "needs_absolute_limit": false
+     },
+     "task_duration_growth": 0.03627529077784453
+    },
+    {
+     "point": {
+      "app": "firefox",
+      "method": "high",
+      "retained_rss_bytes": 1747365888,
+      "retained_cgroup_bytes": 928497664,
+      "requested_bytes": 67108864,
+      "observed_net_release_bytes": 65327104,
+      "baseline_pgfault": 250514,
+      "current_pgfault": 252308,
+      "baseline_task_ms": 7386.249986,
+      "current_task_ms": 7756.785289,
+      "baseline_path": "/home/qi/krita-code-share-20261101/parp-measured-validation-20261113/results/trials/baseline-combined-off-e7f19d3b/result.json",
+      "baseline_sha256": "d955b644106fb503650275932eaf352400479e5aa2d8450761ca4f0f4eaca7ea",
+      "trial_path": "/home/qi/krita-code-share-20261101/parp-measured-validation-20261113/results/trials/calibration-combined-off-ad813edd/result.json",
+      "trial_sha256": "43d0792e9afdd7c1441c8f15129ca7d6a908308330debfa619a3776ea1847a5f",
+      "workload_key": "combined-old-and-new-hot-plus-old-document-revisit",
+      "compression_enabled": true,
+      "compressed_pages_observed": true
+     },
+     "fault_check": {
+      "baseline": 250514,
+      "current": 252308,
+      "additional": 1794,
+      "relative_growth": 0.007161276415689343,
+      "within_trial_limit": true,
+      "relative_trial_limit": 0.1,
+      "absolute_limit_when_zero": null,
+      "needs_absolute_limit": false
+     },
+     "task_duration_growth": 0.050165551355873195
+    },
+    {
+     "point": {
+      "app": "firefox",
+      "method": "high",
+      "retained_rss_bytes": 1665921024,
+      "retained_cgroup_bytes": 907526144,
+      "requested_bytes": 134217728,
+      "observed_net_release_bytes": 101736448,
+      "baseline_pgfault": 250514,
+      "current_pgfault": 254373,
+      "baseline_task_ms": 7386.249986,
+      "current_task_ms": 8135.314714,
+      "baseline_path": "/home/qi/krita-code-share-20261101/parp-measured-validation-20261113/results/trials/baseline-combined-off-e7f19d3b/result.json",
+      "baseline_sha256": "d955b644106fb503650275932eaf352400479e5aa2d8450761ca4f0f4eaca7ea",
+      "trial_path": "/home/qi/krita-code-share-20261101/parp-measured-validation-20261113/results/trials/calibration-combined-off-c8875e2b/result.json",
+      "trial_sha256": "51d34f34635963eedc4612a3debbb2b1c6d6be06c74b7af88af925ecd87062f2",
+      "workload_key": "combined-old-and-new-hot-plus-old-document-revisit",
+      "compression_enabled": true,
+      "compressed_pages_observed": true
+     },
+     "fault_check": {
+      "baseline": 250514,
+      "current": 254373,
+      "additional": 3859,
+      "relative_growth": 0.015404328700192404,
+      "within_trial_limit": true,
+      "relative_trial_limit": 0.1,
+      "absolute_limit_when_zero": null,
+      "needs_absolute_limit": false
+     },
+     "task_duration_growth": 0.10141340049684056
+    }
+   ],
+   "reclaim": [
+    {
+     "point": {
+      "app": "firefox",
+      "method": "reclaim",
+      "retained_rss_bytes": 1774059520,
+      "retained_cgroup_bytes": 959963136,
+      "requested_bytes": 16777216,
+      "observed_net_release_bytes": 25804800,
+      "baseline_pgfault": 250514,
+      "current_pgfault": 250816,
+      "baseline_task_ms": 7386.249986,
+      "current_task_ms": 7271.3763819999995,
+      "baseline_path": "/home/qi/krita-code-share-20261101/parp-measured-validation-20261113/results/trials/baseline-combined-off-e7f19d3b/result.json",
+      "baseline_sha256": "d955b644106fb503650275932eaf352400479e5aa2d8450761ca4f0f4eaca7ea",
+      "trial_path": "/home/qi/krita-code-share-20261101/parp-measured-validation-20261113/results/trials/calibration-combined-off-c6b715dd/result.json",
+      "trial_sha256": "f71bc369863263a02aa1cbd237974988ef43b019a7bbd99d67c313acc8e91ddb",
+      "workload_key": "combined-old-and-new-hot-plus-old-document-revisit",
+      "compression_enabled": true,
+      "compressed_pages_observed": false
+     },
+     "fault_check": {
+      "baseline": 250514,
+      "current": 250816,
+      "additional": 302,
+      "relative_growth": 0.0012055214479031113,
+      "within_trial_limit": true,
+      "relative_trial_limit": 0.1,
+      "absolute_limit_when_zero": null,
+      "needs_absolute_limit": false
+     },
+     "task_duration_growth": -0.01555235799190835
+    },
+    {
+     "point": {
+      "app": "firefox",
+      "method": "reclaim",
+      "retained_rss_bytes": 1640615936,
+      "retained_cgroup_bytes": 913592320,
+      "requested_bytes": 33554432,
+      "observed_net_release_bytes": 40820736,
+      "baseline_pgfault": 250514,
+      "current_pgfault": 251215,
+      "baseline_task_ms": 7386.249986,
+      "current_task_ms": 7523.004696,
+      "baseline_path": "/home/qi/krita-code-share-20261101/parp-measured-validation-20261113/results/trials/baseline-combined-off-e7f19d3b/result.json",
+      "baseline_sha256": "d955b644106fb503650275932eaf352400479e5aa2d8450761ca4f0f4eaca7ea",
+      "trial_path": "/home/qi/krita-code-share-20261101/parp-measured-validation-20261113/results/trials/calibration-combined-off-87d8896e/result.json",
+      "trial_sha256": "26606335af164b7e329eb8daa745b670ed4d40dc53be3a89a1dbb3cfb65ab25a",
+      "workload_key": "combined-old-and-new-hot-plus-old-document-revisit",
+      "compression_enabled": true,
+      "compressed_pages_observed": true
+     },
+     "fault_check": {
+      "baseline": 250514,
+      "current": 251215,
+      "additional": 701,
+      "relative_growth": 0.0027982468045698043,
+      "within_trial_limit": true,
+      "relative_trial_limit": 0.1,
+      "absolute_limit_when_zero": null,
+      "needs_absolute_limit": false
+     },
+     "task_duration_growth": 0.018514768693072448
+    },
+    {
+     "point": {
+      "app": "firefox",
+      "method": "reclaim",
+      "retained_rss_bytes": 1754292224,
+      "retained_cgroup_bytes": 932352000,
+      "requested_bytes": 67108864,
+      "observed_net_release_bytes": 62169088,
+      "baseline_pgfault": 250514,
+      "current_pgfault": 253872,
+      "baseline_task_ms": 7386.249986,
+      "current_task_ms": 7470.1029960000005,
+      "baseline_path": "/home/qi/krita-code-share-20261101/parp-measured-validation-20261113/results/trials/baseline-combined-off-e7f19d3b/result.json",
+      "baseline_sha256": "d955b644106fb503650275932eaf352400479e5aa2d8450761ca4f0f4eaca7ea",
+      "trial_path": "/home/qi/krita-code-share-20261101/parp-measured-validation-20261113/results/trials/calibration-combined-off-e6052444/result.json",
+      "trial_sha256": "7ffc10f5c3f408f2d1f77fdad76a7c18455117705dd31a9112c1cc61ffb45eef",
+      "workload_key": "combined-old-and-new-hot-plus-old-document-revisit",
+      "compression_enabled": true,
+      "compressed_pages_observed": true
+     },
+     "fault_check": {
+      "baseline": 250514,
+      "current": 253872,
+      "additional": 3358,
+      "relative_growth": 0.013404440470392872,
+      "within_trial_limit": true,
+      "relative_trial_limit": 0.1,
+      "absolute_limit_when_zero": null,
+      "needs_absolute_limit": false
+     },
+     "task_duration_growth": 0.011352582184320337
+    }
+   ]
+  }
+ },
+ "selected": {
+  "gimp": {
+   "high": {
+    "app": "gimp",
+    "method": "high",
+    "retained_rss_bytes": 906596352,
+    "retained_cgroup_bytes": 852414464,
+    "requested_bytes": 268435456,
+    "observed_net_release_bytes": 255700992,
+    "baseline_pgfault": 1028186,
+    "current_pgfault": 1093255,
+    "baseline_task_ms": 25926.449773,
+    "current_task_ms": 24610.260986999998,
+    "baseline_path": "/home/qi/krita-code-share-20261101/parp-measured-validation-20261113/results/trials/baseline-combined-off-e9a44731/result.json",
+    "baseline_sha256": "ca425bcdc819960c9c9cd12f99f8dc419e2cced956e075da6c661339a3ff5084",
+    "trial_path": "/home/qi/krita-code-share-20261101/parp-measured-validation-20261113/results/trials/calibration-combined-off-139745a3/result.json",
+    "trial_sha256": "04acd243c16fe3376b109639a1f289fca038ca383b56dbc40448565c04707e5d",
+    "workload_key": "combined-old-and-new-hot-plus-old-document-revisit",
+    "compression_enabled": true,
+    "compressed_pages_observed": true
+   },
+   "reclaim": {
+    "app": "gimp",
+    "method": "reclaim",
+    "retained_rss_bytes": 908136448,
+    "retained_cgroup_bytes": 854016000,
+    "requested_bytes": 268435456,
+    "observed_net_release_bytes": 254119936,
+    "baseline_pgfault": 1028186,
+    "current_pgfault": 1089896,
+    "baseline_task_ms": 25926.449773,
+    "current_task_ms": 24618.904408000002,
+    "baseline_path": "/home/qi/krita-code-share-20261101/parp-measured-validation-20261113/results/trials/baseline-combined-off-e9a44731/result.json",
+    "baseline_sha256": "ca425bcdc819960c9c9cd12f99f8dc419e2cced956e075da6c661339a3ff5084",
+    "trial_path": "/home/qi/krita-code-share-20261101/parp-measured-validation-20261113/results/trials/calibration-combined-off-20bedae5/result.json",
+    "trial_sha256": "5faa17441c72febfac246d524f96ef50a2e541a564a55d62a95b6049b0f52d86",
+    "workload_key": "combined-old-and-new-hot-plus-old-document-revisit",
+    "compression_enabled": true,
+    "compressed_pages_observed": true
+   }
+  },
+  "libreoffice": {
+   "high": {
+    "app": "libreoffice",
+    "method": "high",
+    "retained_rss_bytes": 369672192,
+    "retained_cgroup_bytes": 271208448,
+    "requested_bytes": 8388608,
+    "observed_net_release_bytes": 8929280,
+    "baseline_pgfault": 47331,
+    "current_pgfault": 47515,
+    "baseline_task_ms": 2827.9590829999997,
+    "current_task_ms": 2166.82019,
+    "baseline_path": "/home/qi/krita-code-share-20261101/parp-measured-validation-20261113/results/trials/baseline-combined-off-e7f19d3b/result.json",
+    "baseline_sha256": "d955b644106fb503650275932eaf352400479e5aa2d8450761ca4f0f4eaca7ea",
+    "trial_path": "/home/qi/krita-code-share-20261101/parp-measured-validation-20261113/results/trials/calibration-combined-off-ae8ce7bb/result.json",
+    "trial_sha256": "68d568c0131121fd05d566781bd65e5de5a983c4dc597b40dada203ae572c12f",
+    "workload_key": "combined-old-and-new-hot-plus-old-document-revisit",
+    "compression_enabled": true,
+    "compressed_pages_observed": true
+   },
+   "reclaim": {
+    "app": "libreoffice",
+    "method": "reclaim",
+    "retained_rss_bytes": 355348480,
+    "retained_cgroup_bytes": 262479872,
+    "requested_bytes": 33554432,
+    "observed_net_release_bytes": 23420928,
+    "baseline_pgfault": 47331,
+    "current_pgfault": 46649,
+    "baseline_task_ms": 2827.9590829999997,
+    "current_task_ms": 2189.976163,
+    "baseline_path": "/home/qi/krita-code-share-20261101/parp-measured-validation-20261113/results/trials/baseline-combined-off-e7f19d3b/result.json",
+    "baseline_sha256": "d955b644106fb503650275932eaf352400479e5aa2d8450761ca4f0f4eaca7ea",
+    "trial_path": "/home/qi/krita-code-share-20261101/parp-measured-validation-20261113/results/trials/calibration-combined-off-4cec9673/result.json",
+    "trial_sha256": "96afbe2cbf498e1c8a773614f5aa3f4e42b4f4ae75c074dbe40b69ee9ba577d6",
+    "workload_key": "combined-old-and-new-hot-plus-old-document-revisit",
+    "compression_enabled": true,
+    "compressed_pages_observed": true
+   }
+  },
+  "firefox": {
+   "high": {
+    "app": "firefox",
+    "method": "high",
+    "retained_rss_bytes": 1665921024,
+    "retained_cgroup_bytes": 907526144,
+    "requested_bytes": 134217728,
+    "observed_net_release_bytes": 101736448,
+    "baseline_pgfault": 250514,
+    "current_pgfault": 254373,
+    "baseline_task_ms": 7386.249986,
+    "current_task_ms": 8135.314714,
+    "baseline_path": "/home/qi/krita-code-share-20261101/parp-measured-validation-20261113/results/trials/baseline-combined-off-e7f19d3b/result.json",
+    "baseline_sha256": "d955b644106fb503650275932eaf352400479e5aa2d8450761ca4f0f4eaca7ea",
+    "trial_path": "/home/qi/krita-code-share-20261101/parp-measured-validation-20261113/results/trials/calibration-combined-off-c8875e2b/result.json",
+    "trial_sha256": "51d34f34635963eedc4612a3debbb2b1c6d6be06c74b7af88af925ecd87062f2",
+    "workload_key": "combined-old-and-new-hot-plus-old-document-revisit",
+    "compression_enabled": true,
+    "compressed_pages_observed": true
+   },
+   "reclaim": {
+    "app": "firefox",
+    "method": "reclaim",
+    "retained_rss_bytes": 1640615936,
+    "retained_cgroup_bytes": 913592320,
+    "requested_bytes": 33554432,
+    "observed_net_release_bytes": 40820736,
+    "baseline_pgfault": 250514,
+    "current_pgfault": 251215,
+    "baseline_task_ms": 7386.249986,
+    "current_task_ms": 7523.004696,
+    "baseline_path": "/home/qi/krita-code-share-20261101/parp-measured-validation-20261113/results/trials/baseline-combined-off-e7f19d3b/result.json",
+    "baseline_sha256": "d955b644106fb503650275932eaf352400479e5aa2d8450761ca4f0f4eaca7ea",
+    "trial_path": "/home/qi/krita-code-share-20261101/parp-measured-validation-20261113/results/trials/calibration-combined-off-87d8896e/result.json",
+    "trial_sha256": "26606335af164b7e329eb8daa745b670ed4d40dc53be3a89a1dbb3cfb65ab25a",
+    "workload_key": "combined-old-and-new-hot-plus-old-document-revisit",
+    "compression_enabled": true,
+    "compressed_pages_observed": true
+   }
+  }
+ },
+ "requested_levels_MiB": {
+  "gimp": [
+   16,
+   32,
+   64,
+   128,
+   256
+  ],
+  "libreoffice": [
+   8,
+   16,
+   32,
+   64,
+   96
+  ],
+  "firefox": [
+   16,
+   32,
+   64,
+   128
+  ]
+ },
+ "relative_fault_limit": 0.1,
+ "absolute_zero_limit": null,
+ "selection": "first failing or undetermined level stops descent; no claimed optimum",
+ "workload_version": "measured-v2-cli-open",
+ "protected_work": "combined scene includes old and new accesses plus complete old-document revisit",
+ "elapsed_time_is_reported": true,
+ "elapsed_hard_limit": null,
+ "ended_wall_s": 1794561251.5533204
+}

@@ -1,0 +1,265 @@
+{
+  "status": "COMPLETE",
+  "schema": "parp-total-fault-unclipped-demand-v4",
+  "overall_goal_achieved": false,
+  "reason": "one formal round retains 3.109375 MiB deficit; early-growth deadlines also missed",
+  "scene": "revisit",
+  "test_limit_MiB": 3854.0,
+  "reference_limit_MiB": 6144.0,
+  "reference_growth_MiB": 886.28515625,
+  "target_gap_MiB": 256.0,
+  "minimum_admission_gap_MiB": 64.0,
+  "groups": {
+    "baseline": {
+      "n": 3,
+      "ready_count": 0,
+      "initial_gap_MiB": 199.9140625,
+      "gap_MiB": 199.84505208333334,
+      "drop_MiB": 0.06901041666666667,
+      "p95_ms": 225.50428533333334,
+      "max_ms": 255.805145,
+      "peak_operation_ms": {
+        "gimp": 9143.041344000001,
+        "libreoffice": 1540.008274,
+        "firefox": 741.3759936666667
+      }
+    },
+    "calibration": {
+      "n": 3,
+      "ready_count": 1,
+      "initial_gap_MiB": 217.27604166666666,
+      "gap_MiB": 16.946614583333332,
+      "drop_MiB": 210.09505208333334,
+      "p95_ms": 269.91767300000004,
+      "max_ms": 282.79327333333333,
+      "peak_operation_ms": {
+        "gimp": 8774.797326333333,
+        "libreoffice": 1400.4294016666668,
+        "firefox": 623.9265843333334
+      }
+    },
+    "formal": {
+      "n": 3,
+      "ready_count": 2,
+      "initial_gap_MiB": 190.75651041666666,
+      "gap_MiB": 1.0364583333333333,
+      "drop_MiB": 203.99869791666666,
+      "p95_ms": 230.02974433333333,
+      "max_ms": 253.3805353333333,
+      "peak_operation_ms": {
+        "gimp": 8299.495535,
+        "libreoffice": 1473.1454203333333,
+        "firefox": 1967.4687946666666
+      }
+    }
+  },
+  "p95_change_percent": 2.0068172954277097,
+  "formal_faults": {
+    "scope": "per_app",
+    "relative_limit": 0.1,
+    "aggregation": "fixed-three full-workload arithmetic means",
+    "within_trial_limit": true,
+    "per_app": {
+      "gimp": {
+        "off_values": [
+          1036223,
+          1045442,
+          1045411
+        ],
+        "on_values": [
+          1072378,
+          1071210,
+          1067227
+        ],
+        "off_mean": 1042358.6666666666,
+        "on_mean": 1070271.6666666667,
+        "mean_absolute_increment": 27913.0,
+        "relative_growth": 0.02677869038040649,
+        "within_trial_limit": true,
+        "off_range": [
+          1036223,
+          1045442
+        ],
+        "on_range": [
+          1067227,
+          1072378
+        ],
+        "off_stdev": 5313.665809338533,
+        "on_stdev": 2700.657759386282
+      },
+      "libreoffice": {
+        "off_values": [
+          47431,
+          46690,
+          45268
+        ],
+        "on_values": [
+          47791,
+          47328,
+          47265
+        ],
+        "off_mean": 46463,
+        "on_mean": 47461.333333333336,
+        "mean_absolute_increment": 998.3333333333334,
+        "relative_growth": 0.02148663093931372,
+        "within_trial_limit": true,
+        "off_range": [
+          45268,
+          47431
+        ],
+        "on_range": [
+          47265,
+          47791
+        ],
+        "off_stdev": 1099.221997596482,
+        "on_stdev": 287.23219411015424
+      },
+      "firefox": {
+        "off_values": [
+          221626,
+          222120,
+          217424
+        ],
+        "on_values": [
+          225564,
+          230216,
+          228490
+        ],
+        "off_mean": 220390,
+        "on_mean": 228090,
+        "mean_absolute_increment": 7700.0,
+        "relative_growth": 0.03493806434048732,
+        "within_trial_limit": true,
+        "off_range": [
+          217424,
+          222120
+        ],
+        "on_range": [
+          225564,
+          230216
+        ],
+        "off_stdev": 2580.4798003472147,
+        "on_stdev": 2351.653886098037
+      },
+      "krita": {
+        "off_values": [
+          550,
+          399,
+          98
+        ],
+        "on_values": [
+          99,
+          98,
+          98
+        ],
+        "off_mean": 349,
+        "on_mean": 98.33333333333333,
+        "mean_absolute_increment": -250.66666666666666,
+        "relative_growth": -0.7182425978987583,
+        "within_trial_limit": true,
+        "off_range": [
+          98,
+          550
+        ],
+        "on_range": [
+          98,
+          99
+        ],
+        "off_stdev": 230.11084285622005,
+        "on_stdev": 0.5773502691896257
+      }
+    },
+    "all_apps": {
+      "off_values": [
+        1305830,
+        1314651,
+        1308201
+      ],
+      "on_values": [
+        1345832,
+        1348852,
+        1343080
+      ],
+      "off_mean": 1309560.6666666667,
+      "on_mean": 1345921.3333333333,
+      "mean_absolute_increment": 36360.666666666664,
+      "relative_growth": 0.02776554579882006,
+      "within_trial_limit": true,
+      "off_range": [
+        1305830,
+        1314651
+      ],
+      "on_range": [
+        1343080,
+        1348852
+      ],
+      "off_stdev": 4564.978678299969,
+      "on_stdev": 2887.03677381036
+    },
+    "phase_metrics": "diagnostic only; never used to veto acceptance",
+    "major_faults": {
+      "gimp": {
+        "off": [
+          1654,
+          3052,
+          3061
+        ],
+        "on": [
+          7964,
+          7752,
+          7164
+        ]
+      },
+      "libreoffice": {
+        "off": [
+          324,
+          18,
+          14
+        ],
+        "on": [
+          4,
+          0,
+          0
+        ]
+      },
+      "firefox": {
+        "off": [
+          544,
+          1300,
+          383
+        ],
+        "on": [
+          1128,
+          2129,
+          2551
+        ]
+      },
+      "krita": {
+        "off": [
+          428,
+          252,
+          0
+        ],
+        "on": [
+          0,
+          0,
+          0
+        ]
+      }
+    },
+    "zero_baseline": "positive increment remains unresolved without an agreed absolute allowance"
+  },
+  "sources_unchanged": true,
+  "definitions": {
+    "peak_interval_s": [
+      8,
+      22
+    ],
+    "responses": "inputs initiated in [8,22); slow completions retained",
+    "percentile": "nearest rank; group value is mean of the three per-round P95 values",
+    "gap": "independent unclipped reference growth minus actual cgroup headroom, clamped to zero",
+    "drop": "observed net occupancy decline, including natural release; not exact reclaimed old pages",
+    "operation_time": "full completion time of peak_new_data initiated near 8 s; no full-task elapsed comparison",
+    "fault_interval": "complete workload, per-app mean of three; total pgfault includes minor and major faults"
+  }
+}

@@ -1,0 +1,41 @@
+{
+ "status": "STOPPED",
+ "started_wall_s": 1794556640.0724323,
+ "references": {
+  "stable": "/home/qi/krita-code-share-20261101/parp-measured-validation-20261113/results/trials/reference-stable-off-3e3ab7c2/result.json",
+  "turnover": "/home/qi/krita-code-share-20261101/parp-measured-validation-20261113/results/trials/reference-turnover-off-6d93097f/result.json"
+ },
+ "baselines": [],
+ "points": {},
+ "selected": {},
+ "requested_levels_MiB": {
+  "gimp": [
+   16,
+   32,
+   64,
+   128,
+   256
+  ],
+  "libreoffice": [
+   8,
+   16,
+   32,
+   64,
+   96
+  ],
+  "firefox": [
+   16,
+   32,
+   64,
+   128
+  ]
+ },
+ "relative_fault_limit": 0.1,
+ "absolute_zero_limit": null,
+ "selection": "first failing or undetermined level stops descent; no claimed optimum",
+ "protected_work": "combined scene includes old and new accesses plus complete old-document revisit",
+ "elapsed_time_is_reported": true,
+ "elapsed_hard_limit": null,
+ "error": "RuntimeError('failed native trial retained; no further pressure')",
+ "ended_wall_s": 1794556975.6359117
+}

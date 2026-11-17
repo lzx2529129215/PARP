@@ -1,0 +1,20 @@
+{
+  "date": "2026-11-17",
+  "native_run_during_packaging": false,
+  "controller_tests": {
+    "count": 67,
+    "passed": true
+  },
+  "protocol_tests": {
+    "count": 34,
+    "passed": true
+  },
+  "source_check_passed": true,
+  "frozen_python_sources": 34,
+  "original_result_files_preserved": 54,
+  "single_execution_contract": true,
+  "historical_candidate_hashes_passed": true,
+  "demand_reference_unclipped": true,
+  "document_links_passed": true,
+  "overall_experiment_goal_achieved": false
+}

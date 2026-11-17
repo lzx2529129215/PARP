@@ -1,0 +1,1549 @@
+[
+  {
+    "tag": "baseline-revisit-off-a747fd88",
+    "stage": "baseline",
+    "enabled": false,
+    "status": "COMPLETE",
+    "valid": true,
+    "source_contract": "7245c092c8ecaec4eb31ccc10a2d0e634fe47b915cd85b988e21bcbcac2a9c19",
+    "window_s": [
+      8.0,
+      22.0
+    ],
+    "input_samples": 28,
+    "response_p50_ms": 115.71754050000001,
+    "response_p95_ms": 256.493505,
+    "response_max_ms": 268.982319,
+    "scheduled_response_p95_ms": 261.954268,
+    "scheduled_response_max_ms": 270.298365,
+    "timeouts": 0,
+    "missed_input_slots": 0,
+    "full_workload_faults": {
+      "gimp": {
+        "pgfault": 1036223,
+        "pgmajfault": 1654
+      },
+      "libreoffice": {
+        "pgfault": 47431,
+        "pgmajfault": 324
+      },
+      "firefox": {
+        "pgfault": 221626,
+        "pgmajfault": 544
+      },
+      "krita": {
+        "pgfault": 550,
+        "pgmajfault": 428
+      }
+    },
+    "peak_operations": {
+      "gimp": [
+        {
+          "kind": "peak_new_data",
+          "elapsed_ms": 9161.577724,
+          "start_s": 8.020342578995042,
+          "end_s": 17.181920303031802,
+          "crosses_peak_end": false,
+          "queue_delay_s": 0,
+          "dispatch_lateness_s": 0.02034257899504155
+        }
+      ],
+      "libreoffice": [
+        {
+          "kind": "peak_new_data",
+          "elapsed_ms": 1533.181278,
+          "start_s": 8.019478016998619,
+          "end_s": 9.552659295033664,
+          "crosses_peak_end": false,
+          "queue_delay_s": 0,
+          "dispatch_lateness_s": 0.01947801699861884
+        }
+      ],
+      "firefox": [
+        {
+          "kind": "peak_new_data",
+          "elapsed_ms": 166.228756,
+          "start_s": 8.017603411048185,
+          "end_s": 8.183832167007495,
+          "crosses_peak_end": false,
+          "queue_delay_s": 0,
+          "dispatch_lateness_s": 0.01760341104818508
+        }
+      ]
+    },
+    "peak_active_overlap_s": {
+      "gimp": 13.977530020987615,
+      "libreoffice": 1.6852482400136068,
+      "firefox": 0.6532842179294676
+    },
+    "peak_protection_pause_s": {
+      "gimp": 0.0,
+      "libreoffice": 0.0,
+      "firefox": 0.0
+    },
+    "peak_kernel_write_s": {
+      "gimp": 0,
+      "libreoffice": 0,
+      "firefox": 0
+    },
+    "prepeak_reclaim_requested_MiB": {
+      "gimp": 0.0,
+      "libreoffice": 0.0,
+      "firefox": 0.0
+    },
+    "fixed_high_MiB": {
+      "gimp": 1538.76171875,
+      "libreoffice": 359.8515625,
+      "firefox": 1003.62109375
+    },
+    "queue_delays": [
+      {
+        "app": "gimp",
+        "kind": "new_hot_after_peak",
+        "late_s": 3.183094414009247,
+        "queue_delay_s": 3.181920303031802,
+        "dispatch_lateness_s": 0.0011741109774447978
+      },
+      {
+        "app": "gimp",
+        "kind": "new_hot_after_peak",
+        "late_s": 2.3444315250380896,
+        "queue_delay_s": 2.343478235998191,
+        "dispatch_lateness_s": 0.0009532890398986638
+      },
+      {
+        "app": "gimp",
+        "kind": "old_document_revisit",
+        "late_s": 2.2192232420202345,
+        "queue_delay_s": 2.2183947860030457,
+        "dispatch_lateness_s": 0.0008284560171887279
+      }
+    ],
+    "cleanup": {
+      "complete": true,
+      "remaining": {
+        "background": [],
+        "libreoffice": [],
+        "firefox": [],
+        "foreground": []
+      },
+      "terminated_owned_pids": []
+    },
+    "prepeak_net_drop_MiB": -0.8515625,
+    "prepeak_donor_net_drop_MiB": -0.67578125,
+    "prepeak_headroom_MiB": 726.72265625,
+    "prepeak_sample_s": 8.01530794100836,
+    "reference_growth_MiB": 886.28515625,
+    "required_from_start_MiB": 158.7109375,
+    "remaining_gap_MiB": 159.5625,
+    "space_ready": false,
+    "order": 1,
+    "deficit_admission": {
+      "demand_growth_bytes": 929337344,
+      "initial_free_bytes": 762916864,
+      "initial_gap_bytes": 166420480,
+      "required_minimum_gap_bytes": 67108864,
+      "passed": true
+    },
+    "completion_checks": [],
+    "completion_overruns": [],
+    "peak_reclaim_count": 0,
+    "peak_high_events": {
+      "gimp": 0,
+      "libreoffice": 0,
+      "firefox": 0,
+      "krita": 0
+    }
+  },
+  {
+    "tag": "calibration-revisit-on-cfc0a617",
+    "stage": "calibration",
+    "enabled": true,
+    "status": "COMPLETE",
+    "valid": true,
+    "source_contract": "7245c092c8ecaec4eb31ccc10a2d0e634fe47b915cd85b988e21bcbcac2a9c19",
+    "window_s": [
+      8.0,
+      22.0
+    ],
+    "input_samples": 28,
+    "response_p50_ms": 95.543075,
+    "response_p95_ms": 245.050191,
+    "response_max_ms": 247.49082,
+    "scheduled_response_p95_ms": 245.875984,
+    "scheduled_response_max_ms": 248.993103,
+    "timeouts": 0,
+    "missed_input_slots": 0,
+    "full_workload_faults": {
+      "gimp": {
+        "pgfault": 1072861,
+        "pgmajfault": 8156
+      },
+      "libreoffice": {
+        "pgfault": 50296,
+        "pgmajfault": 419
+      },
+      "firefox": {
+        "pgfault": 222787,
+        "pgmajfault": 671
+      },
+      "krita": {
+        "pgfault": 98,
+        "pgmajfault": 0
+      }
+    },
+    "peak_operations": {
+      "gimp": [
+        {
+          "kind": "peak_new_data",
+          "elapsed_ms": 8718.918574,
+          "start_s": 8.02971701498609,
+          "end_s": 16.7486355889705,
+          "crosses_peak_end": false,
+          "queue_delay_s": 0,
+          "dispatch_lateness_s": 0.029717014986090362
+        }
+      ],
+      "libreoffice": [
+        {
+          "kind": "peak_new_data",
+          "elapsed_ms": 1374.232283,
+          "start_s": 8.027390565956011,
+          "end_s": 9.401622848992702,
+          "crosses_peak_end": false,
+          "queue_delay_s": 0,
+          "dispatch_lateness_s": 0.027390565956011415
+        }
+      ],
+      "firefox": [
+        {
+          "kind": "peak_new_data",
+          "elapsed_ms": 239.249899,
+          "start_s": 8.026873339957092,
+          "end_s": 8.266123238950968,
+          "crosses_peak_end": false,
+          "queue_delay_s": 0,
+          "dispatch_lateness_s": 0.026873339957091957
+        }
+      ]
+    },
+    "peak_active_overlap_s": {
+      "gimp": 13.967070840008091,
+      "libreoffice": 1.3838618590380065,
+      "firefox": 0.7147190460236743
+    },
+    "peak_protection_pause_s": {
+      "gimp": 3.090124000000001,
+      "libreoffice": 0.0,
+      "firefox": 4.175124
+    },
+    "peak_kernel_write_s": {
+      "gimp": 0.0,
+      "libreoffice": 0.0,
+      "firefox": 4.0804967284202576e-05
+    },
+    "prepeak_reclaim_requested_MiB": {
+      "gimp": 184.0,
+      "libreoffice": 6.65625,
+      "firefox": 0.0
+    },
+    "fixed_high_MiB": {
+      "gimp": 1538.76171875,
+      "libreoffice": 359.8515625,
+      "firefox": 1003.62109375
+    },
+    "queue_delays": [
+      {
+        "app": "gimp",
+        "kind": "new_hot_after_peak",
+        "late_s": 2.749675528961234,
+        "queue_delay_s": 2.748635588970501,
+        "dispatch_lateness_s": 0.0010399399907328188
+      },
+      {
+        "app": "gimp",
+        "kind": "new_hot_after_peak",
+        "late_s": 1.971356191963423,
+        "queue_delay_s": 1.9691839869483374,
+        "dispatch_lateness_s": 0.0021722050150856376
+      },
+      {
+        "app": "gimp",
+        "kind": "old_document_revisit",
+        "late_s": 1.8405043519451283,
+        "queue_delay_s": 1.8385273759486154,
+        "dispatch_lateness_s": 0.0019769759965129197
+      }
+    ],
+    "cleanup": {
+      "complete": true,
+      "remaining": {
+        "background": [],
+        "libreoffice": [],
+        "firefox": [],
+        "foreground": []
+      },
+      "terminated_owned_pids": []
+    },
+    "prepeak_net_drop_MiB": 239.58984375,
+    "prepeak_donor_net_drop_MiB": 239.88671875,
+    "prepeak_headroom_MiB": 915.58203125,
+    "prepeak_sample_s": 8.021926269982941,
+    "reference_growth_MiB": 886.28515625,
+    "required_from_start_MiB": 210.29296875,
+    "remaining_gap_MiB": 0.0,
+    "space_ready": true,
+    "order": 2,
+    "deficit_admission": {
+      "demand_growth_bytes": 929337344,
+      "initial_free_bytes": 708829184,
+      "initial_gap_bytes": 220508160,
+      "required_minimum_gap_bytes": 67108864,
+      "passed": true
+    },
+    "completion_checks": [
+      {
+        "time_s": 1.9716627279412933,
+        "event": "release_deadline",
+        "unfilled_bytes": 34840576,
+        "deadline_s": 1.954391338978894,
+        "inflight_apps": [],
+        "check_lateness_s": 0.017271388962399215
+      },
+      {
+        "time_s": 3.694729523966089,
+        "event": "release_deadline",
+        "unfilled_bytes": 0,
+        "deadline_s": 3.4767425889731385,
+        "inflight_apps": [],
+        "check_lateness_s": 0.2179869349929504
+      },
+      {
+        "time_s": 6.47262671997305,
+        "event": "release_deadline",
+        "unfilled_bytes": 0,
+        "deadline_s": 6.422785536968149,
+        "inflight_apps": [],
+        "check_lateness_s": 0.04984118300490081
+      }
+    ],
+    "completion_overruns": [],
+    "peak_reclaim_count": 0,
+    "peak_high_events": {
+      "gimp": 0,
+      "libreoffice": 0,
+      "firefox": 12,
+      "krita": 0
+    }
+  },
+  {
+    "tag": "calibration-revisit-on-d7fe3cb6",
+    "stage": "calibration",
+    "enabled": true,
+    "status": "COMPLETE",
+    "valid": true,
+    "source_contract": "7245c092c8ecaec4eb31ccc10a2d0e634fe47b915cd85b988e21bcbcac2a9c19",
+    "window_s": [
+      8.0,
+      22.0
+    ],
+    "input_samples": 28,
+    "response_p50_ms": 137.3805795,
+    "response_p95_ms": 319.794601,
+    "response_max_ms": 348.359403,
+    "scheduled_response_p95_ms": 320.858844,
+    "scheduled_response_max_ms": 351.404581,
+    "timeouts": 0,
+    "missed_input_slots": 0,
+    "full_workload_faults": {
+      "gimp": {
+        "pgfault": 1065769,
+        "pgmajfault": 7455
+      },
+      "libreoffice": {
+        "pgfault": 45071,
+        "pgmajfault": 625
+      },
+      "firefox": {
+        "pgfault": 234952,
+        "pgmajfault": 2664
+      },
+      "krita": {
+        "pgfault": 103,
+        "pgmajfault": 0
+      }
+    },
+    "peak_operations": {
+      "gimp": [
+        {
+          "kind": "peak_new_data",
+          "elapsed_ms": 8429.088734,
+          "start_s": 8.019524789007846,
+          "end_s": 16.44861352298176,
+          "crosses_peak_end": false,
+          "queue_delay_s": 0,
+          "dispatch_lateness_s": 0.019524789007846266
+        }
+      ],
+      "libreoffice": [
+        {
+          "kind": "peak_new_data",
+          "elapsed_ms": 1425.801094,
+          "start_s": 8.019421935954597,
+          "end_s": 9.44522302999394,
+          "crosses_peak_end": false,
+          "queue_delay_s": 0,
+          "dispatch_lateness_s": 0.019421935954596847
+        }
+      ],
+      "firefox": [
+        {
+          "kind": "peak_new_data",
+          "elapsed_ms": 194.516593,
+          "start_s": 8.026916834001895,
+          "end_s": 8.22143342695199,
+          "crosses_peak_end": false,
+          "queue_delay_s": 0,
+          "dispatch_lateness_s": 0.02691683400189504
+        }
+      ]
+    },
+    "peak_active_overlap_s": {
+      "gimp": 13.977428730984684,
+      "libreoffice": 1.550141918065492,
+      "firefox": 0.6970457248971798
+    },
+    "peak_protection_pause_s": {
+      "gimp": 3.0988930000000003,
+      "libreoffice": 2.0473669999999995,
+      "firefox": 0.0
+    },
+    "peak_kernel_write_s": {
+      "gimp": 0.0,
+      "libreoffice": 0.0,
+      "firefox": 0.0
+    },
+    "prepeak_reclaim_requested_MiB": {
+      "gimp": 152.0,
+      "libreoffice": 28.51171875,
+      "firefox": 0.0
+    },
+    "fixed_high_MiB": {
+      "gimp": 1538.76171875,
+      "libreoffice": 359.8515625,
+      "firefox": 1003.62109375
+    },
+    "queue_delays": [
+      {
+        "app": "gimp",
+        "kind": "new_hot_after_peak",
+        "late_s": 2.449696325988043,
+        "queue_delay_s": 2.448613522981759,
+        "dispatch_lateness_s": 0.0010828030062839389
+      },
+      {
+        "app": "gimp",
+        "kind": "new_hot_after_peak",
+        "late_s": 1.7176173309562728,
+        "queue_delay_s": 1.715653653955087,
+        "dispatch_lateness_s": 0.001963677001185715
+      },
+      {
+        "app": "gimp",
+        "kind": "old_document_revisit",
+        "late_s": 1.6404455229640007,
+        "queue_delay_s": 1.639714916003868,
+        "dispatch_lateness_s": 0.0007306069601327181
+      }
+    ],
+    "cleanup": {
+      "complete": true,
+      "remaining": {
+        "background": [],
+        "libreoffice": [],
+        "firefox": [],
+        "foreground": []
+      },
+      "terminated_owned_pids": []
+    },
+    "prepeak_net_drop_MiB": 221.44140625,
+    "prepeak_donor_net_drop_MiB": 221.5,
+    "prepeak_headroom_MiB": 877.7890625,
+    "prepeak_sample_s": 8.005519724974874,
+    "reference_growth_MiB": 886.28515625,
+    "required_from_start_MiB": 229.9375,
+    "remaining_gap_MiB": 8.49609375,
+    "space_ready": false,
+    "order": 3,
+    "deficit_admission": {
+      "demand_growth_bytes": 929337344,
+      "initial_free_bytes": 688230400,
+      "initial_gap_bytes": 241106944,
+      "required_minimum_gap_bytes": 67108864,
+      "passed": true
+    },
+    "completion_checks": [
+      {
+        "time_s": 1.9603925209958106,
+        "event": "release_deadline",
+        "unfilled_bytes": 72724480,
+        "deadline_s": 1.954391338978894,
+        "inflight_apps": [],
+        "check_lateness_s": 0.006001182016916573
+      },
+      {
+        "time_s": 3.518896978988778,
+        "event": "release_deadline",
+        "unfilled_bytes": 11116544,
+        "deadline_s": 3.4767425889731385,
+        "inflight_apps": [],
+        "check_lateness_s": 0.042154390015639365
+      },
+      {
+        "time_s": 6.441758368979208,
+        "event": "release_deadline",
+        "unfilled_bytes": 12181504,
+        "deadline_s": 6.422785536968149,
+        "inflight_apps": [],
+        "check_lateness_s": 0.018972832011058927
+      }
+    ],
+    "completion_overruns": [],
+    "peak_reclaim_count": 0,
+    "peak_high_events": {
+      "gimp": 0,
+      "libreoffice": 0,
+      "firefox": 0,
+      "krita": 0
+    }
+  },
+  {
+    "tag": "baseline-revisit-off-8f8fe723",
+    "stage": "baseline",
+    "enabled": false,
+    "status": "COMPLETE",
+    "valid": true,
+    "source_contract": "7245c092c8ecaec4eb31ccc10a2d0e634fe47b915cd85b988e21bcbcac2a9c19",
+    "window_s": [
+      8.0,
+      22.0
+    ],
+    "input_samples": 28,
+    "response_p50_ms": 119.4533535,
+    "response_p95_ms": 212.713246,
+    "response_max_ms": 263.534155,
+    "scheduled_response_p95_ms": 213.78144,
+    "scheduled_response_max_ms": 264.414719,
+    "timeouts": 0,
+    "missed_input_slots": 0,
+    "full_workload_faults": {
+      "gimp": {
+        "pgfault": 1045442,
+        "pgmajfault": 3052
+      },
+      "libreoffice": {
+        "pgfault": 46690,
+        "pgmajfault": 18
+      },
+      "firefox": {
+        "pgfault": 222120,
+        "pgmajfault": 1300
+      },
+      "krita": {
+        "pgfault": 399,
+        "pgmajfault": 252
+      }
+    },
+    "peak_operations": {
+      "gimp": [
+        {
+          "kind": "peak_new_data",
+          "elapsed_ms": 9593.840748,
+          "start_s": 8.052951104997192,
+          "end_s": 17.646791853010654,
+          "crosses_peak_end": false,
+          "queue_delay_s": 0,
+          "dispatch_lateness_s": 0.05295110499719158
+        }
+      ],
+      "libreoffice": [
+        {
+          "kind": "peak_new_data",
+          "elapsed_ms": 1700.368899,
+          "start_s": 8.048469853005372,
+          "end_s": 9.748838752042502,
+          "crosses_peak_end": false,
+          "queue_delay_s": 0,
+          "dispatch_lateness_s": 0.04846985300537199
+        }
+      ],
+      "firefox": [
+        {
+          "kind": "peak_new_data",
+          "elapsed_ms": 162.430151,
+          "start_s": 8.051007986010518,
+          "end_s": 8.21343813702697,
+          "crosses_peak_end": false,
+          "queue_delay_s": 0,
+          "dispatch_lateness_s": 0.051007986010517925
+        }
+      ]
+    },
+    "peak_active_overlap_s": {
+      "gimp": 13.945024860964622,
+      "libreoffice": 1.7644854630343616,
+      "firefox": 0.6393377020140179
+    },
+    "peak_protection_pause_s": {
+      "gimp": 0.0,
+      "libreoffice": 0.0,
+      "firefox": 0.0
+    },
+    "peak_kernel_write_s": {
+      "gimp": 0,
+      "libreoffice": 0,
+      "firefox": 0
+    },
+    "prepeak_reclaim_requested_MiB": {
+      "gimp": 0.0,
+      "libreoffice": 0.0,
+      "firefox": 0.0
+    },
+    "fixed_high_MiB": {
+      "gimp": 1538.76171875,
+      "libreoffice": 359.8515625,
+      "firefox": 1003.62109375
+    },
+    "queue_delays": [
+      {
+        "app": "gimp",
+        "kind": "new_hot_after_peak",
+        "late_s": 3.647619752038736,
+        "queue_delay_s": 3.6467918530106544,
+        "dispatch_lateness_s": 0.0008278990280814469
+      },
+      {
+        "app": "gimp",
+        "kind": "new_hot_after_peak",
+        "late_s": 3.00432428001659,
+        "queue_delay_s": 3.0031281450064853,
+        "dispatch_lateness_s": 0.0011961350101046264
+      },
+      {
+        "app": "gimp",
+        "kind": "old_document_revisit",
+        "late_s": 3.0811213990091346,
+        "queue_delay_s": 3.0800320240086876,
+        "dispatch_lateness_s": 0.0010893750004470348
+      }
+    ],
+    "cleanup": {
+      "complete": true,
+      "remaining": {
+        "background": [],
+        "libreoffice": [],
+        "firefox": [],
+        "foreground": []
+      },
+      "terminated_owned_pids": []
+    },
+    "prepeak_net_drop_MiB": 2.18359375,
+    "prepeak_donor_net_drop_MiB": 2.23828125,
+    "prepeak_headroom_MiB": 647.01171875,
+    "prepeak_sample_s": 8.044976388046052,
+    "reference_growth_MiB": 886.28515625,
+    "required_from_start_MiB": 241.45703125,
+    "remaining_gap_MiB": 239.2734375,
+    "space_ready": false,
+    "order": 4,
+    "deficit_admission": {
+      "demand_growth_bytes": 929337344,
+      "initial_free_bytes": 676151296,
+      "initial_gap_bytes": 253186048,
+      "required_minimum_gap_bytes": 67108864,
+      "passed": true
+    },
+    "completion_checks": [],
+    "completion_overruns": [],
+    "peak_reclaim_count": 0,
+    "peak_high_events": {
+      "gimp": 0,
+      "libreoffice": 0,
+      "firefox": 0,
+      "krita": 0
+    }
+  },
+  {
+    "tag": "baseline-revisit-off-ef3aa2a2",
+    "stage": "baseline",
+    "enabled": false,
+    "status": "COMPLETE",
+    "valid": true,
+    "source_contract": "7245c092c8ecaec4eb31ccc10a2d0e634fe47b915cd85b988e21bcbcac2a9c19",
+    "window_s": [
+      8.0,
+      22.0
+    ],
+    "input_samples": 28,
+    "response_p50_ms": 102.88037299999999,
+    "response_p95_ms": 207.306105,
+    "response_max_ms": 234.898961,
+    "scheduled_response_p95_ms": 208.340831,
+    "scheduled_response_max_ms": 235.867726,
+    "timeouts": 0,
+    "missed_input_slots": 0,
+    "full_workload_faults": {
+      "gimp": {
+        "pgfault": 1045411,
+        "pgmajfault": 3061
+      },
+      "libreoffice": {
+        "pgfault": 45268,
+        "pgmajfault": 14
+      },
+      "firefox": {
+        "pgfault": 217424,
+        "pgmajfault": 383
+      },
+      "krita": {
+        "pgfault": 98,
+        "pgmajfault": 0
+      }
+    },
+    "peak_operations": {
+      "gimp": [
+        {
+          "kind": "peak_new_data",
+          "elapsed_ms": 8673.70556,
+          "start_s": 8.040489888982847,
+          "end_s": 16.714195448963437,
+          "crosses_peak_end": false,
+          "queue_delay_s": 0,
+          "dispatch_lateness_s": 0.04048988898284733
+        }
+      ],
+      "libreoffice": [
+        {
+          "kind": "peak_new_data",
+          "elapsed_ms": 1386.474645,
+          "start_s": 8.03997037600493,
+          "end_s": 9.426445021003019,
+          "crosses_peak_end": false,
+          "queue_delay_s": 0,
+          "dispatch_lateness_s": 0.039970376004930586
+        }
+      ],
+      "firefox": [
+        {
+          "kind": "peak_new_data",
+          "elapsed_ms": 1895.469074,
+          "start_s": 8.041389097983483,
+          "end_s": 9.936858172004577,
+          "crosses_peak_end": false,
+          "queue_delay_s": 0,
+          "dispatch_lateness_s": 0.041389097983483225
+        }
+      ]
+    },
+    "peak_active_overlap_s": {
+      "gimp": 13.956014456984121,
+      "libreoffice": 1.486437595973257,
+      "firefox": 3.3084714849246666
+    },
+    "peak_protection_pause_s": {
+      "gimp": 0.0,
+      "libreoffice": 0.0,
+      "firefox": 0.0
+    },
+    "peak_kernel_write_s": {
+      "gimp": 0,
+      "libreoffice": 0,
+      "firefox": 0
+    },
+    "prepeak_reclaim_requested_MiB": {
+      "gimp": 0.0,
+      "libreoffice": 0.0,
+      "firefox": 0.0
+    },
+    "fixed_high_MiB": {
+      "gimp": 1538.76171875,
+      "libreoffice": 359.8515625,
+      "firefox": 1003.62109375
+    },
+    "queue_delays": [
+      {
+        "app": "gimp",
+        "kind": "new_hot_after_peak",
+        "late_s": 2.7156054619699717,
+        "queue_delay_s": 2.7141954489634372,
+        "dispatch_lateness_s": 0.0014100130065344274
+      },
+      {
+        "app": "gimp",
+        "kind": "new_hot_after_peak",
+        "late_s": 1.7142327569890767,
+        "queue_delay_s": 1.7121471159625798,
+        "dispatch_lateness_s": 0.002085641026496887
+      },
+      {
+        "app": "gimp",
+        "kind": "old_document_revisit",
+        "late_s": 1.551163062977139,
+        "queue_delay_s": 1.5493895469699055,
+        "dispatch_lateness_s": 0.001773516007233411
+      }
+    ],
+    "cleanup": {
+      "complete": true,
+      "remaining": {
+        "background": [],
+        "libreoffice": [],
+        "firefox": [],
+        "foreground": []
+      },
+      "terminated_owned_pids": []
+    },
+    "prepeak_net_drop_MiB": -1.125,
+    "prepeak_donor_net_drop_MiB": -1.00390625,
+    "prepeak_headroom_MiB": 685.5859375,
+    "prepeak_sample_s": 8.037323282973375,
+    "reference_growth_MiB": 886.28515625,
+    "required_from_start_MiB": 199.57421875,
+    "remaining_gap_MiB": 200.69921875,
+    "space_ready": false,
+    "order": 5,
+    "deficit_admission": {
+      "demand_growth_bytes": 929337344,
+      "initial_free_bytes": 720068608,
+      "initial_gap_bytes": 209268736,
+      "required_minimum_gap_bytes": 67108864,
+      "passed": true
+    },
+    "completion_checks": [],
+    "completion_overruns": [],
+    "peak_reclaim_count": 0,
+    "peak_high_events": {
+      "gimp": 0,
+      "libreoffice": 0,
+      "firefox": 0,
+      "krita": 0
+    }
+  },
+  {
+    "tag": "calibration-revisit-on-d2a97d56",
+    "stage": "calibration",
+    "enabled": true,
+    "status": "COMPLETE",
+    "valid": true,
+    "source_contract": "7245c092c8ecaec4eb31ccc10a2d0e634fe47b915cd85b988e21bcbcac2a9c19",
+    "window_s": [
+      8.0,
+      22.0
+    ],
+    "input_samples": 28,
+    "response_p50_ms": 120.6314655,
+    "response_p95_ms": 244.908227,
+    "response_max_ms": 252.529597,
+    "scheduled_response_p95_ms": 245.93601,
+    "scheduled_response_max_ms": 258.301423,
+    "timeouts": 0,
+    "missed_input_slots": 0,
+    "full_workload_faults": {
+      "gimp": {
+        "pgfault": 1062860,
+        "pgmajfault": 6377
+      },
+      "libreoffice": {
+        "pgfault": 44186,
+        "pgmajfault": 0
+      },
+      "firefox": {
+        "pgfault": 224405,
+        "pgmajfault": 1348
+      },
+      "krita": {
+        "pgfault": 99,
+        "pgmajfault": 0
+      }
+    },
+    "peak_operations": {
+      "gimp": [
+        {
+          "kind": "peak_new_data",
+          "elapsed_ms": 9176.384671,
+          "start_s": 8.060760981985368,
+          "end_s": 17.237145652994514,
+          "crosses_peak_end": false,
+          "queue_delay_s": 0,
+          "dispatch_lateness_s": 0.060760981985367835
+        }
+      ],
+      "libreoffice": [
+        {
+          "kind": "peak_new_data",
+          "elapsed_ms": 1401.254828,
+          "start_s": 8.06080972601194,
+          "end_s": 9.46206455398351,
+          "crosses_peak_end": false,
+          "queue_delay_s": 0,
+          "dispatch_lateness_s": 0.06080972601193935
+        }
+      ],
+      "firefox": [
+        {
+          "kind": "peak_new_data",
+          "elapsed_ms": 1438.013261,
+          "start_s": 8.060333080997225,
+          "end_s": 9.498346342006698,
+          "crosses_peak_end": false,
+          "queue_delay_s": 0,
+          "dispatch_lateness_s": 0.0603330809972249
+        }
+      ]
+    },
+    "peak_active_overlap_s": {
+      "gimp": 13.93748368503293,
+      "libreoffice": 1.4826922819484025,
+      "firefox": 2.6542717509437352
+    },
+    "peak_protection_pause_s": {
+      "gimp": 3.0232350000000014,
+      "libreoffice": 0.0,
+      "firefox": 0.0
+    },
+    "peak_kernel_write_s": {
+      "gimp": 0.0,
+      "libreoffice": 0.0,
+      "firefox": 2.6946014259010553e-05
+    },
+    "prepeak_reclaim_requested_MiB": {
+      "gimp": 152.0,
+      "libreoffice": 0.0,
+      "firefox": 0.0
+    },
+    "fixed_high_MiB": {
+      "gimp": 1538.76171875,
+      "libreoffice": 359.8515625,
+      "firefox": 1003.62109375
+    },
+    "queue_delays": [
+      {
+        "app": "gimp",
+        "kind": "new_hot_after_peak",
+        "late_s": 3.237841767957434,
+        "queue_delay_s": 3.2371456529945135,
+        "dispatch_lateness_s": 0.0006961149629205465
+      },
+      {
+        "app": "gimp",
+        "kind": "new_hot_after_peak",
+        "late_s": 2.5380424319882877,
+        "queue_delay_s": 2.5369832139695063,
+        "dispatch_lateness_s": 0.0010592180187813938
+      },
+      {
+        "app": "gimp",
+        "kind": "old_document_revisit",
+        "late_s": 2.55130193795776,
+        "queue_delay_s": 2.550020856957417,
+        "dispatch_lateness_s": 0.0012810810003429651
+      }
+    ],
+    "cleanup": {
+      "complete": true,
+      "remaining": {
+        "background": [],
+        "libreoffice": [],
+        "firefox": [],
+        "foreground": []
+      },
+      "terminated_owned_pids": []
+    },
+    "prepeak_net_drop_MiB": 169.25390625,
+    "prepeak_donor_net_drop_MiB": 169.22265625,
+    "prepeak_headroom_MiB": 843.94140625,
+    "prepeak_sample_s": 8.04959010600578,
+    "reference_growth_MiB": 886.28515625,
+    "required_from_start_MiB": 211.59765625,
+    "remaining_gap_MiB": 42.34375,
+    "space_ready": false,
+    "order": 6,
+    "deficit_admission": {
+      "demand_growth_bytes": 929337344,
+      "initial_free_bytes": 707461120,
+      "initial_gap_bytes": 221876224,
+      "required_minimum_gap_bytes": 67108864,
+      "passed": true
+    },
+    "completion_checks": [
+      {
+        "time_s": 2.018675521016121,
+        "event": "release_deadline",
+        "unfilled_bytes": 72155136,
+        "deadline_s": 1.954391338978894,
+        "inflight_apps": [],
+        "check_lateness_s": 0.06428418203722686
+      },
+      {
+        "time_s": 3.792402014019899,
+        "event": "release_deadline",
+        "unfilled_bytes": 48463872,
+        "deadline_s": 3.4767425889731385,
+        "inflight_apps": [],
+        "check_lateness_s": 0.3156594250467606
+      },
+      {
+        "time_s": 6.47194194199983,
+        "event": "release_deadline",
+        "unfilled_bytes": 45535232,
+        "deadline_s": 6.422785536968149,
+        "inflight_apps": [],
+        "check_lateness_s": 0.04915640503168106
+      }
+    ],
+    "completion_overruns": [],
+    "peak_reclaim_count": 0,
+    "peak_high_events": {
+      "gimp": 0,
+      "libreoffice": 0,
+      "firefox": 58,
+      "krita": 0
+    }
+  },
+  {
+    "tag": "formal-revisit-on-ac337a1f",
+    "stage": "formal",
+    "enabled": true,
+    "status": "COMPLETE",
+    "valid": true,
+    "source_contract": "7245c092c8ecaec4eb31ccc10a2d0e634fe47b915cd85b988e21bcbcac2a9c19",
+    "window_s": [
+      8.0,
+      22.0
+    ],
+    "input_samples": 28,
+    "response_p50_ms": 115.0639095,
+    "response_p95_ms": 220.731635,
+    "response_max_ms": 245.091036,
+    "scheduled_response_p95_ms": 224.507235,
+    "scheduled_response_max_ms": 247.690775,
+    "timeouts": 0,
+    "missed_input_slots": 0,
+    "full_workload_faults": {
+      "gimp": {
+        "pgfault": 1072378,
+        "pgmajfault": 7964
+      },
+      "libreoffice": {
+        "pgfault": 47791,
+        "pgmajfault": 4
+      },
+      "firefox": {
+        "pgfault": 225564,
+        "pgmajfault": 1128
+      },
+      "krita": {
+        "pgfault": 99,
+        "pgmajfault": 0
+      }
+    },
+    "peak_operations": {
+      "gimp": [
+        {
+          "kind": "peak_new_data",
+          "elapsed_ms": 8318.940945,
+          "start_s": 8.037742366024759,
+          "end_s": 16.356683310994413,
+          "crosses_peak_end": false,
+          "queue_delay_s": 0,
+          "dispatch_lateness_s": 0.03774236602475867
+        }
+      ],
+      "libreoffice": [
+        {
+          "kind": "peak_new_data",
+          "elapsed_ms": 1563.191727,
+          "start_s": 8.032808993011713,
+          "end_s": 9.596000719990116,
+          "crosses_peak_end": false,
+          "queue_delay_s": 0,
+          "dispatch_lateness_s": 0.03280899301171303
+        }
+      ],
+      "firefox": [
+        {
+          "kind": "peak_new_data",
+          "elapsed_ms": 2063.645083,
+          "start_s": 8.0392499199952,
+          "end_s": 10.102895003044978,
+          "crosses_peak_end": false,
+          "queue_delay_s": 0,
+          "dispatch_lateness_s": 0.03924991999519989
+        }
+      ]
+    },
+    "peak_active_overlap_s": {
+      "gimp": 13.960342438949738,
+      "libreoffice": 1.7239184929640032,
+      "firefox": 3.0850750830140896
+    },
+    "peak_protection_pause_s": {
+      "gimp": 3.098293,
+      "libreoffice": 0.0,
+      "firefox": 1.0308139999999995
+    },
+    "peak_kernel_write_s": {
+      "gimp": 0.0,
+      "libreoffice": 0.0,
+      "firefox": 3.557698801159859e-05
+    },
+    "prepeak_reclaim_requested_MiB": {
+      "gimp": 184.0,
+      "libreoffice": 0.0,
+      "firefox": 0.0
+    },
+    "fixed_high_MiB": {
+      "gimp": 1538.76171875,
+      "libreoffice": 359.8515625,
+      "firefox": 1003.62109375
+    },
+    "queue_delays": [
+      {
+        "app": "gimp",
+        "kind": "new_hot_after_peak",
+        "late_s": 2.357480025035329,
+        "queue_delay_s": 2.3566833109944128,
+        "dispatch_lateness_s": 0.0007967140409164131
+      },
+      {
+        "app": "gimp",
+        "kind": "new_hot_after_peak",
+        "late_s": 1.518229497014545,
+        "queue_delay_s": 1.5171110160299577,
+        "dispatch_lateness_s": 0.0011184809845872223
+      },
+      {
+        "app": "gimp",
+        "kind": "old_document_revisit",
+        "late_s": 1.2662269870052114,
+        "queue_delay_s": 1.2629169430001639,
+        "dispatch_lateness_s": 0.00331004400504753
+      }
+    ],
+    "cleanup": {
+      "complete": true,
+      "remaining": {
+        "background": [],
+        "libreoffice": [],
+        "firefox": [],
+        "foreground": []
+      },
+      "terminated_owned_pids": []
+    },
+    "prepeak_net_drop_MiB": 203.98828125,
+    "prepeak_donor_net_drop_MiB": 204.10546875,
+    "prepeak_headroom_MiB": 883.17578125,
+    "prepeak_sample_s": 8.030974588997196,
+    "reference_growth_MiB": 886.28515625,
+    "required_from_start_MiB": 207.09765625,
+    "remaining_gap_MiB": 3.109375,
+    "space_ready": false,
+    "order": 7,
+    "deficit_admission": {
+      "demand_growth_bytes": 929337344,
+      "initial_free_bytes": 712179712,
+      "initial_gap_bytes": 217157632,
+      "required_minimum_gap_bytes": 67108864,
+      "passed": true
+    },
+    "completion_checks": [
+      {
+        "time_s": 1.9729704100172967,
+        "event": "release_deadline",
+        "unfilled_bytes": 38416384,
+        "deadline_s": 1.954391338978894,
+        "inflight_apps": [],
+        "check_lateness_s": 0.018579071038402617
+      },
+      {
+        "time_s": 3.7621933940099552,
+        "event": "release_deadline",
+        "unfilled_bytes": 4853760,
+        "deadline_s": 3.4767425889731385,
+        "inflight_apps": [],
+        "check_lateness_s": 0.28545080503681675
+      },
+      {
+        "time_s": 6.448878626979422,
+        "event": "release_deadline",
+        "unfilled_bytes": 4718592,
+        "deadline_s": 6.422785536968149,
+        "inflight_apps": [],
+        "check_lateness_s": 0.02609309001127258
+      }
+    ],
+    "completion_overruns": [],
+    "peak_reclaim_count": 0,
+    "peak_high_events": {
+      "gimp": 0,
+      "libreoffice": 0,
+      "firefox": 44,
+      "krita": 0
+    }
+  },
+  {
+    "tag": "formal-revisit-on-d3df8d52",
+    "stage": "formal",
+    "enabled": true,
+    "status": "COMPLETE",
+    "valid": true,
+    "source_contract": "7245c092c8ecaec4eb31ccc10a2d0e634fe47b915cd85b988e21bcbcac2a9c19",
+    "window_s": [
+      8.0,
+      22.0
+    ],
+    "input_samples": 28,
+    "response_p50_ms": 106.1766705,
+    "response_p95_ms": 251.633016,
+    "response_max_ms": 254.929747,
+    "scheduled_response_p95_ms": 252.70073,
+    "scheduled_response_max_ms": 255.719201,
+    "timeouts": 0,
+    "missed_input_slots": 0,
+    "full_workload_faults": {
+      "gimp": {
+        "pgfault": 1071210,
+        "pgmajfault": 7752
+      },
+      "libreoffice": {
+        "pgfault": 47328,
+        "pgmajfault": 0
+      },
+      "firefox": {
+        "pgfault": 230216,
+        "pgmajfault": 2129
+      },
+      "krita": {
+        "pgfault": 98,
+        "pgmajfault": 0
+      }
+    },
+    "peak_operations": {
+      "gimp": [
+        {
+          "kind": "peak_new_data",
+          "elapsed_ms": 7983.543678,
+          "start_s": 8.015560196014121,
+          "end_s": 15.999103874026332,
+          "crosses_peak_end": false,
+          "queue_delay_s": 0,
+          "dispatch_lateness_s": 0.015560196014121175
+        }
+      ],
+      "libreoffice": [
+        {
+          "kind": "peak_new_data",
+          "elapsed_ms": 1435.568098,
+          "start_s": 8.012498904019594,
+          "end_s": 9.448067001998425,
+          "crosses_peak_end": false,
+          "queue_delay_s": 0,
+          "dispatch_lateness_s": 0.012498904019594193
+        }
+      ],
+      "firefox": [
+        {
+          "kind": "peak_new_data",
+          "elapsed_ms": 1897.367643,
+          "start_s": 8.013617491000332,
+          "end_s": 9.91098513401812,
+          "crosses_peak_end": false,
+          "queue_delay_s": 0,
+          "dispatch_lateness_s": 0.013617491000331938
+        }
+      ]
+    },
+    "peak_active_overlap_s": {
+      "gimp": 13.982506674015895,
+      "libreoffice": 1.4703174229944125,
+      "firefox": 3.7782870270311832
+    },
+    "peak_protection_pause_s": {
+      "gimp": 3.0901630000000004,
+      "libreoffice": 0.0,
+      "firefox": 0.0
+    },
+    "peak_kernel_write_s": {
+      "gimp": 0.0,
+      "libreoffice": 0.0,
+      "firefox": 3.814900992438197e-05
+    },
+    "prepeak_reclaim_requested_MiB": {
+      "gimp": 184.0,
+      "libreoffice": 0.0,
+      "firefox": 0.0
+    },
+    "fixed_high_MiB": {
+      "gimp": 1538.76171875,
+      "libreoffice": 359.8515625,
+      "firefox": 1003.62109375
+    },
+    "queue_delays": [
+      {
+        "app": "gimp",
+        "kind": "new_hot_after_peak",
+        "late_s": 1.999999232008122,
+        "queue_delay_s": 1.999103874026332,
+        "dispatch_lateness_s": 0.0008953579817898571
+      },
+      {
+        "app": "gimp",
+        "kind": "new_hot_after_peak",
+        "late_s": 1.2240320380078629,
+        "queue_delay_s": 1.2229942660196684,
+        "dispatch_lateness_s": 0.0010377719881944358
+      }
+    ],
+    "cleanup": {
+      "complete": true,
+      "remaining": {
+        "background": [],
+        "libreoffice": [],
+        "firefox": [],
+        "foreground": []
+      },
+      "terminated_owned_pids": []
+    },
+    "prepeak_net_drop_MiB": 209.5078125,
+    "prepeak_donor_net_drop_MiB": 209.78125,
+    "prepeak_headroom_MiB": 917.99609375,
+    "prepeak_sample_s": 8.005887160019483,
+    "reference_growth_MiB": 886.28515625,
+    "required_from_start_MiB": 177.796875,
+    "remaining_gap_MiB": 0.0,
+    "space_ready": true,
+    "order": 8,
+    "deficit_admission": {
+      "demand_growth_bytes": 929337344,
+      "initial_free_bytes": 742903808,
+      "initial_gap_bytes": 186433536,
+      "required_minimum_gap_bytes": 67108864,
+      "passed": true
+    },
+    "completion_checks": [
+      {
+        "time_s": 2.0022317770053633,
+        "event": "release_deadline",
+        "unfilled_bytes": 9936896,
+        "deadline_s": 1.954391338978894,
+        "inflight_apps": [],
+        "check_lateness_s": 0.0478404380264692
+      },
+      {
+        "time_s": 3.6028005970292725,
+        "event": "release_deadline",
+        "unfilled_bytes": 0,
+        "deadline_s": 3.4767425889731385,
+        "inflight_apps": [],
+        "check_lateness_s": 0.12605800805613399
+      },
+      {
+        "time_s": 6.434688745997846,
+        "event": "release_deadline",
+        "unfilled_bytes": 0,
+        "deadline_s": 6.422785536968149,
+        "inflight_apps": [],
+        "check_lateness_s": 0.011903209029696882
+      }
+    ],
+    "completion_overruns": [],
+    "peak_reclaim_count": 0,
+    "peak_high_events": {
+      "gimp": 0,
+      "libreoffice": 0,
+      "firefox": 108,
+      "krita": 0
+    }
+  },
+  {
+    "tag": "formal-revisit-on-5b42c79e",
+    "stage": "formal",
+    "enabled": true,
+    "status": "COMPLETE",
+    "valid": true,
+    "source_contract": "7245c092c8ecaec4eb31ccc10a2d0e634fe47b915cd85b988e21bcbcac2a9c19",
+    "window_s": [
+      8.0,
+      22.0
+    ],
+    "input_samples": 28,
+    "response_p50_ms": 93.646051,
+    "response_p95_ms": 217.724582,
+    "response_max_ms": 260.120823,
+    "scheduled_response_p95_ms": 218.561367,
+    "scheduled_response_max_ms": 261.253682,
+    "timeouts": 0,
+    "missed_input_slots": 0,
+    "full_workload_faults": {
+      "gimp": {
+        "pgfault": 1067227,
+        "pgmajfault": 7164
+      },
+      "libreoffice": {
+        "pgfault": 47265,
+        "pgmajfault": 0
+      },
+      "firefox": {
+        "pgfault": 228490,
+        "pgmajfault": 2551
+      },
+      "krita": {
+        "pgfault": 98,
+        "pgmajfault": 0
+      }
+    },
+    "peak_operations": {
+      "gimp": [
+        {
+          "kind": "peak_new_data",
+          "elapsed_ms": 8596.001982,
+          "start_s": 8.059613818011712,
+          "end_s": 16.655615800002124,
+          "crosses_peak_end": false,
+          "queue_delay_s": 0,
+          "dispatch_lateness_s": 0.05961381801171228
+        }
+      ],
+      "libreoffice": [
+        {
+          "kind": "peak_new_data",
+          "elapsed_ms": 1420.676436,
+          "start_s": 8.0500799639849,
+          "end_s": 9.470756400027312,
+          "crosses_peak_end": false,
+          "queue_delay_s": 0,
+          "dispatch_lateness_s": 0.05007996398489922
+        }
+      ],
+      "firefox": [
+        {
+          "kind": "peak_new_data",
+          "elapsed_ms": 1941.393658,
+          "start_s": 8.05172725400189,
+          "end_s": 9.993120911996812,
+          "crosses_peak_end": false,
+          "queue_delay_s": 0,
+          "dispatch_lateness_s": 0.05172725400188938
+        }
+      ]
+    },
+    "peak_active_overlap_s": {
+      "gimp": 13.937994554929901,
+      "libreoffice": 1.46058658399852,
+      "firefox": 3.057184466975741
+    },
+    "peak_protection_pause_s": {
+      "gimp": 3.086696999999999,
+      "libreoffice": 0.0,
+      "firefox": 0.0
+    },
+    "peak_kernel_write_s": {
+      "gimp": 3.792298957705498e-05,
+      "libreoffice": 0.0,
+      "firefox": 3.708602162078023e-05
+    },
+    "prepeak_reclaim_requested_MiB": {
+      "gimp": 184.0,
+      "libreoffice": 0.0,
+      "firefox": 0.0
+    },
+    "fixed_high_MiB": {
+      "gimp": 1538.76171875,
+      "libreoffice": 359.8515625,
+      "firefox": 1003.62109375
+    },
+    "queue_delays": [
+      {
+        "app": "gimp",
+        "kind": "new_hot_after_peak",
+        "late_s": 2.6564218400162645,
+        "queue_delay_s": 2.655615800002124,
+        "dispatch_lateness_s": 0.0008060400141403079
+      },
+      {
+        "app": "gimp",
+        "kind": "new_hot_after_peak",
+        "late_s": 1.912987472023815,
+        "queue_delay_s": 1.9114018849795684,
+        "dispatch_lateness_s": 0.0015855870442464948
+      },
+      {
+        "app": "gimp",
+        "kind": "old_document_revisit",
+        "late_s": 1.8289297579904087,
+        "queue_delay_s": 1.8279432840063237,
+        "dispatch_lateness_s": 0.0009864739840850234
+      }
+    ],
+    "cleanup": {
+      "complete": true,
+      "remaining": {
+        "background": [],
+        "libreoffice": [],
+        "firefox": [],
+        "foreground": []
+      },
+      "terminated_owned_pids": []
+    },
+    "prepeak_net_drop_MiB": 198.5,
+    "prepeak_donor_net_drop_MiB": 198.45703125,
+    "prepeak_headroom_MiB": 897.41015625,
+    "prepeak_sample_s": 8.046208271989599,
+    "reference_growth_MiB": 886.28515625,
+    "required_from_start_MiB": 187.375,
+    "remaining_gap_MiB": 0.0,
+    "space_ready": true,
+    "order": 9,
+    "deficit_admission": {
+      "demand_growth_bytes": 929337344,
+      "initial_free_bytes": 732860416,
+      "initial_gap_bytes": 196476928,
+      "required_minimum_gap_bytes": 67108864,
+      "passed": true
+    },
+    "completion_checks": [
+      {
+        "time_s": 1.9746940540499054,
+        "event": "release_deadline",
+        "unfilled_bytes": 17485824,
+        "deadline_s": 1.954391338978894,
+        "inflight_apps": [],
+        "check_lateness_s": 0.020302715071011335
+      },
+      {
+        "time_s": 3.753122582042124,
+        "event": "release_deadline",
+        "unfilled_bytes": 0,
+        "deadline_s": 3.4767425889731385,
+        "inflight_apps": [],
+        "check_lateness_s": 0.27637999306898564
+      },
+      {
+        "time_s": 6.457511005050037,
+        "event": "release_deadline",
+        "unfilled_bytes": 0,
+        "deadline_s": 6.422785536968149,
+        "inflight_apps": [],
+        "check_lateness_s": 0.03472546808188781
+      }
+    ],
+    "completion_overruns": [],
+    "peak_reclaim_count": 0,
+    "peak_high_events": {
+      "gimp": 0,
+      "libreoffice": 0,
+      "firefox": 124,
+      "krita": 0
+    }
+  }
+]

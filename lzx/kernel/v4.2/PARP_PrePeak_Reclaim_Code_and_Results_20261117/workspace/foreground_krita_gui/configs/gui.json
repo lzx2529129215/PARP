@@ -1,0 +1,97 @@
+{
+  "schema_version": 1,
+  "display": null,
+  "asset": {
+    "path": null,
+    "sha256": null
+  },
+  "search_dirs": [
+    "assets",
+    "~/oom-stage-a/krita_gimp_lab/assets"
+  ],
+  "minimum_pixels": 16777216,
+  "timeouts": {
+    "launch": 90,
+    "load": 600,
+    "action": 30,
+    "close": 120,
+    "exit": 60
+  },
+  "poll_s": 0.5,
+  "stable_observations": 2,
+  "ocr_language": "eng",
+  "ocr_confidence": 55,
+  "zoom_scroll_ticks": 2,
+  "change_threshold": 0.015,
+  "regions": {
+    "canvas": [
+      0.15,
+      0.15,
+      0.65,
+      0.7
+    ],
+    "status": [
+      0.0,
+      0.91,
+      1.0,
+      0.09
+    ],
+    "layers": [
+      0.75,
+      0.15,
+      0.25,
+      0.72
+    ],
+    "dialog": [
+      0.15,
+      0.15,
+      0.7,
+      0.7
+    ],
+    "menu": [
+      0,
+      0,
+      0.73,
+      0.12
+    ],
+    "popup": [
+      0,
+      0.05,
+      0.73,
+      0.85
+    ]
+  },
+  "labels": {
+    "file_dialog": [
+      "Open",
+      "File name",
+      "Name"
+    ],
+    "layer_panel": [
+      "Layers"
+    ],
+    "layer_menu": [
+      "Layer"
+    ],
+    "new_submenu": [
+      "New"
+    ],
+    "paint_layer": [
+      "Paint Layer"
+    ],
+    "discard": [
+      "Discard",
+      "Don't Save",
+      "Do not save"
+    ],
+    "save_prompt": [
+      "Save",
+      "Cancel"
+    ],
+    "empty_workspace": [
+      "Welcome",
+      "Create New",
+      "Open File"
+    ]
+  }
+}
