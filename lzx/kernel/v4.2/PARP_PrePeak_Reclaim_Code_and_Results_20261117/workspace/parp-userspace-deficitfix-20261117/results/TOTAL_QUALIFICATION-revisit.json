@@ -1,0 +1,499 @@
+{
+  "schema": "parp-total-fault-unclipped-demand-v4",
+  "execution_contract": {
+    "criterion": {
+      "aggregation": "arithmetic mean of complete-workload total pgfault; operations diagnostic only",
+      "counter": "task_stat_self_and_reaped_descendants",
+      "relative_fault_limit": 0.1,
+      "runs_per_group": 3,
+      "scope": "per_app",
+      "zero_baseline": "absolute increment; no invented allowance"
+    },
+    "execution": {
+      "budget": "original cumulative ceilings; no refill on resume/update",
+      "controller": "fixed sequence high plus feedback/gap/retention fine reclaim",
+      "donors": "same complete proposal set in calibration and formal; no post-calibration donor filtering",
+      "entrypoint": "shared_service.Service",
+      "forecast_update_s": 0.5,
+      "high": "full-sequence WSS peak with calibrated occupancy and tested high allowance floors; immutable per plan",
+      "parallel": true,
+      "plan_expiry_s": 32.0,
+      "reclaim": "finish before curve-derived growth; whole-gap measured duration; immutable per-peak cutoff and live feedback",
+      "timing": {
+        "completion": "admission uses live clock and measured batch bound; overruns are explicit failures",
+        "cutoff": "can move earlier only within the same protected growth period",
+        "duration": "slowest credited calibration batch and full request span, with feedback/batch gaps",
+        "growth_prominence_fraction": 0.05,
+        "quiet_s": 1.0,
+        "update_s": 0.5
+      }
+    },
+    "forecast_reference_sha256": "2cfab89c8a88aa2d1cbff15b42a5b9126d7e4ac8a641ae688e64c70daf96436d",
+    "foreground_limits": {
+      "pan_left": 220.3190156,
+      "pan_right": 175.37447640000002,
+      "zoom_in": 317.345246,
+      "zoom_out": 157.7778424
+    },
+    "guard_profiles": {
+      "firefox": {
+        "high_wait_s": 1.0,
+        "initial_batch_bytes": 8388608,
+        "interval_s": 1.0,
+        "max_batch_bytes": 33554432,
+        "psi_mild": 0.1,
+        "psi_severe": 0.5,
+        "quiet_windows": 2,
+        "refault_mild": 128,
+        "refault_severe": 2048,
+        "repeated_limit": 3,
+        "tick_s": 0.1
+      },
+      "gimp": {
+        "high_wait_s": 1.0,
+        "initial_batch_bytes": 8388608,
+        "interval_s": 1.0,
+        "max_batch_bytes": 33554432,
+        "psi_mild": 0.1,
+        "psi_severe": 0.5,
+        "quiet_windows": 2,
+        "refault_mild": 128,
+        "refault_severe": 2048,
+        "repeated_limit": 3,
+        "tick_s": 0.1
+      },
+      "libreoffice": {
+        "high_wait_s": 1.0,
+        "initial_batch_bytes": 8388608,
+        "interval_s": 1.0,
+        "max_batch_bytes": 33554432,
+        "psi_mild": 0.1,
+        "psi_severe": 0.5,
+        "quiet_windows": 2,
+        "refault_mild": 128,
+        "refault_severe": 2048,
+        "repeated_limit": 3,
+        "tick_s": 0.1
+      }
+    },
+    "live_context": {
+      "first_growth_s": 8.0,
+      "kernel": "6.17.13",
+      "memory_limit_bytes": 4041211904,
+      "new_hot_s": [
+        14,
+        18
+      ],
+      "old_document_revisit_s": 22,
+      "old_hot_s": [
+        2,
+        4
+      ],
+      "peak_mode": "concurrent",
+      "scenario": "revisit",
+      "workload_version": "measured-v2-cli-open:matched-total-task-counters-v1:serial-queue-accounting-v2:concurrent",
+      "zswap": "Y"
+    },
+    "monitored_apps": [
+      "gimp",
+      "libreoffice",
+      "firefox",
+      "krita"
+    ],
+    "proposal_bank_sha256": "2909c88ac96d9f6100b9bb1aad217558169d2f0a582233b59b092c137b6c9fb9",
+    "recipes": {
+      "firefox": {
+        "high": {
+          "app": "firefox",
+          "baseline_pgfault": 250514,
+          "baseline_sha256": "d955b644106fb503650275932eaf352400479e5aa2d8450761ca4f0f4eaca7ea",
+          "baseline_task_ms": 7386.249986,
+          "compressed_pages_observed": true,
+          "compression_enabled": true,
+          "current_pgfault": 254373,
+          "current_task_ms": 8135.314714,
+          "method": "high",
+          "observed_net_release_bytes": 101736448,
+          "requested_bytes": 75206656,
+          "retained_cgroup_bytes": 907526144,
+          "retained_rss_bytes": 1665921024,
+          "trial_sha256": "51d34f34635963eedc4612a3debbb2b1c6d6be06c74b7af88af925ecd87062f2",
+          "workload_key": "combined-old-and-new-hot-plus-old-document-revisit"
+        },
+        "reclaim": {
+          "app": "firefox",
+          "baseline_pgfault": 250514,
+          "baseline_sha256": "d955b644106fb503650275932eaf352400479e5aa2d8450761ca4f0f4eaca7ea",
+          "baseline_task_ms": 7386.249986,
+          "compressed_pages_observed": true,
+          "compression_enabled": true,
+          "current_pgfault": 251215,
+          "current_task_ms": 7523.004696,
+          "method": "reclaim",
+          "observed_net_release_bytes": 40820736,
+          "requested_bytes": 32956416,
+          "retained_cgroup_bytes": 913592320,
+          "retained_rss_bytes": 1640615936,
+          "trial_sha256": "26606335af164b7e329eb8daa745b670ed4d40dc53be3a89a1dbb3cfb65ab25a",
+          "workload_key": "combined-old-and-new-hot-plus-old-document-revisit"
+        }
+      },
+      "gimp": {
+        "high": {
+          "app": "gimp",
+          "baseline_pgfault": 1028186,
+          "baseline_sha256": "ca425bcdc819960c9c9cd12f99f8dc419e2cced956e075da6c661339a3ff5084",
+          "baseline_task_ms": 25926.449773,
+          "compressed_pages_observed": true,
+          "compression_enabled": true,
+          "current_pgfault": 1093255,
+          "current_task_ms": 24610.260986999998,
+          "method": "high",
+          "observed_net_release_bytes": 255700992,
+          "requested_bytes": 159383552,
+          "retained_cgroup_bytes": 852414464,
+          "retained_rss_bytes": 906596352,
+          "trial_sha256": "04acd243c16fe3376b109639a1f289fca038ca383b56dbc40448565c04707e5d",
+          "workload_key": "combined-old-and-new-hot-plus-old-document-revisit"
+        },
+        "reclaim": {
+          "app": "gimp",
+          "baseline_pgfault": 1028186,
+          "baseline_sha256": "ca425bcdc819960c9c9cd12f99f8dc419e2cced956e075da6c661339a3ff5084",
+          "baseline_task_ms": 25926.449773,
+          "compressed_pages_observed": true,
+          "compression_enabled": true,
+          "current_pgfault": 1089896,
+          "current_task_ms": 24618.904408000002,
+          "method": "reclaim",
+          "observed_net_release_bytes": 254119936,
+          "requested_bytes": 268435456,
+          "retained_cgroup_bytes": 854016000,
+          "retained_rss_bytes": 908136448,
+          "trial_sha256": "5faa17441c72febfac246d524f96ef50a2e541a564a55d62a95b6049b0f52d86",
+          "workload_key": "combined-old-and-new-hot-plus-old-document-revisit"
+        }
+      },
+      "libreoffice": {
+        "high": {
+          "app": "libreoffice",
+          "baseline_pgfault": 47331,
+          "baseline_sha256": "d955b644106fb503650275932eaf352400479e5aa2d8450761ca4f0f4eaca7ea",
+          "baseline_task_ms": 2827.9590829999997,
+          "compressed_pages_observed": true,
+          "compression_enabled": true,
+          "current_pgfault": 47515,
+          "current_task_ms": 2166.82019,
+          "method": "high",
+          "observed_net_release_bytes": 8929280,
+          "requested_bytes": 8388608,
+          "retained_cgroup_bytes": 271208448,
+          "retained_rss_bytes": 369672192,
+          "trial_sha256": "68d568c0131121fd05d566781bd65e5de5a983c4dc597b40dada203ae572c12f",
+          "workload_key": "combined-old-and-new-hot-plus-old-document-revisit"
+        },
+        "reclaim": {
+          "app": "libreoffice",
+          "baseline_pgfault": 47331,
+          "baseline_sha256": "d955b644106fb503650275932eaf352400479e5aa2d8450761ca4f0f4eaca7ea",
+          "baseline_task_ms": 2827.9590829999997,
+          "compressed_pages_observed": true,
+          "compression_enabled": true,
+          "current_pgfault": 46649,
+          "current_task_ms": 2189.976163,
+          "method": "reclaim",
+          "observed_net_release_bytes": 23420928,
+          "requested_bytes": 33554432,
+          "retained_cgroup_bytes": 262479872,
+          "retained_rss_bytes": 355348480,
+          "trial_sha256": "96afbe2cbf498e1c8a773614f5aa3f4e42b4f4ae75c074dbe40b69ee9ba577d6",
+          "workload_key": "combined-old-and-new-hot-plus-old-document-revisit"
+        }
+      }
+    },
+    "reference_conditions": {
+      "demand_growth_bytes": 929337344,
+      "minimum_initial_gap_bytes": 67108864,
+      "mode": "unclipped_demand",
+      "reference_limit_bytes": 6442450944,
+      "test_limit_bytes": 4041211904
+    },
+    "rules": {
+      "lookahead_s": 4.0,
+      "page_bytes": 4096,
+      "reuse_faults_per_working_page": 0.1,
+      "stable_relative": 0.15,
+      "turnover_faults_per_working_page": 0.5,
+      "turnover_rise_relative": 0.2
+    },
+    "sampling": {
+      "clear_refs": false,
+      "interval_s": 1.0,
+      "mode": "passive_smaps",
+      "schema": 1,
+      "source_sha256": "da8edafed2a3ea00e0bfed2d2db127cca77c11f6b7d6cc9db58952de6f4cd4a3"
+    },
+    "schema": "parp-total-fault-unclipped-demand-v4",
+    "source_sha256": {
+      "controller/adapters.py": "3b4e30a47c55053cacc24fa58c8757eaf552b5ac10625752e566472648d65629",
+      "controller/coordinator.py": "2c5891d24addae9878cb510a5fb419f54cb2167cf46691ee9e9a1b38f6b586f1",
+      "controller/executor.py": "2d71beea94628242b91aa57606bea8d2496c5f1a68ea350b6380be4449ca9c6f",
+      "controller/faults.py": "3e7ff27aac2cf75059254088807a1768c811771f0a78ad73d94c56a753c375c7",
+      "controller/native.py": "9b14655b61edb0d6ae7e0ad375b396730264cf8ef815bc7c1dae49886af3c7d4",
+      "controller/plan.py": "1908cc9fc2ad31a73edac3c21193e027445b5aa2a4be8a95c42321734b8a5c2c",
+      "controller/prepeak_timing.py": "a5bcfe9e8f947ec874b6896bf1a2dead5dfbe32cb565aa99ac0775e9a9cfddc1",
+      "controller/replay_forecast.py": "9b30a0a25526a8f0ad850d4048d4058bdb3683d843c4c28ba5a1b8fd7a270245",
+      "controller/safety_store.py": "4c6f9948d84b620e72519d7a1d346c812c92c3089982c0cdc9d4117d1fb6cdaa",
+      "controller/sequence_policy.py": "616ad43caf518b8f040626ded1480d09431ed9a23f6678d0ed89c5b367566b71",
+      "controller/signals.py": "52fdc181b8605af31683aa92240290073d36e9d08e0d976f84c1efc796f0e7f3",
+      "controller/workflow.py": "140743fd24b469a8d54e0fd76dacc565a7a13e924adc00c8bae07bf528337c6a",
+      "demand_reference.py": "c8665c4a5b53ed3d47b2a513ef52402e7f82c598c1e84e091fb1df76e4735232",
+      "execution_contract.py": "d6a2945be220e6089052733bc8d3cabd0457dd3118a60362e76434e0f186aef9",
+      "inputs_bundle.py": "2af0c479873e7018cd1691adf5cb2dbae3d78e7f16e045ec5b229d6980769a11",
+      "lab/firefox-install.json": "0e797d35ea142568b3da8b3835e39771cce1f373579e9a53ba3d44466a1d96e5",
+      "lab/foreground_probe.py": "d75a3f3e6c49097c362333493b659f99fd206badf1f64fead9efbb0eca35d9a1",
+      "lab/harness_contracts.py": "b2f57eb5c186ded8eaf933b3424077677494c7f01164857f4838a6ee5c3d8fc9",
+      "lab/native_apps.py": "670aa5cacf48581b94d6576b80064f13f200417628dfb9436ed65ed91edc6bda",
+      "lab/online_service.py": "730054cd4c3bc7501e096c8ca9d522ce0bb4a24f7afbfbb260872c4ee836adc9",
+      "lab/reference.py": "90a0e4fe7b2b47bf31291148dfddf153a3b31d01c0cf441245d547a6292ce152",
+      "lab/root_guard.py": "da8edafed2a3ea00e0bfed2d2db127cca77c11f6b7d6cc9db58952de6f4cd4a3",
+      "lab/shared_service.py": "44a8c3f3f5de46f0f93ced45ec84fdbcba834c2455321b46d6256969d8a6ed8a",
+      "lab/suite.py": "53620cbbc640a066c4db5634ff4653fbf34481ab14ce9fab633164a88802ee4f",
+      "lab/task_faults.py": "3cddc98c1459b7a51b3bfe5a53aa70dd78e81c5e8604277c934ea347b282ad69",
+      "lab/telemetry.py": "221870af8129a5731b58c9fe69acb6594d6f574250eb3bfe7f94595fa68f1e25",
+      "total_faults.py": "48cb8c8de82148936b4d8690501c573c6819609b75c4ce1162d9b70f27bd9a94",
+      "total_profiles.py": "2ec0f3d73465467a748358f23dead49b252102639da734185f07aa00134745e4"
+    }
+  },
+  "execution_contract_sha256": "7245c092c8ecaec4eb31ccc10a2d0e634fe47b915cd85b988e21bcbcac2a9c19",
+  "controls": [
+    {
+      "path": "results/trials/baseline-revisit-off-a747fd88/result.json",
+      "sha256": "87dd781322dd1342352fc46505923a9e19fa5ed408f3753e20b5c5176aac51ef"
+    },
+    {
+      "path": "results/trials/baseline-revisit-off-8f8fe723/result.json",
+      "sha256": "fa679e04faee5b12de53967fe8d3ab3562511c6473e61caa0985aab5b4909f7b"
+    },
+    {
+      "path": "results/trials/baseline-revisit-off-ef3aa2a2/result.json",
+      "sha256": "86591a840845ff465c162263e5415651148e448b571fcf328b177fb0fbc16f75"
+    }
+  ],
+  "trials": [
+    {
+      "path": "results/trials/calibration-revisit-on-cfc0a617/result.json",
+      "sha256": "291c38bfc07e079476d970cc7dda53c14408089831214836209e10e60c61665b"
+    },
+    {
+      "path": "results/trials/calibration-revisit-on-d7fe3cb6/result.json",
+      "sha256": "36fe7d32d8734f09cbf270259206e3666b30d4aa3c5635dce32647c6235a0d6a"
+    },
+    {
+      "path": "results/trials/calibration-revisit-on-d2a97d56/result.json",
+      "sha256": "f2207d507d345f5ba6fe67e752d1863a45b4c5b64aee7f6095cf87a9e3817bc5"
+    }
+  ],
+  "assessment": {
+    "eligible": true,
+    "reason": "total_fault_limit_passed",
+    "total_faults": {
+      "scope": "per_app",
+      "relative_limit": 0.1,
+      "aggregation": "fixed-three full-workload arithmetic means",
+      "within_trial_limit": true,
+      "per_app": {
+        "gimp": {
+          "off_values": [
+            1036223,
+            1045442,
+            1045411
+          ],
+          "on_values": [
+            1072861,
+            1065769,
+            1062860
+          ],
+          "off_mean": 1042358.6666666666,
+          "on_mean": 1067163.3333333333,
+          "mean_absolute_increment": 24804.666666666668,
+          "relative_growth": 0.023796671395258703,
+          "within_trial_limit": true,
+          "off_range": [
+            1036223,
+            1045442
+          ],
+          "on_range": [
+            1062860,
+            1072861
+          ],
+          "off_stdev": 5313.665809338533,
+          "on_stdev": 5144.2321422476
+        },
+        "libreoffice": {
+          "off_values": [
+            47431,
+            46690,
+            45268
+          ],
+          "on_values": [
+            50296,
+            45071,
+            44186
+          ],
+          "off_mean": 46463,
+          "on_mean": 46517.666666666664,
+          "mean_absolute_increment": 54.666666666666664,
+          "relative_growth": 0.0011765634303998163,
+          "within_trial_limit": true,
+          "off_range": [
+            45268,
+            47431
+          ],
+          "on_range": [
+            44186,
+            50296
+          ],
+          "off_stdev": 1099.221997596482,
+          "on_stdev": 3301.9173722752867
+        },
+        "firefox": {
+          "off_values": [
+            221626,
+            222120,
+            217424
+          ],
+          "on_values": [
+            222787,
+            234952,
+            224405
+          ],
+          "off_mean": 220390,
+          "on_mean": 227381.33333333334,
+          "mean_absolute_increment": 6991.333333333333,
+          "relative_growth": 0.03172255244490827,
+          "within_trial_limit": true,
+          "off_range": [
+            217424,
+            222120
+          ],
+          "on_range": [
+            222787,
+            234952
+          ],
+          "off_stdev": 2580.4798003472147,
+          "on_stdev": 6606.112800530531
+        },
+        "krita": {
+          "off_values": [
+            550,
+            399,
+            98
+          ],
+          "on_values": [
+            98,
+            103,
+            99
+          ],
+          "off_mean": 349,
+          "on_mean": 100,
+          "mean_absolute_increment": -249.0,
+          "relative_growth": -0.7134670487106017,
+          "within_trial_limit": true,
+          "off_range": [
+            98,
+            550
+          ],
+          "on_range": [
+            98,
+            103
+          ],
+          "off_stdev": 230.11084285622005,
+          "on_stdev": 2.6457513110645907
+        }
+      },
+      "all_apps": {
+        "off_values": [
+          1305830,
+          1314651,
+          1308201
+        ],
+        "on_values": [
+          1346042,
+          1345895,
+          1331550
+        ],
+        "off_mean": 1309560.6666666667,
+        "on_mean": 1341162.3333333333,
+        "mean_absolute_increment": 31601.666666666668,
+        "relative_growth": 0.02413150262607154,
+        "within_trial_limit": true,
+        "off_range": [
+          1305830,
+          1314651
+        ],
+        "on_range": [
+          1331550,
+          1346042
+        ],
+        "off_stdev": 4564.978678299969,
+        "on_stdev": 8324.849327965841
+      },
+      "phase_metrics": "diagnostic only; never used to veto acceptance",
+      "major_faults": {
+        "gimp": {
+          "off": [
+            1654,
+            3052,
+            3061
+          ],
+          "on": [
+            8156,
+            7455,
+            6377
+          ]
+        },
+        "libreoffice": {
+          "off": [
+            324,
+            18,
+            14
+          ],
+          "on": [
+            419,
+            625,
+            0
+          ]
+        },
+        "firefox": {
+          "off": [
+            544,
+            1300,
+            383
+          ],
+          "on": [
+            671,
+            2664,
+            1348
+          ]
+        },
+        "krita": {
+          "off": [
+            428,
+            252,
+            0
+          ],
+          "on": [
+            0,
+            0,
+            0
+          ]
+        }
+      },
+      "zero_baseline": "positive increment remains unresolved without an agreed absolute allowance"
+    },
+    "latency_qualified": false,
+    "space_target_qualified": false,
+    "scope": "entire same-service multi-app proposal, not independent donor certificates"
+  }
+}
