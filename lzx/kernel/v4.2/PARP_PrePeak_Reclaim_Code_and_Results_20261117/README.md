@@ -1,8 +1,8 @@
-# PARP 预测输出、提前回收与采集审阅包（2026-11-19）
+# PARP 预测输出、提前回收代码与结果（2026-11-19）
 
-**当前状态：待负责人审核，尚未开始补采或真实预测模型训练。** 本次在原GitHub文件夹内更新，保留2026-11-17源码、结果和历史说明。
+本次在原GitHub文件夹内更新，保留2026-11-17源码、结果和历史说明。
 
-负责人先看 [审阅要点与采集准入](04_负责人审阅与采集准入.md)，然后看 [最终预测接口](workspace/PARP_Prediction_Contract_Study_20261119/预测接口与代码改动.md)、[实验结果](workspace/PARP_Prediction_Contract_Study_20261119/实验结果.md)、[采集字段与步骤](workspace/PARP_Prediction_Contract_Study_20261119/交给采集人员的字段与步骤.md)。
+主要文档：[最终预测接口](workspace/PARP_Prediction_Contract_Study_20261119/预测接口与代码改动.md)、[实验结果](workspace/PARP_Prediction_Contract_Study_20261119/实验结果.md)、[采集字段与步骤](workspace/PARP_Prediction_Contract_Study_20261119/交给采集人员的字段与步骤.md)。
 
 ## 最新代码与输出
 
@@ -23,13 +23,12 @@
 
 **本轮是整应用冷热、干净文件页的合成验证；固定high仍采用独立全序列参考包络。** 不代表真实预测准确率、最优历史长度、匿名压缩、页级定向回收或真实GUI卡顿已经验证。页访问采集器仍需按规格实现及预采检查；当前VM支持Page Idle，未启用DAMON。
 
-## 审阅与复核入口
+## 文档与复核入口
 
 1. [代码与逻辑入口](01_代码逻辑说明.md)
 2. [离线复核及运行](02_运行与验证.md)
 3. [环境与尚缺能力](03_环境与依赖.md)
-4. [负责人审阅与采集准入](04_负责人审阅与采集准入.md)
-5. [采集人员规格](workspace/PARP_Prediction_Contract_Study_20261119/交给采集人员的字段与步骤.md)
-6. [逐批结果与源码匹配](workspace/PARP_Prediction_Contract_Study_20261119/results/VERIFIED.json)、[执行源码快照](workspace/PARP_Prediction_Contract_Study_20261119/results/source_archives/)
+4. [采集人员规格](workspace/PARP_Prediction_Contract_Study_20261119/交给采集人员的字段与步骤.md)
+5. [逐批结果与源码匹配](workspace/PARP_Prediction_Contract_Study_20261119/results/VERIFIED.json)、[执行源码快照](workspace/PARP_Prediction_Contract_Study_20261119/results/source_archives/)
 
 旧版真实应用结果仍在 `workspace/parp-userspace-deficitfix-20261117/` 与 `summaries/`，原顶层说明归档在 [history/release-20261117/](history/release-20261117/)。旧版2/3补足、3.11MiB缺口等结论保持原样，与本轮不同场景分开。

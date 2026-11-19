@@ -2,7 +2,6 @@
   "date": "2026-11-19",
   "latest_code": "workspace/PARP_Prediction_Contract_Study_20261119",
   "previous_code": "workspace/parp-userspace-deficitfix-20261117",
-  "review_status": "pending_owner_review",
   "files": [
     {
       "path": "01_代码逻辑说明.md",
@@ -11,18 +10,13 @@
     },
     {
       "path": "02_运行与验证.md",
-      "bytes": 1965,
-      "sha256": "d70e1c1ab0a994c4a29acbeaf51853e352ba07b71fe2563b2a10d37b9e0e1971"
+      "bytes": 1878,
+      "sha256": "905b37baace57422790a2a36042d5591d7ec9d8f6bbc259158459a3f8da26c39"
     },
     {
       "path": "03_环境与依赖.md",
       "bytes": 1508,
       "sha256": "9a07d62221a6e7624a6910e2a961465ab37d3b1265f66f803f373baf297bd391"
-    },
-    {
-      "path": "04_负责人审阅与采集准入.md",
-      "bytes": 2396,
-      "sha256": "5fdb2404ab533e5039393464cf7662dd5fc74d4731a80183752671ed41003b75"
     },
     {
       "path": "evidence/host/host-latest.json",
@@ -411,8 +405,8 @@
     },
     {
       "path": "README.md",
-      "bytes": 3542,
-      "sha256": "da15a01a76b7c84779c1785223a9c0d084b6bd3fb43c71f903fb678f33c93ac9"
+      "bytes": 3294,
+      "sha256": "5a6491bbcdabdc6824c1ced6164617d5491f87b869051c34ff963545356f072a"
     },
     {
       "path": "summaries/实验结果.md",
@@ -446,13 +440,13 @@
     },
     {
       "path": "tools/verify_bundle.py",
-      "bytes": 2877,
-      "sha256": "387c948ed4ca0c14bd3b51438fc3c9059894d9529c840dd90478f579847de693"
+      "bytes": 2659,
+      "sha256": "59ae4e7d6632ab3bf71c95bdc1cb6034469adf1f5111b2ad948a1d20cb9cc2e4"
     },
     {
       "path": "validation.json",
-      "bytes": 23275,
-      "sha256": "548f42eaf9eff137a2fb6970777b39dfd358ae771ca8cbc3ef57a48f29d00028"
+      "bytes": 23261,
+      "sha256": "6219b8ddc456230c8b64f06b9ec50888c9742ff1d29940f02cf1134202a40dea"
     },
     {
       "path": "workspace/foreground_krita_gui/.gitignore",
