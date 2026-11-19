@@ -1,0 +1,38 @@
+[
+  {
+    "scheduled_s": 20.0,
+    "actual_s": 20.03292535,
+    "action": "hot",
+    "app": "incoming",
+    "bytes": 268435456,
+    "preallocation_gap_bytes": 0,
+    "free_before_bytes": 285978624,
+    "response": {
+      "event": "complete",
+      "action": "hot",
+      "bytes": 268435456,
+      "elapsed_ms": 107.622034,
+      "cpu_elapsed_ms": 104.636638,
+      "rss": 297771008,
+      "minor": 71210,
+      "major": 0,
+      "process_cpu_ms": 330.0,
+      "minor_delta": 65537,
+      "major_delta": 0,
+      "feedback_delta": {
+        "cold": {
+          "refaults": 0,
+          "psi_s": 0.0
+        },
+        "hot": {
+          "refaults": 0,
+          "psi_s": 0.0
+        },
+        "incoming": {
+          "refaults": 0,
+          "psi_s": 0.0
+        }
+      }
+    }
+  }
+]

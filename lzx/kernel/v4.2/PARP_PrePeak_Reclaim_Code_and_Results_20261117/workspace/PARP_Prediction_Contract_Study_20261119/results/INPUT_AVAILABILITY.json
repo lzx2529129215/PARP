@@ -1,0 +1,39 @@
+{
+  "uid": 1000,
+  "kernel": "6.17.13",
+  "features": {
+    "CONFIG_IDLE_PAGE_TRACKING": "CONFIG_IDLE_PAGE_TRACKING=y",
+    "CONFIG_DAMON": "# CONFIG_DAMON is not set",
+    "CONFIG_DAMON_VADDR": "UNKNOWN",
+    "CONFIG_PROC_PAGE_MONITOR": "CONFIG_PROC_PAGE_MONITOR=y",
+    "CONFIG_MEMCG": "CONFIG_MEMCG=y"
+  },
+  "paths": {
+    "/sys/kernel/mm/page_idle/bitmap": {
+      "exists": true,
+      "readable": false,
+      "writable": false
+    },
+    "/sys/kernel/mm/damon/admin": {
+      "exists": false,
+      "readable": false,
+      "writable": false
+    },
+    "/proc/self/pagemap": {
+      "exists": true,
+      "readable": true,
+      "writable": false
+    },
+    "/proc/self/clear_refs": {
+      "exists": true,
+      "readable": false,
+      "writable": true
+    },
+    "/proc/self/smaps_rollup": {
+      "exists": true,
+      "readable": true,
+      "writable": false
+    }
+  },
+  "action": "read-only feature/config checks; no page bits changed"
+}

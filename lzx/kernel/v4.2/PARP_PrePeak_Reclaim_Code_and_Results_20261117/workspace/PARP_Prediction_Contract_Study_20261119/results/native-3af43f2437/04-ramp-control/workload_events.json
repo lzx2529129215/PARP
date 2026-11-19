@@ -1,0 +1,146 @@
+[
+  {
+    "scheduled_s": 16.0,
+    "actual_s": 16.038318414,
+    "action": "hot",
+    "app": "incoming",
+    "bytes": 67108864,
+    "preallocation_gap_bytes": 0,
+    "free_before_bytes": 134930432,
+    "response": {
+      "event": "complete",
+      "action": "hot",
+      "bytes": 67108864,
+      "elapsed_ms": 30.704367,
+      "cpu_elapsed_ms": 30.669353,
+      "rss": 96522240,
+      "minor": 22059,
+      "major": 0,
+      "process_cpu_ms": 230.0,
+      "minor_delta": 16384,
+      "major_delta": 0,
+      "feedback_delta": {
+        "cold": {
+          "refaults": 0,
+          "psi_s": 0.0
+        },
+        "hot": {
+          "refaults": 0,
+          "psi_s": 0.0
+        },
+        "incoming": {
+          "refaults": 0,
+          "psi_s": 0.0
+        }
+      }
+    }
+  },
+  {
+    "scheduled_s": 17.0,
+    "actual_s": 17.024741573,
+    "action": "hot",
+    "app": "incoming",
+    "bytes": 67108864,
+    "preallocation_gap_bytes": 0,
+    "free_before_bytes": 67821568,
+    "response": {
+      "event": "complete",
+      "action": "hot",
+      "bytes": 67108864,
+      "elapsed_ms": 25.340803,
+      "cpu_elapsed_ms": 25.107105,
+      "rss": 163631104,
+      "minor": 38444,
+      "major": 0,
+      "process_cpu_ms": 300.0,
+      "minor_delta": 16385,
+      "major_delta": 0,
+      "feedback_delta": {
+        "cold": {
+          "refaults": 0,
+          "psi_s": 0.0
+        },
+        "hot": {
+          "refaults": 0,
+          "psi_s": 0.0
+        },
+        "incoming": {
+          "refaults": 0,
+          "psi_s": 0.0
+        }
+      }
+    }
+  },
+  {
+    "scheduled_s": 18.0,
+    "actual_s": 18.012077789,
+    "action": "hot",
+    "app": "incoming",
+    "bytes": 67108864,
+    "preallocation_gap_bytes": 66658304,
+    "free_before_bytes": 450560,
+    "response": {
+      "event": "complete",
+      "action": "hot",
+      "bytes": 67108864,
+      "elapsed_ms": 33.191829,
+      "cpu_elapsed_ms": 32.785303,
+      "rss": 230739968,
+      "minor": 54828,
+      "major": 0,
+      "process_cpu_ms": 390.0,
+      "minor_delta": 16384,
+      "major_delta": 0,
+      "feedback_delta": {
+        "cold": {
+          "refaults": 0,
+          "psi_s": 0.0
+        },
+        "hot": {
+          "refaults": 0,
+          "psi_s": 0.0
+        },
+        "incoming": {
+          "refaults": 0,
+          "psi_s": 0.001914
+        }
+      }
+    }
+  },
+  {
+    "scheduled_s": 19.0,
+    "actual_s": 19.016049542,
+    "action": "hot",
+    "app": "incoming",
+    "bytes": 67108864,
+    "preallocation_gap_bytes": 66584576,
+    "free_before_bytes": 524288,
+    "response": {
+      "event": "complete",
+      "action": "hot",
+      "bytes": 67108864,
+      "elapsed_ms": 24.576006,
+      "cpu_elapsed_ms": 23.23953,
+      "rss": 297848832,
+      "minor": 71213,
+      "major": 0,
+      "process_cpu_ms": 530.0,
+      "minor_delta": 16384,
+      "major_delta": 0,
+      "feedback_delta": {
+        "cold": {
+          "refaults": 0,
+          "psi_s": 0.0
+        },
+        "hot": {
+          "refaults": 0,
+          "psi_s": 0.0
+        },
+        "incoming": {
+          "refaults": 0,
+          "psi_s": 0.0005530000000000001
+        }
+      }
+    }
+  }
+]

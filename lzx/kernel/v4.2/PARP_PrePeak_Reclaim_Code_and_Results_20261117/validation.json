@@ -1,20 +1,890 @@
 {
-  "date": "2026-11-17",
+  "date": "2026-11-19",
+  "status": "ready_for_owner_review",
+  "collection_started": false,
+  "trained_models": false,
   "native_run_during_packaging": false,
-  "controller_tests": {
-    "count": 67,
-    "passed": true
+  "latest_code": "workspace/PARP_Prediction_Contract_Study_20261119",
+  "latest_evidence": {
+    "status": "VERIFIED",
+    "native_checks": 37,
+    "complete_trials": 34,
+    "ideal_complete_trials": 18,
+    "correctly_infeasible": 3,
+    "all_ideal_preallocation_gaps_zero": true,
+    "batches": [
+      {
+        "batch": "native-3af43f2437",
+        "trials": 9,
+        "feedback_fix": "measured_realized_growth",
+        "warmup": true
+      },
+      {
+        "batch": "native-3f22c16659",
+        "trials": 3,
+        "feedback_fix": "measured_realized_growth",
+        "warmup": true
+      },
+      {
+        "batch": "native-514e5cd8c2",
+        "trials": 25,
+        "feedback_fix": null,
+        "warmup": false
+      }
+    ],
+    "source_matches": [
+      {
+        "batch": "native-3af43f2437",
+        "matching_executed_source": [
+          "4388b865"
+        ]
+      },
+      {
+        "batch": "native-3f22c16659",
+        "matching_executed_source": [
+          "0d9e49f5",
+          "43924efa"
+        ]
+      },
+      {
+        "batch": "native-514e5cd8c2",
+        "matching_executed_source": [
+          "initial"
+        ]
+      }
+    ],
+    "rows": [
+      {
+        "batch": "native-3af43f2437",
+        "tag": "01-step-control",
+        "scenario": "step",
+        "status": "COMPLETE",
+        "advance": false,
+        "variant": "occupancy_supply",
+        "H": 20.0,
+        "gap_MiB": 127.41015625,
+        "peak_ms": [
+          195.428909
+        ],
+        "peak_cpu_ms": [
+          194.58118
+        ],
+        "major_faults": 0,
+        "max_events": 177,
+        "reclaim_MiB": 0.0,
+        "last_reclaim_s": null,
+        "lead_qualified": true,
+        "passed": true
+      },
+      {
+        "batch": "native-3af43f2437",
+        "tag": "02-step-ideal",
+        "scenario": "step",
+        "status": "COMPLETE",
+        "advance": true,
+        "variant": "occupancy_supply",
+        "H": 20.0,
+        "gap_MiB": 0.0,
+        "peak_ms": [
+          110.223678
+        ],
+        "peak_cpu_ms": [
+          108.761078
+        ],
+        "major_faults": 0,
+        "max_events": 0,
+        "reclaim_MiB": 141.80078125,
+        "last_reclaim_s": 8.159409856,
+        "lead_qualified": true,
+        "passed": true
+      },
+      {
+        "batch": "native-3af43f2437",
+        "tag": "03-ramp-ideal",
+        "scenario": "ramp",
+        "status": "COMPLETE",
+        "advance": true,
+        "variant": "occupancy_supply",
+        "H": 20.0,
+        "gap_MiB": 0.0,
+        "peak_ms": [
+          26.402234,
+          25.756915,
+          27.295326,
+          25.761035
+        ],
+        "peak_cpu_ms": [
+          26.313667,
+          25.619407,
+          27.260752,
+          25.590952
+        ],
+        "major_faults": 0,
+        "max_events": 0,
+        "reclaim_MiB": 141.34765625,
+        "last_reclaim_s": 4.140078502,
+        "lead_qualified": true,
+        "passed": true
+      },
+      {
+        "batch": "native-3af43f2437",
+        "tag": "04-ramp-control",
+        "scenario": "ramp",
+        "status": "COMPLETE",
+        "advance": false,
+        "variant": "occupancy_supply",
+        "H": 20.0,
+        "gap_MiB": 63.5703125,
+        "peak_ms": [
+          30.704367,
+          25.340803,
+          33.191829,
+          24.576006
+        ],
+        "peak_cpu_ms": [
+          30.669353,
+          25.107105,
+          32.785303,
+          23.23953
+        ],
+        "major_faults": 0,
+        "max_events": 177,
+        "reclaim_MiB": 0.0,
+        "last_reclaim_s": null,
+        "lead_qualified": true,
+        "passed": true
+      },
+      {
+        "batch": "native-3af43f2437",
+        "tag": "05-V-control",
+        "scenario": "V",
+        "status": "COMPLETE",
+        "advance": false,
+        "variant": "occupancy_supply",
+        "H": 20.0,
+        "gap_MiB": 63.5390625,
+        "peak_ms": [
+          105.404202
+        ],
+        "peak_cpu_ms": [
+          103.199939
+        ],
+        "major_faults": 0,
+        "max_events": 145,
+        "reclaim_MiB": 0.0,
+        "last_reclaim_s": null,
+        "lead_qualified": true,
+        "passed": true
+      },
+      {
+        "batch": "native-3af43f2437",
+        "tag": "06-V-ideal",
+        "scenario": "V",
+        "status": "COMPLETE",
+        "advance": true,
+        "variant": "occupancy_supply",
+        "H": 20.0,
+        "gap_MiB": 0.0,
+        "peak_ms": [
+          103.723657
+        ],
+        "peak_cpu_ms": [
+          103.435831
+        ],
+        "major_faults": 0,
+        "max_events": 0,
+        "reclaim_MiB": 77.37890625,
+        "last_reclaim_s": 12.757771591,
+        "lead_qualified": true,
+        "passed": true
+      },
+      {
+        "batch": "native-3af43f2437",
+        "tag": "09-oscillating-control",
+        "scenario": "oscillating",
+        "status": "COMPLETE",
+        "advance": false,
+        "variant": "occupancy_supply",
+        "H": 20.0,
+        "gap_MiB": 127.2890625,
+        "peak_ms": [
+          65.470659,
+          113.78667,
+          80.377117
+        ],
+        "peak_cpu_ms": [
+          61.32825,
+          111.50325,
+          80.312732
+        ],
+        "major_faults": 0,
+        "max_events": 177,
+        "reclaim_MiB": 0.0,
+        "last_reclaim_s": null,
+        "lead_qualified": true,
+        "passed": true
+      },
+      {
+        "batch": "native-3af43f2437",
+        "tag": "10-oscillating-ideal",
+        "scenario": "oscillating",
+        "status": "COMPLETE",
+        "advance": true,
+        "variant": "occupancy_supply",
+        "H": 20.0,
+        "gap_MiB": 0.0,
+        "peak_ms": [
+          58.331419,
+          103.807504,
+          78.198534
+        ],
+        "peak_cpu_ms": [
+          56.63313,
+          102.216048,
+          76.444652
+        ],
+        "major_faults": 0,
+        "max_events": 0,
+        "reclaim_MiB": 141.34765625,
+        "last_reclaim_s": 5.954814516,
+        "lead_qualified": true,
+        "passed": true
+      },
+      {
+        "batch": "native-3af43f2437",
+        "tag": "25-cold-revisit-guard",
+        "scenario": "cold_revisit",
+        "status": "CORRECTLY_INFEASIBLE",
+        "advance": true,
+        "passed": true
+      },
+      {
+        "batch": "native-3f22c16659",
+        "tag": "01-step-control",
+        "scenario": "step",
+        "status": "COMPLETE",
+        "advance": false,
+        "variant": "occupancy_supply_faults",
+        "H": 20.0,
+        "gap_MiB": 127.31640625,
+        "peak_ms": [
+          118.845401
+        ],
+        "peak_cpu_ms": [
+          114.829
+        ],
+        "major_faults": 0,
+        "max_events": 177,
+        "reclaim_MiB": 0.0,
+        "last_reclaim_s": null,
+        "lead_qualified": true,
+        "passed": true
+      },
+      {
+        "batch": "native-3f22c16659",
+        "tag": "02-step-ideal",
+        "scenario": "step",
+        "status": "COMPLETE",
+        "advance": true,
+        "variant": "occupancy_supply_faults",
+        "H": 20.0,
+        "gap_MiB": 0.0,
+        "peak_ms": [
+          109.150774
+        ],
+        "peak_cpu_ms": [
+          105.634532
+        ],
+        "major_faults": 0,
+        "max_events": 0,
+        "reclaim_MiB": 141.30859375,
+        "last_reclaim_s": 8.128821719,
+        "lead_qualified": true,
+        "passed": true
+      },
+      {
+        "batch": "native-3f22c16659",
+        "tag": "25-cold-revisit-guard",
+        "scenario": "cold_revisit",
+        "status": "CORRECTLY_INFEASIBLE",
+        "advance": true,
+        "passed": true
+      },
+      {
+        "batch": "native-514e5cd8c2",
+        "tag": "01-step-control",
+        "scenario": "step",
+        "status": "COMPLETE",
+        "advance": false,
+        "variant": "occupancy_supply",
+        "H": 20.0,
+        "gap_MiB": 127.9375,
+        "peak_ms": [
+          1156.286188
+        ],
+        "peak_cpu_ms": [
+          1147.145883
+        ],
+        "major_faults": 0,
+        "max_events": 178,
+        "reclaim_MiB": 0.0,
+        "last_reclaim_s": null,
+        "lead_qualified": true,
+        "passed": true
+      },
+      {
+        "batch": "native-514e5cd8c2",
+        "tag": "02-step-ideal",
+        "scenario": "step",
+        "status": "COMPLETE",
+        "advance": true,
+        "variant": "occupancy_supply",
+        "H": 20.0,
+        "gap_MiB": 0.0,
+        "peak_ms": [
+          109.235312
+        ],
+        "peak_cpu_ms": [
+          107.77252
+        ],
+        "major_faults": 0,
+        "max_events": 0,
+        "reclaim_MiB": 140.94921875,
+        "last_reclaim_s": 8.138927004,
+        "lead_qualified": true,
+        "passed": true
+      },
+      {
+        "batch": "native-514e5cd8c2",
+        "tag": "03-ramp-ideal",
+        "scenario": "ramp",
+        "status": "COMPLETE",
+        "advance": true,
+        "variant": "occupancy_supply",
+        "H": 20.0,
+        "gap_MiB": 0.0,
+        "peak_ms": [
+          32.038086,
+          29.260875,
+          29.197042,
+          35.070367
+        ],
+        "peak_cpu_ms": [
+          29.586509,
+          29.047619,
+          28.255675,
+          33.219049
+        ],
+        "major_faults": 0,
+        "max_events": 0,
+        "reclaim_MiB": 141.44921875,
+        "last_reclaim_s": 4.150458856,
+        "lead_qualified": true,
+        "passed": true
+      },
+      {
+        "batch": "native-514e5cd8c2",
+        "tag": "04-ramp-control",
+        "scenario": "ramp",
+        "status": "COMPLETE",
+        "advance": false,
+        "variant": "occupancy_supply",
+        "H": 20.0,
+        "gap_MiB": 63.4453125,
+        "peak_ms": [
+          25.692927,
+          27.584737,
+          35.36557,
+          109.173029
+        ],
+        "peak_cpu_ms": [
+          25.695524,
+          26.553019,
+          34.861892,
+          106.351079
+        ],
+        "major_faults": 0,
+        "max_events": 177,
+        "reclaim_MiB": 0.0,
+        "last_reclaim_s": null,
+        "lead_qualified": true,
+        "passed": true
+      },
+      {
+        "batch": "native-514e5cd8c2",
+        "tag": "05-V-control",
+        "scenario": "V",
+        "status": "COMPLETE",
+        "advance": false,
+        "variant": "occupancy_supply",
+        "H": 20.0,
+        "gap_MiB": 63.96484375,
+        "peak_ms": [
+          169.677453
+        ],
+        "peak_cpu_ms": [
+          166.553678
+        ],
+        "major_faults": 0,
+        "max_events": 146,
+        "reclaim_MiB": 0.0,
+        "last_reclaim_s": null,
+        "lead_qualified": true,
+        "passed": true
+      },
+      {
+        "batch": "native-514e5cd8c2",
+        "tag": "06-V-ideal",
+        "scenario": "V",
+        "status": "COMPLETE",
+        "advance": true,
+        "variant": "occupancy_supply",
+        "H": 20.0,
+        "gap_MiB": 0.0,
+        "peak_ms": [
+          95.951578
+        ],
+        "peak_cpu_ms": [
+          95.033505
+        ],
+        "major_faults": 0,
+        "max_events": 0,
+        "reclaim_MiB": 77.609375,
+        "last_reclaim_s": 12.723869272,
+        "lead_qualified": true,
+        "passed": true
+      },
+      {
+        "batch": "native-514e5cd8c2",
+        "tag": "07-inverted_V-ideal",
+        "scenario": "inverted_V",
+        "status": "COMPLETE",
+        "advance": true,
+        "variant": "occupancy_supply",
+        "H": 20.0,
+        "gap_MiB": 0.0,
+        "peak_ms": [
+          106.028904
+        ],
+        "peak_cpu_ms": [
+          105.767585
+        ],
+        "major_faults": 0,
+        "max_events": 0,
+        "reclaim_MiB": 141.375,
+        "last_reclaim_s": 8.134437401,
+        "lead_qualified": true,
+        "passed": true
+      },
+      {
+        "batch": "native-514e5cd8c2",
+        "tag": "08-inverted_V-control",
+        "scenario": "inverted_V",
+        "status": "COMPLETE",
+        "advance": false,
+        "variant": "occupancy_supply",
+        "H": 20.0,
+        "gap_MiB": 127.96875,
+        "peak_ms": [
+          111.417601
+        ],
+        "peak_cpu_ms": [
+          107.268841
+        ],
+        "major_faults": 0,
+        "max_events": 178,
+        "reclaim_MiB": 0.0,
+        "last_reclaim_s": null,
+        "lead_qualified": true,
+        "passed": true
+      },
+      {
+        "batch": "native-514e5cd8c2",
+        "tag": "09-oscillating-control",
+        "scenario": "oscillating",
+        "status": "COMPLETE",
+        "advance": false,
+        "variant": "occupancy_supply",
+        "H": 20.0,
+        "gap_MiB": 127.515625,
+        "peak_ms": [
+          48.325075,
+          144.507754,
+          83.413871
+        ],
+        "peak_cpu_ms": [
+          47.24655,
+          140.919698,
+          81.36219
+        ],
+        "major_faults": 0,
+        "max_events": 177,
+        "reclaim_MiB": 0.0,
+        "last_reclaim_s": null,
+        "lead_qualified": true,
+        "passed": true
+      },
+      {
+        "batch": "native-514e5cd8c2",
+        "tag": "10-oscillating-ideal",
+        "scenario": "oscillating",
+        "status": "COMPLETE",
+        "advance": true,
+        "variant": "occupancy_supply",
+        "H": 20.0,
+        "gap_MiB": 0.0,
+        "peak_ms": [
+          52.880413,
+          105.995705,
+          76.681337
+        ],
+        "peak_cpu_ms": [
+          51.526606,
+          102.135888,
+          74.953255
+        ],
+        "major_faults": 0,
+        "max_events": 0,
+        "reclaim_MiB": 141.296875,
+        "last_reclaim_s": 5.943748973,
+        "lead_qualified": true,
+        "passed": true
+      },
+      {
+        "batch": "native-514e5cd8c2",
+        "tag": "11-flat_WSS_growth-ideal",
+        "scenario": "flat_WSS_growth",
+        "status": "COMPLETE",
+        "advance": true,
+        "variant": "occupancy_supply",
+        "H": 20.0,
+        "gap_MiB": 0.0,
+        "peak_ms": [
+          94.909404
+        ],
+        "peak_cpu_ms": [
+          94.567844
+        ],
+        "major_faults": 0,
+        "max_events": 0,
+        "reclaim_MiB": 141.35546875,
+        "last_reclaim_s": 8.116686546,
+        "lead_qualified": true,
+        "passed": true
+      },
+      {
+        "batch": "native-514e5cd8c2",
+        "tag": "12-flat_WSS_growth-control",
+        "scenario": "flat_WSS_growth",
+        "status": "COMPLETE",
+        "advance": false,
+        "variant": "occupancy_supply",
+        "H": 20.0,
+        "gap_MiB": 127.34375,
+        "peak_ms": [
+          102.025156
+        ],
+        "peak_cpu_ms": [
+          98.857274
+        ],
+        "major_faults": 0,
+        "max_events": 177,
+        "reclaim_MiB": 0.0,
+        "last_reclaim_s": null,
+        "lead_qualified": true,
+        "passed": true
+      },
+      {
+        "batch": "native-514e5cd8c2",
+        "tag": "13-aligned_free-control",
+        "scenario": "aligned_free",
+        "status": "COMPLETE",
+        "advance": false,
+        "variant": "occupancy_supply",
+        "H": 20.0,
+        "gap_MiB": 0.0,
+        "peak_ms": [
+          171.118872
+        ],
+        "peak_cpu_ms": [
+          166.83957
+        ],
+        "major_faults": 0,
+        "max_events": 0,
+        "reclaim_MiB": 0.0,
+        "last_reclaim_s": null,
+        "lead_qualified": true,
+        "passed": true
+      },
+      {
+        "batch": "native-514e5cd8c2",
+        "tag": "14-aligned_free-ideal",
+        "scenario": "aligned_free",
+        "status": "COMPLETE",
+        "advance": true,
+        "variant": "occupancy_supply",
+        "H": 20.0,
+        "gap_MiB": 0.0,
+        "peak_ms": [
+          101.770607
+        ],
+        "peak_cpu_ms": [
+          99.692477
+        ],
+        "major_faults": 0,
+        "max_events": 0,
+        "reclaim_MiB": 0.0,
+        "last_reclaim_s": null,
+        "lead_qualified": true,
+        "passed": true
+      },
+      {
+        "batch": "native-514e5cd8c2",
+        "tag": "15-WSS_change_no_allocation-ideal",
+        "scenario": "WSS_change_no_allocation",
+        "status": "COMPLETE",
+        "advance": true,
+        "variant": "occupancy_supply",
+        "H": 20.0,
+        "gap_MiB": 0.0,
+        "peak_ms": [],
+        "peak_cpu_ms": [],
+        "major_faults": 0,
+        "max_events": 0,
+        "reclaim_MiB": 0.0,
+        "last_reclaim_s": null,
+        "lead_qualified": true,
+        "passed": true
+      },
+      {
+        "batch": "native-514e5cd8c2",
+        "tag": "16-WSS_change_no_allocation-control",
+        "scenario": "WSS_change_no_allocation",
+        "status": "COMPLETE",
+        "advance": false,
+        "variant": "occupancy_supply",
+        "H": 20.0,
+        "gap_MiB": 0.0,
+        "peak_ms": [],
+        "peak_cpu_ms": [],
+        "major_faults": 0,
+        "max_events": 0,
+        "reclaim_MiB": 0.0,
+        "last_reclaim_s": null,
+        "lead_qualified": true,
+        "passed": true
+      },
+      {
+        "batch": "native-514e5cd8c2",
+        "tag": "17-no_deficit-control",
+        "scenario": "no_deficit",
+        "status": "COMPLETE",
+        "advance": false,
+        "variant": "occupancy_supply",
+        "H": 20.0,
+        "gap_MiB": 0.0,
+        "peak_ms": [
+          111.541076
+        ],
+        "peak_cpu_ms": [
+          110.809652
+        ],
+        "major_faults": 0,
+        "max_events": 0,
+        "reclaim_MiB": 0.0,
+        "last_reclaim_s": null,
+        "lead_qualified": true,
+        "passed": true
+      },
+      {
+        "batch": "native-514e5cd8c2",
+        "tag": "18-no_deficit-ideal",
+        "scenario": "no_deficit",
+        "status": "COMPLETE",
+        "advance": true,
+        "variant": "occupancy_supply",
+        "H": 20.0,
+        "gap_MiB": 0.0,
+        "peak_ms": [
+          141.466285
+        ],
+        "peak_cpu_ms": [
+          138.848513
+        ],
+        "major_faults": 0,
+        "max_events": 0,
+        "reclaim_MiB": 0.0,
+        "last_reclaim_s": null,
+        "lead_qualified": true,
+        "passed": true
+      },
+      {
+        "batch": "native-514e5cd8c2",
+        "tag": "19-step-ideal",
+        "scenario": "step",
+        "status": "COMPLETE",
+        "advance": true,
+        "variant": "occupancy_supply",
+        "H": 20.0,
+        "gap_MiB": 0.0,
+        "peak_ms": [
+          107.622034
+        ],
+        "peak_cpu_ms": [
+          104.636638
+        ],
+        "major_faults": 0,
+        "max_events": 0,
+        "reclaim_MiB": 141.25,
+        "last_reclaim_s": 8.131007388,
+        "lead_qualified": true,
+        "passed": true
+      },
+      {
+        "batch": "native-514e5cd8c2",
+        "tag": "20-step-control",
+        "scenario": "step",
+        "status": "COMPLETE",
+        "advance": false,
+        "variant": "occupancy_supply",
+        "H": 20.0,
+        "gap_MiB": 127.67578125,
+        "peak_ms": [
+          218.923827
+        ],
+        "peak_cpu_ms": [
+          218.093445
+        ],
+        "major_faults": 0,
+        "max_events": 177,
+        "reclaim_MiB": 0.0,
+        "last_reclaim_s": null,
+        "lead_qualified": true,
+        "passed": true
+      },
+      {
+        "batch": "native-514e5cd8c2",
+        "tag": "21-step-control",
+        "scenario": "step",
+        "status": "COMPLETE",
+        "advance": false,
+        "variant": "occupancy_supply",
+        "H": 20.0,
+        "gap_MiB": 127.19921875,
+        "peak_ms": [
+          137.592866
+        ],
+        "peak_cpu_ms": [
+          135.02563
+        ],
+        "major_faults": 0,
+        "max_events": 177,
+        "reclaim_MiB": 0.0,
+        "last_reclaim_s": null,
+        "lead_qualified": true,
+        "passed": true
+      },
+      {
+        "batch": "native-514e5cd8c2",
+        "tag": "22-step-ideal",
+        "scenario": "step",
+        "status": "COMPLETE",
+        "advance": true,
+        "variant": "occupancy_supply",
+        "H": 20.0,
+        "gap_MiB": 0.0,
+        "peak_ms": [
+          97.423198
+        ],
+        "peak_cpu_ms": [
+          95.225751
+        ],
+        "major_faults": 0,
+        "max_events": 0,
+        "reclaim_MiB": 141.54296875,
+        "last_reclaim_s": 8.132803166,
+        "lead_qualified": true,
+        "passed": true
+      },
+      {
+        "batch": "native-514e5cd8c2",
+        "tag": "23-step-H12",
+        "scenario": "step",
+        "status": "COMPLETE",
+        "advance": true,
+        "variant": "occupancy_supply",
+        "H": 12.0,
+        "gap_MiB": 0.0,
+        "peak_ms": [
+          124.156617
+        ],
+        "peak_cpu_ms": [
+          117.43591
+        ],
+        "major_faults": 0,
+        "max_events": 0,
+        "reclaim_MiB": 141.0703125,
+        "last_reclaim_s": 8.88470425,
+        "lead_qualified": false,
+        "passed": true
+      },
+      {
+        "batch": "native-514e5cd8c2",
+        "tag": "24-step-H30",
+        "scenario": "step",
+        "status": "COMPLETE",
+        "advance": true,
+        "variant": "occupancy_supply",
+        "H": 30.0,
+        "gap_MiB": 0.0,
+        "peak_ms": [
+          120.728599
+        ],
+        "peak_cpu_ms": [
+          117.894628
+        ],
+        "major_faults": 0,
+        "max_events": 0,
+        "reclaim_MiB": 141.41015625,
+        "last_reclaim_s": 8.165851334,
+        "lead_qualified": true,
+        "passed": true
+      },
+      {
+        "batch": "native-514e5cd8c2",
+        "tag": "25-cold-revisit-guard",
+        "scenario": "cold_revisit",
+        "status": "CORRECTLY_INFEASIBLE",
+        "advance": true,
+        "passed": true
+      }
+    ],
+    "limitations": [
+      "synthetic whole-app clean-file donation; not anonymous compression",
+      "no real predictor training or history-length optimality established",
+      "fixed high supplied by independent full-session reference envelope",
+      "latency varies, including no-reclaim controls; do not attribute all paired differences to reclamation",
+      "per-window forecasts have 0.5-second resolution; subwindow unobserved peaks are outside the verified scope"
+    ]
   },
-  "protocol_tests": {
-    "count": 34,
-    "passed": true
-  },
-  "source_check_passed": true,
-  "frozen_python_sources": 34,
-  "original_result_files_preserved": 54,
-  "single_execution_contract": true,
-  "historical_candidate_hashes_passed": true,
-  "demand_reference_unclipped": true,
-  "document_links_passed": true,
-  "overall_experiment_goal_achieved": false
+  "historical_validation_20261117": {
+    "date": "2026-11-17",
+    "native_run_during_packaging": false,
+    "controller_tests": {
+      "count": 67,
+      "passed": true
+    },
+    "protocol_tests": {
+      "count": 34,
+      "passed": true
+    },
+    "source_check_passed": true,
+    "frozen_python_sources": 34,
+    "original_result_files_preserved": 54,
+    "single_execution_contract": true,
+    "historical_candidate_hashes_passed": true,
+    "demand_reference_unclipped": true,
+    "document_links_passed": true,
+    "overall_experiment_goal_achieved": false
+  }
 }

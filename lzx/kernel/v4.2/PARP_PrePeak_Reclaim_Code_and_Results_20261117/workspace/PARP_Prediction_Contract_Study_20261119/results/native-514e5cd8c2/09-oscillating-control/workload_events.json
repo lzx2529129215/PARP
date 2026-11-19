@@ -1,0 +1,182 @@
+[
+  {
+    "scheduled_s": 16.0,
+    "actual_s": 16.052026972,
+    "action": "hot",
+    "app": "incoming",
+    "bytes": 134217728,
+    "preallocation_gap_bytes": 0,
+    "free_before_bytes": 134733824,
+    "response": {
+      "event": "complete",
+      "action": "hot",
+      "bytes": 134217728,
+      "elapsed_ms": 48.325075,
+      "cpu_elapsed_ms": 47.24655,
+      "rss": 163647488,
+      "minor": 38446,
+      "major": 0,
+      "process_cpu_ms": 240.0,
+      "minor_delta": 32769,
+      "major_delta": 0,
+      "feedback_delta": {
+        "cold": {
+          "refaults": 0,
+          "psi_s": 0.0
+        },
+        "hot": {
+          "refaults": 0,
+          "psi_s": 0.0
+        },
+        "incoming": {
+          "refaults": 0,
+          "psi_s": 0.0
+        }
+      }
+    }
+  },
+  {
+    "scheduled_s": 19.0,
+    "actual_s": 19.044425648,
+    "action": "release_hot",
+    "app": "incoming",
+    "bytes": 134217728,
+    "preallocation_gap_bytes": 0,
+    "free_before_bytes": 249856,
+    "response": {
+      "event": "complete",
+      "action": "release_hot",
+      "bytes": 134217728,
+      "elapsed_ms": 3.918725,
+      "cpu_elapsed_ms": 3.936856,
+      "rss": 29470720,
+      "minor": 38447,
+      "major": 0,
+      "process_cpu_ms": 470.0,
+      "minor_delta": 1,
+      "major_delta": 0,
+      "feedback_delta": {
+        "cold": {
+          "refaults": 0,
+          "psi_s": 0.0
+        },
+        "hot": {
+          "refaults": 0,
+          "psi_s": 0.0
+        },
+        "incoming": {
+          "refaults": 0,
+          "psi_s": 0.0
+        }
+      }
+    }
+  },
+  {
+    "scheduled_s": 25.0,
+    "actual_s": 25.0442621,
+    "action": "hot",
+    "app": "incoming",
+    "bytes": 268435456,
+    "preallocation_gap_bytes": 133709824,
+    "free_before_bytes": 134725632,
+    "response": {
+      "event": "complete",
+      "action": "hot",
+      "bytes": 268435456,
+      "elapsed_ms": 144.507754,
+      "cpu_elapsed_ms": 140.919698,
+      "rss": 297775104,
+      "minor": 103983,
+      "major": 0,
+      "process_cpu_ms": 670.0,
+      "minor_delta": 65536,
+      "major_delta": 0,
+      "feedback_delta": {
+        "cold": {
+          "refaults": 0,
+          "psi_s": 0.0
+        },
+        "hot": {
+          "refaults": 0,
+          "psi_s": 0.0
+        },
+        "incoming": {
+          "refaults": 0,
+          "psi_s": 0.00174
+        }
+      }
+    }
+  },
+  {
+    "scheduled_s": 28.0,
+    "actual_s": 28.029838962,
+    "action": "release_hot",
+    "app": "incoming",
+    "bytes": 268435456,
+    "preallocation_gap_bytes": 0,
+    "free_before_bytes": 122880,
+    "response": {
+      "event": "complete",
+      "action": "release_hot",
+      "bytes": 268435456,
+      "elapsed_ms": 12.11198,
+      "cpu_elapsed_ms": 12.040137,
+      "rss": 29380608,
+      "minor": 103983,
+      "major": 0,
+      "process_cpu_ms": 1010.0,
+      "minor_delta": 0,
+      "major_delta": 0,
+      "feedback_delta": {
+        "cold": {
+          "refaults": 0,
+          "psi_s": 0.0
+        },
+        "hot": {
+          "refaults": 0,
+          "psi_s": 0.0
+        },
+        "incoming": {
+          "refaults": 0,
+          "psi_s": 0.0
+        }
+      }
+    }
+  },
+  {
+    "scheduled_s": 34.0,
+    "actual_s": 34.028208177,
+    "action": "hot",
+    "app": "incoming",
+    "bytes": 201326592,
+    "preallocation_gap_bytes": 0,
+    "free_before_bytes": 268943360,
+    "response": {
+      "event": "complete",
+      "action": "hot",
+      "bytes": 201326592,
+      "elapsed_ms": 83.413871,
+      "cpu_elapsed_ms": 81.36219,
+      "rss": 230707200,
+      "minor": 153135,
+      "major": 0,
+      "process_cpu_ms": 1160.0,
+      "minor_delta": 49152,
+      "major_delta": 0,
+      "feedback_delta": {
+        "cold": {
+          "refaults": 0,
+          "psi_s": 0.0
+        },
+        "hot": {
+          "refaults": 0,
+          "psi_s": 0.0
+        },
+        "incoming": {
+          "refaults": 0,
+          "psi_s": 0.0
+        }
+      }
+    }
+  }
+]

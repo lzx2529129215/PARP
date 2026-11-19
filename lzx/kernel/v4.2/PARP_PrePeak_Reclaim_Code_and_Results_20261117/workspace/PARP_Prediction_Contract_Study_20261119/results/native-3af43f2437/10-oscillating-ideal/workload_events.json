@@ -1,0 +1,182 @@
+[
+  {
+    "scheduled_s": 16.0,
+    "actual_s": 16.039851717,
+    "action": "hot",
+    "app": "incoming",
+    "bytes": 134217728,
+    "preallocation_gap_bytes": 0,
+    "free_before_bytes": 285876224,
+    "response": {
+      "event": "complete",
+      "action": "hot",
+      "bytes": 134217728,
+      "elapsed_ms": 58.331419,
+      "cpu_elapsed_ms": 56.63313,
+      "rss": 163491840,
+      "minor": 38442,
+      "major": 0,
+      "process_cpu_ms": 260.0,
+      "minor_delta": 32770,
+      "major_delta": 0,
+      "feedback_delta": {
+        "cold": {
+          "refaults": 0,
+          "psi_s": 0.0
+        },
+        "hot": {
+          "refaults": 0,
+          "psi_s": 0.0
+        },
+        "incoming": {
+          "refaults": 0,
+          "psi_s": 0.0
+        }
+      }
+    }
+  },
+  {
+    "scheduled_s": 19.0,
+    "actual_s": 19.033736584,
+    "action": "release_hot",
+    "app": "incoming",
+    "bytes": 134217728,
+    "preallocation_gap_bytes": 0,
+    "free_before_bytes": 151396352,
+    "response": {
+      "event": "complete",
+      "action": "release_hot",
+      "bytes": 134217728,
+      "elapsed_ms": 3.675383,
+      "cpu_elapsed_ms": 3.6703,
+      "rss": 29327360,
+      "minor": 38443,
+      "major": 0,
+      "process_cpu_ms": 470.0,
+      "minor_delta": 1,
+      "major_delta": 0,
+      "feedback_delta": {
+        "cold": {
+          "refaults": 0,
+          "psi_s": 0.0
+        },
+        "hot": {
+          "refaults": 0,
+          "psi_s": 0.0
+        },
+        "incoming": {
+          "refaults": 0,
+          "psi_s": 0.0
+        }
+      }
+    }
+  },
+  {
+    "scheduled_s": 25.0,
+    "actual_s": 25.036941923,
+    "action": "hot",
+    "app": "incoming",
+    "bytes": 268435456,
+    "preallocation_gap_bytes": 0,
+    "free_before_bytes": 285868032,
+    "response": {
+      "event": "complete",
+      "action": "hot",
+      "bytes": 268435456,
+      "elapsed_ms": 103.807504,
+      "cpu_elapsed_ms": 102.216048,
+      "rss": 297631744,
+      "minor": 103979,
+      "major": 0,
+      "process_cpu_ms": 630.0,
+      "minor_delta": 65536,
+      "major_delta": 0,
+      "feedback_delta": {
+        "cold": {
+          "refaults": 0,
+          "psi_s": 0.0
+        },
+        "hot": {
+          "refaults": 0,
+          "psi_s": 0.0
+        },
+        "incoming": {
+          "refaults": 0,
+          "psi_s": 0.0
+        }
+      }
+    }
+  },
+  {
+    "scheduled_s": 28.0,
+    "actual_s": 28.011611899,
+    "action": "release_hot",
+    "app": "incoming",
+    "bytes": 268435456,
+    "preallocation_gap_bytes": 0,
+    "free_before_bytes": 17027072,
+    "response": {
+      "event": "complete",
+      "action": "release_hot",
+      "bytes": 268435456,
+      "elapsed_ms": 6.778544,
+      "cpu_elapsed_ms": 6.780185,
+      "rss": 29282304,
+      "minor": 103979,
+      "major": 0,
+      "process_cpu_ms": 1010.0,
+      "minor_delta": 0,
+      "major_delta": 0,
+      "feedback_delta": {
+        "cold": {
+          "refaults": 0,
+          "psi_s": 0.0
+        },
+        "hot": {
+          "refaults": 0,
+          "psi_s": 0.0
+        },
+        "incoming": {
+          "refaults": 0,
+          "psi_s": 0.0
+        }
+      }
+    }
+  },
+  {
+    "scheduled_s": 34.0,
+    "actual_s": 34.016720462,
+    "action": "hot",
+    "app": "incoming",
+    "bytes": 201326592,
+    "preallocation_gap_bytes": 0,
+    "free_before_bytes": 285995008,
+    "response": {
+      "event": "complete",
+      "action": "hot",
+      "bytes": 201326592,
+      "elapsed_ms": 78.198534,
+      "cpu_elapsed_ms": 76.444652,
+      "rss": 230477824,
+      "minor": 153131,
+      "major": 0,
+      "process_cpu_ms": 1150.0,
+      "minor_delta": 49152,
+      "major_delta": 0,
+      "feedback_delta": {
+        "cold": {
+          "refaults": 0,
+          "psi_s": 0.0
+        },
+        "hot": {
+          "refaults": 0,
+          "psi_s": 0.0
+        },
+        "incoming": {
+          "refaults": 0,
+          "psi_s": 0.0
+        }
+      }
+    }
+  }
+]

@@ -1,0 +1,26 @@
+{
+  "scored": false,
+  "purpose": "prime the full allocation path before both arms",
+  "allocation": {
+    "event": "complete",
+    "action": "hot",
+    "bytes": 268435456,
+    "elapsed_ms": 228.894558,
+    "cpu_elapsed_ms": 228.561624,
+    "rss": 297697280,
+    "minor": 71211,
+    "major": 0,
+    "process_cpu_ms": 260.0
+  },
+  "self_release": {
+    "event": "complete",
+    "action": "release_hot",
+    "bytes": 268435456,
+    "elapsed_ms": 7.313076,
+    "cpu_elapsed_ms": 7.269573,
+    "rss": 29310976,
+    "minor": 71212,
+    "major": 0,
+    "process_cpu_ms": 260.0
+  }
+}

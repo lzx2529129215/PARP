@@ -1,0 +1,34 @@
+{
+  "version": "rolling-intra-app-v1-faults-retained",
+  "status": "selected among tested ideal-output candidates; not a trained predictor",
+  "time_base": "same monotonic clock used by observer and controller",
+  "default_horizon_s": 20.0,
+  "step_s": 0.5,
+  "update_s": 0.5,
+  "header": {
+    "app": "bound application identity",
+    "issued_s": "actual output issue time t",
+    "expires_s": "t + 1 second freshness limit; not prediction horizon",
+    "horizon_s": "H, configurable and identical for oracle and learned provider",
+    "step_s": "0.5 seconds"
+  },
+  "windows": {
+    "count": "exactly H/step_s; 40 when H=20",
+    "start_s": "t + i*step_s",
+    "end_s": "t + (i+1)*step_s",
+    "wss_bytes": "nonnegative per-window working-set estimate in bytes; use one documented observation method",
+    "occupancy_delta_bytes": "signed application occupancy change at window end versus issue, excluding future reclaim by this service; negative means predicted self-release",
+    "pgfault": "nonnegative number of faults in this window (start_s,end_s]; never cumulative since issue"
+  },
+  "cold_supply": {
+    "reclaimable_bytes": "CURRENT additional resident cold supply safe through safe_until_s, not a reset of the session attempt budget",
+    "safe_until_s": "absolute validity bound; positive supply in tested candidate is unused through the current horizon; reuse within horizon returns zero supply"
+  },
+  "not_learned_outputs": [
+    "required reclaim amount and begin/finish times are computed by the controller",
+    "current free space, high/max/low/min, used budget and reclaim calibration are direct observations/configuration",
+    "fixed session high uses a separately declared reference/calibration envelope, identical across arms; the experiments do not show this envelope can be inferred from a 20-second rolling forecast"
+  ],
+  "input_selection": "not established by an oracle; preserve raw history for later 2/4/8/16-second ablations",
+  "scope": "whole-app hot/cold synthetic clean-file donation; no trained heat classifier, page-targeted reclaim, anonymous compression or GUI latency claim"
+}

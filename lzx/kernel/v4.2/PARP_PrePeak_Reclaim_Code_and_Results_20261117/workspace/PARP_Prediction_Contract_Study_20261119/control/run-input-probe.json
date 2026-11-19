@@ -1,0 +1,1 @@
+{"purpose":"Read only kernel/config availability for missing collector fields and preserve exact executed sources; do not allocate experiment memory."}

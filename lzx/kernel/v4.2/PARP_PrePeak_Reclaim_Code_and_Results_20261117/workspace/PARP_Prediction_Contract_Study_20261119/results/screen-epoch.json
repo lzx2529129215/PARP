@@ -1,0 +1,5732 @@
+[
+  {
+    "scenario": "step",
+    "variant": "wss_only",
+    "horizon_s": 12.0,
+    "rate_MiB_s": 16,
+    "timing": "epoch",
+    "simulation_only": true,
+    "errors": [],
+    "max_preallocation_gap_MiB": 0.0,
+    "requested_MiB": 144.0,
+    "cold_refault_MiB": 0.0,
+    "unnecessary_reclaim": false,
+    "checks": [
+      {
+        "time_s": 20.0,
+        "deficit_bytes": 0
+      }
+    ],
+    "calls": [
+      {
+        "time_s": 9.4,
+        "bytes": 8388608
+      },
+      {
+        "time_s": 9.5,
+        "bytes": 16777216
+      },
+      {
+        "time_s": 9.6,
+        "bytes": 33554432
+      },
+      {
+        "time_s": 9.7,
+        "bytes": 33554432
+      },
+      {
+        "time_s": 9.8,
+        "bytes": 33554432
+      },
+      {
+        "time_s": 9.9,
+        "bytes": 25165824
+      }
+    ],
+    "passed": true,
+    "expected_infeasible": false,
+    "correctly_blocked": false,
+    "first_need_timing": {
+      "key": "17:0",
+      "start_s": 9.4,
+      "finish_by_s": 19.5,
+      "protected_until_s": 20.0,
+      "estimated_total_s": 9.6,
+      "remaining_bytes": 150994944,
+      "unallocated_bytes": 0,
+      "feasible": true,
+      "reason": "scheduled_before_growth"
+    },
+    "conservative_lead_qualified": true
+  },
+  {
+    "scenario": "step",
+    "variant": "wss_only",
+    "horizon_s": 20.0,
+    "rate_MiB_s": 16,
+    "timing": "epoch",
+    "simulation_only": true,
+    "errors": [],
+    "max_preallocation_gap_MiB": 0.0,
+    "requested_MiB": 144.0,
+    "cold_refault_MiB": 0.0,
+    "unnecessary_reclaim": false,
+    "checks": [
+      {
+        "time_s": 20.0,
+        "deficit_bytes": 0
+      }
+    ],
+    "calls": [
+      {
+        "time_s": 9.4,
+        "bytes": 8388608
+      },
+      {
+        "time_s": 9.5,
+        "bytes": 16777216
+      },
+      {
+        "time_s": 9.6,
+        "bytes": 33554432
+      },
+      {
+        "time_s": 9.7,
+        "bytes": 33554432
+      },
+      {
+        "time_s": 9.8,
+        "bytes": 33554432
+      },
+      {
+        "time_s": 9.9,
+        "bytes": 25165824
+      }
+    ],
+    "passed": true,
+    "expected_infeasible": false,
+    "correctly_blocked": false,
+    "first_need_timing": {
+      "key": "1:0",
+      "start_s": 9.4,
+      "finish_by_s": 19.5,
+      "protected_until_s": 20.0,
+      "estimated_total_s": 9.6,
+      "remaining_bytes": 150994944,
+      "unallocated_bytes": 0,
+      "feasible": true,
+      "reason": "scheduled_before_growth"
+    },
+    "conservative_lead_qualified": true
+  },
+  {
+    "scenario": "step",
+    "variant": "wss_only",
+    "horizon_s": 30.0,
+    "rate_MiB_s": 16,
+    "timing": "epoch",
+    "simulation_only": true,
+    "errors": [],
+    "max_preallocation_gap_MiB": 0.0,
+    "requested_MiB": 144.0,
+    "cold_refault_MiB": 0.0,
+    "unnecessary_reclaim": false,
+    "checks": [
+      {
+        "time_s": 20.0,
+        "deficit_bytes": 0
+      }
+    ],
+    "calls": [
+      {
+        "time_s": 9.4,
+        "bytes": 8388608
+      },
+      {
+        "time_s": 9.5,
+        "bytes": 16777216
+      },
+      {
+        "time_s": 9.6,
+        "bytes": 33554432
+      },
+      {
+        "time_s": 9.7,
+        "bytes": 33554432
+      },
+      {
+        "time_s": 9.8,
+        "bytes": 33554432
+      },
+      {
+        "time_s": 9.9,
+        "bytes": 25165824
+      }
+    ],
+    "passed": true,
+    "expected_infeasible": false,
+    "correctly_blocked": false,
+    "first_need_timing": {
+      "key": "1:0",
+      "start_s": 9.4,
+      "finish_by_s": 19.5,
+      "protected_until_s": 30.0,
+      "estimated_total_s": 9.6,
+      "remaining_bytes": 150994944,
+      "unallocated_bytes": 0,
+      "feasible": true,
+      "reason": "scheduled_before_growth"
+    },
+    "conservative_lead_qualified": true
+  },
+  {
+    "scenario": "step",
+    "variant": "occupancy",
+    "horizon_s": 12.0,
+    "rate_MiB_s": 16,
+    "timing": "epoch",
+    "simulation_only": true,
+    "errors": [],
+    "max_preallocation_gap_MiB": 0.0,
+    "requested_MiB": 144.0,
+    "cold_refault_MiB": 0.0,
+    "unnecessary_reclaim": false,
+    "checks": [
+      {
+        "time_s": 20.0,
+        "deficit_bytes": 0
+      }
+    ],
+    "calls": [
+      {
+        "time_s": 9.4,
+        "bytes": 8388608
+      },
+      {
+        "time_s": 9.5,
+        "bytes": 16777216
+      },
+      {
+        "time_s": 9.6,
+        "bytes": 33554432
+      },
+      {
+        "time_s": 9.7,
+        "bytes": 33554432
+      },
+      {
+        "time_s": 9.8,
+        "bytes": 33554432
+      },
+      {
+        "time_s": 9.9,
+        "bytes": 25165824
+      }
+    ],
+    "passed": true,
+    "expected_infeasible": false,
+    "correctly_blocked": false,
+    "first_need_timing": {
+      "key": "17:0",
+      "start_s": 9.4,
+      "finish_by_s": 19.5,
+      "protected_until_s": 20.0,
+      "estimated_total_s": 9.6,
+      "remaining_bytes": 150994944,
+      "unallocated_bytes": 0,
+      "feasible": true,
+      "reason": "scheduled_before_growth"
+    },
+    "conservative_lead_qualified": true
+  },
+  {
+    "scenario": "step",
+    "variant": "occupancy",
+    "horizon_s": 20.0,
+    "rate_MiB_s": 16,
+    "timing": "epoch",
+    "simulation_only": true,
+    "errors": [],
+    "max_preallocation_gap_MiB": 0.0,
+    "requested_MiB": 144.0,
+    "cold_refault_MiB": 0.0,
+    "unnecessary_reclaim": false,
+    "checks": [
+      {
+        "time_s": 20.0,
+        "deficit_bytes": 0
+      }
+    ],
+    "calls": [
+      {
+        "time_s": 9.4,
+        "bytes": 8388608
+      },
+      {
+        "time_s": 9.5,
+        "bytes": 16777216
+      },
+      {
+        "time_s": 9.6,
+        "bytes": 33554432
+      },
+      {
+        "time_s": 9.7,
+        "bytes": 33554432
+      },
+      {
+        "time_s": 9.8,
+        "bytes": 33554432
+      },
+      {
+        "time_s": 9.9,
+        "bytes": 25165824
+      }
+    ],
+    "passed": true,
+    "expected_infeasible": false,
+    "correctly_blocked": false,
+    "first_need_timing": {
+      "key": "1:0",
+      "start_s": 9.4,
+      "finish_by_s": 19.5,
+      "protected_until_s": 20.0,
+      "estimated_total_s": 9.6,
+      "remaining_bytes": 150994944,
+      "unallocated_bytes": 0,
+      "feasible": true,
+      "reason": "scheduled_before_growth"
+    },
+    "conservative_lead_qualified": true
+  },
+  {
+    "scenario": "step",
+    "variant": "occupancy",
+    "horizon_s": 30.0,
+    "rate_MiB_s": 16,
+    "timing": "epoch",
+    "simulation_only": true,
+    "errors": [],
+    "max_preallocation_gap_MiB": 0.0,
+    "requested_MiB": 144.0,
+    "cold_refault_MiB": 0.0,
+    "unnecessary_reclaim": false,
+    "checks": [
+      {
+        "time_s": 20.0,
+        "deficit_bytes": 0
+      }
+    ],
+    "calls": [
+      {
+        "time_s": 9.4,
+        "bytes": 8388608
+      },
+      {
+        "time_s": 9.5,
+        "bytes": 16777216
+      },
+      {
+        "time_s": 9.6,
+        "bytes": 33554432
+      },
+      {
+        "time_s": 9.7,
+        "bytes": 33554432
+      },
+      {
+        "time_s": 9.8,
+        "bytes": 33554432
+      },
+      {
+        "time_s": 9.9,
+        "bytes": 25165824
+      }
+    ],
+    "passed": true,
+    "expected_infeasible": false,
+    "correctly_blocked": false,
+    "first_need_timing": {
+      "key": "1:0",
+      "start_s": 9.4,
+      "finish_by_s": 19.5,
+      "protected_until_s": 30.0,
+      "estimated_total_s": 9.6,
+      "remaining_bytes": 150994944,
+      "unallocated_bytes": 0,
+      "feasible": true,
+      "reason": "scheduled_before_growth"
+    },
+    "conservative_lead_qualified": true
+  },
+  {
+    "scenario": "step",
+    "variant": "occupancy_supply",
+    "horizon_s": 12.0,
+    "rate_MiB_s": 16,
+    "timing": "epoch",
+    "simulation_only": true,
+    "errors": [],
+    "max_preallocation_gap_MiB": 0.0,
+    "requested_MiB": 144.0,
+    "cold_refault_MiB": 0.0,
+    "unnecessary_reclaim": false,
+    "checks": [
+      {
+        "time_s": 20.0,
+        "deficit_bytes": 0
+      }
+    ],
+    "calls": [
+      {
+        "time_s": 9.4,
+        "bytes": 8388608
+      },
+      {
+        "time_s": 9.5,
+        "bytes": 16777216
+      },
+      {
+        "time_s": 9.6,
+        "bytes": 33554432
+      },
+      {
+        "time_s": 9.7,
+        "bytes": 33554432
+      },
+      {
+        "time_s": 9.8,
+        "bytes": 33554432
+      },
+      {
+        "time_s": 9.9,
+        "bytes": 25165824
+      }
+    ],
+    "passed": true,
+    "expected_infeasible": false,
+    "correctly_blocked": false,
+    "first_need_timing": {
+      "key": "17:0",
+      "start_s": 9.4,
+      "finish_by_s": 19.5,
+      "protected_until_s": 20.0,
+      "estimated_total_s": 9.6,
+      "remaining_bytes": 150994944,
+      "unallocated_bytes": 0,
+      "feasible": true,
+      "reason": "scheduled_before_growth"
+    },
+    "conservative_lead_qualified": true
+  },
+  {
+    "scenario": "step",
+    "variant": "occupancy_supply",
+    "horizon_s": 20.0,
+    "rate_MiB_s": 16,
+    "timing": "epoch",
+    "simulation_only": true,
+    "errors": [],
+    "max_preallocation_gap_MiB": 0.0,
+    "requested_MiB": 144.0,
+    "cold_refault_MiB": 0.0,
+    "unnecessary_reclaim": false,
+    "checks": [
+      {
+        "time_s": 20.0,
+        "deficit_bytes": 0
+      }
+    ],
+    "calls": [
+      {
+        "time_s": 9.4,
+        "bytes": 8388608
+      },
+      {
+        "time_s": 9.5,
+        "bytes": 16777216
+      },
+      {
+        "time_s": 9.6,
+        "bytes": 33554432
+      },
+      {
+        "time_s": 9.7,
+        "bytes": 33554432
+      },
+      {
+        "time_s": 9.8,
+        "bytes": 33554432
+      },
+      {
+        "time_s": 9.9,
+        "bytes": 25165824
+      }
+    ],
+    "passed": true,
+    "expected_infeasible": false,
+    "correctly_blocked": false,
+    "first_need_timing": {
+      "key": "1:0",
+      "start_s": 9.4,
+      "finish_by_s": 19.5,
+      "protected_until_s": 20.0,
+      "estimated_total_s": 9.6,
+      "remaining_bytes": 150994944,
+      "unallocated_bytes": 0,
+      "feasible": true,
+      "reason": "scheduled_before_growth"
+    },
+    "conservative_lead_qualified": true
+  },
+  {
+    "scenario": "step",
+    "variant": "occupancy_supply",
+    "horizon_s": 30.0,
+    "rate_MiB_s": 16,
+    "timing": "epoch",
+    "simulation_only": true,
+    "errors": [],
+    "max_preallocation_gap_MiB": 0.0,
+    "requested_MiB": 144.0,
+    "cold_refault_MiB": 0.0,
+    "unnecessary_reclaim": false,
+    "checks": [
+      {
+        "time_s": 20.0,
+        "deficit_bytes": 0
+      }
+    ],
+    "calls": [
+      {
+        "time_s": 9.4,
+        "bytes": 8388608
+      },
+      {
+        "time_s": 9.5,
+        "bytes": 16777216
+      },
+      {
+        "time_s": 9.6,
+        "bytes": 33554432
+      },
+      {
+        "time_s": 9.7,
+        "bytes": 33554432
+      },
+      {
+        "time_s": 9.8,
+        "bytes": 33554432
+      },
+      {
+        "time_s": 9.9,
+        "bytes": 25165824
+      }
+    ],
+    "passed": true,
+    "expected_infeasible": false,
+    "correctly_blocked": false,
+    "first_need_timing": {
+      "key": "1:0",
+      "start_s": 9.4,
+      "finish_by_s": 19.5,
+      "protected_until_s": 30.0,
+      "estimated_total_s": 9.6,
+      "remaining_bytes": 150994944,
+      "unallocated_bytes": 0,
+      "feasible": true,
+      "reason": "scheduled_before_growth"
+    },
+    "conservative_lead_qualified": true
+  },
+  {
+    "scenario": "step",
+    "variant": "occupancy_supply_faults",
+    "horizon_s": 12.0,
+    "rate_MiB_s": 16,
+    "timing": "epoch",
+    "simulation_only": true,
+    "errors": [],
+    "max_preallocation_gap_MiB": 0.0,
+    "requested_MiB": 144.0,
+    "cold_refault_MiB": 0.0,
+    "unnecessary_reclaim": false,
+    "checks": [
+      {
+        "time_s": 20.0,
+        "deficit_bytes": 0
+      }
+    ],
+    "calls": [
+      {
+        "time_s": 9.4,
+        "bytes": 8388608
+      },
+      {
+        "time_s": 9.5,
+        "bytes": 16777216
+      },
+      {
+        "time_s": 9.6,
+        "bytes": 33554432
+      },
+      {
+        "time_s": 9.7,
+        "bytes": 33554432
+      },
+      {
+        "time_s": 9.8,
+        "bytes": 33554432
+      },
+      {
+        "time_s": 9.9,
+        "bytes": 25165824
+      }
+    ],
+    "passed": true,
+    "expected_infeasible": false,
+    "correctly_blocked": false,
+    "first_need_timing": {
+      "key": "17:0",
+      "start_s": 9.4,
+      "finish_by_s": 19.5,
+      "protected_until_s": 20.0,
+      "estimated_total_s": 9.6,
+      "remaining_bytes": 150994944,
+      "unallocated_bytes": 0,
+      "feasible": true,
+      "reason": "scheduled_before_growth"
+    },
+    "conservative_lead_qualified": true
+  },
+  {
+    "scenario": "step",
+    "variant": "occupancy_supply_faults",
+    "horizon_s": 20.0,
+    "rate_MiB_s": 16,
+    "timing": "epoch",
+    "simulation_only": true,
+    "errors": [],
+    "max_preallocation_gap_MiB": 0.0,
+    "requested_MiB": 144.0,
+    "cold_refault_MiB": 0.0,
+    "unnecessary_reclaim": false,
+    "checks": [
+      {
+        "time_s": 20.0,
+        "deficit_bytes": 0
+      }
+    ],
+    "calls": [
+      {
+        "time_s": 9.4,
+        "bytes": 8388608
+      },
+      {
+        "time_s": 9.5,
+        "bytes": 16777216
+      },
+      {
+        "time_s": 9.6,
+        "bytes": 33554432
+      },
+      {
+        "time_s": 9.7,
+        "bytes": 33554432
+      },
+      {
+        "time_s": 9.8,
+        "bytes": 33554432
+      },
+      {
+        "time_s": 9.9,
+        "bytes": 25165824
+      }
+    ],
+    "passed": true,
+    "expected_infeasible": false,
+    "correctly_blocked": false,
+    "first_need_timing": {
+      "key": "1:0",
+      "start_s": 9.4,
+      "finish_by_s": 19.5,
+      "protected_until_s": 20.0,
+      "estimated_total_s": 9.6,
+      "remaining_bytes": 150994944,
+      "unallocated_bytes": 0,
+      "feasible": true,
+      "reason": "scheduled_before_growth"
+    },
+    "conservative_lead_qualified": true
+  },
+  {
+    "scenario": "step",
+    "variant": "occupancy_supply_faults",
+    "horizon_s": 30.0,
+    "rate_MiB_s": 16,
+    "timing": "epoch",
+    "simulation_only": true,
+    "errors": [],
+    "max_preallocation_gap_MiB": 0.0,
+    "requested_MiB": 144.0,
+    "cold_refault_MiB": 0.0,
+    "unnecessary_reclaim": false,
+    "checks": [
+      {
+        "time_s": 20.0,
+        "deficit_bytes": 0
+      }
+    ],
+    "calls": [
+      {
+        "time_s": 9.4,
+        "bytes": 8388608
+      },
+      {
+        "time_s": 9.5,
+        "bytes": 16777216
+      },
+      {
+        "time_s": 9.6,
+        "bytes": 33554432
+      },
+      {
+        "time_s": 9.7,
+        "bytes": 33554432
+      },
+      {
+        "time_s": 9.8,
+        "bytes": 33554432
+      },
+      {
+        "time_s": 9.9,
+        "bytes": 25165824
+      }
+    ],
+    "passed": true,
+    "expected_infeasible": false,
+    "correctly_blocked": false,
+    "first_need_timing": {
+      "key": "1:0",
+      "start_s": 9.4,
+      "finish_by_s": 19.5,
+      "protected_until_s": 30.0,
+      "estimated_total_s": 9.6,
+      "remaining_bytes": 150994944,
+      "unallocated_bytes": 0,
+      "feasible": true,
+      "reason": "scheduled_before_growth"
+    },
+    "conservative_lead_qualified": true
+  },
+  {
+    "scenario": "ramp",
+    "variant": "wss_only",
+    "horizon_s": 12.0,
+    "rate_MiB_s": 16,
+    "timing": "epoch",
+    "simulation_only": true,
+    "errors": [],
+    "max_preallocation_gap_MiB": 0.0,
+    "requested_MiB": 144.0,
+    "cold_refault_MiB": 0.0,
+    "unnecessary_reclaim": false,
+    "checks": [
+      {
+        "time_s": 16.0,
+        "deficit_bytes": 0
+      },
+      {
+        "time_s": 17.0,
+        "deficit_bytes": 0
+      },
+      {
+        "time_s": 18.0,
+        "deficit_bytes": 0
+      },
+      {
+        "time_s": 19.0,
+        "deficit_bytes": 0
+      }
+    ],
+    "calls": [
+      {
+        "time_s": 7.0,
+        "bytes": 8388608
+      },
+      {
+        "time_s": 7.1,
+        "bytes": 16777216
+      },
+      {
+        "time_s": 7.2,
+        "bytes": 33554432
+      },
+      {
+        "time_s": 7.3,
+        "bytes": 33554432
+      },
+      {
+        "time_s": 7.4,
+        "bytes": 33554432
+      },
+      {
+        "time_s": 7.5,
+        "bytes": 25165824
+      }
+    ],
+    "passed": true,
+    "expected_infeasible": false,
+    "correctly_blocked": false,
+    "first_need_timing": {
+      "key": "9:0",
+      "start_s": 13.4,
+      "finish_by_s": 15.5,
+      "protected_until_s": 17.0,
+      "estimated_total_s": 1.6,
+      "remaining_bytes": 16777216,
+      "unallocated_bytes": 0,
+      "feasible": true,
+      "reason": "scheduled_before_growth"
+    },
+    "conservative_lead_qualified": true
+  },
+  {
+    "scenario": "ramp",
+    "variant": "wss_only",
+    "horizon_s": 20.0,
+    "rate_MiB_s": 16,
+    "timing": "epoch",
+    "simulation_only": true,
+    "errors": [],
+    "max_preallocation_gap_MiB": 0.0,
+    "requested_MiB": 144.0,
+    "cold_refault_MiB": 0.0,
+    "unnecessary_reclaim": false,
+    "checks": [
+      {
+        "time_s": 16.0,
+        "deficit_bytes": 0
+      },
+      {
+        "time_s": 17.0,
+        "deficit_bytes": 0
+      },
+      {
+        "time_s": 18.0,
+        "deficit_bytes": 0
+      },
+      {
+        "time_s": 19.0,
+        "deficit_bytes": 0
+      }
+    ],
+    "calls": [
+      {
+        "time_s": 5.4,
+        "bytes": 8388608
+      },
+      {
+        "time_s": 5.5,
+        "bytes": 16777216
+      },
+      {
+        "time_s": 5.6,
+        "bytes": 33554432
+      },
+      {
+        "time_s": 5.7,
+        "bytes": 33554432
+      },
+      {
+        "time_s": 5.8,
+        "bytes": 33554432
+      },
+      {
+        "time_s": 5.9,
+        "bytes": 25165824
+      }
+    ],
+    "passed": true,
+    "expected_infeasible": false,
+    "correctly_blocked": false,
+    "first_need_timing": {
+      "key": "1:0",
+      "start_s": 5.4,
+      "finish_by_s": 15.5,
+      "protected_until_s": 20.0,
+      "estimated_total_s": 9.6,
+      "remaining_bytes": 150994944,
+      "unallocated_bytes": 0,
+      "feasible": true,
+      "reason": "scheduled_before_growth"
+    },
+    "conservative_lead_qualified": true
+  },
+  {
+    "scenario": "ramp",
+    "variant": "wss_only",
+    "horizon_s": 30.0,
+    "rate_MiB_s": 16,
+    "timing": "epoch",
+    "simulation_only": true,
+    "errors": [],
+    "max_preallocation_gap_MiB": 0.0,
+    "requested_MiB": 144.0,
+    "cold_refault_MiB": 0.0,
+    "unnecessary_reclaim": false,
+    "checks": [
+      {
+        "time_s": 16.0,
+        "deficit_bytes": 0
+      },
+      {
+        "time_s": 17.0,
+        "deficit_bytes": 0
+      },
+      {
+        "time_s": 18.0,
+        "deficit_bytes": 0
+      },
+      {
+        "time_s": 19.0,
+        "deficit_bytes": 0
+      }
+    ],
+    "calls": [
+      {
+        "time_s": 5.4,
+        "bytes": 8388608
+      },
+      {
+        "time_s": 5.5,
+        "bytes": 16777216
+      },
+      {
+        "time_s": 5.6,
+        "bytes": 33554432
+      },
+      {
+        "time_s": 5.7,
+        "bytes": 33554432
+      },
+      {
+        "time_s": 5.8,
+        "bytes": 33554432
+      },
+      {
+        "time_s": 5.9,
+        "bytes": 25165824
+      }
+    ],
+    "passed": true,
+    "expected_infeasible": false,
+    "correctly_blocked": false,
+    "first_need_timing": {
+      "key": "1:0",
+      "start_s": 5.4,
+      "finish_by_s": 15.5,
+      "protected_until_s": 30.0,
+      "estimated_total_s": 9.6,
+      "remaining_bytes": 150994944,
+      "unallocated_bytes": 0,
+      "feasible": true,
+      "reason": "scheduled_before_growth"
+    },
+    "conservative_lead_qualified": true
+  },
+  {
+    "scenario": "ramp",
+    "variant": "occupancy",
+    "horizon_s": 12.0,
+    "rate_MiB_s": 16,
+    "timing": "epoch",
+    "simulation_only": true,
+    "errors": [],
+    "max_preallocation_gap_MiB": 0.0,
+    "requested_MiB": 144.0,
+    "cold_refault_MiB": 0.0,
+    "unnecessary_reclaim": false,
+    "checks": [
+      {
+        "time_s": 16.0,
+        "deficit_bytes": 0
+      },
+      {
+        "time_s": 17.0,
+        "deficit_bytes": 0
+      },
+      {
+        "time_s": 18.0,
+        "deficit_bytes": 0
+      },
+      {
+        "time_s": 19.0,
+        "deficit_bytes": 0
+      }
+    ],
+    "calls": [
+      {
+        "time_s": 7.0,
+        "bytes": 8388608
+      },
+      {
+        "time_s": 7.1,
+        "bytes": 16777216
+      },
+      {
+        "time_s": 7.2,
+        "bytes": 33554432
+      },
+      {
+        "time_s": 7.3,
+        "bytes": 33554432
+      },
+      {
+        "time_s": 7.4,
+        "bytes": 33554432
+      },
+      {
+        "time_s": 7.5,
+        "bytes": 25165824
+      }
+    ],
+    "passed": true,
+    "expected_infeasible": false,
+    "correctly_blocked": false,
+    "first_need_timing": {
+      "key": "9:0",
+      "start_s": 13.4,
+      "finish_by_s": 15.5,
+      "protected_until_s": 17.0,
+      "estimated_total_s": 1.6,
+      "remaining_bytes": 16777216,
+      "unallocated_bytes": 0,
+      "feasible": true,
+      "reason": "scheduled_before_growth"
+    },
+    "conservative_lead_qualified": true
+  },
+  {
+    "scenario": "ramp",
+    "variant": "occupancy",
+    "horizon_s": 20.0,
+    "rate_MiB_s": 16,
+    "timing": "epoch",
+    "simulation_only": true,
+    "errors": [],
+    "max_preallocation_gap_MiB": 0.0,
+    "requested_MiB": 144.0,
+    "cold_refault_MiB": 0.0,
+    "unnecessary_reclaim": false,
+    "checks": [
+      {
+        "time_s": 16.0,
+        "deficit_bytes": 0
+      },
+      {
+        "time_s": 17.0,
+        "deficit_bytes": 0
+      },
+      {
+        "time_s": 18.0,
+        "deficit_bytes": 0
+      },
+      {
+        "time_s": 19.0,
+        "deficit_bytes": 0
+      }
+    ],
+    "calls": [
+      {
+        "time_s": 5.4,
+        "bytes": 8388608
+      },
+      {
+        "time_s": 5.5,
+        "bytes": 16777216
+      },
+      {
+        "time_s": 5.6,
+        "bytes": 33554432
+      },
+      {
+        "time_s": 5.7,
+        "bytes": 33554432
+      },
+      {
+        "time_s": 5.8,
+        "bytes": 33554432
+      },
+      {
+        "time_s": 5.9,
+        "bytes": 25165824
+      }
+    ],
+    "passed": true,
+    "expected_infeasible": false,
+    "correctly_blocked": false,
+    "first_need_timing": {
+      "key": "1:0",
+      "start_s": 5.4,
+      "finish_by_s": 15.5,
+      "protected_until_s": 20.0,
+      "estimated_total_s": 9.6,
+      "remaining_bytes": 150994944,
+      "unallocated_bytes": 0,
+      "feasible": true,
+      "reason": "scheduled_before_growth"
+    },
+    "conservative_lead_qualified": true
+  },
+  {
+    "scenario": "ramp",
+    "variant": "occupancy",
+    "horizon_s": 30.0,
+    "rate_MiB_s": 16,
+    "timing": "epoch",
+    "simulation_only": true,
+    "errors": [],
+    "max_preallocation_gap_MiB": 0.0,
+    "requested_MiB": 144.0,
+    "cold_refault_MiB": 0.0,
+    "unnecessary_reclaim": false,
+    "checks": [
+      {
+        "time_s": 16.0,
+        "deficit_bytes": 0
+      },
+      {
+        "time_s": 17.0,
+        "deficit_bytes": 0
+      },
+      {
+        "time_s": 18.0,
+        "deficit_bytes": 0
+      },
+      {
+        "time_s": 19.0,
+        "deficit_bytes": 0
+      }
+    ],
+    "calls": [
+      {
+        "time_s": 5.4,
+        "bytes": 8388608
+      },
+      {
+        "time_s": 5.5,
+        "bytes": 16777216
+      },
+      {
+        "time_s": 5.6,
+        "bytes": 33554432
+      },
+      {
+        "time_s": 5.7,
+        "bytes": 33554432
+      },
+      {
+        "time_s": 5.8,
+        "bytes": 33554432
+      },
+      {
+        "time_s": 5.9,
+        "bytes": 25165824
+      }
+    ],
+    "passed": true,
+    "expected_infeasible": false,
+    "correctly_blocked": false,
+    "first_need_timing": {
+      "key": "1:0",
+      "start_s": 5.4,
+      "finish_by_s": 15.5,
+      "protected_until_s": 30.0,
+      "estimated_total_s": 9.6,
+      "remaining_bytes": 150994944,
+      "unallocated_bytes": 0,
+      "feasible": true,
+      "reason": "scheduled_before_growth"
+    },
+    "conservative_lead_qualified": true
+  },
+  {
+    "scenario": "ramp",
+    "variant": "occupancy_supply",
+    "horizon_s": 12.0,
+    "rate_MiB_s": 16,
+    "timing": "epoch",
+    "simulation_only": true,
+    "errors": [],
+    "max_preallocation_gap_MiB": 0.0,
+    "requested_MiB": 144.0,
+    "cold_refault_MiB": 0.0,
+    "unnecessary_reclaim": false,
+    "checks": [
+      {
+        "time_s": 16.0,
+        "deficit_bytes": 0
+      },
+      {
+        "time_s": 17.0,
+        "deficit_bytes": 0
+      },
+      {
+        "time_s": 18.0,
+        "deficit_bytes": 0
+      },
+      {
+        "time_s": 19.0,
+        "deficit_bytes": 0
+      }
+    ],
+    "calls": [
+      {
+        "time_s": 7.0,
+        "bytes": 8388608
+      },
+      {
+        "time_s": 7.1,
+        "bytes": 16777216
+      },
+      {
+        "time_s": 7.2,
+        "bytes": 33554432
+      },
+      {
+        "time_s": 7.3,
+        "bytes": 33554432
+      },
+      {
+        "time_s": 7.4,
+        "bytes": 33554432
+      },
+      {
+        "time_s": 7.5,
+        "bytes": 25165824
+      }
+    ],
+    "passed": true,
+    "expected_infeasible": false,
+    "correctly_blocked": false,
+    "first_need_timing": {
+      "key": "9:0",
+      "start_s": 13.4,
+      "finish_by_s": 15.5,
+      "protected_until_s": 17.0,
+      "estimated_total_s": 1.6,
+      "remaining_bytes": 16777216,
+      "unallocated_bytes": 0,
+      "feasible": true,
+      "reason": "scheduled_before_growth"
+    },
+    "conservative_lead_qualified": true
+  },
+  {
+    "scenario": "ramp",
+    "variant": "occupancy_supply",
+    "horizon_s": 20.0,
+    "rate_MiB_s": 16,
+    "timing": "epoch",
+    "simulation_only": true,
+    "errors": [],
+    "max_preallocation_gap_MiB": 0.0,
+    "requested_MiB": 144.0,
+    "cold_refault_MiB": 0.0,
+    "unnecessary_reclaim": false,
+    "checks": [
+      {
+        "time_s": 16.0,
+        "deficit_bytes": 0
+      },
+      {
+        "time_s": 17.0,
+        "deficit_bytes": 0
+      },
+      {
+        "time_s": 18.0,
+        "deficit_bytes": 0
+      },
+      {
+        "time_s": 19.0,
+        "deficit_bytes": 0
+      }
+    ],
+    "calls": [
+      {
+        "time_s": 5.4,
+        "bytes": 8388608
+      },
+      {
+        "time_s": 5.5,
+        "bytes": 16777216
+      },
+      {
+        "time_s": 5.6,
+        "bytes": 33554432
+      },
+      {
+        "time_s": 5.7,
+        "bytes": 33554432
+      },
+      {
+        "time_s": 5.8,
+        "bytes": 33554432
+      },
+      {
+        "time_s": 5.9,
+        "bytes": 25165824
+      }
+    ],
+    "passed": true,
+    "expected_infeasible": false,
+    "correctly_blocked": false,
+    "first_need_timing": {
+      "key": "1:0",
+      "start_s": 5.4,
+      "finish_by_s": 15.5,
+      "protected_until_s": 20.0,
+      "estimated_total_s": 9.6,
+      "remaining_bytes": 150994944,
+      "unallocated_bytes": 0,
+      "feasible": true,
+      "reason": "scheduled_before_growth"
+    },
+    "conservative_lead_qualified": true
+  },
+  {
+    "scenario": "ramp",
+    "variant": "occupancy_supply",
+    "horizon_s": 30.0,
+    "rate_MiB_s": 16,
+    "timing": "epoch",
+    "simulation_only": true,
+    "errors": [],
+    "max_preallocation_gap_MiB": 0.0,
+    "requested_MiB": 144.0,
+    "cold_refault_MiB": 0.0,
+    "unnecessary_reclaim": false,
+    "checks": [
+      {
+        "time_s": 16.0,
+        "deficit_bytes": 0
+      },
+      {
+        "time_s": 17.0,
+        "deficit_bytes": 0
+      },
+      {
+        "time_s": 18.0,
+        "deficit_bytes": 0
+      },
+      {
+        "time_s": 19.0,
+        "deficit_bytes": 0
+      }
+    ],
+    "calls": [
+      {
+        "time_s": 5.4,
+        "bytes": 8388608
+      },
+      {
+        "time_s": 5.5,
+        "bytes": 16777216
+      },
+      {
+        "time_s": 5.6,
+        "bytes": 33554432
+      },
+      {
+        "time_s": 5.7,
+        "bytes": 33554432
+      },
+      {
+        "time_s": 5.8,
+        "bytes": 33554432
+      },
+      {
+        "time_s": 5.9,
+        "bytes": 25165824
+      }
+    ],
+    "passed": true,
+    "expected_infeasible": false,
+    "correctly_blocked": false,
+    "first_need_timing": {
+      "key": "1:0",
+      "start_s": 5.4,
+      "finish_by_s": 15.5,
+      "protected_until_s": 30.0,
+      "estimated_total_s": 9.6,
+      "remaining_bytes": 150994944,
+      "unallocated_bytes": 0,
+      "feasible": true,
+      "reason": "scheduled_before_growth"
+    },
+    "conservative_lead_qualified": true
+  },
+  {
+    "scenario": "ramp",
+    "variant": "occupancy_supply_faults",
+    "horizon_s": 12.0,
+    "rate_MiB_s": 16,
+    "timing": "epoch",
+    "simulation_only": true,
+    "errors": [],
+    "max_preallocation_gap_MiB": 0.0,
+    "requested_MiB": 144.0,
+    "cold_refault_MiB": 0.0,
+    "unnecessary_reclaim": false,
+    "checks": [
+      {
+        "time_s": 16.0,
+        "deficit_bytes": 0
+      },
+      {
+        "time_s": 17.0,
+        "deficit_bytes": 0
+      },
+      {
+        "time_s": 18.0,
+        "deficit_bytes": 0
+      },
+      {
+        "time_s": 19.0,
+        "deficit_bytes": 0
+      }
+    ],
+    "calls": [
+      {
+        "time_s": 7.0,
+        "bytes": 8388608
+      },
+      {
+        "time_s": 7.1,
+        "bytes": 16777216
+      },
+      {
+        "time_s": 7.2,
+        "bytes": 33554432
+      },
+      {
+        "time_s": 7.3,
+        "bytes": 33554432
+      },
+      {
+        "time_s": 7.4,
+        "bytes": 33554432
+      },
+      {
+        "time_s": 7.5,
+        "bytes": 25165824
+      }
+    ],
+    "passed": true,
+    "expected_infeasible": false,
+    "correctly_blocked": false,
+    "first_need_timing": {
+      "key": "9:0",
+      "start_s": 13.4,
+      "finish_by_s": 15.5,
+      "protected_until_s": 17.0,
+      "estimated_total_s": 1.6,
+      "remaining_bytes": 16777216,
+      "unallocated_bytes": 0,
+      "feasible": true,
+      "reason": "scheduled_before_growth"
+    },
+    "conservative_lead_qualified": true
+  },
+  {
+    "scenario": "ramp",
+    "variant": "occupancy_supply_faults",
+    "horizon_s": 20.0,
+    "rate_MiB_s": 16,
+    "timing": "epoch",
+    "simulation_only": true,
+    "errors": [],
+    "max_preallocation_gap_MiB": 0.0,
+    "requested_MiB": 144.0,
+    "cold_refault_MiB": 0.0,
+    "unnecessary_reclaim": false,
+    "checks": [
+      {
+        "time_s": 16.0,
+        "deficit_bytes": 0
+      },
+      {
+        "time_s": 17.0,
+        "deficit_bytes": 0
+      },
+      {
+        "time_s": 18.0,
+        "deficit_bytes": 0
+      },
+      {
+        "time_s": 19.0,
+        "deficit_bytes": 0
+      }
+    ],
+    "calls": [
+      {
+        "time_s": 5.4,
+        "bytes": 8388608
+      },
+      {
+        "time_s": 5.5,
+        "bytes": 16777216
+      },
+      {
+        "time_s": 5.6,
+        "bytes": 33554432
+      },
+      {
+        "time_s": 5.7,
+        "bytes": 33554432
+      },
+      {
+        "time_s": 5.8,
+        "bytes": 33554432
+      },
+      {
+        "time_s": 5.9,
+        "bytes": 25165824
+      }
+    ],
+    "passed": true,
+    "expected_infeasible": false,
+    "correctly_blocked": false,
+    "first_need_timing": {
+      "key": "1:0",
+      "start_s": 5.4,
+      "finish_by_s": 15.5,
+      "protected_until_s": 20.0,
+      "estimated_total_s": 9.6,
+      "remaining_bytes": 150994944,
+      "unallocated_bytes": 0,
+      "feasible": true,
+      "reason": "scheduled_before_growth"
+    },
+    "conservative_lead_qualified": true
+  },
+  {
+    "scenario": "ramp",
+    "variant": "occupancy_supply_faults",
+    "horizon_s": 30.0,
+    "rate_MiB_s": 16,
+    "timing": "epoch",
+    "simulation_only": true,
+    "errors": [],
+    "max_preallocation_gap_MiB": 0.0,
+    "requested_MiB": 144.0,
+    "cold_refault_MiB": 0.0,
+    "unnecessary_reclaim": false,
+    "checks": [
+      {
+        "time_s": 16.0,
+        "deficit_bytes": 0
+      },
+      {
+        "time_s": 17.0,
+        "deficit_bytes": 0
+      },
+      {
+        "time_s": 18.0,
+        "deficit_bytes": 0
+      },
+      {
+        "time_s": 19.0,
+        "deficit_bytes": 0
+      }
+    ],
+    "calls": [
+      {
+        "time_s": 5.4,
+        "bytes": 8388608
+      },
+      {
+        "time_s": 5.5,
+        "bytes": 16777216
+      },
+      {
+        "time_s": 5.6,
+        "bytes": 33554432
+      },
+      {
+        "time_s": 5.7,
+        "bytes": 33554432
+      },
+      {
+        "time_s": 5.8,
+        "bytes": 33554432
+      },
+      {
+        "time_s": 5.9,
+        "bytes": 25165824
+      }
+    ],
+    "passed": true,
+    "expected_infeasible": false,
+    "correctly_blocked": false,
+    "first_need_timing": {
+      "key": "1:0",
+      "start_s": 5.4,
+      "finish_by_s": 15.5,
+      "protected_until_s": 30.0,
+      "estimated_total_s": 9.6,
+      "remaining_bytes": 150994944,
+      "unallocated_bytes": 0,
+      "feasible": true,
+      "reason": "scheduled_before_growth"
+    },
+    "conservative_lead_qualified": true
+  },
+  {
+    "scenario": "V",
+    "variant": "wss_only",
+    "horizon_s": 12.0,
+    "rate_MiB_s": 16,
+    "timing": "epoch",
+    "simulation_only": true,
+    "errors": [],
+    "max_preallocation_gap_MiB": 0.0,
+    "requested_MiB": 80.0,
+    "cold_refault_MiB": 0.0,
+    "unnecessary_reclaim": false,
+    "checks": [
+      {
+        "time_s": 20.0,
+        "deficit_bytes": 0
+      }
+    ],
+    "calls": [
+      {
+        "time_s": 13.4,
+        "bytes": 8388608
+      },
+      {
+        "time_s": 13.5,
+        "bytes": 16777216
+      },
+      {
+        "time_s": 13.6,
+        "bytes": 33554432
+      },
+      {
+        "time_s": 13.7,
+        "bytes": 25165824
+      }
+    ],
+    "passed": true,
+    "expected_infeasible": false,
+    "correctly_blocked": false,
+    "first_need_timing": {
+      "key": "17:0",
+      "start_s": 13.4,
+      "finish_by_s": 19.5,
+      "protected_until_s": 20.0,
+      "estimated_total_s": 5.6,
+      "remaining_bytes": 83886080,
+      "unallocated_bytes": 0,
+      "feasible": true,
+      "reason": "scheduled_before_growth"
+    },
+    "conservative_lead_qualified": true
+  },
+  {
+    "scenario": "V",
+    "variant": "wss_only",
+    "horizon_s": 20.0,
+    "rate_MiB_s": 16,
+    "timing": "epoch",
+    "simulation_only": true,
+    "errors": [],
+    "max_preallocation_gap_MiB": 0.0,
+    "requested_MiB": 80.0,
+    "cold_refault_MiB": 0.0,
+    "unnecessary_reclaim": false,
+    "checks": [
+      {
+        "time_s": 20.0,
+        "deficit_bytes": 0
+      }
+    ],
+    "calls": [
+      {
+        "time_s": 13.4,
+        "bytes": 8388608
+      },
+      {
+        "time_s": 13.5,
+        "bytes": 16777216
+      },
+      {
+        "time_s": 13.6,
+        "bytes": 33554432
+      },
+      {
+        "time_s": 13.7,
+        "bytes": 25165824
+      }
+    ],
+    "passed": true,
+    "expected_infeasible": false,
+    "correctly_blocked": false,
+    "first_need_timing": {
+      "key": "1:0",
+      "start_s": 13.4,
+      "finish_by_s": 19.5,
+      "protected_until_s": 20.0,
+      "estimated_total_s": 5.6,
+      "remaining_bytes": 83886080,
+      "unallocated_bytes": 0,
+      "feasible": true,
+      "reason": "scheduled_before_growth"
+    },
+    "conservative_lead_qualified": true
+  },
+  {
+    "scenario": "V",
+    "variant": "wss_only",
+    "horizon_s": 30.0,
+    "rate_MiB_s": 16,
+    "timing": "epoch",
+    "simulation_only": true,
+    "errors": [],
+    "max_preallocation_gap_MiB": 0.0,
+    "requested_MiB": 80.0,
+    "cold_refault_MiB": 0.0,
+    "unnecessary_reclaim": false,
+    "checks": [
+      {
+        "time_s": 20.0,
+        "deficit_bytes": 0
+      }
+    ],
+    "calls": [
+      {
+        "time_s": 13.4,
+        "bytes": 8388608
+      },
+      {
+        "time_s": 13.5,
+        "bytes": 16777216
+      },
+      {
+        "time_s": 13.6,
+        "bytes": 33554432
+      },
+      {
+        "time_s": 13.7,
+        "bytes": 25165824
+      }
+    ],
+    "passed": true,
+    "expected_infeasible": false,
+    "correctly_blocked": false,
+    "first_need_timing": {
+      "key": "1:0",
+      "start_s": 13.4,
+      "finish_by_s": 19.5,
+      "protected_until_s": 30.0,
+      "estimated_total_s": 5.6,
+      "remaining_bytes": 83886080,
+      "unallocated_bytes": 0,
+      "feasible": true,
+      "reason": "scheduled_before_growth"
+    },
+    "conservative_lead_qualified": true
+  },
+  {
+    "scenario": "V",
+    "variant": "occupancy",
+    "horizon_s": 12.0,
+    "rate_MiB_s": 16,
+    "timing": "epoch",
+    "simulation_only": true,
+    "errors": [],
+    "max_preallocation_gap_MiB": 0.0,
+    "requested_MiB": 80.0,
+    "cold_refault_MiB": 0.0,
+    "unnecessary_reclaim": false,
+    "checks": [
+      {
+        "time_s": 20.0,
+        "deficit_bytes": 0
+      }
+    ],
+    "calls": [
+      {
+        "time_s": 13.4,
+        "bytes": 8388608
+      },
+      {
+        "time_s": 13.5,
+        "bytes": 16777216
+      },
+      {
+        "time_s": 13.6,
+        "bytes": 33554432
+      },
+      {
+        "time_s": 13.7,
+        "bytes": 25165824
+      }
+    ],
+    "passed": true,
+    "expected_infeasible": false,
+    "correctly_blocked": false,
+    "first_need_timing": {
+      "key": "17:0",
+      "start_s": 13.4,
+      "finish_by_s": 19.5,
+      "protected_until_s": 20.0,
+      "estimated_total_s": 5.6,
+      "remaining_bytes": 83886080,
+      "unallocated_bytes": 0,
+      "feasible": true,
+      "reason": "scheduled_before_growth"
+    },
+    "conservative_lead_qualified": true
+  },
+  {
+    "scenario": "V",
+    "variant": "occupancy",
+    "horizon_s": 20.0,
+    "rate_MiB_s": 16,
+    "timing": "epoch",
+    "simulation_only": true,
+    "errors": [],
+    "max_preallocation_gap_MiB": 0.0,
+    "requested_MiB": 80.0,
+    "cold_refault_MiB": 0.0,
+    "unnecessary_reclaim": false,
+    "checks": [
+      {
+        "time_s": 20.0,
+        "deficit_bytes": 0
+      }
+    ],
+    "calls": [
+      {
+        "time_s": 13.4,
+        "bytes": 8388608
+      },
+      {
+        "time_s": 13.5,
+        "bytes": 16777216
+      },
+      {
+        "time_s": 13.6,
+        "bytes": 33554432
+      },
+      {
+        "time_s": 13.7,
+        "bytes": 25165824
+      }
+    ],
+    "passed": true,
+    "expected_infeasible": false,
+    "correctly_blocked": false,
+    "first_need_timing": {
+      "key": "1:0",
+      "start_s": 13.4,
+      "finish_by_s": 19.5,
+      "protected_until_s": 20.0,
+      "estimated_total_s": 5.6,
+      "remaining_bytes": 83886080,
+      "unallocated_bytes": 0,
+      "feasible": true,
+      "reason": "scheduled_before_growth"
+    },
+    "conservative_lead_qualified": true
+  },
+  {
+    "scenario": "V",
+    "variant": "occupancy",
+    "horizon_s": 30.0,
+    "rate_MiB_s": 16,
+    "timing": "epoch",
+    "simulation_only": true,
+    "errors": [],
+    "max_preallocation_gap_MiB": 0.0,
+    "requested_MiB": 80.0,
+    "cold_refault_MiB": 0.0,
+    "unnecessary_reclaim": false,
+    "checks": [
+      {
+        "time_s": 20.0,
+        "deficit_bytes": 0
+      }
+    ],
+    "calls": [
+      {
+        "time_s": 13.4,
+        "bytes": 8388608
+      },
+      {
+        "time_s": 13.5,
+        "bytes": 16777216
+      },
+      {
+        "time_s": 13.6,
+        "bytes": 33554432
+      },
+      {
+        "time_s": 13.7,
+        "bytes": 25165824
+      }
+    ],
+    "passed": true,
+    "expected_infeasible": false,
+    "correctly_blocked": false,
+    "first_need_timing": {
+      "key": "1:0",
+      "start_s": 13.4,
+      "finish_by_s": 19.5,
+      "protected_until_s": 30.0,
+      "estimated_total_s": 5.6,
+      "remaining_bytes": 83886080,
+      "unallocated_bytes": 0,
+      "feasible": true,
+      "reason": "scheduled_before_growth"
+    },
+    "conservative_lead_qualified": true
+  },
+  {
+    "scenario": "V",
+    "variant": "occupancy_supply",
+    "horizon_s": 12.0,
+    "rate_MiB_s": 16,
+    "timing": "epoch",
+    "simulation_only": true,
+    "errors": [],
+    "max_preallocation_gap_MiB": 0.0,
+    "requested_MiB": 80.0,
+    "cold_refault_MiB": 0.0,
+    "unnecessary_reclaim": false,
+    "checks": [
+      {
+        "time_s": 20.0,
+        "deficit_bytes": 0
+      }
+    ],
+    "calls": [
+      {
+        "time_s": 13.4,
+        "bytes": 8388608
+      },
+      {
+        "time_s": 13.5,
+        "bytes": 16777216
+      },
+      {
+        "time_s": 13.6,
+        "bytes": 33554432
+      },
+      {
+        "time_s": 13.7,
+        "bytes": 25165824
+      }
+    ],
+    "passed": true,
+    "expected_infeasible": false,
+    "correctly_blocked": false,
+    "first_need_timing": {
+      "key": "17:0",
+      "start_s": 13.4,
+      "finish_by_s": 19.5,
+      "protected_until_s": 20.0,
+      "estimated_total_s": 5.6,
+      "remaining_bytes": 83886080,
+      "unallocated_bytes": 0,
+      "feasible": true,
+      "reason": "scheduled_before_growth"
+    },
+    "conservative_lead_qualified": true
+  },
+  {
+    "scenario": "V",
+    "variant": "occupancy_supply",
+    "horizon_s": 20.0,
+    "rate_MiB_s": 16,
+    "timing": "epoch",
+    "simulation_only": true,
+    "errors": [],
+    "max_preallocation_gap_MiB": 0.0,
+    "requested_MiB": 80.0,
+    "cold_refault_MiB": 0.0,
+    "unnecessary_reclaim": false,
+    "checks": [
+      {
+        "time_s": 20.0,
+        "deficit_bytes": 0
+      }
+    ],
+    "calls": [
+      {
+        "time_s": 13.4,
+        "bytes": 8388608
+      },
+      {
+        "time_s": 13.5,
+        "bytes": 16777216
+      },
+      {
+        "time_s": 13.6,
+        "bytes": 33554432
+      },
+      {
+        "time_s": 13.7,
+        "bytes": 25165824
+      }
+    ],
+    "passed": true,
+    "expected_infeasible": false,
+    "correctly_blocked": false,
+    "first_need_timing": {
+      "key": "1:0",
+      "start_s": 13.4,
+      "finish_by_s": 19.5,
+      "protected_until_s": 20.0,
+      "estimated_total_s": 5.6,
+      "remaining_bytes": 83886080,
+      "unallocated_bytes": 0,
+      "feasible": true,
+      "reason": "scheduled_before_growth"
+    },
+    "conservative_lead_qualified": true
+  },
+  {
+    "scenario": "V",
+    "variant": "occupancy_supply",
+    "horizon_s": 30.0,
+    "rate_MiB_s": 16,
+    "timing": "epoch",
+    "simulation_only": true,
+    "errors": [],
+    "max_preallocation_gap_MiB": 0.0,
+    "requested_MiB": 80.0,
+    "cold_refault_MiB": 0.0,
+    "unnecessary_reclaim": false,
+    "checks": [
+      {
+        "time_s": 20.0,
+        "deficit_bytes": 0
+      }
+    ],
+    "calls": [
+      {
+        "time_s": 13.4,
+        "bytes": 8388608
+      },
+      {
+        "time_s": 13.5,
+        "bytes": 16777216
+      },
+      {
+        "time_s": 13.6,
+        "bytes": 33554432
+      },
+      {
+        "time_s": 13.7,
+        "bytes": 25165824
+      }
+    ],
+    "passed": true,
+    "expected_infeasible": false,
+    "correctly_blocked": false,
+    "first_need_timing": {
+      "key": "1:0",
+      "start_s": 13.4,
+      "finish_by_s": 19.5,
+      "protected_until_s": 30.0,
+      "estimated_total_s": 5.6,
+      "remaining_bytes": 83886080,
+      "unallocated_bytes": 0,
+      "feasible": true,
+      "reason": "scheduled_before_growth"
+    },
+    "conservative_lead_qualified": true
+  },
+  {
+    "scenario": "V",
+    "variant": "occupancy_supply_faults",
+    "horizon_s": 12.0,
+    "rate_MiB_s": 16,
+    "timing": "epoch",
+    "simulation_only": true,
+    "errors": [],
+    "max_preallocation_gap_MiB": 0.0,
+    "requested_MiB": 80.0,
+    "cold_refault_MiB": 0.0,
+    "unnecessary_reclaim": false,
+    "checks": [
+      {
+        "time_s": 20.0,
+        "deficit_bytes": 0
+      }
+    ],
+    "calls": [
+      {
+        "time_s": 13.4,
+        "bytes": 8388608
+      },
+      {
+        "time_s": 13.5,
+        "bytes": 16777216
+      },
+      {
+        "time_s": 13.6,
+        "bytes": 33554432
+      },
+      {
+        "time_s": 13.7,
+        "bytes": 25165824
+      }
+    ],
+    "passed": true,
+    "expected_infeasible": false,
+    "correctly_blocked": false,
+    "first_need_timing": {
+      "key": "17:0",
+      "start_s": 13.4,
+      "finish_by_s": 19.5,
+      "protected_until_s": 20.0,
+      "estimated_total_s": 5.6,
+      "remaining_bytes": 83886080,
+      "unallocated_bytes": 0,
+      "feasible": true,
+      "reason": "scheduled_before_growth"
+    },
+    "conservative_lead_qualified": true
+  },
+  {
+    "scenario": "V",
+    "variant": "occupancy_supply_faults",
+    "horizon_s": 20.0,
+    "rate_MiB_s": 16,
+    "timing": "epoch",
+    "simulation_only": true,
+    "errors": [],
+    "max_preallocation_gap_MiB": 0.0,
+    "requested_MiB": 80.0,
+    "cold_refault_MiB": 0.0,
+    "unnecessary_reclaim": false,
+    "checks": [
+      {
+        "time_s": 20.0,
+        "deficit_bytes": 0
+      }
+    ],
+    "calls": [
+      {
+        "time_s": 13.4,
+        "bytes": 8388608
+      },
+      {
+        "time_s": 13.5,
+        "bytes": 16777216
+      },
+      {
+        "time_s": 13.6,
+        "bytes": 33554432
+      },
+      {
+        "time_s": 13.7,
+        "bytes": 25165824
+      }
+    ],
+    "passed": true,
+    "expected_infeasible": false,
+    "correctly_blocked": false,
+    "first_need_timing": {
+      "key": "1:0",
+      "start_s": 13.4,
+      "finish_by_s": 19.5,
+      "protected_until_s": 20.0,
+      "estimated_total_s": 5.6,
+      "remaining_bytes": 83886080,
+      "unallocated_bytes": 0,
+      "feasible": true,
+      "reason": "scheduled_before_growth"
+    },
+    "conservative_lead_qualified": true
+  },
+  {
+    "scenario": "V",
+    "variant": "occupancy_supply_faults",
+    "horizon_s": 30.0,
+    "rate_MiB_s": 16,
+    "timing": "epoch",
+    "simulation_only": true,
+    "errors": [],
+    "max_preallocation_gap_MiB": 0.0,
+    "requested_MiB": 80.0,
+    "cold_refault_MiB": 0.0,
+    "unnecessary_reclaim": false,
+    "checks": [
+      {
+        "time_s": 20.0,
+        "deficit_bytes": 0
+      }
+    ],
+    "calls": [
+      {
+        "time_s": 13.4,
+        "bytes": 8388608
+      },
+      {
+        "time_s": 13.5,
+        "bytes": 16777216
+      },
+      {
+        "time_s": 13.6,
+        "bytes": 33554432
+      },
+      {
+        "time_s": 13.7,
+        "bytes": 25165824
+      }
+    ],
+    "passed": true,
+    "expected_infeasible": false,
+    "correctly_blocked": false,
+    "first_need_timing": {
+      "key": "1:0",
+      "start_s": 13.4,
+      "finish_by_s": 19.5,
+      "protected_until_s": 30.0,
+      "estimated_total_s": 5.6,
+      "remaining_bytes": 83886080,
+      "unallocated_bytes": 0,
+      "feasible": true,
+      "reason": "scheduled_before_growth"
+    },
+    "conservative_lead_qualified": true
+  },
+  {
+    "scenario": "inverted_V",
+    "variant": "wss_only",
+    "horizon_s": 12.0,
+    "rate_MiB_s": 16,
+    "timing": "epoch",
+    "simulation_only": true,
+    "errors": [],
+    "max_preallocation_gap_MiB": 0.0,
+    "requested_MiB": 144.0,
+    "cold_refault_MiB": 0.0,
+    "unnecessary_reclaim": false,
+    "checks": [
+      {
+        "time_s": 20.0,
+        "deficit_bytes": 0
+      }
+    ],
+    "calls": [
+      {
+        "time_s": 9.4,
+        "bytes": 8388608
+      },
+      {
+        "time_s": 9.5,
+        "bytes": 16777216
+      },
+      {
+        "time_s": 9.6,
+        "bytes": 33554432
+      },
+      {
+        "time_s": 9.7,
+        "bytes": 33554432
+      },
+      {
+        "time_s": 9.8,
+        "bytes": 33554432
+      },
+      {
+        "time_s": 9.9,
+        "bytes": 25165824
+      }
+    ],
+    "passed": true,
+    "expected_infeasible": false,
+    "correctly_blocked": false,
+    "first_need_timing": {
+      "key": "17:0",
+      "start_s": 9.4,
+      "finish_by_s": 19.5,
+      "protected_until_s": 20.0,
+      "estimated_total_s": 9.6,
+      "remaining_bytes": 150994944,
+      "unallocated_bytes": 0,
+      "feasible": true,
+      "reason": "scheduled_before_growth"
+    },
+    "conservative_lead_qualified": true
+  },
+  {
+    "scenario": "inverted_V",
+    "variant": "wss_only",
+    "horizon_s": 20.0,
+    "rate_MiB_s": 16,
+    "timing": "epoch",
+    "simulation_only": true,
+    "errors": [],
+    "max_preallocation_gap_MiB": 0.0,
+    "requested_MiB": 144.0,
+    "cold_refault_MiB": 0.0,
+    "unnecessary_reclaim": false,
+    "checks": [
+      {
+        "time_s": 20.0,
+        "deficit_bytes": 0
+      }
+    ],
+    "calls": [
+      {
+        "time_s": 9.4,
+        "bytes": 8388608
+      },
+      {
+        "time_s": 9.5,
+        "bytes": 16777216
+      },
+      {
+        "time_s": 9.6,
+        "bytes": 33554432
+      },
+      {
+        "time_s": 9.7,
+        "bytes": 33554432
+      },
+      {
+        "time_s": 9.8,
+        "bytes": 33554432
+      },
+      {
+        "time_s": 9.9,
+        "bytes": 25165824
+      }
+    ],
+    "passed": true,
+    "expected_infeasible": false,
+    "correctly_blocked": false,
+    "first_need_timing": {
+      "key": "1:0",
+      "start_s": 9.4,
+      "finish_by_s": 19.5,
+      "protected_until_s": 20.0,
+      "estimated_total_s": 9.6,
+      "remaining_bytes": 150994944,
+      "unallocated_bytes": 0,
+      "feasible": true,
+      "reason": "scheduled_before_growth"
+    },
+    "conservative_lead_qualified": true
+  },
+  {
+    "scenario": "inverted_V",
+    "variant": "wss_only",
+    "horizon_s": 30.0,
+    "rate_MiB_s": 16,
+    "timing": "epoch",
+    "simulation_only": true,
+    "errors": [],
+    "max_preallocation_gap_MiB": 0.0,
+    "requested_MiB": 144.0,
+    "cold_refault_MiB": 0.0,
+    "unnecessary_reclaim": false,
+    "checks": [
+      {
+        "time_s": 20.0,
+        "deficit_bytes": 0
+      }
+    ],
+    "calls": [
+      {
+        "time_s": 9.4,
+        "bytes": 8388608
+      },
+      {
+        "time_s": 9.5,
+        "bytes": 16777216
+      },
+      {
+        "time_s": 9.6,
+        "bytes": 33554432
+      },
+      {
+        "time_s": 9.7,
+        "bytes": 33554432
+      },
+      {
+        "time_s": 9.8,
+        "bytes": 33554432
+      },
+      {
+        "time_s": 9.9,
+        "bytes": 25165824
+      }
+    ],
+    "passed": true,
+    "expected_infeasible": false,
+    "correctly_blocked": false,
+    "first_need_timing": {
+      "key": "1:0",
+      "start_s": 9.4,
+      "finish_by_s": 19.5,
+      "protected_until_s": 24.0,
+      "estimated_total_s": 9.6,
+      "remaining_bytes": 150994944,
+      "unallocated_bytes": 0,
+      "feasible": true,
+      "reason": "scheduled_before_growth"
+    },
+    "conservative_lead_qualified": true
+  },
+  {
+    "scenario": "inverted_V",
+    "variant": "occupancy",
+    "horizon_s": 12.0,
+    "rate_MiB_s": 16,
+    "timing": "epoch",
+    "simulation_only": true,
+    "errors": [],
+    "max_preallocation_gap_MiB": 0.0,
+    "requested_MiB": 144.0,
+    "cold_refault_MiB": 0.0,
+    "unnecessary_reclaim": false,
+    "checks": [
+      {
+        "time_s": 20.0,
+        "deficit_bytes": 0
+      }
+    ],
+    "calls": [
+      {
+        "time_s": 9.4,
+        "bytes": 8388608
+      },
+      {
+        "time_s": 9.5,
+        "bytes": 16777216
+      },
+      {
+        "time_s": 9.6,
+        "bytes": 33554432
+      },
+      {
+        "time_s": 9.7,
+        "bytes": 33554432
+      },
+      {
+        "time_s": 9.8,
+        "bytes": 33554432
+      },
+      {
+        "time_s": 9.9,
+        "bytes": 25165824
+      }
+    ],
+    "passed": true,
+    "expected_infeasible": false,
+    "correctly_blocked": false,
+    "first_need_timing": {
+      "key": "17:0",
+      "start_s": 9.4,
+      "finish_by_s": 19.5,
+      "protected_until_s": 20.0,
+      "estimated_total_s": 9.6,
+      "remaining_bytes": 150994944,
+      "unallocated_bytes": 0,
+      "feasible": true,
+      "reason": "scheduled_before_growth"
+    },
+    "conservative_lead_qualified": true
+  },
+  {
+    "scenario": "inverted_V",
+    "variant": "occupancy",
+    "horizon_s": 20.0,
+    "rate_MiB_s": 16,
+    "timing": "epoch",
+    "simulation_only": true,
+    "errors": [],
+    "max_preallocation_gap_MiB": 0.0,
+    "requested_MiB": 144.0,
+    "cold_refault_MiB": 0.0,
+    "unnecessary_reclaim": false,
+    "checks": [
+      {
+        "time_s": 20.0,
+        "deficit_bytes": 0
+      }
+    ],
+    "calls": [
+      {
+        "time_s": 9.4,
+        "bytes": 8388608
+      },
+      {
+        "time_s": 9.5,
+        "bytes": 16777216
+      },
+      {
+        "time_s": 9.6,
+        "bytes": 33554432
+      },
+      {
+        "time_s": 9.7,
+        "bytes": 33554432
+      },
+      {
+        "time_s": 9.8,
+        "bytes": 33554432
+      },
+      {
+        "time_s": 9.9,
+        "bytes": 25165824
+      }
+    ],
+    "passed": true,
+    "expected_infeasible": false,
+    "correctly_blocked": false,
+    "first_need_timing": {
+      "key": "1:0",
+      "start_s": 9.4,
+      "finish_by_s": 19.5,
+      "protected_until_s": 20.0,
+      "estimated_total_s": 9.6,
+      "remaining_bytes": 150994944,
+      "unallocated_bytes": 0,
+      "feasible": true,
+      "reason": "scheduled_before_growth"
+    },
+    "conservative_lead_qualified": true
+  },
+  {
+    "scenario": "inverted_V",
+    "variant": "occupancy",
+    "horizon_s": 30.0,
+    "rate_MiB_s": 16,
+    "timing": "epoch",
+    "simulation_only": true,
+    "errors": [],
+    "max_preallocation_gap_MiB": 0.0,
+    "requested_MiB": 144.0,
+    "cold_refault_MiB": 0.0,
+    "unnecessary_reclaim": false,
+    "checks": [
+      {
+        "time_s": 20.0,
+        "deficit_bytes": 0
+      }
+    ],
+    "calls": [
+      {
+        "time_s": 9.4,
+        "bytes": 8388608
+      },
+      {
+        "time_s": 9.5,
+        "bytes": 16777216
+      },
+      {
+        "time_s": 9.6,
+        "bytes": 33554432
+      },
+      {
+        "time_s": 9.7,
+        "bytes": 33554432
+      },
+      {
+        "time_s": 9.8,
+        "bytes": 33554432
+      },
+      {
+        "time_s": 9.9,
+        "bytes": 25165824
+      }
+    ],
+    "passed": true,
+    "expected_infeasible": false,
+    "correctly_blocked": false,
+    "first_need_timing": {
+      "key": "1:0",
+      "start_s": 9.4,
+      "finish_by_s": 19.5,
+      "protected_until_s": 24.0,
+      "estimated_total_s": 9.6,
+      "remaining_bytes": 150994944,
+      "unallocated_bytes": 0,
+      "feasible": true,
+      "reason": "scheduled_before_growth"
+    },
+    "conservative_lead_qualified": true
+  },
+  {
+    "scenario": "inverted_V",
+    "variant": "occupancy_supply",
+    "horizon_s": 12.0,
+    "rate_MiB_s": 16,
+    "timing": "epoch",
+    "simulation_only": true,
+    "errors": [],
+    "max_preallocation_gap_MiB": 0.0,
+    "requested_MiB": 144.0,
+    "cold_refault_MiB": 0.0,
+    "unnecessary_reclaim": false,
+    "checks": [
+      {
+        "time_s": 20.0,
+        "deficit_bytes": 0
+      }
+    ],
+    "calls": [
+      {
+        "time_s": 9.4,
+        "bytes": 8388608
+      },
+      {
+        "time_s": 9.5,
+        "bytes": 16777216
+      },
+      {
+        "time_s": 9.6,
+        "bytes": 33554432
+      },
+      {
+        "time_s": 9.7,
+        "bytes": 33554432
+      },
+      {
+        "time_s": 9.8,
+        "bytes": 33554432
+      },
+      {
+        "time_s": 9.9,
+        "bytes": 25165824
+      }
+    ],
+    "passed": true,
+    "expected_infeasible": false,
+    "correctly_blocked": false,
+    "first_need_timing": {
+      "key": "17:0",
+      "start_s": 9.4,
+      "finish_by_s": 19.5,
+      "protected_until_s": 20.0,
+      "estimated_total_s": 9.6,
+      "remaining_bytes": 150994944,
+      "unallocated_bytes": 0,
+      "feasible": true,
+      "reason": "scheduled_before_growth"
+    },
+    "conservative_lead_qualified": true
+  },
+  {
+    "scenario": "inverted_V",
+    "variant": "occupancy_supply",
+    "horizon_s": 20.0,
+    "rate_MiB_s": 16,
+    "timing": "epoch",
+    "simulation_only": true,
+    "errors": [],
+    "max_preallocation_gap_MiB": 0.0,
+    "requested_MiB": 144.0,
+    "cold_refault_MiB": 0.0,
+    "unnecessary_reclaim": false,
+    "checks": [
+      {
+        "time_s": 20.0,
+        "deficit_bytes": 0
+      }
+    ],
+    "calls": [
+      {
+        "time_s": 9.4,
+        "bytes": 8388608
+      },
+      {
+        "time_s": 9.5,
+        "bytes": 16777216
+      },
+      {
+        "time_s": 9.6,
+        "bytes": 33554432
+      },
+      {
+        "time_s": 9.7,
+        "bytes": 33554432
+      },
+      {
+        "time_s": 9.8,
+        "bytes": 33554432
+      },
+      {
+        "time_s": 9.9,
+        "bytes": 25165824
+      }
+    ],
+    "passed": true,
+    "expected_infeasible": false,
+    "correctly_blocked": false,
+    "first_need_timing": {
+      "key": "1:0",
+      "start_s": 9.4,
+      "finish_by_s": 19.5,
+      "protected_until_s": 20.0,
+      "estimated_total_s": 9.6,
+      "remaining_bytes": 150994944,
+      "unallocated_bytes": 0,
+      "feasible": true,
+      "reason": "scheduled_before_growth"
+    },
+    "conservative_lead_qualified": true
+  },
+  {
+    "scenario": "inverted_V",
+    "variant": "occupancy_supply",
+    "horizon_s": 30.0,
+    "rate_MiB_s": 16,
+    "timing": "epoch",
+    "simulation_only": true,
+    "errors": [],
+    "max_preallocation_gap_MiB": 0.0,
+    "requested_MiB": 144.0,
+    "cold_refault_MiB": 0.0,
+    "unnecessary_reclaim": false,
+    "checks": [
+      {
+        "time_s": 20.0,
+        "deficit_bytes": 0
+      }
+    ],
+    "calls": [
+      {
+        "time_s": 9.4,
+        "bytes": 8388608
+      },
+      {
+        "time_s": 9.5,
+        "bytes": 16777216
+      },
+      {
+        "time_s": 9.6,
+        "bytes": 33554432
+      },
+      {
+        "time_s": 9.7,
+        "bytes": 33554432
+      },
+      {
+        "time_s": 9.8,
+        "bytes": 33554432
+      },
+      {
+        "time_s": 9.9,
+        "bytes": 25165824
+      }
+    ],
+    "passed": true,
+    "expected_infeasible": false,
+    "correctly_blocked": false,
+    "first_need_timing": {
+      "key": "1:0",
+      "start_s": 9.4,
+      "finish_by_s": 19.5,
+      "protected_until_s": 24.0,
+      "estimated_total_s": 9.6,
+      "remaining_bytes": 150994944,
+      "unallocated_bytes": 0,
+      "feasible": true,
+      "reason": "scheduled_before_growth"
+    },
+    "conservative_lead_qualified": true
+  },
+  {
+    "scenario": "inverted_V",
+    "variant": "occupancy_supply_faults",
+    "horizon_s": 12.0,
+    "rate_MiB_s": 16,
+    "timing": "epoch",
+    "simulation_only": true,
+    "errors": [],
+    "max_preallocation_gap_MiB": 0.0,
+    "requested_MiB": 144.0,
+    "cold_refault_MiB": 0.0,
+    "unnecessary_reclaim": false,
+    "checks": [
+      {
+        "time_s": 20.0,
+        "deficit_bytes": 0
+      }
+    ],
+    "calls": [
+      {
+        "time_s": 9.4,
+        "bytes": 8388608
+      },
+      {
+        "time_s": 9.5,
+        "bytes": 16777216
+      },
+      {
+        "time_s": 9.6,
+        "bytes": 33554432
+      },
+      {
+        "time_s": 9.7,
+        "bytes": 33554432
+      },
+      {
+        "time_s": 9.8,
+        "bytes": 33554432
+      },
+      {
+        "time_s": 9.9,
+        "bytes": 25165824
+      }
+    ],
+    "passed": true,
+    "expected_infeasible": false,
+    "correctly_blocked": false,
+    "first_need_timing": {
+      "key": "17:0",
+      "start_s": 9.4,
+      "finish_by_s": 19.5,
+      "protected_until_s": 20.0,
+      "estimated_total_s": 9.6,
+      "remaining_bytes": 150994944,
+      "unallocated_bytes": 0,
+      "feasible": true,
+      "reason": "scheduled_before_growth"
+    },
+    "conservative_lead_qualified": true
+  },
+  {
+    "scenario": "inverted_V",
+    "variant": "occupancy_supply_faults",
+    "horizon_s": 20.0,
+    "rate_MiB_s": 16,
+    "timing": "epoch",
+    "simulation_only": true,
+    "errors": [],
+    "max_preallocation_gap_MiB": 0.0,
+    "requested_MiB": 144.0,
+    "cold_refault_MiB": 0.0,
+    "unnecessary_reclaim": false,
+    "checks": [
+      {
+        "time_s": 20.0,
+        "deficit_bytes": 0
+      }
+    ],
+    "calls": [
+      {
+        "time_s": 9.4,
+        "bytes": 8388608
+      },
+      {
+        "time_s": 9.5,
+        "bytes": 16777216
+      },
+      {
+        "time_s": 9.6,
+        "bytes": 33554432
+      },
+      {
+        "time_s": 9.7,
+        "bytes": 33554432
+      },
+      {
+        "time_s": 9.8,
+        "bytes": 33554432
+      },
+      {
+        "time_s": 9.9,
+        "bytes": 25165824
+      }
+    ],
+    "passed": true,
+    "expected_infeasible": false,
+    "correctly_blocked": false,
+    "first_need_timing": {
+      "key": "1:0",
+      "start_s": 9.4,
+      "finish_by_s": 19.5,
+      "protected_until_s": 20.0,
+      "estimated_total_s": 9.6,
+      "remaining_bytes": 150994944,
+      "unallocated_bytes": 0,
+      "feasible": true,
+      "reason": "scheduled_before_growth"
+    },
+    "conservative_lead_qualified": true
+  },
+  {
+    "scenario": "inverted_V",
+    "variant": "occupancy_supply_faults",
+    "horizon_s": 30.0,
+    "rate_MiB_s": 16,
+    "timing": "epoch",
+    "simulation_only": true,
+    "errors": [],
+    "max_preallocation_gap_MiB": 0.0,
+    "requested_MiB": 144.0,
+    "cold_refault_MiB": 0.0,
+    "unnecessary_reclaim": false,
+    "checks": [
+      {
+        "time_s": 20.0,
+        "deficit_bytes": 0
+      }
+    ],
+    "calls": [
+      {
+        "time_s": 9.4,
+        "bytes": 8388608
+      },
+      {
+        "time_s": 9.5,
+        "bytes": 16777216
+      },
+      {
+        "time_s": 9.6,
+        "bytes": 33554432
+      },
+      {
+        "time_s": 9.7,
+        "bytes": 33554432
+      },
+      {
+        "time_s": 9.8,
+        "bytes": 33554432
+      },
+      {
+        "time_s": 9.9,
+        "bytes": 25165824
+      }
+    ],
+    "passed": true,
+    "expected_infeasible": false,
+    "correctly_blocked": false,
+    "first_need_timing": {
+      "key": "1:0",
+      "start_s": 9.4,
+      "finish_by_s": 19.5,
+      "protected_until_s": 24.0,
+      "estimated_total_s": 9.6,
+      "remaining_bytes": 150994944,
+      "unallocated_bytes": 0,
+      "feasible": true,
+      "reason": "scheduled_before_growth"
+    },
+    "conservative_lead_qualified": true
+  },
+  {
+    "scenario": "oscillating",
+    "variant": "wss_only",
+    "horizon_s": 12.0,
+    "rate_MiB_s": 16,
+    "timing": "epoch",
+    "simulation_only": true,
+    "errors": [],
+    "max_preallocation_gap_MiB": 0.0,
+    "requested_MiB": 144.0,
+    "cold_refault_MiB": 0.0,
+    "unnecessary_reclaim": false,
+    "checks": [
+      {
+        "time_s": 16.0,
+        "deficit_bytes": 0
+      },
+      {
+        "time_s": 25.0,
+        "deficit_bytes": 0
+      },
+      {
+        "time_s": 34.0,
+        "deficit_bytes": 0
+      }
+    ],
+    "calls": [
+      {
+        "time_s": 13.0,
+        "bytes": 8388608
+      },
+      {
+        "time_s": 13.1,
+        "bytes": 16777216
+      },
+      {
+        "time_s": 13.2,
+        "bytes": 33554432
+      },
+      {
+        "time_s": 13.3,
+        "bytes": 33554432
+      },
+      {
+        "time_s": 13.4,
+        "bytes": 33554432
+      },
+      {
+        "time_s": 13.5,
+        "bytes": 25165824
+      }
+    ],
+    "passed": true,
+    "expected_infeasible": false,
+    "correctly_blocked": false,
+    "first_need_timing": {
+      "key": "9:0",
+      "start_s": 13.4,
+      "finish_by_s": 15.5,
+      "protected_until_s": 16.0,
+      "estimated_total_s": 1.6,
+      "remaining_bytes": 16777216,
+      "unallocated_bytes": 0,
+      "feasible": true,
+      "reason": "scheduled_before_growth"
+    },
+    "conservative_lead_qualified": true
+  },
+  {
+    "scenario": "oscillating",
+    "variant": "wss_only",
+    "horizon_s": 20.0,
+    "rate_MiB_s": 16,
+    "timing": "epoch",
+    "simulation_only": true,
+    "errors": [],
+    "max_preallocation_gap_MiB": 0.0,
+    "requested_MiB": 144.0,
+    "cold_refault_MiB": 0.0,
+    "unnecessary_reclaim": false,
+    "checks": [
+      {
+        "time_s": 16.0,
+        "deficit_bytes": 0
+      },
+      {
+        "time_s": 25.0,
+        "deficit_bytes": 0
+      },
+      {
+        "time_s": 34.0,
+        "deficit_bytes": 0
+      }
+    ],
+    "calls": [
+      {
+        "time_s": 5.4,
+        "bytes": 8388608
+      },
+      {
+        "time_s": 5.5,
+        "bytes": 16777216
+      },
+      {
+        "time_s": 5.6,
+        "bytes": 33554432
+      },
+      {
+        "time_s": 5.7,
+        "bytes": 33554432
+      },
+      {
+        "time_s": 5.8,
+        "bytes": 33554432
+      },
+      {
+        "time_s": 5.9,
+        "bytes": 25165824
+      }
+    ],
+    "passed": true,
+    "expected_infeasible": false,
+    "correctly_blocked": false,
+    "first_need_timing": {
+      "key": "1:0",
+      "start_s": 13.4,
+      "finish_by_s": 15.5,
+      "protected_until_s": 20.0,
+      "estimated_total_s": 1.6,
+      "remaining_bytes": 16777216,
+      "unallocated_bytes": 0,
+      "feasible": true,
+      "reason": "scheduled_before_growth"
+    },
+    "conservative_lead_qualified": true
+  },
+  {
+    "scenario": "oscillating",
+    "variant": "wss_only",
+    "horizon_s": 30.0,
+    "rate_MiB_s": 16,
+    "timing": "epoch",
+    "simulation_only": true,
+    "errors": [],
+    "max_preallocation_gap_MiB": 0.0,
+    "requested_MiB": 144.0,
+    "cold_refault_MiB": 0.0,
+    "unnecessary_reclaim": false,
+    "checks": [
+      {
+        "time_s": 16.0,
+        "deficit_bytes": 0
+      },
+      {
+        "time_s": 25.0,
+        "deficit_bytes": 0
+      },
+      {
+        "time_s": 34.0,
+        "deficit_bytes": 0
+      }
+    ],
+    "calls": [
+      {
+        "time_s": 5.4,
+        "bytes": 8388608
+      },
+      {
+        "time_s": 5.5,
+        "bytes": 16777216
+      },
+      {
+        "time_s": 5.6,
+        "bytes": 33554432
+      },
+      {
+        "time_s": 5.7,
+        "bytes": 33554432
+      },
+      {
+        "time_s": 5.8,
+        "bytes": 33554432
+      },
+      {
+        "time_s": 5.9,
+        "bytes": 25165824
+      }
+    ],
+    "passed": true,
+    "expected_infeasible": false,
+    "correctly_blocked": false,
+    "first_need_timing": {
+      "key": "1:0",
+      "start_s": 5.4,
+      "finish_by_s": 15.5,
+      "protected_until_s": 20.0,
+      "estimated_total_s": 9.6,
+      "remaining_bytes": 150994944,
+      "unallocated_bytes": 0,
+      "feasible": true,
+      "reason": "scheduled_before_growth"
+    },
+    "conservative_lead_qualified": true
+  },
+  {
+    "scenario": "oscillating",
+    "variant": "occupancy",
+    "horizon_s": 12.0,
+    "rate_MiB_s": 16,
+    "timing": "epoch",
+    "simulation_only": true,
+    "errors": [],
+    "max_preallocation_gap_MiB": 0.0,
+    "requested_MiB": 144.0,
+    "cold_refault_MiB": 0.0,
+    "unnecessary_reclaim": false,
+    "checks": [
+      {
+        "time_s": 16.0,
+        "deficit_bytes": 0
+      },
+      {
+        "time_s": 25.0,
+        "deficit_bytes": 0
+      },
+      {
+        "time_s": 34.0,
+        "deficit_bytes": 0
+      }
+    ],
+    "calls": [
+      {
+        "time_s": 13.0,
+        "bytes": 8388608
+      },
+      {
+        "time_s": 13.1,
+        "bytes": 16777216
+      },
+      {
+        "time_s": 13.2,
+        "bytes": 33554432
+      },
+      {
+        "time_s": 13.3,
+        "bytes": 33554432
+      },
+      {
+        "time_s": 13.4,
+        "bytes": 33554432
+      },
+      {
+        "time_s": 13.5,
+        "bytes": 25165824
+      }
+    ],
+    "passed": true,
+    "expected_infeasible": false,
+    "correctly_blocked": false,
+    "first_need_timing": {
+      "key": "9:0",
+      "start_s": 13.4,
+      "finish_by_s": 15.5,
+      "protected_until_s": 16.0,
+      "estimated_total_s": 1.6,
+      "remaining_bytes": 16777216,
+      "unallocated_bytes": 0,
+      "feasible": true,
+      "reason": "scheduled_before_growth"
+    },
+    "conservative_lead_qualified": true
+  },
+  {
+    "scenario": "oscillating",
+    "variant": "occupancy",
+    "horizon_s": 20.0,
+    "rate_MiB_s": 16,
+    "timing": "epoch",
+    "simulation_only": true,
+    "errors": [],
+    "max_preallocation_gap_MiB": 0.0,
+    "requested_MiB": 144.0,
+    "cold_refault_MiB": 0.0,
+    "unnecessary_reclaim": false,
+    "checks": [
+      {
+        "time_s": 16.0,
+        "deficit_bytes": 0
+      },
+      {
+        "time_s": 25.0,
+        "deficit_bytes": 0
+      },
+      {
+        "time_s": 34.0,
+        "deficit_bytes": 0
+      }
+    ],
+    "calls": [
+      {
+        "time_s": 5.4,
+        "bytes": 8388608
+      },
+      {
+        "time_s": 5.5,
+        "bytes": 16777216
+      },
+      {
+        "time_s": 5.6,
+        "bytes": 33554432
+      },
+      {
+        "time_s": 5.7,
+        "bytes": 33554432
+      },
+      {
+        "time_s": 5.8,
+        "bytes": 33554432
+      },
+      {
+        "time_s": 5.9,
+        "bytes": 25165824
+      }
+    ],
+    "passed": true,
+    "expected_infeasible": false,
+    "correctly_blocked": false,
+    "first_need_timing": {
+      "key": "1:0",
+      "start_s": 13.4,
+      "finish_by_s": 15.5,
+      "protected_until_s": 20.0,
+      "estimated_total_s": 1.6,
+      "remaining_bytes": 16777216,
+      "unallocated_bytes": 0,
+      "feasible": true,
+      "reason": "scheduled_before_growth"
+    },
+    "conservative_lead_qualified": true
+  },
+  {
+    "scenario": "oscillating",
+    "variant": "occupancy",
+    "horizon_s": 30.0,
+    "rate_MiB_s": 16,
+    "timing": "epoch",
+    "simulation_only": true,
+    "errors": [],
+    "max_preallocation_gap_MiB": 0.0,
+    "requested_MiB": 144.0,
+    "cold_refault_MiB": 0.0,
+    "unnecessary_reclaim": false,
+    "checks": [
+      {
+        "time_s": 16.0,
+        "deficit_bytes": 0
+      },
+      {
+        "time_s": 25.0,
+        "deficit_bytes": 0
+      },
+      {
+        "time_s": 34.0,
+        "deficit_bytes": 0
+      }
+    ],
+    "calls": [
+      {
+        "time_s": 5.4,
+        "bytes": 8388608
+      },
+      {
+        "time_s": 5.5,
+        "bytes": 16777216
+      },
+      {
+        "time_s": 5.6,
+        "bytes": 33554432
+      },
+      {
+        "time_s": 5.7,
+        "bytes": 33554432
+      },
+      {
+        "time_s": 5.8,
+        "bytes": 33554432
+      },
+      {
+        "time_s": 5.9,
+        "bytes": 25165824
+      }
+    ],
+    "passed": true,
+    "expected_infeasible": false,
+    "correctly_blocked": false,
+    "first_need_timing": {
+      "key": "1:0",
+      "start_s": 5.4,
+      "finish_by_s": 15.5,
+      "protected_until_s": 20.0,
+      "estimated_total_s": 9.6,
+      "remaining_bytes": 150994944,
+      "unallocated_bytes": 0,
+      "feasible": true,
+      "reason": "scheduled_before_growth"
+    },
+    "conservative_lead_qualified": true
+  },
+  {
+    "scenario": "oscillating",
+    "variant": "occupancy_supply",
+    "horizon_s": 12.0,
+    "rate_MiB_s": 16,
+    "timing": "epoch",
+    "simulation_only": true,
+    "errors": [],
+    "max_preallocation_gap_MiB": 0.0,
+    "requested_MiB": 144.0,
+    "cold_refault_MiB": 0.0,
+    "unnecessary_reclaim": false,
+    "checks": [
+      {
+        "time_s": 16.0,
+        "deficit_bytes": 0
+      },
+      {
+        "time_s": 25.0,
+        "deficit_bytes": 0
+      },
+      {
+        "time_s": 34.0,
+        "deficit_bytes": 0
+      }
+    ],
+    "calls": [
+      {
+        "time_s": 13.0,
+        "bytes": 8388608
+      },
+      {
+        "time_s": 13.1,
+        "bytes": 16777216
+      },
+      {
+        "time_s": 13.2,
+        "bytes": 33554432
+      },
+      {
+        "time_s": 13.3,
+        "bytes": 33554432
+      },
+      {
+        "time_s": 13.4,
+        "bytes": 33554432
+      },
+      {
+        "time_s": 13.5,
+        "bytes": 25165824
+      }
+    ],
+    "passed": true,
+    "expected_infeasible": false,
+    "correctly_blocked": false,
+    "first_need_timing": {
+      "key": "9:0",
+      "start_s": 13.4,
+      "finish_by_s": 15.5,
+      "protected_until_s": 16.0,
+      "estimated_total_s": 1.6,
+      "remaining_bytes": 16777216,
+      "unallocated_bytes": 0,
+      "feasible": true,
+      "reason": "scheduled_before_growth"
+    },
+    "conservative_lead_qualified": true
+  },
+  {
+    "scenario": "oscillating",
+    "variant": "occupancy_supply",
+    "horizon_s": 20.0,
+    "rate_MiB_s": 16,
+    "timing": "epoch",
+    "simulation_only": true,
+    "errors": [],
+    "max_preallocation_gap_MiB": 0.0,
+    "requested_MiB": 144.0,
+    "cold_refault_MiB": 0.0,
+    "unnecessary_reclaim": false,
+    "checks": [
+      {
+        "time_s": 16.0,
+        "deficit_bytes": 0
+      },
+      {
+        "time_s": 25.0,
+        "deficit_bytes": 0
+      },
+      {
+        "time_s": 34.0,
+        "deficit_bytes": 0
+      }
+    ],
+    "calls": [
+      {
+        "time_s": 5.4,
+        "bytes": 8388608
+      },
+      {
+        "time_s": 5.5,
+        "bytes": 16777216
+      },
+      {
+        "time_s": 5.6,
+        "bytes": 33554432
+      },
+      {
+        "time_s": 5.7,
+        "bytes": 33554432
+      },
+      {
+        "time_s": 5.8,
+        "bytes": 33554432
+      },
+      {
+        "time_s": 5.9,
+        "bytes": 25165824
+      }
+    ],
+    "passed": true,
+    "expected_infeasible": false,
+    "correctly_blocked": false,
+    "first_need_timing": {
+      "key": "1:0",
+      "start_s": 13.4,
+      "finish_by_s": 15.5,
+      "protected_until_s": 20.0,
+      "estimated_total_s": 1.6,
+      "remaining_bytes": 16777216,
+      "unallocated_bytes": 0,
+      "feasible": true,
+      "reason": "scheduled_before_growth"
+    },
+    "conservative_lead_qualified": true
+  },
+  {
+    "scenario": "oscillating",
+    "variant": "occupancy_supply",
+    "horizon_s": 30.0,
+    "rate_MiB_s": 16,
+    "timing": "epoch",
+    "simulation_only": true,
+    "errors": [],
+    "max_preallocation_gap_MiB": 0.0,
+    "requested_MiB": 144.0,
+    "cold_refault_MiB": 0.0,
+    "unnecessary_reclaim": false,
+    "checks": [
+      {
+        "time_s": 16.0,
+        "deficit_bytes": 0
+      },
+      {
+        "time_s": 25.0,
+        "deficit_bytes": 0
+      },
+      {
+        "time_s": 34.0,
+        "deficit_bytes": 0
+      }
+    ],
+    "calls": [
+      {
+        "time_s": 5.4,
+        "bytes": 8388608
+      },
+      {
+        "time_s": 5.5,
+        "bytes": 16777216
+      },
+      {
+        "time_s": 5.6,
+        "bytes": 33554432
+      },
+      {
+        "time_s": 5.7,
+        "bytes": 33554432
+      },
+      {
+        "time_s": 5.8,
+        "bytes": 33554432
+      },
+      {
+        "time_s": 5.9,
+        "bytes": 25165824
+      }
+    ],
+    "passed": true,
+    "expected_infeasible": false,
+    "correctly_blocked": false,
+    "first_need_timing": {
+      "key": "1:0",
+      "start_s": 5.4,
+      "finish_by_s": 15.5,
+      "protected_until_s": 20.0,
+      "estimated_total_s": 9.6,
+      "remaining_bytes": 150994944,
+      "unallocated_bytes": 0,
+      "feasible": true,
+      "reason": "scheduled_before_growth"
+    },
+    "conservative_lead_qualified": true
+  },
+  {
+    "scenario": "oscillating",
+    "variant": "occupancy_supply_faults",
+    "horizon_s": 12.0,
+    "rate_MiB_s": 16,
+    "timing": "epoch",
+    "simulation_only": true,
+    "errors": [],
+    "max_preallocation_gap_MiB": 0.0,
+    "requested_MiB": 144.0,
+    "cold_refault_MiB": 0.0,
+    "unnecessary_reclaim": false,
+    "checks": [
+      {
+        "time_s": 16.0,
+        "deficit_bytes": 0
+      },
+      {
+        "time_s": 25.0,
+        "deficit_bytes": 0
+      },
+      {
+        "time_s": 34.0,
+        "deficit_bytes": 0
+      }
+    ],
+    "calls": [
+      {
+        "time_s": 13.0,
+        "bytes": 8388608
+      },
+      {
+        "time_s": 13.1,
+        "bytes": 16777216
+      },
+      {
+        "time_s": 13.2,
+        "bytes": 33554432
+      },
+      {
+        "time_s": 13.3,
+        "bytes": 33554432
+      },
+      {
+        "time_s": 13.4,
+        "bytes": 33554432
+      },
+      {
+        "time_s": 13.5,
+        "bytes": 25165824
+      }
+    ],
+    "passed": true,
+    "expected_infeasible": false,
+    "correctly_blocked": false,
+    "first_need_timing": {
+      "key": "9:0",
+      "start_s": 13.4,
+      "finish_by_s": 15.5,
+      "protected_until_s": 16.0,
+      "estimated_total_s": 1.6,
+      "remaining_bytes": 16777216,
+      "unallocated_bytes": 0,
+      "feasible": true,
+      "reason": "scheduled_before_growth"
+    },
+    "conservative_lead_qualified": true
+  },
+  {
+    "scenario": "oscillating",
+    "variant": "occupancy_supply_faults",
+    "horizon_s": 20.0,
+    "rate_MiB_s": 16,
+    "timing": "epoch",
+    "simulation_only": true,
+    "errors": [],
+    "max_preallocation_gap_MiB": 0.0,
+    "requested_MiB": 144.0,
+    "cold_refault_MiB": 0.0,
+    "unnecessary_reclaim": false,
+    "checks": [
+      {
+        "time_s": 16.0,
+        "deficit_bytes": 0
+      },
+      {
+        "time_s": 25.0,
+        "deficit_bytes": 0
+      },
+      {
+        "time_s": 34.0,
+        "deficit_bytes": 0
+      }
+    ],
+    "calls": [
+      {
+        "time_s": 5.4,
+        "bytes": 8388608
+      },
+      {
+        "time_s": 5.5,
+        "bytes": 16777216
+      },
+      {
+        "time_s": 5.6,
+        "bytes": 33554432
+      },
+      {
+        "time_s": 5.7,
+        "bytes": 33554432
+      },
+      {
+        "time_s": 5.8,
+        "bytes": 33554432
+      },
+      {
+        "time_s": 5.9,
+        "bytes": 25165824
+      }
+    ],
+    "passed": true,
+    "expected_infeasible": false,
+    "correctly_blocked": false,
+    "first_need_timing": {
+      "key": "1:0",
+      "start_s": 13.4,
+      "finish_by_s": 15.5,
+      "protected_until_s": 20.0,
+      "estimated_total_s": 1.6,
+      "remaining_bytes": 16777216,
+      "unallocated_bytes": 0,
+      "feasible": true,
+      "reason": "scheduled_before_growth"
+    },
+    "conservative_lead_qualified": true
+  },
+  {
+    "scenario": "oscillating",
+    "variant": "occupancy_supply_faults",
+    "horizon_s": 30.0,
+    "rate_MiB_s": 16,
+    "timing": "epoch",
+    "simulation_only": true,
+    "errors": [],
+    "max_preallocation_gap_MiB": 0.0,
+    "requested_MiB": 144.0,
+    "cold_refault_MiB": 0.0,
+    "unnecessary_reclaim": false,
+    "checks": [
+      {
+        "time_s": 16.0,
+        "deficit_bytes": 0
+      },
+      {
+        "time_s": 25.0,
+        "deficit_bytes": 0
+      },
+      {
+        "time_s": 34.0,
+        "deficit_bytes": 0
+      }
+    ],
+    "calls": [
+      {
+        "time_s": 5.4,
+        "bytes": 8388608
+      },
+      {
+        "time_s": 5.5,
+        "bytes": 16777216
+      },
+      {
+        "time_s": 5.6,
+        "bytes": 33554432
+      },
+      {
+        "time_s": 5.7,
+        "bytes": 33554432
+      },
+      {
+        "time_s": 5.8,
+        "bytes": 33554432
+      },
+      {
+        "time_s": 5.9,
+        "bytes": 25165824
+      }
+    ],
+    "passed": true,
+    "expected_infeasible": false,
+    "correctly_blocked": false,
+    "first_need_timing": {
+      "key": "1:0",
+      "start_s": 5.4,
+      "finish_by_s": 15.5,
+      "protected_until_s": 20.0,
+      "estimated_total_s": 9.6,
+      "remaining_bytes": 150994944,
+      "unallocated_bytes": 0,
+      "feasible": true,
+      "reason": "scheduled_before_growth"
+    },
+    "conservative_lead_qualified": true
+  },
+  {
+    "scenario": "flat_WSS_growth",
+    "variant": "wss_only",
+    "horizon_s": 12.0,
+    "rate_MiB_s": 16,
+    "timing": "epoch",
+    "simulation_only": true,
+    "errors": [],
+    "max_preallocation_gap_MiB": 128.0,
+    "requested_MiB": 0.0,
+    "cold_refault_MiB": 0.0,
+    "unnecessary_reclaim": false,
+    "checks": [
+      {
+        "time_s": 20.0,
+        "deficit_bytes": 134217728
+      }
+    ],
+    "calls": [],
+    "passed": false,
+    "expected_infeasible": false,
+    "correctly_blocked": false,
+    "first_need_timing": null,
+    "conservative_lead_qualified": true
+  },
+  {
+    "scenario": "flat_WSS_growth",
+    "variant": "wss_only",
+    "horizon_s": 20.0,
+    "rate_MiB_s": 16,
+    "timing": "epoch",
+    "simulation_only": true,
+    "errors": [],
+    "max_preallocation_gap_MiB": 128.0,
+    "requested_MiB": 0.0,
+    "cold_refault_MiB": 0.0,
+    "unnecessary_reclaim": false,
+    "checks": [
+      {
+        "time_s": 20.0,
+        "deficit_bytes": 134217728
+      }
+    ],
+    "calls": [],
+    "passed": false,
+    "expected_infeasible": false,
+    "correctly_blocked": false,
+    "first_need_timing": null,
+    "conservative_lead_qualified": true
+  },
+  {
+    "scenario": "flat_WSS_growth",
+    "variant": "wss_only",
+    "horizon_s": 30.0,
+    "rate_MiB_s": 16,
+    "timing": "epoch",
+    "simulation_only": true,
+    "errors": [],
+    "max_preallocation_gap_MiB": 128.0,
+    "requested_MiB": 0.0,
+    "cold_refault_MiB": 0.0,
+    "unnecessary_reclaim": false,
+    "checks": [
+      {
+        "time_s": 20.0,
+        "deficit_bytes": 134217728
+      }
+    ],
+    "calls": [],
+    "passed": false,
+    "expected_infeasible": false,
+    "correctly_blocked": false,
+    "first_need_timing": null,
+    "conservative_lead_qualified": true
+  },
+  {
+    "scenario": "flat_WSS_growth",
+    "variant": "occupancy",
+    "horizon_s": 12.0,
+    "rate_MiB_s": 16,
+    "timing": "epoch",
+    "simulation_only": true,
+    "errors": [],
+    "max_preallocation_gap_MiB": 0.0,
+    "requested_MiB": 144.0,
+    "cold_refault_MiB": 0.0,
+    "unnecessary_reclaim": false,
+    "checks": [
+      {
+        "time_s": 20.0,
+        "deficit_bytes": 0
+      }
+    ],
+    "calls": [
+      {
+        "time_s": 9.4,
+        "bytes": 8388608
+      },
+      {
+        "time_s": 9.5,
+        "bytes": 16777216
+      },
+      {
+        "time_s": 9.6,
+        "bytes": 33554432
+      },
+      {
+        "time_s": 9.7,
+        "bytes": 33554432
+      },
+      {
+        "time_s": 9.8,
+        "bytes": 33554432
+      },
+      {
+        "time_s": 9.9,
+        "bytes": 25165824
+      }
+    ],
+    "passed": true,
+    "expected_infeasible": false,
+    "correctly_blocked": false,
+    "first_need_timing": {
+      "key": "17:0",
+      "start_s": 9.4,
+      "finish_by_s": 19.5,
+      "protected_until_s": 20.0,
+      "estimated_total_s": 9.6,
+      "remaining_bytes": 150994944,
+      "unallocated_bytes": 0,
+      "feasible": true,
+      "reason": "scheduled_before_growth"
+    },
+    "conservative_lead_qualified": true
+  },
+  {
+    "scenario": "flat_WSS_growth",
+    "variant": "occupancy",
+    "horizon_s": 20.0,
+    "rate_MiB_s": 16,
+    "timing": "epoch",
+    "simulation_only": true,
+    "errors": [],
+    "max_preallocation_gap_MiB": 0.0,
+    "requested_MiB": 144.0,
+    "cold_refault_MiB": 0.0,
+    "unnecessary_reclaim": false,
+    "checks": [
+      {
+        "time_s": 20.0,
+        "deficit_bytes": 0
+      }
+    ],
+    "calls": [
+      {
+        "time_s": 9.4,
+        "bytes": 8388608
+      },
+      {
+        "time_s": 9.5,
+        "bytes": 16777216
+      },
+      {
+        "time_s": 9.6,
+        "bytes": 33554432
+      },
+      {
+        "time_s": 9.7,
+        "bytes": 33554432
+      },
+      {
+        "time_s": 9.8,
+        "bytes": 33554432
+      },
+      {
+        "time_s": 9.9,
+        "bytes": 25165824
+      }
+    ],
+    "passed": true,
+    "expected_infeasible": false,
+    "correctly_blocked": false,
+    "first_need_timing": {
+      "key": "1:0",
+      "start_s": 9.4,
+      "finish_by_s": 19.5,
+      "protected_until_s": 20.0,
+      "estimated_total_s": 9.6,
+      "remaining_bytes": 150994944,
+      "unallocated_bytes": 0,
+      "feasible": true,
+      "reason": "scheduled_before_growth"
+    },
+    "conservative_lead_qualified": true
+  },
+  {
+    "scenario": "flat_WSS_growth",
+    "variant": "occupancy",
+    "horizon_s": 30.0,
+    "rate_MiB_s": 16,
+    "timing": "epoch",
+    "simulation_only": true,
+    "errors": [],
+    "max_preallocation_gap_MiB": 0.0,
+    "requested_MiB": 144.0,
+    "cold_refault_MiB": 0.0,
+    "unnecessary_reclaim": false,
+    "checks": [
+      {
+        "time_s": 20.0,
+        "deficit_bytes": 0
+      }
+    ],
+    "calls": [
+      {
+        "time_s": 9.4,
+        "bytes": 8388608
+      },
+      {
+        "time_s": 9.5,
+        "bytes": 16777216
+      },
+      {
+        "time_s": 9.6,
+        "bytes": 33554432
+      },
+      {
+        "time_s": 9.7,
+        "bytes": 33554432
+      },
+      {
+        "time_s": 9.8,
+        "bytes": 33554432
+      },
+      {
+        "time_s": 9.9,
+        "bytes": 25165824
+      }
+    ],
+    "passed": true,
+    "expected_infeasible": false,
+    "correctly_blocked": false,
+    "first_need_timing": {
+      "key": "1:0",
+      "start_s": 9.4,
+      "finish_by_s": 19.5,
+      "protected_until_s": 30.0,
+      "estimated_total_s": 9.6,
+      "remaining_bytes": 150994944,
+      "unallocated_bytes": 0,
+      "feasible": true,
+      "reason": "scheduled_before_growth"
+    },
+    "conservative_lead_qualified": true
+  },
+  {
+    "scenario": "flat_WSS_growth",
+    "variant": "occupancy_supply",
+    "horizon_s": 12.0,
+    "rate_MiB_s": 16,
+    "timing": "epoch",
+    "simulation_only": true,
+    "errors": [],
+    "max_preallocation_gap_MiB": 0.0,
+    "requested_MiB": 144.0,
+    "cold_refault_MiB": 0.0,
+    "unnecessary_reclaim": false,
+    "checks": [
+      {
+        "time_s": 20.0,
+        "deficit_bytes": 0
+      }
+    ],
+    "calls": [
+      {
+        "time_s": 9.4,
+        "bytes": 8388608
+      },
+      {
+        "time_s": 9.5,
+        "bytes": 16777216
+      },
+      {
+        "time_s": 9.6,
+        "bytes": 33554432
+      },
+      {
+        "time_s": 9.7,
+        "bytes": 33554432
+      },
+      {
+        "time_s": 9.8,
+        "bytes": 33554432
+      },
+      {
+        "time_s": 9.9,
+        "bytes": 25165824
+      }
+    ],
+    "passed": true,
+    "expected_infeasible": false,
+    "correctly_blocked": false,
+    "first_need_timing": {
+      "key": "17:0",
+      "start_s": 9.4,
+      "finish_by_s": 19.5,
+      "protected_until_s": 20.0,
+      "estimated_total_s": 9.6,
+      "remaining_bytes": 150994944,
+      "unallocated_bytes": 0,
+      "feasible": true,
+      "reason": "scheduled_before_growth"
+    },
+    "conservative_lead_qualified": true
+  },
+  {
+    "scenario": "flat_WSS_growth",
+    "variant": "occupancy_supply",
+    "horizon_s": 20.0,
+    "rate_MiB_s": 16,
+    "timing": "epoch",
+    "simulation_only": true,
+    "errors": [],
+    "max_preallocation_gap_MiB": 0.0,
+    "requested_MiB": 144.0,
+    "cold_refault_MiB": 0.0,
+    "unnecessary_reclaim": false,
+    "checks": [
+      {
+        "time_s": 20.0,
+        "deficit_bytes": 0
+      }
+    ],
+    "calls": [
+      {
+        "time_s": 9.4,
+        "bytes": 8388608
+      },
+      {
+        "time_s": 9.5,
+        "bytes": 16777216
+      },
+      {
+        "time_s": 9.6,
+        "bytes": 33554432
+      },
+      {
+        "time_s": 9.7,
+        "bytes": 33554432
+      },
+      {
+        "time_s": 9.8,
+        "bytes": 33554432
+      },
+      {
+        "time_s": 9.9,
+        "bytes": 25165824
+      }
+    ],
+    "passed": true,
+    "expected_infeasible": false,
+    "correctly_blocked": false,
+    "first_need_timing": {
+      "key": "1:0",
+      "start_s": 9.4,
+      "finish_by_s": 19.5,
+      "protected_until_s": 20.0,
+      "estimated_total_s": 9.6,
+      "remaining_bytes": 150994944,
+      "unallocated_bytes": 0,
+      "feasible": true,
+      "reason": "scheduled_before_growth"
+    },
+    "conservative_lead_qualified": true
+  },
+  {
+    "scenario": "flat_WSS_growth",
+    "variant": "occupancy_supply",
+    "horizon_s": 30.0,
+    "rate_MiB_s": 16,
+    "timing": "epoch",
+    "simulation_only": true,
+    "errors": [],
+    "max_preallocation_gap_MiB": 0.0,
+    "requested_MiB": 144.0,
+    "cold_refault_MiB": 0.0,
+    "unnecessary_reclaim": false,
+    "checks": [
+      {
+        "time_s": 20.0,
+        "deficit_bytes": 0
+      }
+    ],
+    "calls": [
+      {
+        "time_s": 9.4,
+        "bytes": 8388608
+      },
+      {
+        "time_s": 9.5,
+        "bytes": 16777216
+      },
+      {
+        "time_s": 9.6,
+        "bytes": 33554432
+      },
+      {
+        "time_s": 9.7,
+        "bytes": 33554432
+      },
+      {
+        "time_s": 9.8,
+        "bytes": 33554432
+      },
+      {
+        "time_s": 9.9,
+        "bytes": 25165824
+      }
+    ],
+    "passed": true,
+    "expected_infeasible": false,
+    "correctly_blocked": false,
+    "first_need_timing": {
+      "key": "1:0",
+      "start_s": 9.4,
+      "finish_by_s": 19.5,
+      "protected_until_s": 30.0,
+      "estimated_total_s": 9.6,
+      "remaining_bytes": 150994944,
+      "unallocated_bytes": 0,
+      "feasible": true,
+      "reason": "scheduled_before_growth"
+    },
+    "conservative_lead_qualified": true
+  },
+  {
+    "scenario": "flat_WSS_growth",
+    "variant": "occupancy_supply_faults",
+    "horizon_s": 12.0,
+    "rate_MiB_s": 16,
+    "timing": "epoch",
+    "simulation_only": true,
+    "errors": [],
+    "max_preallocation_gap_MiB": 0.0,
+    "requested_MiB": 144.0,
+    "cold_refault_MiB": 0.0,
+    "unnecessary_reclaim": false,
+    "checks": [
+      {
+        "time_s": 20.0,
+        "deficit_bytes": 0
+      }
+    ],
+    "calls": [
+      {
+        "time_s": 9.4,
+        "bytes": 8388608
+      },
+      {
+        "time_s": 9.5,
+        "bytes": 16777216
+      },
+      {
+        "time_s": 9.6,
+        "bytes": 33554432
+      },
+      {
+        "time_s": 9.7,
+        "bytes": 33554432
+      },
+      {
+        "time_s": 9.8,
+        "bytes": 33554432
+      },
+      {
+        "time_s": 9.9,
+        "bytes": 25165824
+      }
+    ],
+    "passed": true,
+    "expected_infeasible": false,
+    "correctly_blocked": false,
+    "first_need_timing": {
+      "key": "17:0",
+      "start_s": 9.4,
+      "finish_by_s": 19.5,
+      "protected_until_s": 20.0,
+      "estimated_total_s": 9.6,
+      "remaining_bytes": 150994944,
+      "unallocated_bytes": 0,
+      "feasible": true,
+      "reason": "scheduled_before_growth"
+    },
+    "conservative_lead_qualified": true
+  },
+  {
+    "scenario": "flat_WSS_growth",
+    "variant": "occupancy_supply_faults",
+    "horizon_s": 20.0,
+    "rate_MiB_s": 16,
+    "timing": "epoch",
+    "simulation_only": true,
+    "errors": [],
+    "max_preallocation_gap_MiB": 0.0,
+    "requested_MiB": 144.0,
+    "cold_refault_MiB": 0.0,
+    "unnecessary_reclaim": false,
+    "checks": [
+      {
+        "time_s": 20.0,
+        "deficit_bytes": 0
+      }
+    ],
+    "calls": [
+      {
+        "time_s": 9.4,
+        "bytes": 8388608
+      },
+      {
+        "time_s": 9.5,
+        "bytes": 16777216
+      },
+      {
+        "time_s": 9.6,
+        "bytes": 33554432
+      },
+      {
+        "time_s": 9.7,
+        "bytes": 33554432
+      },
+      {
+        "time_s": 9.8,
+        "bytes": 33554432
+      },
+      {
+        "time_s": 9.9,
+        "bytes": 25165824
+      }
+    ],
+    "passed": true,
+    "expected_infeasible": false,
+    "correctly_blocked": false,
+    "first_need_timing": {
+      "key": "1:0",
+      "start_s": 9.4,
+      "finish_by_s": 19.5,
+      "protected_until_s": 20.0,
+      "estimated_total_s": 9.6,
+      "remaining_bytes": 150994944,
+      "unallocated_bytes": 0,
+      "feasible": true,
+      "reason": "scheduled_before_growth"
+    },
+    "conservative_lead_qualified": true
+  },
+  {
+    "scenario": "flat_WSS_growth",
+    "variant": "occupancy_supply_faults",
+    "horizon_s": 30.0,
+    "rate_MiB_s": 16,
+    "timing": "epoch",
+    "simulation_only": true,
+    "errors": [],
+    "max_preallocation_gap_MiB": 0.0,
+    "requested_MiB": 144.0,
+    "cold_refault_MiB": 0.0,
+    "unnecessary_reclaim": false,
+    "checks": [
+      {
+        "time_s": 20.0,
+        "deficit_bytes": 0
+      }
+    ],
+    "calls": [
+      {
+        "time_s": 9.4,
+        "bytes": 8388608
+      },
+      {
+        "time_s": 9.5,
+        "bytes": 16777216
+      },
+      {
+        "time_s": 9.6,
+        "bytes": 33554432
+      },
+      {
+        "time_s": 9.7,
+        "bytes": 33554432
+      },
+      {
+        "time_s": 9.8,
+        "bytes": 33554432
+      },
+      {
+        "time_s": 9.9,
+        "bytes": 25165824
+      }
+    ],
+    "passed": true,
+    "expected_infeasible": false,
+    "correctly_blocked": false,
+    "first_need_timing": {
+      "key": "1:0",
+      "start_s": 9.4,
+      "finish_by_s": 19.5,
+      "protected_until_s": 30.0,
+      "estimated_total_s": 9.6,
+      "remaining_bytes": 150994944,
+      "unallocated_bytes": 0,
+      "feasible": true,
+      "reason": "scheduled_before_growth"
+    },
+    "conservative_lead_qualified": true
+  },
+  {
+    "scenario": "WSS_change_no_allocation",
+    "variant": "wss_only",
+    "horizon_s": 12.0,
+    "rate_MiB_s": 16,
+    "timing": "epoch",
+    "simulation_only": true,
+    "errors": [],
+    "max_preallocation_gap_MiB": 0.0,
+    "requested_MiB": 16.0,
+    "cold_refault_MiB": 16.0,
+    "unnecessary_reclaim": true,
+    "checks": [],
+    "calls": [
+      {
+        "time_s": 8.0,
+        "bytes": 8388608
+      },
+      {
+        "time_s": 8.1,
+        "bytes": 8388608
+      }
+    ],
+    "passed": false,
+    "expected_infeasible": false,
+    "correctly_blocked": false,
+    "first_need_timing": {
+      "key": "17:0",
+      "start_s": 0.0,
+      "finish_by_s": 19.5,
+      "protected_until_s": 20.0,
+      "estimated_total_s": 24.6,
+      "remaining_bytes": 419430400,
+      "unallocated_bytes": 16777216,
+      "feasible": false,
+      "reason": "insufficient_capacity_or_time"
+    },
+    "conservative_lead_qualified": false
+  },
+  {
+    "scenario": "WSS_change_no_allocation",
+    "variant": "wss_only",
+    "horizon_s": 20.0,
+    "rate_MiB_s": 16,
+    "timing": "epoch",
+    "simulation_only": true,
+    "errors": [],
+    "max_preallocation_gap_MiB": 0.0,
+    "requested_MiB": 16.0,
+    "cold_refault_MiB": 16.0,
+    "unnecessary_reclaim": true,
+    "checks": [],
+    "calls": [
+      {
+        "time_s": 0.0,
+        "bytes": 8388608
+      },
+      {
+        "time_s": 0.1,
+        "bytes": 8388608
+      }
+    ],
+    "passed": false,
+    "expected_infeasible": false,
+    "correctly_blocked": false,
+    "first_need_timing": {
+      "key": "1:0",
+      "start_s": 0.0,
+      "finish_by_s": 19.5,
+      "protected_until_s": 20.0,
+      "estimated_total_s": 24.6,
+      "remaining_bytes": 419430400,
+      "unallocated_bytes": 16777216,
+      "feasible": false,
+      "reason": "insufficient_capacity_or_time"
+    },
+    "conservative_lead_qualified": false
+  },
+  {
+    "scenario": "WSS_change_no_allocation",
+    "variant": "wss_only",
+    "horizon_s": 30.0,
+    "rate_MiB_s": 16,
+    "timing": "epoch",
+    "simulation_only": true,
+    "errors": [],
+    "max_preallocation_gap_MiB": 0.0,
+    "requested_MiB": 16.0,
+    "cold_refault_MiB": 16.0,
+    "unnecessary_reclaim": true,
+    "checks": [],
+    "calls": [
+      {
+        "time_s": 0.0,
+        "bytes": 8388608
+      },
+      {
+        "time_s": 0.1,
+        "bytes": 8388608
+      }
+    ],
+    "passed": false,
+    "expected_infeasible": false,
+    "correctly_blocked": false,
+    "first_need_timing": {
+      "key": "1:0",
+      "start_s": 0.0,
+      "finish_by_s": 19.5,
+      "protected_until_s": 30.0,
+      "estimated_total_s": 24.6,
+      "remaining_bytes": 419430400,
+      "unallocated_bytes": 16777216,
+      "feasible": false,
+      "reason": "insufficient_capacity_or_time"
+    },
+    "conservative_lead_qualified": false
+  },
+  {
+    "scenario": "WSS_change_no_allocation",
+    "variant": "occupancy",
+    "horizon_s": 12.0,
+    "rate_MiB_s": 16,
+    "timing": "epoch",
+    "simulation_only": true,
+    "errors": [],
+    "max_preallocation_gap_MiB": 0.0,
+    "requested_MiB": 0.0,
+    "cold_refault_MiB": 0.0,
+    "unnecessary_reclaim": false,
+    "checks": [],
+    "calls": [],
+    "passed": true,
+    "expected_infeasible": false,
+    "correctly_blocked": false,
+    "first_need_timing": null,
+    "conservative_lead_qualified": true
+  },
+  {
+    "scenario": "WSS_change_no_allocation",
+    "variant": "occupancy",
+    "horizon_s": 20.0,
+    "rate_MiB_s": 16,
+    "timing": "epoch",
+    "simulation_only": true,
+    "errors": [],
+    "max_preallocation_gap_MiB": 0.0,
+    "requested_MiB": 0.0,
+    "cold_refault_MiB": 0.0,
+    "unnecessary_reclaim": false,
+    "checks": [],
+    "calls": [],
+    "passed": true,
+    "expected_infeasible": false,
+    "correctly_blocked": false,
+    "first_need_timing": null,
+    "conservative_lead_qualified": true
+  },
+  {
+    "scenario": "WSS_change_no_allocation",
+    "variant": "occupancy",
+    "horizon_s": 30.0,
+    "rate_MiB_s": 16,
+    "timing": "epoch",
+    "simulation_only": true,
+    "errors": [],
+    "max_preallocation_gap_MiB": 0.0,
+    "requested_MiB": 0.0,
+    "cold_refault_MiB": 0.0,
+    "unnecessary_reclaim": false,
+    "checks": [],
+    "calls": [],
+    "passed": true,
+    "expected_infeasible": false,
+    "correctly_blocked": false,
+    "first_need_timing": null,
+    "conservative_lead_qualified": true
+  },
+  {
+    "scenario": "WSS_change_no_allocation",
+    "variant": "occupancy_supply",
+    "horizon_s": 12.0,
+    "rate_MiB_s": 16,
+    "timing": "epoch",
+    "simulation_only": true,
+    "errors": [],
+    "max_preallocation_gap_MiB": 0.0,
+    "requested_MiB": 0.0,
+    "cold_refault_MiB": 0.0,
+    "unnecessary_reclaim": false,
+    "checks": [],
+    "calls": [],
+    "passed": true,
+    "expected_infeasible": false,
+    "correctly_blocked": false,
+    "first_need_timing": null,
+    "conservative_lead_qualified": true
+  },
+  {
+    "scenario": "WSS_change_no_allocation",
+    "variant": "occupancy_supply",
+    "horizon_s": 20.0,
+    "rate_MiB_s": 16,
+    "timing": "epoch",
+    "simulation_only": true,
+    "errors": [],
+    "max_preallocation_gap_MiB": 0.0,
+    "requested_MiB": 0.0,
+    "cold_refault_MiB": 0.0,
+    "unnecessary_reclaim": false,
+    "checks": [],
+    "calls": [],
+    "passed": true,
+    "expected_infeasible": false,
+    "correctly_blocked": false,
+    "first_need_timing": null,
+    "conservative_lead_qualified": true
+  },
+  {
+    "scenario": "WSS_change_no_allocation",
+    "variant": "occupancy_supply",
+    "horizon_s": 30.0,
+    "rate_MiB_s": 16,
+    "timing": "epoch",
+    "simulation_only": true,
+    "errors": [],
+    "max_preallocation_gap_MiB": 0.0,
+    "requested_MiB": 0.0,
+    "cold_refault_MiB": 0.0,
+    "unnecessary_reclaim": false,
+    "checks": [],
+    "calls": [],
+    "passed": true,
+    "expected_infeasible": false,
+    "correctly_blocked": false,
+    "first_need_timing": null,
+    "conservative_lead_qualified": true
+  },
+  {
+    "scenario": "WSS_change_no_allocation",
+    "variant": "occupancy_supply_faults",
+    "horizon_s": 12.0,
+    "rate_MiB_s": 16,
+    "timing": "epoch",
+    "simulation_only": true,
+    "errors": [],
+    "max_preallocation_gap_MiB": 0.0,
+    "requested_MiB": 0.0,
+    "cold_refault_MiB": 0.0,
+    "unnecessary_reclaim": false,
+    "checks": [],
+    "calls": [],
+    "passed": true,
+    "expected_infeasible": false,
+    "correctly_blocked": false,
+    "first_need_timing": null,
+    "conservative_lead_qualified": true
+  },
+  {
+    "scenario": "WSS_change_no_allocation",
+    "variant": "occupancy_supply_faults",
+    "horizon_s": 20.0,
+    "rate_MiB_s": 16,
+    "timing": "epoch",
+    "simulation_only": true,
+    "errors": [],
+    "max_preallocation_gap_MiB": 0.0,
+    "requested_MiB": 0.0,
+    "cold_refault_MiB": 0.0,
+    "unnecessary_reclaim": false,
+    "checks": [],
+    "calls": [],
+    "passed": true,
+    "expected_infeasible": false,
+    "correctly_blocked": false,
+    "first_need_timing": null,
+    "conservative_lead_qualified": true
+  },
+  {
+    "scenario": "WSS_change_no_allocation",
+    "variant": "occupancy_supply_faults",
+    "horizon_s": 30.0,
+    "rate_MiB_s": 16,
+    "timing": "epoch",
+    "simulation_only": true,
+    "errors": [],
+    "max_preallocation_gap_MiB": 0.0,
+    "requested_MiB": 0.0,
+    "cold_refault_MiB": 0.0,
+    "unnecessary_reclaim": false,
+    "checks": [],
+    "calls": [],
+    "passed": true,
+    "expected_infeasible": false,
+    "correctly_blocked": false,
+    "first_need_timing": null,
+    "conservative_lead_qualified": true
+  },
+  {
+    "scenario": "aligned_free",
+    "variant": "wss_only",
+    "horizon_s": 12.0,
+    "rate_MiB_s": 16,
+    "timing": "epoch",
+    "simulation_only": true,
+    "errors": [],
+    "max_preallocation_gap_MiB": 0.0,
+    "requested_MiB": 0.0,
+    "cold_refault_MiB": 0.0,
+    "unnecessary_reclaim": false,
+    "checks": [
+      {
+        "time_s": 20.0,
+        "deficit_bytes": 0
+      }
+    ],
+    "calls": [],
+    "passed": true,
+    "expected_infeasible": false,
+    "correctly_blocked": false,
+    "first_need_timing": null,
+    "conservative_lead_qualified": true
+  },
+  {
+    "scenario": "aligned_free",
+    "variant": "wss_only",
+    "horizon_s": 20.0,
+    "rate_MiB_s": 16,
+    "timing": "epoch",
+    "simulation_only": true,
+    "errors": [],
+    "max_preallocation_gap_MiB": 0.0,
+    "requested_MiB": 0.0,
+    "cold_refault_MiB": 0.0,
+    "unnecessary_reclaim": false,
+    "checks": [
+      {
+        "time_s": 20.0,
+        "deficit_bytes": 0
+      }
+    ],
+    "calls": [],
+    "passed": true,
+    "expected_infeasible": false,
+    "correctly_blocked": false,
+    "first_need_timing": null,
+    "conservative_lead_qualified": true
+  },
+  {
+    "scenario": "aligned_free",
+    "variant": "wss_only",
+    "horizon_s": 30.0,
+    "rate_MiB_s": 16,
+    "timing": "epoch",
+    "simulation_only": true,
+    "errors": [],
+    "max_preallocation_gap_MiB": 0.0,
+    "requested_MiB": 0.0,
+    "cold_refault_MiB": 0.0,
+    "unnecessary_reclaim": false,
+    "checks": [
+      {
+        "time_s": 20.0,
+        "deficit_bytes": 0
+      }
+    ],
+    "calls": [],
+    "passed": true,
+    "expected_infeasible": false,
+    "correctly_blocked": false,
+    "first_need_timing": null,
+    "conservative_lead_qualified": true
+  },
+  {
+    "scenario": "aligned_free",
+    "variant": "occupancy",
+    "horizon_s": 12.0,
+    "rate_MiB_s": 16,
+    "timing": "epoch",
+    "simulation_only": true,
+    "errors": [],
+    "max_preallocation_gap_MiB": 0.0,
+    "requested_MiB": 0.0,
+    "cold_refault_MiB": 0.0,
+    "unnecessary_reclaim": false,
+    "checks": [
+      {
+        "time_s": 20.0,
+        "deficit_bytes": 0
+      }
+    ],
+    "calls": [],
+    "passed": true,
+    "expected_infeasible": false,
+    "correctly_blocked": false,
+    "first_need_timing": null,
+    "conservative_lead_qualified": true
+  },
+  {
+    "scenario": "aligned_free",
+    "variant": "occupancy",
+    "horizon_s": 20.0,
+    "rate_MiB_s": 16,
+    "timing": "epoch",
+    "simulation_only": true,
+    "errors": [],
+    "max_preallocation_gap_MiB": 0.0,
+    "requested_MiB": 0.0,
+    "cold_refault_MiB": 0.0,
+    "unnecessary_reclaim": false,
+    "checks": [
+      {
+        "time_s": 20.0,
+        "deficit_bytes": 0
+      }
+    ],
+    "calls": [],
+    "passed": true,
+    "expected_infeasible": false,
+    "correctly_blocked": false,
+    "first_need_timing": null,
+    "conservative_lead_qualified": true
+  },
+  {
+    "scenario": "aligned_free",
+    "variant": "occupancy",
+    "horizon_s": 30.0,
+    "rate_MiB_s": 16,
+    "timing": "epoch",
+    "simulation_only": true,
+    "errors": [],
+    "max_preallocation_gap_MiB": 0.0,
+    "requested_MiB": 0.0,
+    "cold_refault_MiB": 0.0,
+    "unnecessary_reclaim": false,
+    "checks": [
+      {
+        "time_s": 20.0,
+        "deficit_bytes": 0
+      }
+    ],
+    "calls": [],
+    "passed": true,
+    "expected_infeasible": false,
+    "correctly_blocked": false,
+    "first_need_timing": null,
+    "conservative_lead_qualified": true
+  },
+  {
+    "scenario": "aligned_free",
+    "variant": "occupancy_supply",
+    "horizon_s": 12.0,
+    "rate_MiB_s": 16,
+    "timing": "epoch",
+    "simulation_only": true,
+    "errors": [],
+    "max_preallocation_gap_MiB": 0.0,
+    "requested_MiB": 0.0,
+    "cold_refault_MiB": 0.0,
+    "unnecessary_reclaim": false,
+    "checks": [
+      {
+        "time_s": 20.0,
+        "deficit_bytes": 0
+      }
+    ],
+    "calls": [],
+    "passed": true,
+    "expected_infeasible": false,
+    "correctly_blocked": false,
+    "first_need_timing": null,
+    "conservative_lead_qualified": true
+  },
+  {
+    "scenario": "aligned_free",
+    "variant": "occupancy_supply",
+    "horizon_s": 20.0,
+    "rate_MiB_s": 16,
+    "timing": "epoch",
+    "simulation_only": true,
+    "errors": [],
+    "max_preallocation_gap_MiB": 0.0,
+    "requested_MiB": 0.0,
+    "cold_refault_MiB": 0.0,
+    "unnecessary_reclaim": false,
+    "checks": [
+      {
+        "time_s": 20.0,
+        "deficit_bytes": 0
+      }
+    ],
+    "calls": [],
+    "passed": true,
+    "expected_infeasible": false,
+    "correctly_blocked": false,
+    "first_need_timing": null,
+    "conservative_lead_qualified": true
+  },
+  {
+    "scenario": "aligned_free",
+    "variant": "occupancy_supply",
+    "horizon_s": 30.0,
+    "rate_MiB_s": 16,
+    "timing": "epoch",
+    "simulation_only": true,
+    "errors": [],
+    "max_preallocation_gap_MiB": 0.0,
+    "requested_MiB": 0.0,
+    "cold_refault_MiB": 0.0,
+    "unnecessary_reclaim": false,
+    "checks": [
+      {
+        "time_s": 20.0,
+        "deficit_bytes": 0
+      }
+    ],
+    "calls": [],
+    "passed": true,
+    "expected_infeasible": false,
+    "correctly_blocked": false,
+    "first_need_timing": null,
+    "conservative_lead_qualified": true
+  },
+  {
+    "scenario": "aligned_free",
+    "variant": "occupancy_supply_faults",
+    "horizon_s": 12.0,
+    "rate_MiB_s": 16,
+    "timing": "epoch",
+    "simulation_only": true,
+    "errors": [],
+    "max_preallocation_gap_MiB": 0.0,
+    "requested_MiB": 0.0,
+    "cold_refault_MiB": 0.0,
+    "unnecessary_reclaim": false,
+    "checks": [
+      {
+        "time_s": 20.0,
+        "deficit_bytes": 0
+      }
+    ],
+    "calls": [],
+    "passed": true,
+    "expected_infeasible": false,
+    "correctly_blocked": false,
+    "first_need_timing": null,
+    "conservative_lead_qualified": true
+  },
+  {
+    "scenario": "aligned_free",
+    "variant": "occupancy_supply_faults",
+    "horizon_s": 20.0,
+    "rate_MiB_s": 16,
+    "timing": "epoch",
+    "simulation_only": true,
+    "errors": [],
+    "max_preallocation_gap_MiB": 0.0,
+    "requested_MiB": 0.0,
+    "cold_refault_MiB": 0.0,
+    "unnecessary_reclaim": false,
+    "checks": [
+      {
+        "time_s": 20.0,
+        "deficit_bytes": 0
+      }
+    ],
+    "calls": [],
+    "passed": true,
+    "expected_infeasible": false,
+    "correctly_blocked": false,
+    "first_need_timing": null,
+    "conservative_lead_qualified": true
+  },
+  {
+    "scenario": "aligned_free",
+    "variant": "occupancy_supply_faults",
+    "horizon_s": 30.0,
+    "rate_MiB_s": 16,
+    "timing": "epoch",
+    "simulation_only": true,
+    "errors": [],
+    "max_preallocation_gap_MiB": 0.0,
+    "requested_MiB": 0.0,
+    "cold_refault_MiB": 0.0,
+    "unnecessary_reclaim": false,
+    "checks": [
+      {
+        "time_s": 20.0,
+        "deficit_bytes": 0
+      }
+    ],
+    "calls": [],
+    "passed": true,
+    "expected_infeasible": false,
+    "correctly_blocked": false,
+    "first_need_timing": null,
+    "conservative_lead_qualified": true
+  },
+  {
+    "scenario": "cold_revisit",
+    "variant": "wss_only",
+    "horizon_s": 12.0,
+    "rate_MiB_s": 16,
+    "timing": "epoch",
+    "simulation_only": true,
+    "errors": [],
+    "max_preallocation_gap_MiB": 112.0,
+    "requested_MiB": 16.0,
+    "cold_refault_MiB": 16.0,
+    "unnecessary_reclaim": false,
+    "checks": [
+      {
+        "time_s": 20.0,
+        "deficit_bytes": 117440512
+      }
+    ],
+    "calls": [
+      {
+        "time_s": 9.0,
+        "bytes": 8388608
+      },
+      {
+        "time_s": 9.1,
+        "bytes": 8388608
+      }
+    ],
+    "passed": false,
+    "expected_infeasible": true,
+    "correctly_blocked": false,
+    "first_need_timing": {
+      "key": "17:0",
+      "start_s": 9.4,
+      "finish_by_s": 19.5,
+      "protected_until_s": 20.0,
+      "estimated_total_s": 9.6,
+      "remaining_bytes": 150994944,
+      "unallocated_bytes": 0,
+      "feasible": true,
+      "reason": "scheduled_before_growth"
+    },
+    "conservative_lead_qualified": true
+  },
+  {
+    "scenario": "cold_revisit",
+    "variant": "wss_only",
+    "horizon_s": 20.0,
+    "rate_MiB_s": 16,
+    "timing": "epoch",
+    "simulation_only": true,
+    "errors": [],
+    "max_preallocation_gap_MiB": 112.0,
+    "requested_MiB": 16.0,
+    "cold_refault_MiB": 16.0,
+    "unnecessary_reclaim": false,
+    "checks": [
+      {
+        "time_s": 20.0,
+        "deficit_bytes": 117440512
+      }
+    ],
+    "calls": [
+      {
+        "time_s": 1.0,
+        "bytes": 8388608
+      },
+      {
+        "time_s": 1.1,
+        "bytes": 8388608
+      }
+    ],
+    "passed": false,
+    "expected_infeasible": true,
+    "correctly_blocked": false,
+    "first_need_timing": {
+      "key": "1:0",
+      "start_s": 9.4,
+      "finish_by_s": 19.5,
+      "protected_until_s": 20.0,
+      "estimated_total_s": 9.6,
+      "remaining_bytes": 150994944,
+      "unallocated_bytes": 0,
+      "feasible": true,
+      "reason": "scheduled_before_growth"
+    },
+    "conservative_lead_qualified": true
+  },
+  {
+    "scenario": "cold_revisit",
+    "variant": "wss_only",
+    "horizon_s": 30.0,
+    "rate_MiB_s": 16,
+    "timing": "epoch",
+    "simulation_only": true,
+    "errors": [],
+    "max_preallocation_gap_MiB": 112.0,
+    "requested_MiB": 16.0,
+    "cold_refault_MiB": 16.0,
+    "unnecessary_reclaim": false,
+    "checks": [
+      {
+        "time_s": 20.0,
+        "deficit_bytes": 117440512
+      }
+    ],
+    "calls": [
+      {
+        "time_s": 0.0,
+        "bytes": 8388608
+      },
+      {
+        "time_s": 0.1,
+        "bytes": 8388608
+      }
+    ],
+    "passed": false,
+    "expected_infeasible": true,
+    "correctly_blocked": false,
+    "first_need_timing": {
+      "key": "1:0",
+      "start_s": 0.0,
+      "finish_by_s": 19.5,
+      "protected_until_s": 30.0,
+      "estimated_total_s": 24.6,
+      "remaining_bytes": 687865856,
+      "unallocated_bytes": 285212672,
+      "feasible": false,
+      "reason": "insufficient_capacity_or_time"
+    },
+    "conservative_lead_qualified": false
+  },
+  {
+    "scenario": "cold_revisit",
+    "variant": "occupancy",
+    "horizon_s": 12.0,
+    "rate_MiB_s": 16,
+    "timing": "epoch",
+    "simulation_only": true,
+    "errors": [],
+    "max_preallocation_gap_MiB": 112.0,
+    "requested_MiB": 16.0,
+    "cold_refault_MiB": 16.0,
+    "unnecessary_reclaim": false,
+    "checks": [
+      {
+        "time_s": 20.0,
+        "deficit_bytes": 117440512
+      }
+    ],
+    "calls": [
+      {
+        "time_s": 9.4,
+        "bytes": 8388608
+      },
+      {
+        "time_s": 9.5,
+        "bytes": 8388608
+      }
+    ],
+    "passed": false,
+    "expected_infeasible": true,
+    "correctly_blocked": false,
+    "first_need_timing": {
+      "key": "17:0",
+      "start_s": 9.4,
+      "finish_by_s": 19.5,
+      "protected_until_s": 20.0,
+      "estimated_total_s": 9.6,
+      "remaining_bytes": 150994944,
+      "unallocated_bytes": 0,
+      "feasible": true,
+      "reason": "scheduled_before_growth"
+    },
+    "conservative_lead_qualified": true
+  },
+  {
+    "scenario": "cold_revisit",
+    "variant": "occupancy",
+    "horizon_s": 20.0,
+    "rate_MiB_s": 16,
+    "timing": "epoch",
+    "simulation_only": true,
+    "errors": [],
+    "max_preallocation_gap_MiB": 112.0,
+    "requested_MiB": 16.0,
+    "cold_refault_MiB": 16.0,
+    "unnecessary_reclaim": false,
+    "checks": [
+      {
+        "time_s": 20.0,
+        "deficit_bytes": 117440512
+      }
+    ],
+    "calls": [
+      {
+        "time_s": 9.4,
+        "bytes": 8388608
+      },
+      {
+        "time_s": 9.5,
+        "bytes": 8388608
+      }
+    ],
+    "passed": false,
+    "expected_infeasible": true,
+    "correctly_blocked": false,
+    "first_need_timing": {
+      "key": "1:0",
+      "start_s": 9.4,
+      "finish_by_s": 19.5,
+      "protected_until_s": 20.0,
+      "estimated_total_s": 9.6,
+      "remaining_bytes": 150994944,
+      "unallocated_bytes": 0,
+      "feasible": true,
+      "reason": "scheduled_before_growth"
+    },
+    "conservative_lead_qualified": true
+  },
+  {
+    "scenario": "cold_revisit",
+    "variant": "occupancy",
+    "horizon_s": 30.0,
+    "rate_MiB_s": 16,
+    "timing": "epoch",
+    "simulation_only": true,
+    "errors": [],
+    "max_preallocation_gap_MiB": 112.0,
+    "requested_MiB": 16.0,
+    "cold_refault_MiB": 16.0,
+    "unnecessary_reclaim": false,
+    "checks": [
+      {
+        "time_s": 20.0,
+        "deficit_bytes": 117440512
+      }
+    ],
+    "calls": [
+      {
+        "time_s": 9.4,
+        "bytes": 8388608
+      },
+      {
+        "time_s": 9.5,
+        "bytes": 8388608
+      }
+    ],
+    "passed": false,
+    "expected_infeasible": true,
+    "correctly_blocked": false,
+    "first_need_timing": {
+      "key": "1:0",
+      "start_s": 9.4,
+      "finish_by_s": 19.5,
+      "protected_until_s": 30.0,
+      "estimated_total_s": 9.6,
+      "remaining_bytes": 150994944,
+      "unallocated_bytes": 0,
+      "feasible": true,
+      "reason": "scheduled_before_growth"
+    },
+    "conservative_lead_qualified": true
+  },
+  {
+    "scenario": "cold_revisit",
+    "variant": "occupancy_supply",
+    "horizon_s": 12.0,
+    "rate_MiB_s": 16,
+    "timing": "epoch",
+    "simulation_only": true,
+    "errors": [],
+    "max_preallocation_gap_MiB": 128.0,
+    "requested_MiB": 0.0,
+    "cold_refault_MiB": 0.0,
+    "unnecessary_reclaim": false,
+    "checks": [
+      {
+        "time_s": 20.0,
+        "deficit_bytes": 134217728
+      }
+    ],
+    "calls": [],
+    "passed": false,
+    "expected_infeasible": true,
+    "correctly_blocked": true,
+    "first_need_timing": {
+      "key": "17:0",
+      "start_s": 9.4,
+      "finish_by_s": 19.5,
+      "protected_until_s": 20.0,
+      "estimated_total_s": 9.6,
+      "remaining_bytes": 150994944,
+      "unallocated_bytes": 0,
+      "feasible": true,
+      "reason": "scheduled_before_growth"
+    },
+    "conservative_lead_qualified": true
+  },
+  {
+    "scenario": "cold_revisit",
+    "variant": "occupancy_supply",
+    "horizon_s": 20.0,
+    "rate_MiB_s": 16,
+    "timing": "epoch",
+    "simulation_only": true,
+    "errors": [],
+    "max_preallocation_gap_MiB": 128.0,
+    "requested_MiB": 0.0,
+    "cold_refault_MiB": 0.0,
+    "unnecessary_reclaim": false,
+    "checks": [
+      {
+        "time_s": 20.0,
+        "deficit_bytes": 134217728
+      }
+    ],
+    "calls": [],
+    "passed": false,
+    "expected_infeasible": true,
+    "correctly_blocked": true,
+    "first_need_timing": {
+      "key": "1:0",
+      "start_s": 9.4,
+      "finish_by_s": 19.5,
+      "protected_until_s": 20.0,
+      "estimated_total_s": 9.6,
+      "remaining_bytes": 150994944,
+      "unallocated_bytes": 0,
+      "feasible": true,
+      "reason": "scheduled_before_growth"
+    },
+    "conservative_lead_qualified": true
+  },
+  {
+    "scenario": "cold_revisit",
+    "variant": "occupancy_supply",
+    "horizon_s": 30.0,
+    "rate_MiB_s": 16,
+    "timing": "epoch",
+    "simulation_only": true,
+    "errors": [],
+    "max_preallocation_gap_MiB": 128.0,
+    "requested_MiB": 0.0,
+    "cold_refault_MiB": 0.0,
+    "unnecessary_reclaim": false,
+    "checks": [
+      {
+        "time_s": 20.0,
+        "deficit_bytes": 134217728
+      }
+    ],
+    "calls": [],
+    "passed": false,
+    "expected_infeasible": true,
+    "correctly_blocked": true,
+    "first_need_timing": {
+      "key": "1:0",
+      "start_s": 18.4,
+      "finish_by_s": 19.5,
+      "protected_until_s": 30.0,
+      "estimated_total_s": 0.6,
+      "remaining_bytes": 150994944,
+      "unallocated_bytes": 150994944,
+      "feasible": false,
+      "reason": "insufficient_capacity_or_time"
+    },
+    "conservative_lead_qualified": false
+  },
+  {
+    "scenario": "cold_revisit",
+    "variant": "occupancy_supply_faults",
+    "horizon_s": 12.0,
+    "rate_MiB_s": 16,
+    "timing": "epoch",
+    "simulation_only": true,
+    "errors": [],
+    "max_preallocation_gap_MiB": 128.0,
+    "requested_MiB": 0.0,
+    "cold_refault_MiB": 0.0,
+    "unnecessary_reclaim": false,
+    "checks": [
+      {
+        "time_s": 20.0,
+        "deficit_bytes": 134217728
+      }
+    ],
+    "calls": [],
+    "passed": false,
+    "expected_infeasible": true,
+    "correctly_blocked": true,
+    "first_need_timing": {
+      "key": "17:0",
+      "start_s": 9.4,
+      "finish_by_s": 19.5,
+      "protected_until_s": 20.0,
+      "estimated_total_s": 9.6,
+      "remaining_bytes": 150994944,
+      "unallocated_bytes": 0,
+      "feasible": true,
+      "reason": "scheduled_before_growth"
+    },
+    "conservative_lead_qualified": true
+  },
+  {
+    "scenario": "cold_revisit",
+    "variant": "occupancy_supply_faults",
+    "horizon_s": 20.0,
+    "rate_MiB_s": 16,
+    "timing": "epoch",
+    "simulation_only": true,
+    "errors": [],
+    "max_preallocation_gap_MiB": 128.0,
+    "requested_MiB": 0.0,
+    "cold_refault_MiB": 0.0,
+    "unnecessary_reclaim": false,
+    "checks": [
+      {
+        "time_s": 20.0,
+        "deficit_bytes": 134217728
+      }
+    ],
+    "calls": [],
+    "passed": false,
+    "expected_infeasible": true,
+    "correctly_blocked": true,
+    "first_need_timing": {
+      "key": "1:0",
+      "start_s": 9.4,
+      "finish_by_s": 19.5,
+      "protected_until_s": 20.0,
+      "estimated_total_s": 9.6,
+      "remaining_bytes": 150994944,
+      "unallocated_bytes": 0,
+      "feasible": true,
+      "reason": "scheduled_before_growth"
+    },
+    "conservative_lead_qualified": true
+  },
+  {
+    "scenario": "cold_revisit",
+    "variant": "occupancy_supply_faults",
+    "horizon_s": 30.0,
+    "rate_MiB_s": 16,
+    "timing": "epoch",
+    "simulation_only": true,
+    "errors": [],
+    "max_preallocation_gap_MiB": 128.0,
+    "requested_MiB": 0.0,
+    "cold_refault_MiB": 0.0,
+    "unnecessary_reclaim": false,
+    "checks": [
+      {
+        "time_s": 20.0,
+        "deficit_bytes": 134217728
+      }
+    ],
+    "calls": [],
+    "passed": false,
+    "expected_infeasible": true,
+    "correctly_blocked": true,
+    "first_need_timing": {
+      "key": "1:0",
+      "start_s": 18.4,
+      "finish_by_s": 19.5,
+      "protected_until_s": 30.0,
+      "estimated_total_s": 0.6,
+      "remaining_bytes": 150994944,
+      "unallocated_bytes": 150994944,
+      "feasible": false,
+      "reason": "insufficient_capacity_or_time"
+    },
+    "conservative_lead_qualified": false
+  },
+  {
+    "scenario": "no_deficit",
+    "variant": "wss_only",
+    "horizon_s": 12.0,
+    "rate_MiB_s": 16,
+    "timing": "epoch",
+    "simulation_only": true,
+    "errors": [],
+    "max_preallocation_gap_MiB": 0.0,
+    "requested_MiB": 0.0,
+    "cold_refault_MiB": 0.0,
+    "unnecessary_reclaim": false,
+    "checks": [
+      {
+        "time_s": 20.0,
+        "deficit_bytes": 0
+      }
+    ],
+    "calls": [],
+    "passed": true,
+    "expected_infeasible": false,
+    "correctly_blocked": false,
+    "first_need_timing": null,
+    "conservative_lead_qualified": true
+  },
+  {
+    "scenario": "no_deficit",
+    "variant": "wss_only",
+    "horizon_s": 20.0,
+    "rate_MiB_s": 16,
+    "timing": "epoch",
+    "simulation_only": true,
+    "errors": [],
+    "max_preallocation_gap_MiB": 0.0,
+    "requested_MiB": 0.0,
+    "cold_refault_MiB": 0.0,
+    "unnecessary_reclaim": false,
+    "checks": [
+      {
+        "time_s": 20.0,
+        "deficit_bytes": 0
+      }
+    ],
+    "calls": [],
+    "passed": true,
+    "expected_infeasible": false,
+    "correctly_blocked": false,
+    "first_need_timing": null,
+    "conservative_lead_qualified": true
+  },
+  {
+    "scenario": "no_deficit",
+    "variant": "wss_only",
+    "horizon_s": 30.0,
+    "rate_MiB_s": 16,
+    "timing": "epoch",
+    "simulation_only": true,
+    "errors": [],
+    "max_preallocation_gap_MiB": 0.0,
+    "requested_MiB": 0.0,
+    "cold_refault_MiB": 0.0,
+    "unnecessary_reclaim": false,
+    "checks": [
+      {
+        "time_s": 20.0,
+        "deficit_bytes": 0
+      }
+    ],
+    "calls": [],
+    "passed": true,
+    "expected_infeasible": false,
+    "correctly_blocked": false,
+    "first_need_timing": null,
+    "conservative_lead_qualified": true
+  },
+  {
+    "scenario": "no_deficit",
+    "variant": "occupancy",
+    "horizon_s": 12.0,
+    "rate_MiB_s": 16,
+    "timing": "epoch",
+    "simulation_only": true,
+    "errors": [],
+    "max_preallocation_gap_MiB": 0.0,
+    "requested_MiB": 0.0,
+    "cold_refault_MiB": 0.0,
+    "unnecessary_reclaim": false,
+    "checks": [
+      {
+        "time_s": 20.0,
+        "deficit_bytes": 0
+      }
+    ],
+    "calls": [],
+    "passed": true,
+    "expected_infeasible": false,
+    "correctly_blocked": false,
+    "first_need_timing": null,
+    "conservative_lead_qualified": true
+  },
+  {
+    "scenario": "no_deficit",
+    "variant": "occupancy",
+    "horizon_s": 20.0,
+    "rate_MiB_s": 16,
+    "timing": "epoch",
+    "simulation_only": true,
+    "errors": [],
+    "max_preallocation_gap_MiB": 0.0,
+    "requested_MiB": 0.0,
+    "cold_refault_MiB": 0.0,
+    "unnecessary_reclaim": false,
+    "checks": [
+      {
+        "time_s": 20.0,
+        "deficit_bytes": 0
+      }
+    ],
+    "calls": [],
+    "passed": true,
+    "expected_infeasible": false,
+    "correctly_blocked": false,
+    "first_need_timing": null,
+    "conservative_lead_qualified": true
+  },
+  {
+    "scenario": "no_deficit",
+    "variant": "occupancy",
+    "horizon_s": 30.0,
+    "rate_MiB_s": 16,
+    "timing": "epoch",
+    "simulation_only": true,
+    "errors": [],
+    "max_preallocation_gap_MiB": 0.0,
+    "requested_MiB": 0.0,
+    "cold_refault_MiB": 0.0,
+    "unnecessary_reclaim": false,
+    "checks": [
+      {
+        "time_s": 20.0,
+        "deficit_bytes": 0
+      }
+    ],
+    "calls": [],
+    "passed": true,
+    "expected_infeasible": false,
+    "correctly_blocked": false,
+    "first_need_timing": null,
+    "conservative_lead_qualified": true
+  },
+  {
+    "scenario": "no_deficit",
+    "variant": "occupancy_supply",
+    "horizon_s": 12.0,
+    "rate_MiB_s": 16,
+    "timing": "epoch",
+    "simulation_only": true,
+    "errors": [],
+    "max_preallocation_gap_MiB": 0.0,
+    "requested_MiB": 0.0,
+    "cold_refault_MiB": 0.0,
+    "unnecessary_reclaim": false,
+    "checks": [
+      {
+        "time_s": 20.0,
+        "deficit_bytes": 0
+      }
+    ],
+    "calls": [],
+    "passed": true,
+    "expected_infeasible": false,
+    "correctly_blocked": false,
+    "first_need_timing": null,
+    "conservative_lead_qualified": true
+  },
+  {
+    "scenario": "no_deficit",
+    "variant": "occupancy_supply",
+    "horizon_s": 20.0,
+    "rate_MiB_s": 16,
+    "timing": "epoch",
+    "simulation_only": true,
+    "errors": [],
+    "max_preallocation_gap_MiB": 0.0,
+    "requested_MiB": 0.0,
+    "cold_refault_MiB": 0.0,
+    "unnecessary_reclaim": false,
+    "checks": [
+      {
+        "time_s": 20.0,
+        "deficit_bytes": 0
+      }
+    ],
+    "calls": [],
+    "passed": true,
+    "expected_infeasible": false,
+    "correctly_blocked": false,
+    "first_need_timing": null,
+    "conservative_lead_qualified": true
+  },
+  {
+    "scenario": "no_deficit",
+    "variant": "occupancy_supply",
+    "horizon_s": 30.0,
+    "rate_MiB_s": 16,
+    "timing": "epoch",
+    "simulation_only": true,
+    "errors": [],
+    "max_preallocation_gap_MiB": 0.0,
+    "requested_MiB": 0.0,
+    "cold_refault_MiB": 0.0,
+    "unnecessary_reclaim": false,
+    "checks": [
+      {
+        "time_s": 20.0,
+        "deficit_bytes": 0
+      }
+    ],
+    "calls": [],
+    "passed": true,
+    "expected_infeasible": false,
+    "correctly_blocked": false,
+    "first_need_timing": null,
+    "conservative_lead_qualified": true
+  },
+  {
+    "scenario": "no_deficit",
+    "variant": "occupancy_supply_faults",
+    "horizon_s": 12.0,
+    "rate_MiB_s": 16,
+    "timing": "epoch",
+    "simulation_only": true,
+    "errors": [],
+    "max_preallocation_gap_MiB": 0.0,
+    "requested_MiB": 0.0,
+    "cold_refault_MiB": 0.0,
+    "unnecessary_reclaim": false,
+    "checks": [
+      {
+        "time_s": 20.0,
+        "deficit_bytes": 0
+      }
+    ],
+    "calls": [],
+    "passed": true,
+    "expected_infeasible": false,
+    "correctly_blocked": false,
+    "first_need_timing": null,
+    "conservative_lead_qualified": true
+  },
+  {
+    "scenario": "no_deficit",
+    "variant": "occupancy_supply_faults",
+    "horizon_s": 20.0,
+    "rate_MiB_s": 16,
+    "timing": "epoch",
+    "simulation_only": true,
+    "errors": [],
+    "max_preallocation_gap_MiB": 0.0,
+    "requested_MiB": 0.0,
+    "cold_refault_MiB": 0.0,
+    "unnecessary_reclaim": false,
+    "checks": [
+      {
+        "time_s": 20.0,
+        "deficit_bytes": 0
+      }
+    ],
+    "calls": [],
+    "passed": true,
+    "expected_infeasible": false,
+    "correctly_blocked": false,
+    "first_need_timing": null,
+    "conservative_lead_qualified": true
+  },
+  {
+    "scenario": "no_deficit",
+    "variant": "occupancy_supply_faults",
+    "horizon_s": 30.0,
+    "rate_MiB_s": 16,
+    "timing": "epoch",
+    "simulation_only": true,
+    "errors": [],
+    "max_preallocation_gap_MiB": 0.0,
+    "requested_MiB": 0.0,
+    "cold_refault_MiB": 0.0,
+    "unnecessary_reclaim": false,
+    "checks": [
+      {
+        "time_s": 20.0,
+        "deficit_bytes": 0
+      }
+    ],
+    "calls": [],
+    "passed": true,
+    "expected_infeasible": false,
+    "correctly_blocked": false,
+    "first_need_timing": null,
+    "conservative_lead_qualified": true
+  }
+]

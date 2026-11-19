@@ -1,0 +1,293 @@
+{
+  "app": "incoming",
+  "issued_s": 9.743444488,
+  "expires_s": 10.743444488,
+  "horizon_s": 20.0,
+  "step_s": 0.5,
+  "current_wss_bytes": 16777216,
+  "windows": [
+    {
+      "start_s": 9.743444488,
+      "end_s": 10.243444488,
+      "wss_bytes": 16777216,
+      "occupancy_delta_bytes": 0,
+      "pgfault": 0
+    },
+    {
+      "start_s": 10.243444488,
+      "end_s": 10.743444488,
+      "wss_bytes": 16777216,
+      "occupancy_delta_bytes": 0,
+      "pgfault": 0
+    },
+    {
+      "start_s": 10.743444488,
+      "end_s": 11.243444488,
+      "wss_bytes": 16777216,
+      "occupancy_delta_bytes": 0,
+      "pgfault": 0
+    },
+    {
+      "start_s": 11.243444488,
+      "end_s": 11.743444488,
+      "wss_bytes": 16777216,
+      "occupancy_delta_bytes": 0,
+      "pgfault": 0
+    },
+    {
+      "start_s": 11.743444488,
+      "end_s": 12.243444488,
+      "wss_bytes": 16777216,
+      "occupancy_delta_bytes": 0,
+      "pgfault": 0
+    },
+    {
+      "start_s": 12.243444488,
+      "end_s": 12.743444488,
+      "wss_bytes": 16777216,
+      "occupancy_delta_bytes": 0,
+      "pgfault": 0
+    },
+    {
+      "start_s": 12.743444488,
+      "end_s": 13.243444488,
+      "wss_bytes": 16777216,
+      "occupancy_delta_bytes": 0,
+      "pgfault": 0
+    },
+    {
+      "start_s": 13.243444488,
+      "end_s": 13.743444488,
+      "wss_bytes": 16777216,
+      "occupancy_delta_bytes": 0,
+      "pgfault": 0
+    },
+    {
+      "start_s": 13.743444488,
+      "end_s": 14.243444488,
+      "wss_bytes": 16777216,
+      "occupancy_delta_bytes": 0,
+      "pgfault": 0
+    },
+    {
+      "start_s": 14.243444488,
+      "end_s": 14.743444488,
+      "wss_bytes": 16777216,
+      "occupancy_delta_bytes": 0,
+      "pgfault": 0
+    },
+    {
+      "start_s": 14.743444488,
+      "end_s": 15.243444488,
+      "wss_bytes": 16777216,
+      "occupancy_delta_bytes": 0,
+      "pgfault": 0
+    },
+    {
+      "start_s": 15.243444488,
+      "end_s": 15.743444488,
+      "wss_bytes": 16777216,
+      "occupancy_delta_bytes": 0,
+      "pgfault": 0
+    },
+    {
+      "start_s": 15.743444488,
+      "end_s": 16.243444488,
+      "wss_bytes": 16777216,
+      "occupancy_delta_bytes": 0,
+      "pgfault": 0
+    },
+    {
+      "start_s": 16.243444488,
+      "end_s": 16.743444488,
+      "wss_bytes": 16777216,
+      "occupancy_delta_bytes": 0,
+      "pgfault": 0
+    },
+    {
+      "start_s": 16.743444488,
+      "end_s": 17.243444488,
+      "wss_bytes": 16777216,
+      "occupancy_delta_bytes": 0,
+      "pgfault": 0
+    },
+    {
+      "start_s": 17.243444488,
+      "end_s": 17.743444488,
+      "wss_bytes": 16777216,
+      "occupancy_delta_bytes": 0,
+      "pgfault": 0
+    },
+    {
+      "start_s": 17.743444488,
+      "end_s": 18.243444488,
+      "wss_bytes": 16777216,
+      "occupancy_delta_bytes": 0,
+      "pgfault": 0
+    },
+    {
+      "start_s": 18.243444488,
+      "end_s": 18.743444488,
+      "wss_bytes": 16777216,
+      "occupancy_delta_bytes": 0,
+      "pgfault": 0
+    },
+    {
+      "start_s": 18.743444488,
+      "end_s": 19.243444488,
+      "wss_bytes": 16777216,
+      "occupancy_delta_bytes": 0,
+      "pgfault": 0
+    },
+    {
+      "start_s": 19.243444488,
+      "end_s": 19.743444488,
+      "wss_bytes": 16777216,
+      "occupancy_delta_bytes": 0,
+      "pgfault": 0
+    },
+    {
+      "start_s": 19.743444488,
+      "end_s": 20.243444488,
+      "wss_bytes": 285212672,
+      "occupancy_delta_bytes": 268435456,
+      "pgfault": 65536
+    },
+    {
+      "start_s": 20.243444488,
+      "end_s": 20.743444488,
+      "wss_bytes": 285212672,
+      "occupancy_delta_bytes": 268435456,
+      "pgfault": 0
+    },
+    {
+      "start_s": 20.743444488,
+      "end_s": 21.243444488,
+      "wss_bytes": 285212672,
+      "occupancy_delta_bytes": 268435456,
+      "pgfault": 0
+    },
+    {
+      "start_s": 21.243444488,
+      "end_s": 21.743444488,
+      "wss_bytes": 285212672,
+      "occupancy_delta_bytes": 268435456,
+      "pgfault": 0
+    },
+    {
+      "start_s": 21.743444488,
+      "end_s": 22.243444488,
+      "wss_bytes": 285212672,
+      "occupancy_delta_bytes": 268435456,
+      "pgfault": 0
+    },
+    {
+      "start_s": 22.243444488,
+      "end_s": 22.743444488,
+      "wss_bytes": 285212672,
+      "occupancy_delta_bytes": 268435456,
+      "pgfault": 0
+    },
+    {
+      "start_s": 22.743444488,
+      "end_s": 23.243444488,
+      "wss_bytes": 285212672,
+      "occupancy_delta_bytes": 268435456,
+      "pgfault": 0
+    },
+    {
+      "start_s": 23.243444488,
+      "end_s": 23.743444488,
+      "wss_bytes": 285212672,
+      "occupancy_delta_bytes": 268435456,
+      "pgfault": 0
+    },
+    {
+      "start_s": 23.743444488,
+      "end_s": 24.243444488,
+      "wss_bytes": 285212672,
+      "occupancy_delta_bytes": 268435456,
+      "pgfault": 0
+    },
+    {
+      "start_s": 24.243444488,
+      "end_s": 24.743444488,
+      "wss_bytes": 285212672,
+      "occupancy_delta_bytes": 268435456,
+      "pgfault": 0
+    },
+    {
+      "start_s": 24.743444488,
+      "end_s": 25.243444488,
+      "wss_bytes": 285212672,
+      "occupancy_delta_bytes": 268435456,
+      "pgfault": 0
+    },
+    {
+      "start_s": 25.243444488,
+      "end_s": 25.743444488,
+      "wss_bytes": 285212672,
+      "occupancy_delta_bytes": 268435456,
+      "pgfault": 0
+    },
+    {
+      "start_s": 25.743444488,
+      "end_s": 26.243444488,
+      "wss_bytes": 285212672,
+      "occupancy_delta_bytes": 268435456,
+      "pgfault": 0
+    },
+    {
+      "start_s": 26.243444488,
+      "end_s": 26.743444488,
+      "wss_bytes": 285212672,
+      "occupancy_delta_bytes": 268435456,
+      "pgfault": 0
+    },
+    {
+      "start_s": 26.743444488,
+      "end_s": 27.243444488,
+      "wss_bytes": 285212672,
+      "occupancy_delta_bytes": 268435456,
+      "pgfault": 0
+    },
+    {
+      "start_s": 27.243444488,
+      "end_s": 27.743444488,
+      "wss_bytes": 285212672,
+      "occupancy_delta_bytes": 268435456,
+      "pgfault": 0
+    },
+    {
+      "start_s": 27.743444488,
+      "end_s": 28.243444488,
+      "wss_bytes": 285212672,
+      "occupancy_delta_bytes": 268435456,
+      "pgfault": 0
+    },
+    {
+      "start_s": 28.243444488,
+      "end_s": 28.743444488,
+      "wss_bytes": 285212672,
+      "occupancy_delta_bytes": 268435456,
+      "pgfault": 0
+    },
+    {
+      "start_s": 28.743444488,
+      "end_s": 29.243444488,
+      "wss_bytes": 285212672,
+      "occupancy_delta_bytes": 268435456,
+      "pgfault": 0
+    },
+    {
+      "start_s": 29.243444488,
+      "end_s": 29.743444488,
+      "wss_bytes": 285212672,
+      "occupancy_delta_bytes": 268435456,
+      "pgfault": 0
+    }
+  ],
+  "source": "scripted_truth_not_a_trained_model",
+  "reclaimable_bytes": 0,
+  "safe_until_s": 29.743444488
+}

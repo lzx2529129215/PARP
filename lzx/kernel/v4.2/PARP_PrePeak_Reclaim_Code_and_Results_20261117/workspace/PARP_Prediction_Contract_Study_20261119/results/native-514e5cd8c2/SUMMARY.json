@@ -1,0 +1,1460 @@
+{
+  "status": "COMPLETE",
+  "trials": [
+    {
+      "status": "COMPLETE",
+      "spec": {
+        "tag": "01-step-control",
+        "scenario": "step",
+        "variant": "occupancy_supply",
+        "horizon_s": 20.0,
+        "advance": false
+      },
+      "scenario": {
+        "name": "step",
+        "events": [
+          {
+            "at": 20.0,
+            "app": "incoming",
+            "delta": 268435456
+          }
+        ],
+        "end_s": 25.0,
+        "cold_bytes": 536870912,
+        "hot_bytes": 67108864,
+        "incoming_base_bytes": 16777216,
+        "initial_headroom_bytes": 134217728,
+        "reserve_bytes": 16777216,
+        "update_s": 0.5,
+        "cold_reuse_s": null,
+        "flat_wss": false
+      },
+      "initial_usage": 622301184,
+      "quota_bytes": 756518912,
+      "max_preallocation_gap_bytes": 134152192,
+      "peak_events": {
+        "low": 0,
+        "high": 0,
+        "max": 178,
+        "oom": 0,
+        "oom_kill": 0,
+        "oom_group_kill": 0
+      },
+      "peak_allocation_ms": [
+        1156.286188
+      ],
+      "peak_allocation_cpu_ms": [
+        1147.145883
+      ],
+      "during_peak_reclaim_calls": 0,
+      "bad_reclaim_calls": 0,
+      "passed": true,
+      "first_need_timing": null,
+      "conservative_lead_qualified": true
+    },
+    {
+      "status": "COMPLETE",
+      "spec": {
+        "tag": "02-step-ideal",
+        "scenario": "step",
+        "variant": "occupancy_supply",
+        "horizon_s": 20.0,
+        "advance": true
+      },
+      "scenario": {
+        "name": "step",
+        "events": [
+          {
+            "at": 20.0,
+            "app": "incoming",
+            "delta": 268435456
+          }
+        ],
+        "end_s": 25.0,
+        "cold_bytes": 536870912,
+        "hot_bytes": 67108864,
+        "incoming_base_bytes": 16777216,
+        "initial_headroom_bytes": 134217728,
+        "reserve_bytes": 16777216,
+        "update_s": 0.5,
+        "cold_reuse_s": null,
+        "flat_wss": false
+      },
+      "initial_usage": 623079424,
+      "quota_bytes": 757297152,
+      "max_preallocation_gap_bytes": 0,
+      "peak_events": {
+        "low": 0,
+        "high": 0,
+        "max": 0,
+        "oom": 0,
+        "oom_kill": 0,
+        "oom_group_kill": 0
+      },
+      "peak_allocation_ms": [
+        109.235312
+      ],
+      "peak_allocation_cpu_ms": [
+        107.77252
+      ],
+      "during_peak_reclaim_calls": 0,
+      "bad_reclaim_calls": 0,
+      "passed": true,
+      "first_need_timing": {
+        "key": "1:0",
+        "start_s": 7.572145369149196,
+        "finish_by_s": 19.500723877,
+        "protected_until_s": 20.000723877,
+        "estimated_total_s": 11.428578507850803,
+        "remaining_bytes": 150994944,
+        "unallocated_bytes": 0,
+        "feasible": true,
+        "reason": "scheduled_before_growth"
+      },
+      "conservative_lead_qualified": true
+    },
+    {
+      "status": "COMPLETE",
+      "spec": {
+        "tag": "03-ramp-ideal",
+        "scenario": "ramp",
+        "variant": "occupancy_supply",
+        "horizon_s": 20.0,
+        "advance": true
+      },
+      "scenario": {
+        "name": "ramp",
+        "events": [
+          {
+            "at": 16.0,
+            "app": "incoming",
+            "delta": 67108864
+          },
+          {
+            "at": 17.0,
+            "app": "incoming",
+            "delta": 67108864
+          },
+          {
+            "at": 18.0,
+            "app": "incoming",
+            "delta": 67108864
+          },
+          {
+            "at": 19.0,
+            "app": "incoming",
+            "delta": 67108864
+          }
+        ],
+        "end_s": 25.0,
+        "cold_bytes": 536870912,
+        "hot_bytes": 67108864,
+        "incoming_base_bytes": 16777216,
+        "initial_headroom_bytes": 134217728,
+        "reserve_bytes": 16777216,
+        "update_s": 0.5,
+        "cold_reuse_s": null,
+        "flat_wss": false
+      },
+      "initial_usage": 622837760,
+      "quota_bytes": 757055488,
+      "max_preallocation_gap_bytes": 0,
+      "peak_events": {
+        "low": 0,
+        "high": 0,
+        "max": 0,
+        "oom": 0,
+        "oom_kill": 0,
+        "oom_group_kill": 0
+      },
+      "peak_allocation_ms": [
+        32.038086,
+        29.260875,
+        29.197042,
+        35.070367
+      ],
+      "peak_allocation_cpu_ms": [
+        29.586509,
+        29.047619,
+        28.255675,
+        33.219049
+      ],
+      "during_peak_reclaim_calls": 0,
+      "bad_reclaim_calls": 0,
+      "passed": true,
+      "first_need_timing": {
+        "key": "1:0",
+        "start_s": 3.5719868671491977,
+        "finish_by_s": 15.500565375,
+        "protected_until_s": 20.000565375,
+        "estimated_total_s": 11.428578507850803,
+        "remaining_bytes": 150994944,
+        "unallocated_bytes": 0,
+        "feasible": true,
+        "reason": "scheduled_before_growth"
+      },
+      "conservative_lead_qualified": true
+    },
+    {
+      "status": "COMPLETE",
+      "spec": {
+        "tag": "04-ramp-control",
+        "scenario": "ramp",
+        "variant": "occupancy_supply",
+        "horizon_s": 20.0,
+        "advance": false
+      },
+      "scenario": {
+        "name": "ramp",
+        "events": [
+          {
+            "at": 16.0,
+            "app": "incoming",
+            "delta": 67108864
+          },
+          {
+            "at": 17.0,
+            "app": "incoming",
+            "delta": 67108864
+          },
+          {
+            "at": 18.0,
+            "app": "incoming",
+            "delta": 67108864
+          },
+          {
+            "at": 19.0,
+            "app": "incoming",
+            "delta": 67108864
+          }
+        ],
+        "end_s": 25.0,
+        "cold_bytes": 536870912,
+        "hot_bytes": 67108864,
+        "incoming_base_bytes": 16777216,
+        "initial_headroom_bytes": 134217728,
+        "reserve_bytes": 16777216,
+        "update_s": 0.5,
+        "cold_reuse_s": null,
+        "flat_wss": false
+      },
+      "initial_usage": 623079424,
+      "quota_bytes": 757297152,
+      "max_preallocation_gap_bytes": 66527232,
+      "peak_events": {
+        "low": 0,
+        "high": 0,
+        "max": 177,
+        "oom": 0,
+        "oom_kill": 0,
+        "oom_group_kill": 0
+      },
+      "peak_allocation_ms": [
+        25.692927,
+        27.584737,
+        35.36557,
+        109.173029
+      ],
+      "peak_allocation_cpu_ms": [
+        25.695524,
+        26.553019,
+        34.861892,
+        106.351079
+      ],
+      "during_peak_reclaim_calls": 0,
+      "bad_reclaim_calls": 0,
+      "passed": true,
+      "first_need_timing": null,
+      "conservative_lead_qualified": true
+    },
+    {
+      "status": "COMPLETE",
+      "spec": {
+        "tag": "05-V-control",
+        "scenario": "V",
+        "variant": "occupancy_supply",
+        "horizon_s": 20.0,
+        "advance": false
+      },
+      "scenario": {
+        "name": "V",
+        "events": [
+          {
+            "at": 12.0,
+            "app": "incoming",
+            "delta": -67108864
+          },
+          {
+            "at": 20.0,
+            "app": "incoming",
+            "delta": 268435456
+          }
+        ],
+        "end_s": 25.0,
+        "cold_bytes": 536870912,
+        "hot_bytes": 67108864,
+        "incoming_base_bytes": 83886080,
+        "initial_headroom_bytes": 134217728,
+        "reserve_bytes": 16777216,
+        "update_s": 0.5,
+        "cold_reuse_s": null,
+        "flat_wss": false
+      },
+      "initial_usage": 689381376,
+      "quota_bytes": 823599104,
+      "max_preallocation_gap_bytes": 67072000,
+      "peak_events": {
+        "low": 0,
+        "high": 0,
+        "max": 146,
+        "oom": 0,
+        "oom_kill": 0,
+        "oom_group_kill": 0
+      },
+      "peak_allocation_ms": [
+        169.677453
+      ],
+      "peak_allocation_cpu_ms": [
+        166.553678
+      ],
+      "during_peak_reclaim_calls": 0,
+      "bad_reclaim_calls": 0,
+      "passed": true,
+      "first_need_timing": null,
+      "conservative_lead_qualified": true
+    },
+    {
+      "status": "COMPLETE",
+      "spec": {
+        "tag": "06-V-ideal",
+        "scenario": "V",
+        "variant": "occupancy_supply",
+        "horizon_s": 20.0,
+        "advance": true
+      },
+      "scenario": {
+        "name": "V",
+        "events": [
+          {
+            "at": 12.0,
+            "app": "incoming",
+            "delta": -67108864
+          },
+          {
+            "at": 20.0,
+            "app": "incoming",
+            "delta": 268435456
+          }
+        ],
+        "end_s": 25.0,
+        "cold_bytes": 536870912,
+        "hot_bytes": 67108864,
+        "incoming_base_bytes": 83886080,
+        "initial_headroom_bytes": 134217728,
+        "reserve_bytes": 16777216,
+        "update_s": 0.5,
+        "cold_reuse_s": null,
+        "flat_wss": false
+      },
+      "initial_usage": 689864704,
+      "quota_bytes": 824082432,
+      "max_preallocation_gap_bytes": 0,
+      "peak_events": {
+        "low": 0,
+        "high": 0,
+        "max": 0,
+        "oom": 0,
+        "oom_kill": 0,
+        "oom_group_kill": 0
+      },
+      "peak_allocation_ms": [
+        95.951578
+      ],
+      "peak_allocation_cpu_ms": [
+        95.033505
+      ],
+      "during_peak_reclaim_calls": 0,
+      "bad_reclaim_calls": 0,
+      "passed": true,
+      "first_need_timing": {
+        "key": "1:0",
+        "start_s": 12.385078725193999,
+        "finish_by_s": 19.500955674,
+        "protected_until_s": 20.000955674,
+        "estimated_total_s": 6.615876948806001,
+        "remaining_bytes": 83886080,
+        "unallocated_bytes": 0,
+        "feasible": true,
+        "reason": "scheduled_before_growth"
+      },
+      "conservative_lead_qualified": true
+    },
+    {
+      "status": "COMPLETE",
+      "spec": {
+        "tag": "07-inverted_V-ideal",
+        "scenario": "inverted_V",
+        "variant": "occupancy_supply",
+        "horizon_s": 20.0,
+        "advance": true
+      },
+      "scenario": {
+        "name": "inverted_V",
+        "events": [
+          {
+            "at": 20.0,
+            "app": "incoming",
+            "delta": 268435456
+          },
+          {
+            "at": 23.0,
+            "app": "incoming",
+            "delta": -268435456
+          }
+        ],
+        "end_s": 27.0,
+        "cold_bytes": 536870912,
+        "hot_bytes": 67108864,
+        "incoming_base_bytes": 16777216,
+        "initial_headroom_bytes": 134217728,
+        "reserve_bytes": 16777216,
+        "update_s": 0.5,
+        "cold_reuse_s": null,
+        "flat_wss": false
+      },
+      "initial_usage": 622755840,
+      "quota_bytes": 756973568,
+      "max_preallocation_gap_bytes": 0,
+      "peak_events": {
+        "low": 0,
+        "high": 0,
+        "max": 0,
+        "oom": 0,
+        "oom_kill": 0,
+        "oom_group_kill": 0
+      },
+      "peak_allocation_ms": [
+        106.028904
+      ],
+      "peak_allocation_cpu_ms": [
+        105.767585
+      ],
+      "during_peak_reclaim_calls": 0,
+      "bad_reclaim_calls": 0,
+      "passed": true,
+      "first_need_timing": {
+        "key": "1:0",
+        "start_s": 7.572422392149198,
+        "finish_by_s": 19.5010009,
+        "protected_until_s": 20.0010009,
+        "estimated_total_s": 11.428578507850803,
+        "remaining_bytes": 150994944,
+        "unallocated_bytes": 0,
+        "feasible": true,
+        "reason": "scheduled_before_growth"
+      },
+      "conservative_lead_qualified": true
+    },
+    {
+      "status": "COMPLETE",
+      "spec": {
+        "tag": "08-inverted_V-control",
+        "scenario": "inverted_V",
+        "variant": "occupancy_supply",
+        "horizon_s": 20.0,
+        "advance": false
+      },
+      "scenario": {
+        "name": "inverted_V",
+        "events": [
+          {
+            "at": 20.0,
+            "app": "incoming",
+            "delta": 268435456
+          },
+          {
+            "at": 23.0,
+            "app": "incoming",
+            "delta": -268435456
+          }
+        ],
+        "end_s": 27.0,
+        "cold_bytes": 536870912,
+        "hot_bytes": 67108864,
+        "incoming_base_bytes": 16777216,
+        "initial_headroom_bytes": 134217728,
+        "reserve_bytes": 16777216,
+        "update_s": 0.5,
+        "cold_reuse_s": null,
+        "flat_wss": false
+      },
+      "initial_usage": 622354432,
+      "quota_bytes": 756572160,
+      "max_preallocation_gap_bytes": 134184960,
+      "peak_events": {
+        "low": 0,
+        "high": 0,
+        "max": 178,
+        "oom": 0,
+        "oom_kill": 0,
+        "oom_group_kill": 0
+      },
+      "peak_allocation_ms": [
+        111.417601
+      ],
+      "peak_allocation_cpu_ms": [
+        107.268841
+      ],
+      "during_peak_reclaim_calls": 0,
+      "bad_reclaim_calls": 0,
+      "passed": true,
+      "first_need_timing": null,
+      "conservative_lead_qualified": true
+    },
+    {
+      "status": "COMPLETE",
+      "spec": {
+        "tag": "09-oscillating-control",
+        "scenario": "oscillating",
+        "variant": "occupancy_supply",
+        "horizon_s": 20.0,
+        "advance": false
+      },
+      "scenario": {
+        "name": "oscillating",
+        "events": [
+          {
+            "at": 16.0,
+            "app": "incoming",
+            "delta": 134217728
+          },
+          {
+            "at": 19.0,
+            "app": "incoming",
+            "delta": -134217728
+          },
+          {
+            "at": 25.0,
+            "app": "incoming",
+            "delta": 268435456
+          },
+          {
+            "at": 28.0,
+            "app": "incoming",
+            "delta": -268435456
+          },
+          {
+            "at": 34.0,
+            "app": "incoming",
+            "delta": 201326592
+          }
+        ],
+        "end_s": 38.0,
+        "cold_bytes": 536870912,
+        "hot_bytes": 67108864,
+        "incoming_base_bytes": 16777216,
+        "initial_headroom_bytes": 134217728,
+        "reserve_bytes": 16777216,
+        "update_s": 0.5,
+        "cold_reuse_s": null,
+        "flat_wss": false
+      },
+      "initial_usage": 622755840,
+      "quota_bytes": 756973568,
+      "max_preallocation_gap_bytes": 133709824,
+      "peak_events": {
+        "low": 0,
+        "high": 0,
+        "max": 177,
+        "oom": 0,
+        "oom_kill": 0,
+        "oom_group_kill": 0
+      },
+      "peak_allocation_ms": [
+        48.325075,
+        144.507754,
+        83.413871
+      ],
+      "peak_allocation_cpu_ms": [
+        47.24655,
+        140.919698,
+        81.36219
+      ],
+      "during_peak_reclaim_calls": 0,
+      "bad_reclaim_calls": 0,
+      "passed": true,
+      "first_need_timing": null,
+      "conservative_lead_qualified": true
+    },
+    {
+      "status": "COMPLETE",
+      "spec": {
+        "tag": "10-oscillating-ideal",
+        "scenario": "oscillating",
+        "variant": "occupancy_supply",
+        "horizon_s": 20.0,
+        "advance": true
+      },
+      "scenario": {
+        "name": "oscillating",
+        "events": [
+          {
+            "at": 16.0,
+            "app": "incoming",
+            "delta": 134217728
+          },
+          {
+            "at": 19.0,
+            "app": "incoming",
+            "delta": -134217728
+          },
+          {
+            "at": 25.0,
+            "app": "incoming",
+            "delta": 268435456
+          },
+          {
+            "at": 28.0,
+            "app": "incoming",
+            "delta": -268435456
+          },
+          {
+            "at": 34.0,
+            "app": "incoming",
+            "delta": 201326592
+          }
+        ],
+        "end_s": 38.0,
+        "cold_bytes": 536870912,
+        "hot_bytes": 67108864,
+        "incoming_base_bytes": 16777216,
+        "initial_headroom_bytes": 134217728,
+        "reserve_bytes": 16777216,
+        "update_s": 0.5,
+        "cold_reuse_s": null,
+        "flat_wss": false
+      },
+      "initial_usage": 623079424,
+      "quota_bytes": 757297152,
+      "max_preallocation_gap_bytes": 0,
+      "peak_events": {
+        "low": 0,
+        "high": 0,
+        "max": 0,
+        "oom": 0,
+        "oom_kill": 0,
+        "oom_group_kill": 0
+      },
+      "peak_allocation_ms": [
+        52.880413,
+        105.995705,
+        76.681337
+      ],
+      "peak_allocation_cpu_ms": [
+        51.526606,
+        102.135888,
+        74.953255
+      ],
+      "during_peak_reclaim_calls": 0,
+      "bad_reclaim_calls": 0,
+      "passed": true,
+      "first_need_timing": {
+        "key": "1:0",
+        "start_s": 13.1977157992388,
+        "finish_by_s": 15.500891189,
+        "protected_until_s": 20.000891189,
+        "estimated_total_s": 1.8031753897612002,
+        "remaining_bytes": 16777216,
+        "unallocated_bytes": 0,
+        "feasible": true,
+        "reason": "scheduled_before_growth"
+      },
+      "conservative_lead_qualified": true
+    },
+    {
+      "status": "COMPLETE",
+      "spec": {
+        "tag": "11-flat_WSS_growth-ideal",
+        "scenario": "flat_WSS_growth",
+        "variant": "occupancy_supply",
+        "horizon_s": 20.0,
+        "advance": true
+      },
+      "scenario": {
+        "name": "flat_WSS_growth",
+        "events": [
+          {
+            "at": 20.0,
+            "app": "incoming",
+            "delta": 268435456
+          }
+        ],
+        "end_s": 25.0,
+        "cold_bytes": 536870912,
+        "hot_bytes": 67108864,
+        "incoming_base_bytes": 16777216,
+        "initial_headroom_bytes": 134217728,
+        "reserve_bytes": 16777216,
+        "update_s": 0.5,
+        "cold_reuse_s": null,
+        "flat_wss": true
+      },
+      "initial_usage": 622653440,
+      "quota_bytes": 756871168,
+      "max_preallocation_gap_bytes": 0,
+      "peak_events": {
+        "low": 0,
+        "high": 0,
+        "max": 0,
+        "oom": 0,
+        "oom_kill": 0,
+        "oom_group_kill": 0
+      },
+      "peak_allocation_ms": [
+        94.909404
+      ],
+      "peak_allocation_cpu_ms": [
+        94.567844
+      ],
+      "during_peak_reclaim_calls": 0,
+      "bad_reclaim_calls": 0,
+      "passed": true,
+      "first_need_timing": {
+        "key": "1:0",
+        "start_s": 7.572399502149198,
+        "finish_by_s": 19.50097801,
+        "protected_until_s": 20.00097801,
+        "estimated_total_s": 11.428578507850803,
+        "remaining_bytes": 150994944,
+        "unallocated_bytes": 0,
+        "feasible": true,
+        "reason": "scheduled_before_growth"
+      },
+      "conservative_lead_qualified": true
+    },
+    {
+      "status": "COMPLETE",
+      "spec": {
+        "tag": "12-flat_WSS_growth-control",
+        "scenario": "flat_WSS_growth",
+        "variant": "occupancy_supply",
+        "horizon_s": 20.0,
+        "advance": false
+      },
+      "scenario": {
+        "name": "flat_WSS_growth",
+        "events": [
+          {
+            "at": 20.0,
+            "app": "incoming",
+            "delta": 268435456
+          }
+        ],
+        "end_s": 25.0,
+        "cold_bytes": 536870912,
+        "hot_bytes": 67108864,
+        "incoming_base_bytes": 16777216,
+        "initial_headroom_bytes": 134217728,
+        "reserve_bytes": 16777216,
+        "update_s": 0.5,
+        "cold_reuse_s": null,
+        "flat_wss": true
+      },
+      "initial_usage": 622923776,
+      "quota_bytes": 757141504,
+      "max_preallocation_gap_bytes": 133529600,
+      "peak_events": {
+        "low": 0,
+        "high": 0,
+        "max": 177,
+        "oom": 0,
+        "oom_kill": 0,
+        "oom_group_kill": 0
+      },
+      "peak_allocation_ms": [
+        102.025156
+      ],
+      "peak_allocation_cpu_ms": [
+        98.857274
+      ],
+      "during_peak_reclaim_calls": 0,
+      "bad_reclaim_calls": 0,
+      "passed": true,
+      "first_need_timing": null,
+      "conservative_lead_qualified": true
+    },
+    {
+      "status": "COMPLETE",
+      "spec": {
+        "tag": "13-aligned_free-control",
+        "scenario": "aligned_free",
+        "variant": "occupancy_supply",
+        "horizon_s": 20.0,
+        "advance": false
+      },
+      "scenario": {
+        "name": "aligned_free",
+        "events": [
+          {
+            "at": 20.0,
+            "app": "hot",
+            "delta": -201326592
+          },
+          {
+            "at": 20.0,
+            "app": "incoming",
+            "delta": 268435456
+          }
+        ],
+        "end_s": 25.0,
+        "cold_bytes": 536870912,
+        "hot_bytes": 268435456,
+        "incoming_base_bytes": 16777216,
+        "initial_headroom_bytes": 134217728,
+        "reserve_bytes": 16777216,
+        "update_s": 0.5,
+        "cold_reuse_s": null,
+        "flat_wss": false
+      },
+      "initial_usage": 824655872,
+      "quota_bytes": 958873600,
+      "max_preallocation_gap_bytes": 0,
+      "peak_events": {
+        "low": 0,
+        "high": 0,
+        "max": 0,
+        "oom": 0,
+        "oom_kill": 0,
+        "oom_group_kill": 0
+      },
+      "peak_allocation_ms": [
+        171.118872
+      ],
+      "peak_allocation_cpu_ms": [
+        166.83957
+      ],
+      "during_peak_reclaim_calls": 0,
+      "bad_reclaim_calls": 0,
+      "passed": true,
+      "first_need_timing": null,
+      "conservative_lead_qualified": true
+    },
+    {
+      "status": "COMPLETE",
+      "spec": {
+        "tag": "14-aligned_free-ideal",
+        "scenario": "aligned_free",
+        "variant": "occupancy_supply",
+        "horizon_s": 20.0,
+        "advance": true
+      },
+      "scenario": {
+        "name": "aligned_free",
+        "events": [
+          {
+            "at": 20.0,
+            "app": "hot",
+            "delta": -201326592
+          },
+          {
+            "at": 20.0,
+            "app": "incoming",
+            "delta": 268435456
+          }
+        ],
+        "end_s": 25.0,
+        "cold_bytes": 536870912,
+        "hot_bytes": 268435456,
+        "incoming_base_bytes": 16777216,
+        "initial_headroom_bytes": 134217728,
+        "reserve_bytes": 16777216,
+        "update_s": 0.5,
+        "cold_reuse_s": null,
+        "flat_wss": false
+      },
+      "initial_usage": 824606720,
+      "quota_bytes": 958824448,
+      "max_preallocation_gap_bytes": 0,
+      "peak_events": {
+        "low": 0,
+        "high": 0,
+        "max": 0,
+        "oom": 0,
+        "oom_kill": 0,
+        "oom_group_kill": 0
+      },
+      "peak_allocation_ms": [
+        101.770607
+      ],
+      "peak_allocation_cpu_ms": [
+        99.692477
+      ],
+      "during_peak_reclaim_calls": 0,
+      "bad_reclaim_calls": 0,
+      "passed": true,
+      "first_need_timing": null,
+      "conservative_lead_qualified": true
+    },
+    {
+      "status": "COMPLETE",
+      "spec": {
+        "tag": "15-WSS_change_no_allocation-ideal",
+        "scenario": "WSS_change_no_allocation",
+        "variant": "occupancy_supply",
+        "horizon_s": 20.0,
+        "advance": true
+      },
+      "scenario": {
+        "name": "WSS_change_no_allocation",
+        "events": [],
+        "end_s": 25.0,
+        "cold_bytes": 536870912,
+        "hot_bytes": 67108864,
+        "incoming_base_bytes": 16777216,
+        "initial_headroom_bytes": 134217728,
+        "reserve_bytes": 16777216,
+        "update_s": 0.5,
+        "cold_reuse_s": 20.0,
+        "flat_wss": false
+      },
+      "initial_usage": 622837760,
+      "quota_bytes": 757055488,
+      "max_preallocation_gap_bytes": 0,
+      "peak_events": {
+        "low": 0,
+        "high": 0,
+        "max": 0,
+        "oom": 0,
+        "oom_kill": 0,
+        "oom_group_kill": 0
+      },
+      "peak_allocation_ms": [],
+      "peak_allocation_cpu_ms": [],
+      "during_peak_reclaim_calls": 0,
+      "bad_reclaim_calls": 0,
+      "passed": true,
+      "first_need_timing": null,
+      "conservative_lead_qualified": true
+    },
+    {
+      "status": "COMPLETE",
+      "spec": {
+        "tag": "16-WSS_change_no_allocation-control",
+        "scenario": "WSS_change_no_allocation",
+        "variant": "occupancy_supply",
+        "horizon_s": 20.0,
+        "advance": false
+      },
+      "scenario": {
+        "name": "WSS_change_no_allocation",
+        "events": [],
+        "end_s": 25.0,
+        "cold_bytes": 536870912,
+        "hot_bytes": 67108864,
+        "incoming_base_bytes": 16777216,
+        "initial_headroom_bytes": 134217728,
+        "reserve_bytes": 16777216,
+        "update_s": 0.5,
+        "cold_reuse_s": 20.0,
+        "flat_wss": false
+      },
+      "initial_usage": 622436352,
+      "quota_bytes": 756654080,
+      "max_preallocation_gap_bytes": 0,
+      "peak_events": {
+        "low": 0,
+        "high": 0,
+        "max": 0,
+        "oom": 0,
+        "oom_kill": 0,
+        "oom_group_kill": 0
+      },
+      "peak_allocation_ms": [],
+      "peak_allocation_cpu_ms": [],
+      "during_peak_reclaim_calls": 0,
+      "bad_reclaim_calls": 0,
+      "passed": true,
+      "first_need_timing": null,
+      "conservative_lead_qualified": true
+    },
+    {
+      "status": "COMPLETE",
+      "spec": {
+        "tag": "17-no_deficit-control",
+        "scenario": "no_deficit",
+        "variant": "occupancy_supply",
+        "horizon_s": 20.0,
+        "advance": false
+      },
+      "scenario": {
+        "name": "no_deficit",
+        "events": [
+          {
+            "at": 20.0,
+            "app": "incoming",
+            "delta": 268435456
+          }
+        ],
+        "end_s": 25.0,
+        "cold_bytes": 536870912,
+        "hot_bytes": 67108864,
+        "incoming_base_bytes": 16777216,
+        "initial_headroom_bytes": 402653184,
+        "reserve_bytes": 16777216,
+        "update_s": 0.5,
+        "cold_reuse_s": null,
+        "flat_wss": false
+      },
+      "initial_usage": 623079424,
+      "quota_bytes": 1025732608,
+      "max_preallocation_gap_bytes": 0,
+      "peak_events": {
+        "low": 0,
+        "high": 0,
+        "max": 0,
+        "oom": 0,
+        "oom_kill": 0,
+        "oom_group_kill": 0
+      },
+      "peak_allocation_ms": [
+        111.541076
+      ],
+      "peak_allocation_cpu_ms": [
+        110.809652
+      ],
+      "during_peak_reclaim_calls": 0,
+      "bad_reclaim_calls": 0,
+      "passed": true,
+      "first_need_timing": null,
+      "conservative_lead_qualified": true
+    },
+    {
+      "status": "COMPLETE",
+      "spec": {
+        "tag": "18-no_deficit-ideal",
+        "scenario": "no_deficit",
+        "variant": "occupancy_supply",
+        "horizon_s": 20.0,
+        "advance": true
+      },
+      "scenario": {
+        "name": "no_deficit",
+        "events": [
+          {
+            "at": 20.0,
+            "app": "incoming",
+            "delta": 268435456
+          }
+        ],
+        "end_s": 25.0,
+        "cold_bytes": 536870912,
+        "hot_bytes": 67108864,
+        "incoming_base_bytes": 16777216,
+        "initial_headroom_bytes": 402653184,
+        "reserve_bytes": 16777216,
+        "update_s": 0.5,
+        "cold_reuse_s": null,
+        "flat_wss": false
+      },
+      "initial_usage": 622817280,
+      "quota_bytes": 1025470464,
+      "max_preallocation_gap_bytes": 0,
+      "peak_events": {
+        "low": 0,
+        "high": 0,
+        "max": 0,
+        "oom": 0,
+        "oom_kill": 0,
+        "oom_group_kill": 0
+      },
+      "peak_allocation_ms": [
+        141.466285
+      ],
+      "peak_allocation_cpu_ms": [
+        138.848513
+      ],
+      "during_peak_reclaim_calls": 0,
+      "bad_reclaim_calls": 0,
+      "passed": true,
+      "first_need_timing": null,
+      "conservative_lead_qualified": true
+    },
+    {
+      "status": "COMPLETE",
+      "spec": {
+        "tag": "19-step-ideal",
+        "scenario": "step",
+        "variant": "occupancy_supply",
+        "horizon_s": 20.0,
+        "advance": true
+      },
+      "scenario": {
+        "name": "step",
+        "events": [
+          {
+            "at": 20.0,
+            "app": "incoming",
+            "delta": 268435456
+          }
+        ],
+        "end_s": 25.0,
+        "cold_bytes": 536870912,
+        "hot_bytes": 67108864,
+        "incoming_base_bytes": 16777216,
+        "initial_headroom_bytes": 134217728,
+        "reserve_bytes": 16777216,
+        "update_s": 0.5,
+        "cold_reuse_s": null,
+        "flat_wss": false
+      },
+      "initial_usage": 623079424,
+      "quota_bytes": 757297152,
+      "max_preallocation_gap_bytes": 0,
+      "peak_events": {
+        "low": 0,
+        "high": 0,
+        "max": 0,
+        "oom": 0,
+        "oom_kill": 0,
+        "oom_group_kill": 0
+      },
+      "peak_allocation_ms": [
+        107.622034
+      ],
+      "peak_allocation_cpu_ms": [
+        104.636638
+      ],
+      "during_peak_reclaim_calls": 0,
+      "bad_reclaim_calls": 0,
+      "passed": true,
+      "first_need_timing": {
+        "key": "1:0",
+        "start_s": 7.572411356149198,
+        "finish_by_s": 19.500989864,
+        "protected_until_s": 20.000989864,
+        "estimated_total_s": 11.428578507850803,
+        "remaining_bytes": 150994944,
+        "unallocated_bytes": 0,
+        "feasible": true,
+        "reason": "scheduled_before_growth"
+      },
+      "conservative_lead_qualified": true
+    },
+    {
+      "status": "COMPLETE",
+      "spec": {
+        "tag": "20-step-control",
+        "scenario": "step",
+        "variant": "occupancy_supply",
+        "horizon_s": 20.0,
+        "advance": false
+      },
+      "scenario": {
+        "name": "step",
+        "events": [
+          {
+            "at": 20.0,
+            "app": "incoming",
+            "delta": 268435456
+          }
+        ],
+        "end_s": 25.0,
+        "cold_bytes": 536870912,
+        "hot_bytes": 67108864,
+        "incoming_base_bytes": 16777216,
+        "initial_headroom_bytes": 134217728,
+        "reserve_bytes": 16777216,
+        "update_s": 0.5,
+        "cold_reuse_s": null,
+        "flat_wss": false
+      },
+      "initial_usage": 622817280,
+      "quota_bytes": 757035008,
+      "max_preallocation_gap_bytes": 133877760,
+      "peak_events": {
+        "low": 0,
+        "high": 0,
+        "max": 177,
+        "oom": 0,
+        "oom_kill": 0,
+        "oom_group_kill": 0
+      },
+      "peak_allocation_ms": [
+        218.923827
+      ],
+      "peak_allocation_cpu_ms": [
+        218.093445
+      ],
+      "during_peak_reclaim_calls": 0,
+      "bad_reclaim_calls": 0,
+      "passed": true,
+      "first_need_timing": null,
+      "conservative_lead_qualified": true
+    },
+    {
+      "status": "COMPLETE",
+      "spec": {
+        "tag": "21-step-control",
+        "scenario": "step",
+        "variant": "occupancy_supply",
+        "horizon_s": 20.0,
+        "advance": false
+      },
+      "scenario": {
+        "name": "step",
+        "events": [
+          {
+            "at": 20.0,
+            "app": "incoming",
+            "delta": 268435456
+          }
+        ],
+        "end_s": 25.0,
+        "cold_bytes": 536870912,
+        "hot_bytes": 67108864,
+        "incoming_base_bytes": 16777216,
+        "initial_headroom_bytes": 134217728,
+        "reserve_bytes": 16777216,
+        "update_s": 0.5,
+        "cold_reuse_s": null,
+        "flat_wss": false
+      },
+      "initial_usage": 623079424,
+      "quota_bytes": 757297152,
+      "max_preallocation_gap_bytes": 133378048,
+      "peak_events": {
+        "low": 0,
+        "high": 0,
+        "max": 177,
+        "oom": 0,
+        "oom_kill": 0,
+        "oom_group_kill": 0
+      },
+      "peak_allocation_ms": [
+        137.592866
+      ],
+      "peak_allocation_cpu_ms": [
+        135.02563
+      ],
+      "during_peak_reclaim_calls": 0,
+      "bad_reclaim_calls": 0,
+      "passed": true,
+      "first_need_timing": null,
+      "conservative_lead_qualified": true
+    },
+    {
+      "status": "COMPLETE",
+      "spec": {
+        "tag": "22-step-ideal",
+        "scenario": "step",
+        "variant": "occupancy_supply",
+        "horizon_s": 20.0,
+        "advance": true
+      },
+      "scenario": {
+        "name": "step",
+        "events": [
+          {
+            "at": 20.0,
+            "app": "incoming",
+            "delta": 268435456
+          }
+        ],
+        "end_s": 25.0,
+        "cold_bytes": 536870912,
+        "hot_bytes": 67108864,
+        "incoming_base_bytes": 16777216,
+        "initial_headroom_bytes": 134217728,
+        "reserve_bytes": 16777216,
+        "update_s": 0.5,
+        "cold_reuse_s": null,
+        "flat_wss": false
+      },
+      "initial_usage": 622755840,
+      "quota_bytes": 756973568,
+      "max_preallocation_gap_bytes": 0,
+      "peak_events": {
+        "low": 0,
+        "high": 0,
+        "max": 0,
+        "oom": 0,
+        "oom_kill": 0,
+        "oom_group_kill": 0
+      },
+      "peak_allocation_ms": [
+        97.423198
+      ],
+      "peak_allocation_cpu_ms": [
+        95.225751
+      ],
+      "during_peak_reclaim_calls": 0,
+      "bad_reclaim_calls": 0,
+      "passed": true,
+      "first_need_timing": {
+        "key": "1:0",
+        "start_s": 7.572191679149197,
+        "finish_by_s": 19.500770187,
+        "protected_until_s": 20.000770187,
+        "estimated_total_s": 11.428578507850803,
+        "remaining_bytes": 150994944,
+        "unallocated_bytes": 0,
+        "feasible": true,
+        "reason": "scheduled_before_growth"
+      },
+      "conservative_lead_qualified": true
+    },
+    {
+      "status": "COMPLETE",
+      "spec": {
+        "tag": "23-step-H12",
+        "scenario": "step",
+        "variant": "occupancy_supply",
+        "horizon_s": 12.0,
+        "advance": true
+      },
+      "scenario": {
+        "name": "step",
+        "events": [
+          {
+            "at": 20.0,
+            "app": "incoming",
+            "delta": 268435456
+          }
+        ],
+        "end_s": 25.0,
+        "cold_bytes": 536870912,
+        "hot_bytes": 67108864,
+        "incoming_base_bytes": 16777216,
+        "initial_headroom_bytes": 134217728,
+        "reserve_bytes": 16777216,
+        "update_s": 0.5,
+        "cold_reuse_s": null,
+        "flat_wss": false
+      },
+      "initial_usage": 623079424,
+      "quota_bytes": 757297152,
+      "max_preallocation_gap_bytes": 0,
+      "peak_events": {
+        "low": 0,
+        "high": 0,
+        "max": 0,
+        "oom": 0,
+        "oom_kill": 0,
+        "oom_group_kill": 0
+      },
+      "peak_allocation_ms": [
+        124.156617
+      ],
+      "peak_allocation_cpu_ms": [
+        117.43591
+      ],
+      "during_peak_reclaim_calls": 0,
+      "bad_reclaim_calls": 0,
+      "passed": true,
+      "first_need_timing": {
+        "key": "17:0",
+        "start_s": 7.972152909652921,
+        "finish_by_s": 19.848151243,
+        "protected_until_s": 20.348151243,
+        "estimated_total_s": 11.375998333347079,
+        "remaining_bytes": 150261760,
+        "unallocated_bytes": 0,
+        "feasible": false,
+        "reason": "insufficient_capacity_or_time"
+      },
+      "conservative_lead_qualified": false
+    },
+    {
+      "status": "COMPLETE",
+      "spec": {
+        "tag": "24-step-H30",
+        "scenario": "step",
+        "variant": "occupancy_supply",
+        "horizon_s": 30.0,
+        "advance": true
+      },
+      "scenario": {
+        "name": "step",
+        "events": [
+          {
+            "at": 20.0,
+            "app": "incoming",
+            "delta": 268435456
+          }
+        ],
+        "end_s": 25.0,
+        "cold_bytes": 536870912,
+        "hot_bytes": 67108864,
+        "incoming_base_bytes": 16777216,
+        "initial_headroom_bytes": 134217728,
+        "reserve_bytes": 16777216,
+        "update_s": 0.5,
+        "cold_reuse_s": null,
+        "flat_wss": false
+      },
+      "initial_usage": 623079424,
+      "quota_bytes": 757297152,
+      "max_preallocation_gap_bytes": 0,
+      "peak_events": {
+        "low": 0,
+        "high": 0,
+        "max": 0,
+        "oom": 0,
+        "oom_kill": 0,
+        "oom_group_kill": 0
+      },
+      "peak_allocation_ms": [
+        120.728599
+      ],
+      "peak_allocation_cpu_ms": [
+        117.894628
+      ],
+      "during_peak_reclaim_calls": 0,
+      "bad_reclaim_calls": 0,
+      "passed": true,
+      "first_need_timing": {
+        "key": "1:0",
+        "start_s": 7.572235969149196,
+        "finish_by_s": 19.500814477,
+        "protected_until_s": 30.000814477,
+        "estimated_total_s": 11.428578507850803,
+        "remaining_bytes": 150994944,
+        "unallocated_bytes": 0,
+        "feasible": true,
+        "reason": "scheduled_before_growth"
+      },
+      "conservative_lead_qualified": true
+    },
+    {
+      "status": "CORRECTLY_INFEASIBLE",
+      "passed": true,
+      "spec": {
+        "tag": "25-cold-revisit-guard",
+        "scenario": "cold_revisit",
+        "variant": "occupancy_supply",
+        "horizon_s": 20.0,
+        "advance": true
+      },
+      "scenario": {
+        "name": "cold_revisit",
+        "events": [
+          {
+            "at": 20.0,
+            "app": "incoming",
+            "delta": 268435456
+          }
+        ],
+        "end_s": 25.0,
+        "cold_bytes": 536870912,
+        "hot_bytes": 67108864,
+        "incoming_base_bytes": 16777216,
+        "initial_headroom_bytes": 134217728,
+        "reserve_bytes": 16777216,
+        "update_s": 0.5,
+        "cold_reuse_s": 21.0,
+        "flat_wss": false
+      },
+      "reason": "only donor becomes hot in the protected forecast; no safe cold supply"
+    }
+  ]
+}

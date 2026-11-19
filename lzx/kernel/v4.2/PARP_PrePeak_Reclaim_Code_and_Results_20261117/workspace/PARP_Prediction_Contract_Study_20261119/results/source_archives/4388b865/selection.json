@@ -1,0 +1,9 @@
+{
+  "tags": [
+    "01-step-control", "02-step-ideal",
+    "03-ramp-ideal", "04-ramp-control",
+    "05-V-control", "06-V-ideal",
+    "09-oscillating-control", "10-oscillating-ideal",
+    "25-cold-revisit-guard"
+  ]
+}

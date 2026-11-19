@@ -1,0 +1,8 @@
+{
+  "base": "/sys/fs/cgroup/parp-ideal-bb36f7f872c5",
+  "uid": 1000,
+  "gid": 1000,
+  "root_memory_max_bytes": 2147483648,
+  "swap_max_bytes": 0,
+  "global_controls_changed": false
+}

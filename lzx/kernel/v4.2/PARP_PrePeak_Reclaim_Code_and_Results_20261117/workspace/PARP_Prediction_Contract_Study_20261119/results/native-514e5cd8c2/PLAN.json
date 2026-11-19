@@ -1,0 +1,214 @@
+{
+  "native": true,
+  "trained_predictors_called": false,
+  "timing_fix": "expired_peak_epoch",
+  "specs": [
+    {
+      "tag": "01-step-control",
+      "scenario": "step",
+      "variant": "occupancy_supply",
+      "horizon_s": 20.0,
+      "advance": false
+    },
+    {
+      "tag": "02-step-ideal",
+      "scenario": "step",
+      "variant": "occupancy_supply",
+      "horizon_s": 20.0,
+      "advance": true
+    },
+    {
+      "tag": "03-ramp-ideal",
+      "scenario": "ramp",
+      "variant": "occupancy_supply",
+      "horizon_s": 20.0,
+      "advance": true
+    },
+    {
+      "tag": "04-ramp-control",
+      "scenario": "ramp",
+      "variant": "occupancy_supply",
+      "horizon_s": 20.0,
+      "advance": false
+    },
+    {
+      "tag": "05-V-control",
+      "scenario": "V",
+      "variant": "occupancy_supply",
+      "horizon_s": 20.0,
+      "advance": false
+    },
+    {
+      "tag": "06-V-ideal",
+      "scenario": "V",
+      "variant": "occupancy_supply",
+      "horizon_s": 20.0,
+      "advance": true
+    },
+    {
+      "tag": "07-inverted_V-ideal",
+      "scenario": "inverted_V",
+      "variant": "occupancy_supply",
+      "horizon_s": 20.0,
+      "advance": true
+    },
+    {
+      "tag": "08-inverted_V-control",
+      "scenario": "inverted_V",
+      "variant": "occupancy_supply",
+      "horizon_s": 20.0,
+      "advance": false
+    },
+    {
+      "tag": "09-oscillating-control",
+      "scenario": "oscillating",
+      "variant": "occupancy_supply",
+      "horizon_s": 20.0,
+      "advance": false
+    },
+    {
+      "tag": "10-oscillating-ideal",
+      "scenario": "oscillating",
+      "variant": "occupancy_supply",
+      "horizon_s": 20.0,
+      "advance": true
+    },
+    {
+      "tag": "11-flat_WSS_growth-ideal",
+      "scenario": "flat_WSS_growth",
+      "variant": "occupancy_supply",
+      "horizon_s": 20.0,
+      "advance": true
+    },
+    {
+      "tag": "12-flat_WSS_growth-control",
+      "scenario": "flat_WSS_growth",
+      "variant": "occupancy_supply",
+      "horizon_s": 20.0,
+      "advance": false
+    },
+    {
+      "tag": "13-aligned_free-control",
+      "scenario": "aligned_free",
+      "variant": "occupancy_supply",
+      "horizon_s": 20.0,
+      "advance": false
+    },
+    {
+      "tag": "14-aligned_free-ideal",
+      "scenario": "aligned_free",
+      "variant": "occupancy_supply",
+      "horizon_s": 20.0,
+      "advance": true
+    },
+    {
+      "tag": "15-WSS_change_no_allocation-ideal",
+      "scenario": "WSS_change_no_allocation",
+      "variant": "occupancy_supply",
+      "horizon_s": 20.0,
+      "advance": true
+    },
+    {
+      "tag": "16-WSS_change_no_allocation-control",
+      "scenario": "WSS_change_no_allocation",
+      "variant": "occupancy_supply",
+      "horizon_s": 20.0,
+      "advance": false
+    },
+    {
+      "tag": "17-no_deficit-control",
+      "scenario": "no_deficit",
+      "variant": "occupancy_supply",
+      "horizon_s": 20.0,
+      "advance": false
+    },
+    {
+      "tag": "18-no_deficit-ideal",
+      "scenario": "no_deficit",
+      "variant": "occupancy_supply",
+      "horizon_s": 20.0,
+      "advance": true
+    },
+    {
+      "tag": "19-step-ideal",
+      "scenario": "step",
+      "variant": "occupancy_supply",
+      "horizon_s": 20.0,
+      "advance": true
+    },
+    {
+      "tag": "20-step-control",
+      "scenario": "step",
+      "variant": "occupancy_supply",
+      "horizon_s": 20.0,
+      "advance": false
+    },
+    {
+      "tag": "21-step-control",
+      "scenario": "step",
+      "variant": "occupancy_supply",
+      "horizon_s": 20.0,
+      "advance": false
+    },
+    {
+      "tag": "22-step-ideal",
+      "scenario": "step",
+      "variant": "occupancy_supply",
+      "horizon_s": 20.0,
+      "advance": true
+    },
+    {
+      "tag": "23-step-H12",
+      "scenario": "step",
+      "variant": "occupancy_supply",
+      "horizon_s": 12.0,
+      "advance": true
+    },
+    {
+      "tag": "24-step-H30",
+      "scenario": "step",
+      "variant": "occupancy_supply",
+      "horizon_s": 30.0,
+      "advance": true
+    },
+    {
+      "tag": "25-cold-revisit-guard",
+      "scenario": "cold_revisit",
+      "variant": "occupancy_supply",
+      "horizon_s": 20.0,
+      "advance": true
+    }
+  ],
+  "source_sha256": {
+    "scheduler_fix.py": "9d67991667474162f78bd5cd3a50f62b8618998c23ba2bf82b20d0106a479a04",
+    "run_simulation.py": "e6ca128dbd8eac7adefb17eb4f69eb6737fb90c59a2ef95df0104394f54ae93b",
+    "memory_worker.py": "222b48f1d23161993345263ec3c1cb71e709830cdc7d48f75c1816f5b7674490",
+    "study_pipeline.py": "ed58280b0c5f81732e33c574d915b73a67047be1a84783b9d1507bc8910d37c3",
+    "prediction_contract.py": "70c184042b7beab8fb5c65ac75d6016009fb84f27bee61ef1e70412a81a17b00",
+    "verify_source.py": "528134afa61611075a0cd8497695ec155f2c3cc80c5f5577e47f697ccdaefa3d",
+    "vm_service.py": "5676f4f582ceb3d409a00db994d2e47f76b00b7ac798658f9d1f41d282d4e677",
+    "prepare_cgroup.py": "d5f95231ebe95ec2f30eac2c77275dd50ab2edccf2861d54395c7eb6043cdb53",
+    "stage_native.py": "d0c0c3bcff439b2c0a2080cdd6de8d8b0dfa47ceba43b34aa5512899c828479c",
+    "run_native.py": "a47b7484e451a9209cdd05f7c0527c4b58a194abf63bcc1cbf00c88c04708af8",
+    "test_contract.py": "73a87e49713c7b752c222e9dee30ece6664c79440395d2b3660811c8df0db10e",
+    "oracle_scenarios.py": "0bab2382ed8adfd393cd13b143bac5ce5570e14c123a874c76528b30da0957af",
+    "native_support.py": "3901f1c0aee124cf24fccbd01610c4672468262f7ccf7134c02beac4b9b962e6"
+  },
+  "controller_sha256": {
+    "native.py": "9b14655b61edb0d6ae7e0ad375b396730264cf8ef815bc7c1dae49886af3c7d4",
+    "test_prepeak_timing.py": "b5dfc8373c6fe8e024e8f78712353029ee36c15d50389dcce157cc2e68960401",
+    "safety_store.py": "4c6f9948d84b620e72519d7a1d346c812c92c3089982c0cdc9d4117d1fb6cdaa",
+    "prepeak_timing.py": "a5bcfe9e8f947ec874b6896bf1a2dead5dfbe32cb565aa99ac0775e9a9cfddc1",
+    "workflow.py": "140743fd24b469a8d54e0fd76dacc565a7a13e924adc00c8bae07bf528337c6a",
+    "sequence_policy.py": "616ad43caf518b8f040626ded1480d09431ed9a23f6678d0ed89c5b367566b71",
+    "faults.py": "3e7ff27aac2cf75059254088807a1768c811771f0a78ad73d94c56a753c375c7",
+    "test_sequence_policy.py": "39bd076c04ca6a0be04feb5a93cbb45a0724595995878e66db99ced1161f364f",
+    "executor.py": "2d71beea94628242b91aa57606bea8d2496c5f1a68ea350b6380be4449ca9c6f",
+    "plan.py": "1908cc9fc2ad31a73edac3c21193e027445b5aa2a4be8a95c42321734b8a5c2c",
+    "coordinator.py": "2c5891d24addae9878cb510a5fb419f54cb2167cf46691ee9e9a1b38f6b586f1",
+    "signals.py": "52fdc181b8605af31683aa92240290073d36e9d08e0d976f84c1efc796f0e7f3",
+    "replay_forecast.py": "9b30a0a25526a8f0ad850d4048d4058bdb3683d843c4c28ba5a1b8fd7a270245",
+    "adapters.py": "3b4e30a47c55053cacc24fa58c8757eaf552b5ac10625752e566472648d65629",
+    "test_measured.py": "8ca86005d3b840f713b0720129c60e31ceecb9b76c4ea7e296165be7081db0c8"
+  }
+}

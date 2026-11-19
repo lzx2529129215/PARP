@@ -1,55 +1,35 @@
-# PARP 最新代码、逻辑说明与结果（2026-11-17）
+# PARP 预测输出、提前回收与采集审阅包（2026-11-19）
 
-本包对应最后完成的 **3854 MiB、真实缺口、revisit 场景**批次。最新主代码只有一份：
+**当前状态：待负责人审核，尚未开始补采或真实预测模型训练。** 本次在原GitHub文件夹内更新，保留2026-11-17源码、结果和历史说明。
 
-[`workspace/parp-userspace-deficitfix-20261117/`](workspace/parp-userspace-deficitfix-20261117/)
+负责人先看 [审阅要点与采集准入](04_负责人审阅与采集准入.md)，然后看 [最终预测接口](workspace/PARP_Prediction_Contract_Study_20261119/预测接口与代码改动.md)、[实验结果](workspace/PARP_Prediction_Contract_Study_20261119/实验结果.md)、[采集字段与步骤](workspace/PARP_Prediction_Contract_Study_20261119/交给采集人员的字段与步骤.md)。
 
-代码与原始结果原样复制，未修改本批已经冻结的运行代码，也未重新启动虚拟机实验。其余旧日期目录是必要依赖、历史校准证据或中止记录。
+## 最新代码与输出
 
-## 阅读顺序
+最新代码：[`workspace/PARP_Prediction_Contract_Study_20261119/`](workspace/PARP_Prediction_Contract_Study_20261119/)。两类预测由脚本提供理想输出，完整调用应用间→应用内→提前回收；真实函数将沿用同一输出格式。
 
-1. [代码逻辑说明](01_代码逻辑说明.md)：输入、WSS 固定 high、细粒度 reclaim、截止时间、0.5 秒更新和保护机制。
-2. [实验结果](summaries/实验结果.md)：设置、9 轮明细、正式对照、缺页、未达到的部分。
-3. [运行与验证](02_运行与验证.md)：离线检查、结果再生成、另建目录后运行新实验。
-4. [环境与依赖](03_环境与依赖.md)：包内依赖和仍需现有 Ubuntu 虚拟机提供的程序、资产。
+- 每0.5秒更新；默认从当前时刻起未来20秒，共40个0.5秒窗口。
+- 每段保留 **WSS、实际占用增量、缺页次数**。缺页是本窗口计数，不是累计值。
+- 同时给出当前安全冷量和有效期；实时空间、回收开始/截止和预算由控制器计算。
+- 机器可读定义：[OUTPUT_CONTRACT.json](workspace/PARP_Prediction_Contract_Study_20261119/OUTPUT_CONTRACT.json)；实际原生输出示例：[OUTPUT_EXAMPLE.json](workspace/PARP_Prediction_Contract_Study_20261119/OUTPUT_EXAMPLE.json)。
 
-## 当前结论
+## 已验证与边界
 
-- 正式开启组 2/3 轮在第 8 秒主峰开始前补足空间，另一轮仍缺 **3.11 MiB**，因此目标没有全部达成。
-- 正式组峰值响应 P95 均值 **230.03 ms**，关闭组 **225.50 ms**，观察到约 **+2.01%**；每组仅 3 轮。
-- 各应用完整任务总 pgfault 增幅均低于 10%。这项通过不代替空间、响应或大缺页诊断。
-- 全部开启轮在主峰统计区间没有发起 memory.reclaim，也没有调用越过截止时间；Firefox 仍有 high 压力事件。
+完成37项真实虚拟机检查：34轮完整运行（16轮对照、18轮理想预测）以及3次正确报告安全冷量不足。18轮理想预测的每次分配前缺口均为0。无热应用主动回收、无增长保护期主动回收、无OOM。峰值耗时存在波动，不宣称统一加速比例。
 
-## 目录
+覆盖阶跃、缓慢增长、V形、倒V形、反复波动、工作集与占用解耦、同步释放、无缺口与重访保护等理想条件。12秒实际补足过空间但保守时间预算不合格；当前默认20秒，非普适最优。
 
-```text
-workspace/
-  parp-userspace-deficitfix-20261117/  最新主代码、测试、原始 results
-  parp-measured-validation-20261113/ 历史源码和候选额度证据
-  oracle-realapps-validation-20261110/ 原生 GIMP 和输入探针辅助代码
-  foreground_krita_gui/             Krita GUI 辅助包、配置与依赖清单
-  krita-vm-acceptance/              cgroup 启动、临时任务通道等必要辅助代码
-  parp-userspace-four-ops/           核验用原始操作控制器
-  parp-wss-v5/                      任务通道核验所需的 10 个历史源码文件
-summaries/                         可读结果及机器可读汇总
-evidence/                          本批实时日志、宿主机采样
-history/                           3918 MiB 中止批次，与正式汇总分开
-tools/                             汇总、完整性校验、新实验目录准备工具
-manifest.json                      包内文件 SHA-256 清单
-validation.json                    整理后的本地验证记录
-```
+验证的候选修正：下一峰值身份、按实际增长扣除已实现需求、按剩余安全冷量/预算判断可行性。原上传版controller的15个文件保持原哈希，修正通过外层适配及调度子类接入，并保留逐批已执行源码。
 
-原始结果中的 `/home/qi/...` 等绝对路径是采集时的记录，保留原样；它们不表示本包在当前机器上的位置。复核结果直接使用包内相对路径即可。
+**本轮是整应用冷热、干净文件页的合成验证；固定high仍采用独立全序列参考包络。** 不代表真实预测准确率、最优历史长度、匿名压缩、页级定向回收或真实GUI卡顿已经验证。页访问采集器仍需按规格实现及预采检查；当前VM支持Page Idle，未启用DAMON。
 
-`TOTAL_QUALIFICATION-revisit.json` 是总缺页校准资格记录，里面 `latency_qualified` 和 `space_target_qualified` 均为 false；不能把文件存在或 eligible=true 当作整个研究目标已经完成。
+## 审阅与复核入口
 
-## 快速复核
+1. [代码与逻辑入口](01_代码逻辑说明.md)
+2. [离线复核及运行](02_运行与验证.md)
+3. [环境与尚缺能力](03_环境与依赖.md)
+4. [负责人审阅与采集准入](04_负责人审阅与采集准入.md)
+5. [采集人员规格](workspace/PARP_Prediction_Contract_Study_20261119/交给采集人员的字段与步骤.md)
+6. [逐批结果与源码匹配](workspace/PARP_Prediction_Contract_Study_20261119/results/VERIFIED.json)、[执行源码快照](workspace/PARP_Prediction_Contract_Study_20261119/results/source_archives/)
 
-在本文件所在目录执行：
-
-```text
-python -X utf8 -B tools/verify_bundle.py
-python -X utf8 -B tools/summarize_results.py
-```
-
-两个命令均不启动原生应用、不操作 cgroup、不需要 sudo。第二个命令只重建 `summaries/` 的派生结果，不改原始记录。
+旧版真实应用结果仍在 `workspace/parp-userspace-deficitfix-20261117/` 与 `summaries/`，原顶层说明归档在 [history/release-20261117/](history/release-20261117/)。旧版2/3补足、3.11MiB缺口等结论保持原样，与本轮不同场景分开。

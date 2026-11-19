@@ -1,0 +1,148 @@
+{
+  "status": "COMPLETE",
+  "trials": [
+    {
+      "status": "COMPLETE",
+      "spec": {
+        "tag": "01-step-control",
+        "scenario": "step",
+        "variant": "occupancy_supply_faults",
+        "horizon_s": 20.0,
+        "advance": false
+      },
+      "scenario": {
+        "name": "step",
+        "events": [
+          {
+            "at": 20.0,
+            "app": "incoming",
+            "delta": 268435456
+          }
+        ],
+        "end_s": 25.0,
+        "cold_bytes": 536870912,
+        "hot_bytes": 67108864,
+        "incoming_base_bytes": 16777216,
+        "initial_headroom_bytes": 134217728,
+        "reserve_bytes": 16777216,
+        "update_s": 0.5,
+        "cold_reuse_s": null,
+        "flat_wss": false
+      },
+      "initial_usage": 623079424,
+      "quota_bytes": 757297152,
+      "max_preallocation_gap_bytes": 133500928,
+      "peak_events": {
+        "low": 0,
+        "high": 0,
+        "max": 177,
+        "oom": 0,
+        "oom_kill": 0,
+        "oom_group_kill": 0
+      },
+      "peak_allocation_ms": [
+        118.845401
+      ],
+      "peak_allocation_cpu_ms": [
+        114.829
+      ],
+      "during_peak_reclaim_calls": 0,
+      "bad_reclaim_calls": 0,
+      "passed": true,
+      "first_need_timing": null,
+      "conservative_lead_qualified": true
+    },
+    {
+      "status": "COMPLETE",
+      "spec": {
+        "tag": "02-step-ideal",
+        "scenario": "step",
+        "variant": "occupancy_supply_faults",
+        "horizon_s": 20.0,
+        "advance": true
+      },
+      "scenario": {
+        "name": "step",
+        "events": [
+          {
+            "at": 20.0,
+            "app": "incoming",
+            "delta": 268435456
+          }
+        ],
+        "end_s": 25.0,
+        "cold_bytes": 536870912,
+        "hot_bytes": 67108864,
+        "incoming_base_bytes": 16777216,
+        "initial_headroom_bytes": 134217728,
+        "reserve_bytes": 16777216,
+        "update_s": 0.5,
+        "cold_reuse_s": null,
+        "flat_wss": false
+      },
+      "initial_usage": 623079424,
+      "quota_bytes": 757297152,
+      "max_preallocation_gap_bytes": 0,
+      "peak_events": {
+        "low": 0,
+        "high": 0,
+        "max": 0,
+        "oom": 0,
+        "oom_kill": 0,
+        "oom_group_kill": 0
+      },
+      "peak_allocation_ms": [
+        109.150774
+      ],
+      "peak_allocation_cpu_ms": [
+        105.634532
+      ],
+      "during_peak_reclaim_calls": 0,
+      "bad_reclaim_calls": 0,
+      "passed": true,
+      "first_need_timing": {
+        "key": "1:0",
+        "start_s": 7.5595980335487365,
+        "finish_by_s": 19.500770048,
+        "protected_until_s": 20.000770048,
+        "estimated_total_s": 11.441172014451263,
+        "remaining_bytes": 150994944,
+        "unallocated_bytes": 0,
+        "feasible": true,
+        "reason": "scheduled_before_growth"
+      },
+      "conservative_lead_qualified": true
+    },
+    {
+      "status": "CORRECTLY_INFEASIBLE",
+      "passed": true,
+      "spec": {
+        "tag": "25-cold-revisit-guard",
+        "scenario": "cold_revisit",
+        "variant": "occupancy_supply_faults",
+        "horizon_s": 20.0,
+        "advance": true
+      },
+      "scenario": {
+        "name": "cold_revisit",
+        "events": [
+          {
+            "at": 20.0,
+            "app": "incoming",
+            "delta": 268435456
+          }
+        ],
+        "end_s": 25.0,
+        "cold_bytes": 536870912,
+        "hot_bytes": 67108864,
+        "incoming_base_bytes": 16777216,
+        "initial_headroom_bytes": 134217728,
+        "reserve_bytes": 16777216,
+        "update_s": 0.5,
+        "cold_reuse_s": 21.0,
+        "flat_wss": false
+      },
+      "reason": "only donor becomes hot in the protected forecast; no safe cold supply"
+    }
+  ]
+}

@@ -1,0 +1,159 @@
+{
+  "measurement_id": "native-clean-cold-4c612f942823427ba33680e2b91db22a",
+  "approved_bytes": 402653184,
+  "safe_rss": 144953344,
+  "safe_usage": 132358144,
+  "idle_faults": 0,
+  "profile": {
+    "bytes_per_s": 13927917,
+    "batch_bound_s": 0.6,
+    "credited_bytes": 402653184,
+    "source": "conservative calibration occupancy-drop estimate; not exact old-page speed"
+  },
+  "writes": [
+    {
+      "name": "memory.reclaim",
+      "value": 8388608,
+      "start_ns": 4029641734377,
+      "end_ns": 4029644021695,
+      "before_bytes": 537198592,
+      "after_bytes": 528728064,
+      "error": null
+    },
+    {
+      "name": "memory.reclaim",
+      "value": 16777216,
+      "start_ns": 4029744511790,
+      "end_ns": 4029746157810,
+      "before_bytes": 528728064,
+      "after_bytes": 511770624,
+      "error": null
+    },
+    {
+      "name": "memory.reclaim",
+      "value": 33554432,
+      "start_ns": 4029846512299,
+      "end_ns": 4029847373181,
+      "before_bytes": 511770624,
+      "after_bytes": 476381184,
+      "error": null
+    },
+    {
+      "name": "memory.reclaim",
+      "value": 33554432,
+      "start_ns": 4029947844215,
+      "end_ns": 4029948178341,
+      "before_bytes": 476381184,
+      "after_bytes": 442826752,
+      "error": null
+    },
+    {
+      "name": "memory.reclaim",
+      "value": 33554432,
+      "start_ns": 4030048559778,
+      "end_ns": 4030048773423,
+      "before_bytes": 442736640,
+      "after_bytes": 409182208,
+      "error": null
+    },
+    {
+      "name": "memory.reclaim",
+      "value": 33554432,
+      "start_ns": 4030149213345,
+      "end_ns": 4030149442969,
+      "before_bytes": 409182208,
+      "after_bytes": 375627776,
+      "error": null
+    },
+    {
+      "name": "memory.reclaim",
+      "value": 33554432,
+      "start_ns": 4030249733670,
+      "end_ns": 4030249932724,
+      "before_bytes": 375627776,
+      "after_bytes": 342073344,
+      "error": null
+    },
+    {
+      "name": "memory.reclaim",
+      "value": 33554432,
+      "start_ns": 4030350242570,
+      "end_ns": 4030350501037,
+      "before_bytes": 342073344,
+      "after_bytes": 308518912,
+      "error": null
+    },
+    {
+      "name": "memory.reclaim",
+      "value": 33554432,
+      "start_ns": 4030450859015,
+      "end_ns": 4030451142343,
+      "before_bytes": 308518912,
+      "after_bytes": 274964480,
+      "error": null
+    },
+    {
+      "name": "memory.reclaim",
+      "value": 33554432,
+      "start_ns": 4030551598736,
+      "end_ns": 4030552224002,
+      "before_bytes": 274964480,
+      "after_bytes": 241410048,
+      "error": null
+    },
+    {
+      "name": "memory.reclaim",
+      "value": 33554432,
+      "start_ns": 4030652549684,
+      "end_ns": 4030652849164,
+      "before_bytes": 241410048,
+      "after_bytes": 207855616,
+      "error": null
+    },
+    {
+      "name": "memory.reclaim",
+      "value": 33554432,
+      "start_ns": 4030753604632,
+      "end_ns": 4030754564074,
+      "before_bytes": 207855616,
+      "after_bytes": 174301184,
+      "error": null
+    },
+    {
+      "name": "memory.reclaim",
+      "value": 33554432,
+      "start_ns": 4030854956664,
+      "end_ns": 4030855203884,
+      "before_bytes": 174301184,
+      "after_bytes": 140746752,
+      "error": null
+    },
+    {
+      "name": "memory.reclaim",
+      "value": 8388608,
+      "start_ns": 4030956216075,
+      "end_ns": 4030956320777,
+      "before_bytes": 140746752,
+      "after_bytes": 132358144,
+      "error": null
+    }
+  ],
+  "before_bytes": 537198592,
+  "after_bytes": 132358144,
+  "requested_bytes": 402653184,
+  "fixture_initial": {
+    "cold": {
+      "rss": 549703680,
+      "usage": 537198592
+    },
+    "hot": {
+      "rss": 79781888,
+      "usage": 67629056
+    },
+    "incoming": {
+      "rss": 29364224,
+      "usage": 17301504
+    }
+  },
+  "stage": "physical_calibration_not_scored"
+}

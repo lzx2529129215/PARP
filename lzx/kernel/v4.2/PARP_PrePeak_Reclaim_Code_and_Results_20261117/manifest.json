@@ -1,22 +1,28 @@
 {
-  "date": "2026-11-17",
-  "latest_code": "workspace/parp-userspace-deficitfix-20261117",
-  "source_original": "D:\\C\\Desktop\\华为项目\\代码\\parp-userspace-deficitfix-20261117",
+  "date": "2026-11-19",
+  "latest_code": "workspace/PARP_Prediction_Contract_Study_20261119",
+  "previous_code": "workspace/parp-userspace-deficitfix-20261117",
+  "review_status": "pending_owner_review",
   "files": [
     {
       "path": "01_代码逻辑说明.md",
-      "bytes": 9751,
-      "sha256": "003096bf323f9060d6826d9c2c8a420b850f8dad0e9b38e47289bffb99e99411"
+      "bytes": 1541,
+      "sha256": "448fa7084aa8e689ddc0d1d5da9d547d204bcd088ab0dbe65b5080dc50393bf5"
     },
     {
       "path": "02_运行与验证.md",
-      "bytes": 4543,
-      "sha256": "41ef745afc953d9b8fe5599f01b60628ae347bc27ed186be96e499f8e6256a8e"
+      "bytes": 1965,
+      "sha256": "d70e1c1ab0a994c4a29acbeaf51853e352ba07b71fe2563b2a10d37b9e0e1971"
     },
     {
       "path": "03_环境与依赖.md",
-      "bytes": 2681,
-      "sha256": "171bb4448b4561c5ce0026c3eb0d2122c127e81ffdb64ccd9cfbca6075069ba3"
+      "bytes": 1508,
+      "sha256": "9a07d62221a6e7624a6910e2a961465ab37d3b1265f66f803f373baf297bd391"
+    },
+    {
+      "path": "04_负责人审阅与采集准入.md",
+      "bytes": 2396,
+      "sha256": "5fdb2404ab533e5039393464cf7662dd5fc74d4731a80183752671ed41003b75"
     },
     {
       "path": "evidence/host/host-latest.json",
@@ -369,14 +375,44 @@
       "sha256": "2ec0f3d73465467a748358f23dead49b252102639da734185f07aa00134745e4"
     },
     {
+      "path": "history/release-20261117/01_代码逻辑说明.md",
+      "bytes": 9751,
+      "sha256": "003096bf323f9060d6826d9c2c8a420b850f8dad0e9b38e47289bffb99e99411"
+    },
+    {
+      "path": "history/release-20261117/02_运行与验证.md",
+      "bytes": 4543,
+      "sha256": "41ef745afc953d9b8fe5599f01b60628ae347bc27ed186be96e499f8e6256a8e"
+    },
+    {
+      "path": "history/release-20261117/03_环境与依赖.md",
+      "bytes": 2681,
+      "sha256": "171bb4448b4561c5ce0026c3eb0d2122c127e81ffdb64ccd9cfbca6075069ba3"
+    },
+    {
+      "path": "history/release-20261117/manifest.json",
+      "bytes": 91644,
+      "sha256": "fc009b071edcef364d55003dc6532d15292ad7a111d921ac9296c8ed89168bda"
+    },
+    {
+      "path": "history/release-20261117/README.md",
+      "bytes": 3255,
+      "sha256": "2ce20153698785a1116555ff831ae98ccb1a86becf408db25758d379072286eb"
+    },
+    {
+      "path": "history/release-20261117/validation.json",
+      "bytes": 517,
+      "sha256": "b5329dd9e46fd234626dad07d994bd176a5b6426c4390441f9334e7c22ab64ed"
+    },
+    {
       "path": "history/说明.md",
       "bytes": 947,
       "sha256": "6dc23aafb216de63f808f2f34d7f98b33361ce1459f45a88520e7f9301f54744"
     },
     {
       "path": "README.md",
-      "bytes": 3255,
-      "sha256": "2ce20153698785a1116555ff831ae98ccb1a86becf408db25758d379072286eb"
+      "bytes": 3542,
+      "sha256": "da15a01a76b7c84779c1785223a9c0d084b6bd3fb43c71f903fb678f33c93ac9"
     },
     {
       "path": "summaries/实验结果.md",
@@ -410,13 +446,13 @@
     },
     {
       "path": "tools/verify_bundle.py",
-      "bytes": 1518,
-      "sha256": "ab498e23a0420b3661c8b3356514cd36a8782df5c509b80e61c06def98633115"
+      "bytes": 2877,
+      "sha256": "387c948ed4ca0c14bd3b51438fc3c9059894d9529c840dd90478f579847de693"
     },
     {
       "path": "validation.json",
-      "bytes": 517,
-      "sha256": "b5329dd9e46fd234626dad07d994bd176a5b6426c4390441f9334e7c22ab64ed"
+      "bytes": 23275,
+      "sha256": "548f42eaf9eff137a2fb6970777b39dfd358ae771ca8cbc3ef57a48f29d00028"
     },
     {
       "path": "workspace/foreground_krita_gui/.gitignore",
@@ -2047,6 +2083,2096 @@
       "path": "workspace/parp-wss-v5/src/tools/testing/selftests/parp_wss/operation_lookup.py",
       "bytes": 6382,
       "sha256": "b8d141743173cf7072c173a736f0fc5944c94808acc29d6dc9dee07941965ed8"
+    },
+    {
+      "path": "workspace/PARP_Prediction_Contract_Study_20261119/analyze_results.py",
+      "bytes": 7538,
+      "sha256": "2beb03282fa50c265a8f01007d3d7dd0bccc95eb42afab7ae87c4d5b7d062262"
+    },
+    {
+      "path": "workspace/PARP_Prediction_Contract_Study_20261119/control/run-faults-retained.json",
+      "bytes": 145,
+      "sha256": "5c365dc967cc19b4ae3e893f3383e328a811bbe8ac7fa748a851a482617da547"
+    },
+    {
+      "path": "workspace/PARP_Prediction_Contract_Study_20261119/control/run-feedback-fix.json",
+      "bytes": 134,
+      "sha256": "70f4995f9ef9a79625e77c2c64eb0d9bcf0e7e32177e389dc4b71eb868e3d8c8"
+    },
+    {
+      "path": "workspace/PARP_Prediction_Contract_Study_20261119/control/run-final-source-preservation.json",
+      "bytes": 101,
+      "sha256": "0141d5a4daeadc7b76a49249d3be472328f6f9945db60bf5406c248c77ad46d7"
+    },
+    {
+      "path": "workspace/PARP_Prediction_Contract_Study_20261119/control/run-input-probe.json",
+      "bytes": 152,
+      "sha256": "c3da60dfb1ecf0f47b72a5d7078741873bf8be52a15c967fb1f2af081f573127"
+    },
+    {
+      "path": "workspace/PARP_Prediction_Contract_Study_20261119/control/STOP.json",
+      "bytes": 119,
+      "sha256": "d802a4a2372e928a372526c02b0612dba103f5c6fa32b2ce041be0af0bbcc050"
+    },
+    {
+      "path": "workspace/PARP_Prediction_Contract_Study_20261119/controller/adapters.py",
+      "bytes": 2521,
+      "sha256": "3b4e30a47c55053cacc24fa58c8757eaf552b5ac10625752e566472648d65629"
+    },
+    {
+      "path": "workspace/PARP_Prediction_Contract_Study_20261119/controller/coordinator.py",
+      "bytes": 8177,
+      "sha256": "2c5891d24addae9878cb510a5fb419f54cb2167cf46691ee9e9a1b38f6b586f1"
+    },
+    {
+      "path": "workspace/PARP_Prediction_Contract_Study_20261119/controller/executor.py",
+      "bytes": 19766,
+      "sha256": "2d71beea94628242b91aa57606bea8d2496c5f1a68ea350b6380be4449ca9c6f"
+    },
+    {
+      "path": "workspace/PARP_Prediction_Contract_Study_20261119/controller/faults.py",
+      "bytes": 1259,
+      "sha256": "3e7ff27aac2cf75059254088807a1768c811771f0a78ad73d94c56a753c375c7"
+    },
+    {
+      "path": "workspace/PARP_Prediction_Contract_Study_20261119/controller/native.py",
+      "bytes": 4262,
+      "sha256": "9b14655b61edb0d6ae7e0ad375b396730264cf8ef815bc7c1dae49886af3c7d4"
+    },
+    {
+      "path": "workspace/PARP_Prediction_Contract_Study_20261119/controller/plan.py",
+      "bytes": 16853,
+      "sha256": "1908cc9fc2ad31a73edac3c21193e027445b5aa2a4be8a95c42321734b8a5c2c"
+    },
+    {
+      "path": "workspace/PARP_Prediction_Contract_Study_20261119/controller/prepeak_timing.py",
+      "bytes": 7183,
+      "sha256": "a5bcfe9e8f947ec874b6896bf1a2dead5dfbe32cb565aa99ac0775e9a9cfddc1"
+    },
+    {
+      "path": "workspace/PARP_Prediction_Contract_Study_20261119/controller/replay_forecast.py",
+      "bytes": 2814,
+      "sha256": "9b30a0a25526a8f0ad850d4048d4058bdb3683d843c4c28ba5a1b8fd7a270245"
+    },
+    {
+      "path": "workspace/PARP_Prediction_Contract_Study_20261119/controller/safety_store.py",
+      "bytes": 2153,
+      "sha256": "4c6f9948d84b620e72519d7a1d346c812c92c3089982c0cdc9d4117d1fb6cdaa"
+    },
+    {
+      "path": "workspace/PARP_Prediction_Contract_Study_20261119/controller/sequence_policy.py",
+      "bytes": 2452,
+      "sha256": "616ad43caf518b8f040626ded1480d09431ed9a23f6678d0ed89c5b367566b71"
+    },
+    {
+      "path": "workspace/PARP_Prediction_Contract_Study_20261119/controller/signals.py",
+      "bytes": 2409,
+      "sha256": "52fdc181b8605af31683aa92240290073d36e9d08e0d976f84c1efc796f0e7f3"
+    },
+    {
+      "path": "workspace/PARP_Prediction_Contract_Study_20261119/controller/test_measured.py",
+      "bytes": 8994,
+      "sha256": "8ca86005d3b840f713b0720129c60e31ceecb9b76c4ea7e296165be7081db0c8"
+    },
+    {
+      "path": "workspace/PARP_Prediction_Contract_Study_20261119/controller/test_prepeak_timing.py",
+      "bytes": 9564,
+      "sha256": "b5dfc8373c6fe8e024e8f78712353029ee36c15d50389dcce157cc2e68960401"
+    },
+    {
+      "path": "workspace/PARP_Prediction_Contract_Study_20261119/controller/test_sequence_policy.py",
+      "bytes": 9281,
+      "sha256": "39bd076c04ca6a0be04feb5a93cbb45a0724595995878e66db99ced1161f364f"
+    },
+    {
+      "path": "workspace/PARP_Prediction_Contract_Study_20261119/controller/workflow.py",
+      "bytes": 1813,
+      "sha256": "140743fd24b469a8d54e0fd76dacc565a7a13e924adc00c8bae07bf528337c6a"
+    },
+    {
+      "path": "workspace/PARP_Prediction_Contract_Study_20261119/input_probe.py",
+      "bytes": 1989,
+      "sha256": "93f2374c3981b095fb715fc799594a9daa79f0dc40c5b9a42dfe60926249bd68"
+    },
+    {
+      "path": "workspace/PARP_Prediction_Contract_Study_20261119/memory_worker.py",
+      "bytes": 5002,
+      "sha256": "222b48f1d23161993345263ec3c1cb71e709830cdc7d48f75c1816f5b7674490"
+    },
+    {
+      "path": "workspace/PARP_Prediction_Contract_Study_20261119/native_support.py",
+      "bytes": 8898,
+      "sha256": "3901f1c0aee124cf24fccbd01610c4672468262f7ccf7134c02beac4b9b962e6"
+    },
+    {
+      "path": "workspace/PARP_Prediction_Contract_Study_20261119/oracle_scenarios.py",
+      "bytes": 2551,
+      "sha256": "0bab2382ed8adfd393cd13b143bac5ce5570e14c123a874c76528b30da0957af"
+    },
+    {
+      "path": "workspace/PARP_Prediction_Contract_Study_20261119/OUTPUT_CONTRACT.json",
+      "bytes": 2121,
+      "sha256": "8f468b10c5e369d27be3a3ce8a77b4392ab5ff8b62fead53648d096483881d18"
+    },
+    {
+      "path": "workspace/PARP_Prediction_Contract_Study_20261119/OUTPUT_EXAMPLE.json",
+      "bytes": 6954,
+      "sha256": "0d0d54bc284aed70f963892da6149f0a70f2e2e7cbe2c87bae5caa2e08428314"
+    },
+    {
+      "path": "workspace/PARP_Prediction_Contract_Study_20261119/prediction_contract.py",
+      "bytes": 5971,
+      "sha256": "3ac29c4456cc745d501e64297c4b3c05a338ec598e6b61bcac025082d34e339e"
+    },
+    {
+      "path": "workspace/PARP_Prediction_Contract_Study_20261119/prepare_cgroup.py",
+      "bytes": 3347,
+      "sha256": "d5f95231ebe95ec2f30eac2c77275dd50ab2edccf2861d54395c7eb6043cdb53"
+    },
+    {
+      "path": "workspace/PARP_Prediction_Contract_Study_20261119/README.md",
+      "bytes": 2427,
+      "sha256": "2cf3f947f0fdd9e64fea3b2d4ffef87ba3ccb674219935a18743389ca5621f9f"
+    },
+    {
+      "path": "workspace/PARP_Prediction_Contract_Study_20261119/results/ACTIVE.json",
+      "bytes": 60,
+      "sha256": "5c634f6eb0dd8a70d32d3185fccf8950b87b4bd69d1e74c61c61e6e64be7a700"
+    },
+    {
+      "path": "workspace/PARP_Prediction_Contract_Study_20261119/results/delegation.json",
+      "bytes": 183,
+      "sha256": "ce920c66165e07412ae68afed02258dc10dd7eefde08bb15f9aac70c397bb6fc"
+    },
+    {
+      "path": "workspace/PARP_Prediction_Contract_Study_20261119/results/first_logical_error.json",
+      "bytes": 934177,
+      "sha256": "a221267da4002d7f61f1139425bf97efc17eec717eeccbc21eb0db6bd2987af1"
+    },
+    {
+      "path": "workspace/PARP_Prediction_Contract_Study_20261119/results/INPUT_AVAILABILITY.json",
+      "bytes": 954,
+      "sha256": "aeafcdc22b0af16806513d6f7faccedb9ae64660629d1e9ebd328b79d3ae48eb"
+    },
+    {
+      "path": "workspace/PARP_Prediction_Contract_Study_20261119/results/launcher.log",
+      "bytes": 41579,
+      "sha256": "0bd45d081502e31965bd6a891ebef1a60186d1d9aac65c4cd664664c5b5e3ac4"
+    },
+    {
+      "path": "workspace/PARP_Prediction_Contract_Study_20261119/results/logical_error_baseline.json",
+      "bytes": 1068039,
+      "sha256": "c50d13667d98a94b92c32b61987db77426d46a1953fb4bcf80848e70e73ba99f"
+    },
+    {
+      "path": "workspace/PARP_Prediction_Contract_Study_20261119/results/native-3af43f2437/01-step-control/cold/worker.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "workspace/PARP_Prediction_Contract_Study_20261119/results/native-3af43f2437/01-step-control/hot/worker.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "workspace/PARP_Prediction_Contract_Study_20261119/results/native-3af43f2437/01-step-control/incoming/worker.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "workspace/PARP_Prediction_Contract_Study_20261119/results/native-3af43f2437/01-step-control/result.json",
+      "bytes": 1948616,
+      "sha256": "8624f3736a6a083d005fd06b51499d0ffda88bf42f5a94523fe8877c0e7d7233"
+    },
+    {
+      "path": "workspace/PARP_Prediction_Contract_Study_20261119/results/native-3af43f2437/01-step-control/workload_events.json",
+      "bytes": 797,
+      "sha256": "facfd419fbf8d2dba0a02c37468f3dca6651a27d0c272746113c1a6c28e7c322"
+    },
+    {
+      "path": "workspace/PARP_Prediction_Contract_Study_20261119/results/native-3af43f2437/02-step-ideal/cold/worker.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "workspace/PARP_Prediction_Contract_Study_20261119/results/native-3af43f2437/02-step-ideal/hot/worker.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "workspace/PARP_Prediction_Contract_Study_20261119/results/native-3af43f2437/02-step-ideal/incoming/worker.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "workspace/PARP_Prediction_Contract_Study_20261119/results/native-3af43f2437/02-step-ideal/result.json",
+      "bytes": 1948785,
+      "sha256": "6f41c4c8185f92579ead03f6027cd4f949957b882ec69e706710b4e0e1f6d9aa"
+    },
+    {
+      "path": "workspace/PARP_Prediction_Contract_Study_20261119/results/native-3af43f2437/02-step-ideal/workload_events.json",
+      "bytes": 787,
+      "sha256": "6c3e0cf9f36d6f0dd986c4a985ba0f7b4bcd712ce7c1320721bf3fe5b3105c9b"
+    },
+    {
+      "path": "workspace/PARP_Prediction_Contract_Study_20261119/results/native-3af43f2437/03-ramp-ideal/cold/worker.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "workspace/PARP_Prediction_Contract_Study_20261119/results/native-3af43f2437/03-ramp-ideal/hot/worker.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "workspace/PARP_Prediction_Contract_Study_20261119/results/native-3af43f2437/03-ramp-ideal/incoming/worker.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "workspace/PARP_Prediction_Contract_Study_20261119/results/native-3af43f2437/03-ramp-ideal/result.json",
+      "bytes": 2000323,
+      "sha256": "25e796f87e1fd4f5cd45a50fdca643f493ddaaf1021ba834ed89382edd8a4752"
+    },
+    {
+      "path": "workspace/PARP_Prediction_Contract_Study_20261119/results/native-3af43f2437/03-ramp-ideal/workload_events.json",
+      "bytes": 3121,
+      "sha256": "0abd6f84f566eb51eec40f3dfce7914ad091fd11cc61ecf4893242578c042b02"
+    },
+    {
+      "path": "workspace/PARP_Prediction_Contract_Study_20261119/results/native-3af43f2437/04-ramp-control/cold/worker.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "workspace/PARP_Prediction_Contract_Study_20261119/results/native-3af43f2437/04-ramp-control/hot/worker.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "workspace/PARP_Prediction_Contract_Study_20261119/results/native-3af43f2437/04-ramp-control/incoming/worker.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "workspace/PARP_Prediction_Contract_Study_20261119/results/native-3af43f2437/04-ramp-control/result.json",
+      "bytes": 1936287,
+      "sha256": "e5d22b655a19cb970dc5a0141b1ab3066437aa25105f89a77e63c9f475131d82"
+    },
+    {
+      "path": "workspace/PARP_Prediction_Contract_Study_20261119/results/native-3af43f2437/04-ramp-control/workload_events.json",
+      "bytes": 3151,
+      "sha256": "deeaf3a7851ae94d59f10eadfd4bc1f4379000691f3714b382b7c36f47fbe36f"
+    },
+    {
+      "path": "workspace/PARP_Prediction_Contract_Study_20261119/results/native-3af43f2437/05-V-control/cold/worker.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "workspace/PARP_Prediction_Contract_Study_20261119/results/native-3af43f2437/05-V-control/hot/worker.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "workspace/PARP_Prediction_Contract_Study_20261119/results/native-3af43f2437/05-V-control/incoming/worker.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "workspace/PARP_Prediction_Contract_Study_20261119/results/native-3af43f2437/05-V-control/result.json",
+      "bytes": 1925989,
+      "sha256": "4448390ed384daaf2646b48e33504e99a492e3590fcc812901ea1ba2b7dafe37"
+    },
+    {
+      "path": "workspace/PARP_Prediction_Contract_Study_20261119/results/native-3af43f2437/05-V-control/workload_events.json",
+      "bytes": 1588,
+      "sha256": "944c4d9eff6c2ad6fb7af2c3de1e34b58e706faac966420947c8cd375b90f25e"
+    },
+    {
+      "path": "workspace/PARP_Prediction_Contract_Study_20261119/results/native-3af43f2437/06-V-ideal/cold/worker.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "workspace/PARP_Prediction_Contract_Study_20261119/results/native-3af43f2437/06-V-ideal/hot/worker.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "workspace/PARP_Prediction_Contract_Study_20261119/results/native-3af43f2437/06-V-ideal/incoming/worker.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "workspace/PARP_Prediction_Contract_Study_20261119/results/native-3af43f2437/06-V-ideal/result.json",
+      "bytes": 1959739,
+      "sha256": "f3fa929e671e121d4024f4072f4d1fe0f729c52cdd5044ab2fe696f9bf1728a6"
+    },
+    {
+      "path": "workspace/PARP_Prediction_Contract_Study_20261119/results/native-3af43f2437/06-V-ideal/workload_events.json",
+      "bytes": 1576,
+      "sha256": "7674fcd9e01de5fa5d4b5ea6f1b973ccdd360848d4806b8bb13fcc95f9d31668"
+    },
+    {
+      "path": "workspace/PARP_Prediction_Contract_Study_20261119/results/native-3af43f2437/09-oscillating-control/cold/worker.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "workspace/PARP_Prediction_Contract_Study_20261119/results/native-3af43f2437/09-oscillating-control/hot/worker.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "workspace/PARP_Prediction_Contract_Study_20261119/results/native-3af43f2437/09-oscillating-control/incoming/worker.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "workspace/PARP_Prediction_Contract_Study_20261119/results/native-3af43f2437/09-oscillating-control/result.json",
+      "bytes": 2999458,
+      "sha256": "a60310bcdb4cfc9b69175eaa3e3404431cb3a521602fbdaff835f271db7b24f5"
+    },
+    {
+      "path": "workspace/PARP_Prediction_Contract_Study_20261119/results/native-3af43f2437/09-oscillating-control/workload_events.json",
+      "bytes": 3941,
+      "sha256": "2624f5642eec4a722cb89992c2c165636c09ee2aebc6406216c2ca10dfb0583f"
+    },
+    {
+      "path": "workspace/PARP_Prediction_Contract_Study_20261119/results/native-3af43f2437/10-oscillating-ideal/cold/worker.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "workspace/PARP_Prediction_Contract_Study_20261119/results/native-3af43f2437/10-oscillating-ideal/hot/worker.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "workspace/PARP_Prediction_Contract_Study_20261119/results/native-3af43f2437/10-oscillating-ideal/incoming/worker.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "workspace/PARP_Prediction_Contract_Study_20261119/results/native-3af43f2437/10-oscillating-ideal/result.json",
+      "bytes": 3028251,
+      "sha256": "59eab8e8674ba94de44b6953e39fac2237adcff239bd0bf18c4aa8872447abc7"
+    },
+    {
+      "path": "workspace/PARP_Prediction_Contract_Study_20261119/results/native-3af43f2437/10-oscillating-ideal/workload_events.json",
+      "bytes": 3934,
+      "sha256": "4ac0875a836a67aba7b5dda00353b6de31206e86a942e7c505902b215475e7c4"
+    },
+    {
+      "path": "workspace/PARP_Prediction_Contract_Study_20261119/results/native-3af43f2437/25-cold-revisit-guard/cold/worker.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "workspace/PARP_Prediction_Contract_Study_20261119/results/native-3af43f2437/25-cold-revisit-guard/hot/worker.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "workspace/PARP_Prediction_Contract_Study_20261119/results/native-3af43f2437/25-cold-revisit-guard/incoming/worker.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "workspace/PARP_Prediction_Contract_Study_20261119/results/native-3af43f2437/25-cold-revisit-guard/result.json",
+      "bytes": 127789,
+      "sha256": "600e91be7518c73bea7124b19a89bb098b256176040db904f56d4baeab3b1f2c"
+    },
+    {
+      "path": "workspace/PARP_Prediction_Contract_Study_20261119/results/native-3af43f2437/LIVE.json",
+      "bytes": 120,
+      "sha256": "557615d9dcbd866fc1e6a107ae5dea220fa64905eb8f531cbdf832791797ca32"
+    },
+    {
+      "path": "workspace/PARP_Prediction_Contract_Study_20261119/results/native-3af43f2437/physical_calibration/cold/worker.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "workspace/PARP_Prediction_Contract_Study_20261119/results/native-3af43f2437/physical_calibration/hot/worker.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "workspace/PARP_Prediction_Contract_Study_20261119/results/native-3af43f2437/physical_calibration/incoming/worker.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "workspace/PARP_Prediction_Contract_Study_20261119/results/native-3af43f2437/physical_calibration/result.json",
+      "bytes": 3832,
+      "sha256": "24e14ccf6594e7c8962667ca7672a18dc53c365375498e3c30b2c971d7735bd9"
+    },
+    {
+      "path": "workspace/PARP_Prediction_Contract_Study_20261119/results/native-3af43f2437/PLAN.json",
+      "bytes": 4220,
+      "sha256": "4226e49a6609cc47d43aa13f75743ac1423d55e181d36c4157d4dd436dcb8b5f"
+    },
+    {
+      "path": "workspace/PARP_Prediction_Contract_Study_20261119/results/native-3af43f2437/SUMMARY.json",
+      "bytes": 14410,
+      "sha256": "4bad9f152bf0e69343dc22c712e8f9a4f061f11cfc69860e8df5caf7e07d2cec"
+    },
+    {
+      "path": "workspace/PARP_Prediction_Contract_Study_20261119/results/native-3af43f2437/unscored_warmup/cold/worker.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "workspace/PARP_Prediction_Contract_Study_20261119/results/native-3af43f2437/unscored_warmup/hot/worker.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "workspace/PARP_Prediction_Contract_Study_20261119/results/native-3af43f2437/unscored_warmup/incoming/worker.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "workspace/PARP_Prediction_Contract_Study_20261119/results/native-3af43f2437/unscored_warmup/result.json",
+      "bytes": 577,
+      "sha256": "1d9166ae86c8cbc1557258aed2eb50361bd7bc9d471a4b898b40fb53315fd6c8"
+    },
+    {
+      "path": "workspace/PARP_Prediction_Contract_Study_20261119/results/native-3f22c16659/01-step-control/cold/worker.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "workspace/PARP_Prediction_Contract_Study_20261119/results/native-3f22c16659/01-step-control/hot/worker.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "workspace/PARP_Prediction_Contract_Study_20261119/results/native-3f22c16659/01-step-control/incoming/worker.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "workspace/PARP_Prediction_Contract_Study_20261119/results/native-3f22c16659/01-step-control/result.json",
+      "bytes": 2093758,
+      "sha256": "abdcc69623d5aa98ce5582b1f1747fc3e7680924cb2a2b8dfb74e4693ba59e83"
+    },
+    {
+      "path": "workspace/PARP_Prediction_Contract_Study_20261119/results/native-3f22c16659/01-step-control/workload_events.json",
+      "bytes": 797,
+      "sha256": "9be42d79a188e8054b9f0421596841b3e1096169d1c7181f4cd0f0a7d2e429c4"
+    },
+    {
+      "path": "workspace/PARP_Prediction_Contract_Study_20261119/results/native-3f22c16659/02-step-ideal/cold/worker.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "workspace/PARP_Prediction_Contract_Study_20261119/results/native-3f22c16659/02-step-ideal/hot/worker.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "workspace/PARP_Prediction_Contract_Study_20261119/results/native-3f22c16659/02-step-ideal/incoming/worker.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "workspace/PARP_Prediction_Contract_Study_20261119/results/native-3f22c16659/02-step-ideal/result.json",
+      "bytes": 2110291,
+      "sha256": "82ff21fcfeacdd4e88ef58e779b7cd09ff6862ef262bc8aa40c3aab576397441"
+    },
+    {
+      "path": "workspace/PARP_Prediction_Contract_Study_20261119/results/native-3f22c16659/02-step-ideal/workload_events.json",
+      "bytes": 787,
+      "sha256": "5315a306d389f1c8cea25305e5977b8c5eb2fe8eaeef95c837598182f84120fa"
+    },
+    {
+      "path": "workspace/PARP_Prediction_Contract_Study_20261119/results/native-3f22c16659/25-cold-revisit-guard/cold/worker.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "workspace/PARP_Prediction_Contract_Study_20261119/results/native-3f22c16659/25-cold-revisit-guard/hot/worker.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "workspace/PARP_Prediction_Contract_Study_20261119/results/native-3f22c16659/25-cold-revisit-guard/incoming/worker.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "workspace/PARP_Prediction_Contract_Study_20261119/results/native-3f22c16659/25-cold-revisit-guard/result.json",
+      "bytes": 142460,
+      "sha256": "6d243c3d4a6a1f256f6f60f3c46567a9c8d519d71eded46b76865dd14cab3fca"
+    },
+    {
+      "path": "workspace/PARP_Prediction_Contract_Study_20261119/results/native-3f22c16659/LIVE.json",
+      "bytes": 114,
+      "sha256": "50836e85f5539323d140d97b17188c1cebec3b2778900b3ad2561211f4d5c7e5"
+    },
+    {
+      "path": "workspace/PARP_Prediction_Contract_Study_20261119/results/native-3f22c16659/physical_calibration/cold/worker.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "workspace/PARP_Prediction_Contract_Study_20261119/results/native-3f22c16659/physical_calibration/hot/worker.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "workspace/PARP_Prediction_Contract_Study_20261119/results/native-3f22c16659/physical_calibration/incoming/worker.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "workspace/PARP_Prediction_Contract_Study_20261119/results/native-3f22c16659/physical_calibration/result.json",
+      "bytes": 3832,
+      "sha256": "4238cbb56dc9cb7e906ef59d5170172d53f87868cc5491cb3356b17b6dba73ac"
+    },
+    {
+      "path": "workspace/PARP_Prediction_Contract_Study_20261119/results/native-3f22c16659/PLAN.json",
+      "bytes": 3388,
+      "sha256": "16254c3e8c62c876e8052d4aa7866ca6e496397d8697e8820cd494f764e7ae06"
+    },
+    {
+      "path": "workspace/PARP_Prediction_Contract_Study_20261119/results/native-3f22c16659/SUMMARY.json",
+      "bytes": 3748,
+      "sha256": "f6e006b1f7243acc89e18c11ee46909e43a2f0b6638f824b75db5f206cb01ee5"
+    },
+    {
+      "path": "workspace/PARP_Prediction_Contract_Study_20261119/results/native-3f22c16659/unscored_warmup/cold/worker.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "workspace/PARP_Prediction_Contract_Study_20261119/results/native-3f22c16659/unscored_warmup/hot/worker.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "workspace/PARP_Prediction_Contract_Study_20261119/results/native-3f22c16659/unscored_warmup/incoming/worker.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "workspace/PARP_Prediction_Contract_Study_20261119/results/native-3f22c16659/unscored_warmup/result.json",
+      "bytes": 577,
+      "sha256": "17ddc3b50a0d5bd2fa36bdb539492d41d3dd6c4c01258d623dfe7775134f527a"
+    },
+    {
+      "path": "workspace/PARP_Prediction_Contract_Study_20261119/results/native-514e5cd8c2/01-step-control/cold/worker.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "workspace/PARP_Prediction_Contract_Study_20261119/results/native-514e5cd8c2/01-step-control/hot/worker.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "workspace/PARP_Prediction_Contract_Study_20261119/results/native-514e5cd8c2/01-step-control/incoming/worker.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "workspace/PARP_Prediction_Contract_Study_20261119/results/native-514e5cd8c2/01-step-control/result.json",
+      "bytes": 1881306,
+      "sha256": "f9815ba135005bca5bda87623e5164a11d209f94de29b16f9c0411a058298591"
+    },
+    {
+      "path": "workspace/PARP_Prediction_Contract_Study_20261119/results/native-514e5cd8c2/01-step-control/workload_events.json",
+      "bytes": 803,
+      "sha256": "db66b0ce6d95d81ac54dc4a49dd4b0a39daa334a086b5cb5aeb434dcc5d27ffa"
+    },
+    {
+      "path": "workspace/PARP_Prediction_Contract_Study_20261119/results/native-514e5cd8c2/02-step-ideal/cold/worker.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "workspace/PARP_Prediction_Contract_Study_20261119/results/native-514e5cd8c2/02-step-ideal/hot/worker.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "workspace/PARP_Prediction_Contract_Study_20261119/results/native-514e5cd8c2/02-step-ideal/incoming/worker.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "workspace/PARP_Prediction_Contract_Study_20261119/results/native-514e5cd8c2/02-step-ideal/result.json",
+      "bytes": 1943940,
+      "sha256": "6da5525b10b80d6c2b52e28a1bc8d3ae8d4e44335e4b4410dd7a383b0ae19358"
+    },
+    {
+      "path": "workspace/PARP_Prediction_Contract_Study_20261119/results/native-514e5cd8c2/02-step-ideal/workload_events.json",
+      "bytes": 786,
+      "sha256": "993668cfacbcbd654fc8eb6192165a3061f2df50dca8f2f5e04cfdc55a126ff0"
+    },
+    {
+      "path": "workspace/PARP_Prediction_Contract_Study_20261119/results/native-514e5cd8c2/03-ramp-ideal/cold/worker.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "workspace/PARP_Prediction_Contract_Study_20261119/results/native-514e5cd8c2/03-ramp-ideal/hot/worker.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "workspace/PARP_Prediction_Contract_Study_20261119/results/native-514e5cd8c2/03-ramp-ideal/incoming/worker.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "workspace/PARP_Prediction_Contract_Study_20261119/results/native-514e5cd8c2/03-ramp-ideal/result.json",
+      "bytes": 1995490,
+      "sha256": "c9a9cf1316f69b07bdb912de1ad1e2a6c0a846ba98f8a84a8504074c7b71065e"
+    },
+    {
+      "path": "workspace/PARP_Prediction_Contract_Study_20261119/results/native-514e5cd8c2/03-ramp-ideal/workload_events.json",
+      "bytes": 3121,
+      "sha256": "5123b658588f2dd91acad30f12816410c67e00211adc6e4f77c535c4a61ae7d5"
+    },
+    {
+      "path": "workspace/PARP_Prediction_Contract_Study_20261119/results/native-514e5cd8c2/04-ramp-control/cold/worker.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "workspace/PARP_Prediction_Contract_Study_20261119/results/native-514e5cd8c2/04-ramp-control/hot/worker.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "workspace/PARP_Prediction_Contract_Study_20261119/results/native-514e5cd8c2/04-ramp-control/incoming/worker.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "workspace/PARP_Prediction_Contract_Study_20261119/results/native-514e5cd8c2/04-ramp-control/result.json",
+      "bytes": 1992717,
+      "sha256": "096e693fc28128d075de651dfb5dfeb180d04dee5889ab68e87a2c049f6790cd"
+    },
+    {
+      "path": "workspace/PARP_Prediction_Contract_Study_20261119/results/native-514e5cd8c2/04-ramp-control/workload_events.json",
+      "bytes": 3152,
+      "sha256": "8228e898515374c2a783bb0ae77506094035a8dd223eb362b6f0a873a2c9195c"
+    },
+    {
+      "path": "workspace/PARP_Prediction_Contract_Study_20261119/results/native-514e5cd8c2/05-V-control/cold/worker.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "workspace/PARP_Prediction_Contract_Study_20261119/results/native-514e5cd8c2/05-V-control/hot/worker.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "workspace/PARP_Prediction_Contract_Study_20261119/results/native-514e5cd8c2/05-V-control/incoming/worker.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "workspace/PARP_Prediction_Contract_Study_20261119/results/native-514e5cd8c2/05-V-control/result.json",
+      "bytes": 1977849,
+      "sha256": "a20858b1f0b2e0238a7bf864a3da1a9c6e49c9ca85b1707ebf3bd485607dd5ea"
+    },
+    {
+      "path": "workspace/PARP_Prediction_Contract_Study_20261119/results/native-514e5cd8c2/05-V-control/workload_events.json",
+      "bytes": 1587,
+      "sha256": "ed3c1b0270aec32522bbae5e77bcaeca35db9fdbb626ec7f4a496d16340bacbb"
+    },
+    {
+      "path": "workspace/PARP_Prediction_Contract_Study_20261119/results/native-514e5cd8c2/06-V-ideal/cold/worker.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "workspace/PARP_Prediction_Contract_Study_20261119/results/native-514e5cd8c2/06-V-ideal/hot/worker.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "workspace/PARP_Prediction_Contract_Study_20261119/results/native-514e5cd8c2/06-V-ideal/incoming/worker.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "workspace/PARP_Prediction_Contract_Study_20261119/results/native-514e5cd8c2/06-V-ideal/result.json",
+      "bytes": 1953912,
+      "sha256": "56101415feba416646068bb9beda10a312e88dbbfea326b1309520284caf3722"
+    },
+    {
+      "path": "workspace/PARP_Prediction_Contract_Study_20261119/results/native-514e5cd8c2/06-V-ideal/workload_events.json",
+      "bytes": 1574,
+      "sha256": "19fbfa09933c4f5dad0627bae1141e327f9fc7ddbdff844de679f58b2935223c"
+    },
+    {
+      "path": "workspace/PARP_Prediction_Contract_Study_20261119/results/native-514e5cd8c2/07-inverted_V-ideal/cold/worker.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "workspace/PARP_Prediction_Contract_Study_20261119/results/native-514e5cd8c2/07-inverted_V-ideal/hot/worker.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "workspace/PARP_Prediction_Contract_Study_20261119/results/native-514e5cd8c2/07-inverted_V-ideal/incoming/worker.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "workspace/PARP_Prediction_Contract_Study_20261119/results/native-514e5cd8c2/07-inverted_V-ideal/result.json",
+      "bytes": 2132067,
+      "sha256": "23306fd6d1e603072edb124c2c8b8388daa729d9f7523fca920260f6f8a53b7a"
+    },
+    {
+      "path": "workspace/PARP_Prediction_Contract_Study_20261119/results/native-514e5cd8c2/07-inverted_V-ideal/workload_events.json",
+      "bytes": 1576,
+      "sha256": "e4db69625d543e14f703cd8af856a8f9c79b972e4a4886710fd33ea2d0b22862"
+    },
+    {
+      "path": "workspace/PARP_Prediction_Contract_Study_20261119/results/native-514e5cd8c2/08-inverted_V-control/cold/worker.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "workspace/PARP_Prediction_Contract_Study_20261119/results/native-514e5cd8c2/08-inverted_V-control/hot/worker.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "workspace/PARP_Prediction_Contract_Study_20261119/results/native-514e5cd8c2/08-inverted_V-control/incoming/worker.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "workspace/PARP_Prediction_Contract_Study_20261119/results/native-514e5cd8c2/08-inverted_V-control/result.json",
+      "bytes": 2166457,
+      "sha256": "5cb08cd0b406f7baea4300989d159c1f573bd72e1883b3a463652f704bc9a31d"
+    },
+    {
+      "path": "workspace/PARP_Prediction_Contract_Study_20261119/results/native-514e5cd8c2/08-inverted_V-control/workload_events.json",
+      "bytes": 1587,
+      "sha256": "fab8f8833fda67dd3998949a88a67b8ee28129ed3381522e010732b0dcb65ee1"
+    },
+    {
+      "path": "workspace/PARP_Prediction_Contract_Study_20261119/results/native-514e5cd8c2/09-oscillating-control/cold/worker.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "workspace/PARP_Prediction_Contract_Study_20261119/results/native-514e5cd8c2/09-oscillating-control/hot/worker.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "workspace/PARP_Prediction_Contract_Study_20261119/results/native-514e5cd8c2/09-oscillating-control/incoming/worker.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "workspace/PARP_Prediction_Contract_Study_20261119/results/native-514e5cd8c2/09-oscillating-control/result.json",
+      "bytes": 3083806,
+      "sha256": "f81fc4d739b49ea302454ddb5338f6db2c12d5e68c0af1df5935635d098092ee"
+    },
+    {
+      "path": "workspace/PARP_Prediction_Contract_Study_20261119/results/native-514e5cd8c2/09-oscillating-control/workload_events.json",
+      "bytes": 3941,
+      "sha256": "e6bff4ef81975f18e9a9969da6bfec536d742fc0bf49fcade240d7b16e1b4f74"
+    },
+    {
+      "path": "workspace/PARP_Prediction_Contract_Study_20261119/results/native-514e5cd8c2/10-oscillating-ideal/cold/worker.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "workspace/PARP_Prediction_Contract_Study_20261119/results/native-514e5cd8c2/10-oscillating-ideal/hot/worker.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "workspace/PARP_Prediction_Contract_Study_20261119/results/native-514e5cd8c2/10-oscillating-ideal/incoming/worker.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "workspace/PARP_Prediction_Contract_Study_20261119/results/native-514e5cd8c2/10-oscillating-ideal/result.json",
+      "bytes": 3097389,
+      "sha256": "67d296d775781c1c32aa5c66d47db52c0c67a258fd62fc0ff13e59f4fc8b23f2"
+    },
+    {
+      "path": "workspace/PARP_Prediction_Contract_Study_20261119/results/native-514e5cd8c2/10-oscillating-ideal/workload_events.json",
+      "bytes": 3936,
+      "sha256": "45d2d55f2a0c99287d08c414c9f804c2ad518a4655ba1e431682fde533a76869"
+    },
+    {
+      "path": "workspace/PARP_Prediction_Contract_Study_20261119/results/native-514e5cd8c2/11-flat_WSS_growth-ideal/cold/worker.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "workspace/PARP_Prediction_Contract_Study_20261119/results/native-514e5cd8c2/11-flat_WSS_growth-ideal/hot/worker.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "workspace/PARP_Prediction_Contract_Study_20261119/results/native-514e5cd8c2/11-flat_WSS_growth-ideal/incoming/worker.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "workspace/PARP_Prediction_Contract_Study_20261119/results/native-514e5cd8c2/11-flat_WSS_growth-ideal/result.json",
+      "bytes": 1944060,
+      "sha256": "8e6ab024b96c6f2d420dc6e3888fc951e3d0a410984866f7c87650b649cb4d45"
+    },
+    {
+      "path": "workspace/PARP_Prediction_Contract_Study_20261119/results/native-514e5cd8c2/11-flat_WSS_growth-ideal/workload_events.json",
+      "bytes": 785,
+      "sha256": "743001b03e324615905d4aad7c2bb010afcbcb715adb3f3fa12a7be2ab523e40"
+    },
+    {
+      "path": "workspace/PARP_Prediction_Contract_Study_20261119/results/native-514e5cd8c2/12-flat_WSS_growth-control/cold/worker.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "workspace/PARP_Prediction_Contract_Study_20261119/results/native-514e5cd8c2/12-flat_WSS_growth-control/hot/worker.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "workspace/PARP_Prediction_Contract_Study_20261119/results/native-514e5cd8c2/12-flat_WSS_growth-control/incoming/worker.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "workspace/PARP_Prediction_Contract_Study_20261119/results/native-514e5cd8c2/12-flat_WSS_growth-control/result.json",
+      "bytes": 1990386,
+      "sha256": "77de57780f06a4c8d553fcfdd8d7278df9b9c377ef026bc488d827e71b446822"
+    },
+    {
+      "path": "workspace/PARP_Prediction_Contract_Study_20261119/results/native-514e5cd8c2/12-flat_WSS_growth-control/workload_events.json",
+      "bytes": 799,
+      "sha256": "f876f6c907a305f8f9a92a30e948c173d5a13a3d306894610990b30f5f110fbd"
+    },
+    {
+      "path": "workspace/PARP_Prediction_Contract_Study_20261119/results/native-514e5cd8c2/13-aligned_free-control/cold/worker.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "workspace/PARP_Prediction_Contract_Study_20261119/results/native-514e5cd8c2/13-aligned_free-control/hot/worker.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "workspace/PARP_Prediction_Contract_Study_20261119/results/native-514e5cd8c2/13-aligned_free-control/incoming/worker.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "workspace/PARP_Prediction_Contract_Study_20261119/results/native-514e5cd8c2/13-aligned_free-control/result.json",
+      "bytes": 1982668,
+      "sha256": "ef56737b35f10cb6a2b7efacd0aa2845156c5a10a76ec4959f889475f51b4b17"
+    },
+    {
+      "path": "workspace/PARP_Prediction_Contract_Study_20261119/results/native-514e5cd8c2/13-aligned_free-control/workload_events.json",
+      "bytes": 1573,
+      "sha256": "8bfb1bcf436275f5a223bd9c1a6d96fa4fbbf12623ae3245b5f520f6c9ea87c8"
+    },
+    {
+      "path": "workspace/PARP_Prediction_Contract_Study_20261119/results/native-514e5cd8c2/14-aligned_free-ideal/cold/worker.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "workspace/PARP_Prediction_Contract_Study_20261119/results/native-514e5cd8c2/14-aligned_free-ideal/hot/worker.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "workspace/PARP_Prediction_Contract_Study_20261119/results/native-514e5cd8c2/14-aligned_free-ideal/incoming/worker.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "workspace/PARP_Prediction_Contract_Study_20261119/results/native-514e5cd8c2/14-aligned_free-ideal/result.json",
+      "bytes": 1958876,
+      "sha256": "e4ab2b0a7432b15454f0a9d06d32979ba07f1b1e70da72c67e553d34bef17502"
+    },
+    {
+      "path": "workspace/PARP_Prediction_Contract_Study_20261119/results/native-514e5cd8c2/14-aligned_free-ideal/workload_events.json",
+      "bytes": 1573,
+      "sha256": "47674d3cac77ef1bb48d5e06cc5fe136c7fb5ddf472696d4b008a5a26b47637b"
+    },
+    {
+      "path": "workspace/PARP_Prediction_Contract_Study_20261119/results/native-514e5cd8c2/15-WSS_change_no_allocation-ideal/cold/worker.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "workspace/PARP_Prediction_Contract_Study_20261119/results/native-514e5cd8c2/15-WSS_change_no_allocation-ideal/hot/worker.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "workspace/PARP_Prediction_Contract_Study_20261119/results/native-514e5cd8c2/15-WSS_change_no_allocation-ideal/incoming/worker.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "workspace/PARP_Prediction_Contract_Study_20261119/results/native-514e5cd8c2/15-WSS_change_no_allocation-ideal/result.json",
+      "bytes": 2012169,
+      "sha256": "1e2ebf6f4d244bb43253e75f67d5f535f942b374d8c6a433c3fe335adf85e8d8"
+    },
+    {
+      "path": "workspace/PARP_Prediction_Contract_Study_20261119/results/native-514e5cd8c2/15-WSS_change_no_allocation-ideal/workload_events.json",
+      "bytes": 768,
+      "sha256": "abe1e8eec43f27b2072eb55dd879c91e6da5b731b7106c3c42d21d7fb3f45bf0"
+    },
+    {
+      "path": "workspace/PARP_Prediction_Contract_Study_20261119/results/native-514e5cd8c2/16-WSS_change_no_allocation-control/cold/worker.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "workspace/PARP_Prediction_Contract_Study_20261119/results/native-514e5cd8c2/16-WSS_change_no_allocation-control/hot/worker.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "workspace/PARP_Prediction_Contract_Study_20261119/results/native-514e5cd8c2/16-WSS_change_no_allocation-control/incoming/worker.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "workspace/PARP_Prediction_Contract_Study_20261119/results/native-514e5cd8c2/16-WSS_change_no_allocation-control/result.json",
+      "bytes": 1987536,
+      "sha256": "4cc08625d86197f927bbe8ee8d734d7d5d4a2cb7366d77afcab950b9d510679f"
+    },
+    {
+      "path": "workspace/PARP_Prediction_Contract_Study_20261119/results/native-514e5cd8c2/16-WSS_change_no_allocation-control/workload_events.json",
+      "bytes": 765,
+      "sha256": "d2369cc77d0b71c62ea8c20c5d80f7a1e8aa177d28ca21a8b3b4dbb3985b9b19"
+    },
+    {
+      "path": "workspace/PARP_Prediction_Contract_Study_20261119/results/native-514e5cd8c2/17-no_deficit-control/cold/worker.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "workspace/PARP_Prediction_Contract_Study_20261119/results/native-514e5cd8c2/17-no_deficit-control/hot/worker.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "workspace/PARP_Prediction_Contract_Study_20261119/results/native-514e5cd8c2/17-no_deficit-control/incoming/worker.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "workspace/PARP_Prediction_Contract_Study_20261119/results/native-514e5cd8c2/17-no_deficit-control/result.json",
+      "bytes": 1984296,
+      "sha256": "633e2f3f5b14cc56479e83d3d00b6f6136cbf030a2d9428028109a906663ffd9"
+    },
+    {
+      "path": "workspace/PARP_Prediction_Contract_Study_20261119/results/native-514e5cd8c2/17-no_deficit-control/workload_events.json",
+      "bytes": 787,
+      "sha256": "d01ac1a02ab1739846533eb73000c9c02679e3a85091495ccf95e9d4b868ee6c"
+    },
+    {
+      "path": "workspace/PARP_Prediction_Contract_Study_20261119/results/native-514e5cd8c2/18-no_deficit-ideal/cold/worker.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "workspace/PARP_Prediction_Contract_Study_20261119/results/native-514e5cd8c2/18-no_deficit-ideal/hot/worker.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "workspace/PARP_Prediction_Contract_Study_20261119/results/native-514e5cd8c2/18-no_deficit-ideal/incoming/worker.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "workspace/PARP_Prediction_Contract_Study_20261119/results/native-514e5cd8c2/18-no_deficit-ideal/result.json",
+      "bytes": 1935106,
+      "sha256": "cdf37068bf8a9836fa1e7775f1f0af9a69f12ca8d61900f698c9e558ece1a786"
+    },
+    {
+      "path": "workspace/PARP_Prediction_Contract_Study_20261119/results/native-514e5cd8c2/18-no_deficit-ideal/workload_events.json",
+      "bytes": 787,
+      "sha256": "cdcceae9adeb36933724b22d1af3605801e0e3b2b38eaeb3be05988dbbc956b3"
+    },
+    {
+      "path": "workspace/PARP_Prediction_Contract_Study_20261119/results/native-514e5cd8c2/19-step-ideal/cold/worker.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "workspace/PARP_Prediction_Contract_Study_20261119/results/native-514e5cd8c2/19-step-ideal/hot/worker.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "workspace/PARP_Prediction_Contract_Study_20261119/results/native-514e5cd8c2/19-step-ideal/incoming/worker.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "workspace/PARP_Prediction_Contract_Study_20261119/results/native-514e5cd8c2/19-step-ideal/result.json",
+      "bytes": 1940866,
+      "sha256": "bf310b6187d5d443a256c923288d184eef806627876c29ae57bc11fa5bce73ed"
+    },
+    {
+      "path": "workspace/PARP_Prediction_Contract_Study_20261119/results/native-514e5cd8c2/19-step-ideal/workload_events.json",
+      "bytes": 786,
+      "sha256": "9a0486a69615aeb586ed2b157570baa30cdf5dc3a459dd0a2646f351bac80526"
+    },
+    {
+      "path": "workspace/PARP_Prediction_Contract_Study_20261119/results/native-514e5cd8c2/20-step-control/cold/worker.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "workspace/PARP_Prediction_Contract_Study_20261119/results/native-514e5cd8c2/20-step-control/hot/worker.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "workspace/PARP_Prediction_Contract_Study_20261119/results/native-514e5cd8c2/20-step-control/incoming/worker.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "workspace/PARP_Prediction_Contract_Study_20261119/results/native-514e5cd8c2/20-step-control/result.json",
+      "bytes": 1940929,
+      "sha256": "1dd882deb731f5796dbf6a88e93d0fd3ed79f81ea2b9b93ea37bc1e3e826d00e"
+    },
+    {
+      "path": "workspace/PARP_Prediction_Contract_Study_20261119/results/native-514e5cd8c2/20-step-control/workload_events.json",
+      "bytes": 800,
+      "sha256": "5d32f6cdc12d45c776fd4b884f9d597cc47120701be6bfc8ef2e1e89871ee6df"
+    },
+    {
+      "path": "workspace/PARP_Prediction_Contract_Study_20261119/results/native-514e5cd8c2/21-step-control/cold/worker.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "workspace/PARP_Prediction_Contract_Study_20261119/results/native-514e5cd8c2/21-step-control/hot/worker.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "workspace/PARP_Prediction_Contract_Study_20261119/results/native-514e5cd8c2/21-step-control/incoming/worker.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "workspace/PARP_Prediction_Contract_Study_20261119/results/native-514e5cd8c2/21-step-control/result.json",
+      "bytes": 1983909,
+      "sha256": "1f92a304bb702a3cce92d09e83132194d25788e787428832fc6629f06265c79d"
+    },
+    {
+      "path": "workspace/PARP_Prediction_Contract_Study_20261119/results/native-514e5cd8c2/21-step-control/workload_events.json",
+      "bytes": 799,
+      "sha256": "7de5877493143618074ecedc14f0eb15b7bedee1465beb32b9714318ada69b1d"
+    },
+    {
+      "path": "workspace/PARP_Prediction_Contract_Study_20261119/results/native-514e5cd8c2/22-step-ideal/cold/worker.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "workspace/PARP_Prediction_Contract_Study_20261119/results/native-514e5cd8c2/22-step-ideal/hot/worker.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "workspace/PARP_Prediction_Contract_Study_20261119/results/native-514e5cd8c2/22-step-ideal/incoming/worker.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "workspace/PARP_Prediction_Contract_Study_20261119/results/native-514e5cd8c2/22-step-ideal/result.json",
+      "bytes": 1947115,
+      "sha256": "62c0c910a90696bd7823a0fc902547b652299a9de588665876f60d859f1f508d"
+    },
+    {
+      "path": "workspace/PARP_Prediction_Contract_Study_20261119/results/native-514e5cd8c2/22-step-ideal/workload_events.json",
+      "bytes": 785,
+      "sha256": "636486bc0a315f252bb86b1d562f70971a8bf4f8802c760ea23b6c18e385082a"
+    },
+    {
+      "path": "workspace/PARP_Prediction_Contract_Study_20261119/results/native-514e5cd8c2/23-step-H12/cold/worker.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "workspace/PARP_Prediction_Contract_Study_20261119/results/native-514e5cd8c2/23-step-H12/hot/worker.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "workspace/PARP_Prediction_Contract_Study_20261119/results/native-514e5cd8c2/23-step-H12/incoming/worker.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "workspace/PARP_Prediction_Contract_Study_20261119/results/native-514e5cd8c2/23-step-H12/result.json",
+      "bytes": 1539475,
+      "sha256": "183e21af041f3630a398b7b97f308581299bc232942ecbfa0090d03df4fce9d7"
+    },
+    {
+      "path": "workspace/PARP_Prediction_Contract_Study_20261119/results/native-514e5cd8c2/23-step-H12/workload_events.json",
+      "bytes": 786,
+      "sha256": "8def49f3369dbf97dfedce9544bfb47fc55135a02397425dbe699b75a82f5ff4"
+    },
+    {
+      "path": "workspace/PARP_Prediction_Contract_Study_20261119/results/native-514e5cd8c2/24-step-H30/cold/worker.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "workspace/PARP_Prediction_Contract_Study_20261119/results/native-514e5cd8c2/24-step-H30/hot/worker.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "workspace/PARP_Prediction_Contract_Study_20261119/results/native-514e5cd8c2/24-step-H30/incoming/worker.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "workspace/PARP_Prediction_Contract_Study_20261119/results/native-514e5cd8c2/24-step-H30/result.json",
+      "bytes": 2497392,
+      "sha256": "27b65d735e58890a8aea77e8f58bc111ecddef249b49bcfc2df95434f8141a26"
+    },
+    {
+      "path": "workspace/PARP_Prediction_Contract_Study_20261119/results/native-514e5cd8c2/24-step-H30/workload_events.json",
+      "bytes": 786,
+      "sha256": "8db186e1e4aa8fc8780c038095577afcb8b4ab48db37165346a84425a7e38392"
+    },
+    {
+      "path": "workspace/PARP_Prediction_Contract_Study_20261119/results/native-514e5cd8c2/25-cold-revisit-guard/cold/worker.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "workspace/PARP_Prediction_Contract_Study_20261119/results/native-514e5cd8c2/25-cold-revisit-guard/hot/worker.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "workspace/PARP_Prediction_Contract_Study_20261119/results/native-514e5cd8c2/25-cold-revisit-guard/incoming/worker.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "workspace/PARP_Prediction_Contract_Study_20261119/results/native-514e5cd8c2/25-cold-revisit-guard/result.json",
+      "bytes": 127517,
+      "sha256": "a211538342c0bd29b07934cd4a1a5aa14cfeb256443f592659e8a4c54902ebc8"
+    },
+    {
+      "path": "workspace/PARP_Prediction_Contract_Study_20261119/results/native-514e5cd8c2/LIVE.json",
+      "bytes": 111,
+      "sha256": "383005b57c6f7dc1ae9331aff93784a870392da734a0c47008a92e2111cb6cd3"
+    },
+    {
+      "path": "workspace/PARP_Prediction_Contract_Study_20261119/results/native-514e5cd8c2/physical_calibration/cold/worker.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "workspace/PARP_Prediction_Contract_Study_20261119/results/native-514e5cd8c2/physical_calibration/hot/worker.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "workspace/PARP_Prediction_Contract_Study_20261119/results/native-514e5cd8c2/physical_calibration/incoming/worker.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "workspace/PARP_Prediction_Contract_Study_20261119/results/native-514e5cd8c2/physical_calibration/result.json",
+      "bytes": 3832,
+      "sha256": "574a7686ceadd0156ad5b5417d7d87008ca625476fe1d0bfe3c35ef3a95cd66b"
+    },
+    {
+      "path": "workspace/PARP_Prediction_Contract_Study_20261119/results/native-514e5cd8c2/PLAN.json",
+      "bytes": 6811,
+      "sha256": "c62b7601e0a8d36ca85402588bbd5191b24aded93efab1031ead888179f004b7"
+    },
+    {
+      "path": "workspace/PARP_Prediction_Contract_Study_20261119/results/native-514e5cd8c2/SUMMARY.json",
+      "bytes": 36807,
+      "sha256": "d73d11d82dc740aebbdf1865ad42a43e80f261d459971d88405cd0afc6e8779b"
+    },
+    {
+      "path": "workspace/PARP_Prediction_Contract_Study_20261119/results/screen-baseline.json",
+      "bytes": 128078,
+      "sha256": "0aef34af624496ec555869a98c34f465fc0ef6043f468082171514dd67c7131e"
+    },
+    {
+      "path": "workspace/PARP_Prediction_Contract_Study_20261119/results/screen-epoch.json",
+      "bytes": 128576,
+      "sha256": "52492a3c05f0c3019bcd0275e7999040e73cad542055d65420e99e26871a2375"
+    },
+    {
+      "path": "workspace/PARP_Prediction_Contract_Study_20261119/results/screen.json",
+      "bytes": 43078,
+      "sha256": "eb3df0b10fc23670646e98d334a7fec496d1dbb894780e55fa91570667d0307f"
+    },
+    {
+      "path": "workspace/PARP_Prediction_Contract_Study_20261119/results/SERVICE.json",
+      "bytes": 41,
+      "sha256": "da22c8ab32f83d467c801421fe621482a2877dba5ab99c8aa80d2e9cc98fc52b"
+    },
+    {
+      "path": "workspace/PARP_Prediction_Contract_Study_20261119/results/source_archives/0d9e49f5/controller/adapters.py",
+      "bytes": 2521,
+      "sha256": "3b4e30a47c55053cacc24fa58c8757eaf552b5ac10625752e566472648d65629"
+    },
+    {
+      "path": "workspace/PARP_Prediction_Contract_Study_20261119/results/source_archives/0d9e49f5/controller/coordinator.py",
+      "bytes": 8177,
+      "sha256": "2c5891d24addae9878cb510a5fb419f54cb2167cf46691ee9e9a1b38f6b586f1"
+    },
+    {
+      "path": "workspace/PARP_Prediction_Contract_Study_20261119/results/source_archives/0d9e49f5/controller/executor.py",
+      "bytes": 19766,
+      "sha256": "2d71beea94628242b91aa57606bea8d2496c5f1a68ea350b6380be4449ca9c6f"
+    },
+    {
+      "path": "workspace/PARP_Prediction_Contract_Study_20261119/results/source_archives/0d9e49f5/controller/faults.py",
+      "bytes": 1259,
+      "sha256": "3e7ff27aac2cf75059254088807a1768c811771f0a78ad73d94c56a753c375c7"
+    },
+    {
+      "path": "workspace/PARP_Prediction_Contract_Study_20261119/results/source_archives/0d9e49f5/controller/native.py",
+      "bytes": 4262,
+      "sha256": "9b14655b61edb0d6ae7e0ad375b396730264cf8ef815bc7c1dae49886af3c7d4"
+    },
+    {
+      "path": "workspace/PARP_Prediction_Contract_Study_20261119/results/source_archives/0d9e49f5/controller/plan.py",
+      "bytes": 16853,
+      "sha256": "1908cc9fc2ad31a73edac3c21193e027445b5aa2a4be8a95c42321734b8a5c2c"
+    },
+    {
+      "path": "workspace/PARP_Prediction_Contract_Study_20261119/results/source_archives/0d9e49f5/controller/prepeak_timing.py",
+      "bytes": 7183,
+      "sha256": "a5bcfe9e8f947ec874b6896bf1a2dead5dfbe32cb565aa99ac0775e9a9cfddc1"
+    },
+    {
+      "path": "workspace/PARP_Prediction_Contract_Study_20261119/results/source_archives/0d9e49f5/controller/replay_forecast.py",
+      "bytes": 2814,
+      "sha256": "9b30a0a25526a8f0ad850d4048d4058bdb3683d843c4c28ba5a1b8fd7a270245"
+    },
+    {
+      "path": "workspace/PARP_Prediction_Contract_Study_20261119/results/source_archives/0d9e49f5/controller/safety_store.py",
+      "bytes": 2153,
+      "sha256": "4c6f9948d84b620e72519d7a1d346c812c92c3089982c0cdc9d4117d1fb6cdaa"
+    },
+    {
+      "path": "workspace/PARP_Prediction_Contract_Study_20261119/results/source_archives/0d9e49f5/controller/sequence_policy.py",
+      "bytes": 2452,
+      "sha256": "616ad43caf518b8f040626ded1480d09431ed9a23f6678d0ed89c5b367566b71"
+    },
+    {
+      "path": "workspace/PARP_Prediction_Contract_Study_20261119/results/source_archives/0d9e49f5/controller/signals.py",
+      "bytes": 2409,
+      "sha256": "52fdc181b8605af31683aa92240290073d36e9d08e0d976f84c1efc796f0e7f3"
+    },
+    {
+      "path": "workspace/PARP_Prediction_Contract_Study_20261119/results/source_archives/0d9e49f5/controller/test_measured.py",
+      "bytes": 8994,
+      "sha256": "8ca86005d3b840f713b0720129c60e31ceecb9b76c4ea7e296165be7081db0c8"
+    },
+    {
+      "path": "workspace/PARP_Prediction_Contract_Study_20261119/results/source_archives/0d9e49f5/controller/test_prepeak_timing.py",
+      "bytes": 9564,
+      "sha256": "b5dfc8373c6fe8e024e8f78712353029ee36c15d50389dcce157cc2e68960401"
+    },
+    {
+      "path": "workspace/PARP_Prediction_Contract_Study_20261119/results/source_archives/0d9e49f5/controller/test_sequence_policy.py",
+      "bytes": 9281,
+      "sha256": "39bd076c04ca6a0be04feb5a93cbb45a0724595995878e66db99ced1161f364f"
+    },
+    {
+      "path": "workspace/PARP_Prediction_Contract_Study_20261119/results/source_archives/0d9e49f5/controller/workflow.py",
+      "bytes": 1813,
+      "sha256": "140743fd24b469a8d54e0fd76dacc565a7a13e924adc00c8bae07bf528337c6a"
+    },
+    {
+      "path": "workspace/PARP_Prediction_Contract_Study_20261119/results/source_archives/0d9e49f5/input_probe.py",
+      "bytes": 1989,
+      "sha256": "93f2374c3981b095fb715fc799594a9daa79f0dc40c5b9a42dfe60926249bd68"
+    },
+    {
+      "path": "workspace/PARP_Prediction_Contract_Study_20261119/results/source_archives/0d9e49f5/memory_worker.py",
+      "bytes": 5002,
+      "sha256": "222b48f1d23161993345263ec3c1cb71e709830cdc7d48f75c1816f5b7674490"
+    },
+    {
+      "path": "workspace/PARP_Prediction_Contract_Study_20261119/results/source_archives/0d9e49f5/native_support.py",
+      "bytes": 8898,
+      "sha256": "3901f1c0aee124cf24fccbd01610c4672468262f7ccf7134c02beac4b9b962e6"
+    },
+    {
+      "path": "workspace/PARP_Prediction_Contract_Study_20261119/results/source_archives/0d9e49f5/oracle_scenarios.py",
+      "bytes": 2551,
+      "sha256": "0bab2382ed8adfd393cd13b143bac5ce5570e14c123a874c76528b30da0957af"
+    },
+    {
+      "path": "workspace/PARP_Prediction_Contract_Study_20261119/results/source_archives/0d9e49f5/prediction_contract.py",
+      "bytes": 5971,
+      "sha256": "3ac29c4456cc745d501e64297c4b3c05a338ec598e6b61bcac025082d34e339e"
+    },
+    {
+      "path": "workspace/PARP_Prediction_Contract_Study_20261119/results/source_archives/0d9e49f5/prepare_cgroup.py",
+      "bytes": 3347,
+      "sha256": "d5f95231ebe95ec2f30eac2c77275dd50ab2edccf2861d54395c7eb6043cdb53"
+    },
+    {
+      "path": "workspace/PARP_Prediction_Contract_Study_20261119/results/source_archives/0d9e49f5/run_native.py",
+      "bytes": 12136,
+      "sha256": "b97a41c16fe9adc0dda50400e1c636358bb99d3acc6e7b9604cbab08928e3fd1"
+    },
+    {
+      "path": "workspace/PARP_Prediction_Contract_Study_20261119/results/source_archives/0d9e49f5/run_simulation.py",
+      "bytes": 5340,
+      "sha256": "e6ca128dbd8eac7adefb17eb4f69eb6737fb90c59a2ef95df0104394f54ae93b"
+    },
+    {
+      "path": "workspace/PARP_Prediction_Contract_Study_20261119/results/source_archives/0d9e49f5/scheduler_fix.py",
+      "bytes": 787,
+      "sha256": "9d67991667474162f78bd5cd3a50f62b8618998c23ba2bf82b20d0106a479a04"
+    },
+    {
+      "path": "workspace/PARP_Prediction_Contract_Study_20261119/results/source_archives/0d9e49f5/selection.json",
+      "bytes": 88,
+      "sha256": "85576266ec428f738f0eb2f124dc7003d78bb0bb5df140470e98eb0b0fbf3ff3"
+    },
+    {
+      "path": "workspace/PARP_Prediction_Contract_Study_20261119/results/source_archives/0d9e49f5/source_baseline.json",
+      "bytes": 1524,
+      "sha256": "b02b652a6b56e1baa78e9cb9bcca47e2e26fe6a6c611ef3151b2253afdd1f866"
+    },
+    {
+      "path": "workspace/PARP_Prediction_Contract_Study_20261119/results/source_archives/0d9e49f5/stage_native.py",
+      "bytes": 2407,
+      "sha256": "d0c0c3bcff439b2c0a2080cdd6de8d8b0dfa47ceba43b34aa5512899c828479c"
+    },
+    {
+      "path": "workspace/PARP_Prediction_Contract_Study_20261119/results/source_archives/0d9e49f5/study_pipeline.py",
+      "bytes": 11223,
+      "sha256": "ed8501322c2f581e9e86e1af645666e295dc1443fdd398955d5777fb011e7c97"
+    },
+    {
+      "path": "workspace/PARP_Prediction_Contract_Study_20261119/results/source_archives/0d9e49f5/test_contract.py",
+      "bytes": 4157,
+      "sha256": "40c987e8707a52eeaec8f80fd513739a6d06a3346ec6aeb190eb0b850443a8c6"
+    },
+    {
+      "path": "workspace/PARP_Prediction_Contract_Study_20261119/results/source_archives/0d9e49f5/verify_source.py",
+      "bytes": 604,
+      "sha256": "528134afa61611075a0cd8497695ec155f2c3cc80c5f5577e47f697ccdaefa3d"
+    },
+    {
+      "path": "workspace/PARP_Prediction_Contract_Study_20261119/results/source_archives/0d9e49f5/vm_service.py",
+      "bytes": 2437,
+      "sha256": "5676f4f582ceb3d409a00db994d2e47f76b00b7ac798658f9d1f41d282d4e677"
+    },
+    {
+      "path": "workspace/PARP_Prediction_Contract_Study_20261119/results/source_archives/4388b865/controller/adapters.py",
+      "bytes": 2521,
+      "sha256": "3b4e30a47c55053cacc24fa58c8757eaf552b5ac10625752e566472648d65629"
+    },
+    {
+      "path": "workspace/PARP_Prediction_Contract_Study_20261119/results/source_archives/4388b865/controller/coordinator.py",
+      "bytes": 8177,
+      "sha256": "2c5891d24addae9878cb510a5fb419f54cb2167cf46691ee9e9a1b38f6b586f1"
+    },
+    {
+      "path": "workspace/PARP_Prediction_Contract_Study_20261119/results/source_archives/4388b865/controller/executor.py",
+      "bytes": 19766,
+      "sha256": "2d71beea94628242b91aa57606bea8d2496c5f1a68ea350b6380be4449ca9c6f"
+    },
+    {
+      "path": "workspace/PARP_Prediction_Contract_Study_20261119/results/source_archives/4388b865/controller/faults.py",
+      "bytes": 1259,
+      "sha256": "3e7ff27aac2cf75059254088807a1768c811771f0a78ad73d94c56a753c375c7"
+    },
+    {
+      "path": "workspace/PARP_Prediction_Contract_Study_20261119/results/source_archives/4388b865/controller/native.py",
+      "bytes": 4262,
+      "sha256": "9b14655b61edb0d6ae7e0ad375b396730264cf8ef815bc7c1dae49886af3c7d4"
+    },
+    {
+      "path": "workspace/PARP_Prediction_Contract_Study_20261119/results/source_archives/4388b865/controller/plan.py",
+      "bytes": 16853,
+      "sha256": "1908cc9fc2ad31a73edac3c21193e027445b5aa2a4be8a95c42321734b8a5c2c"
+    },
+    {
+      "path": "workspace/PARP_Prediction_Contract_Study_20261119/results/source_archives/4388b865/controller/prepeak_timing.py",
+      "bytes": 7183,
+      "sha256": "a5bcfe9e8f947ec874b6896bf1a2dead5dfbe32cb565aa99ac0775e9a9cfddc1"
+    },
+    {
+      "path": "workspace/PARP_Prediction_Contract_Study_20261119/results/source_archives/4388b865/controller/replay_forecast.py",
+      "bytes": 2814,
+      "sha256": "9b30a0a25526a8f0ad850d4048d4058bdb3683d843c4c28ba5a1b8fd7a270245"
+    },
+    {
+      "path": "workspace/PARP_Prediction_Contract_Study_20261119/results/source_archives/4388b865/controller/safety_store.py",
+      "bytes": 2153,
+      "sha256": "4c6f9948d84b620e72519d7a1d346c812c92c3089982c0cdc9d4117d1fb6cdaa"
+    },
+    {
+      "path": "workspace/PARP_Prediction_Contract_Study_20261119/results/source_archives/4388b865/controller/sequence_policy.py",
+      "bytes": 2452,
+      "sha256": "616ad43caf518b8f040626ded1480d09431ed9a23f6678d0ed89c5b367566b71"
+    },
+    {
+      "path": "workspace/PARP_Prediction_Contract_Study_20261119/results/source_archives/4388b865/controller/signals.py",
+      "bytes": 2409,
+      "sha256": "52fdc181b8605af31683aa92240290073d36e9d08e0d976f84c1efc796f0e7f3"
+    },
+    {
+      "path": "workspace/PARP_Prediction_Contract_Study_20261119/results/source_archives/4388b865/controller/test_measured.py",
+      "bytes": 8994,
+      "sha256": "8ca86005d3b840f713b0720129c60e31ceecb9b76c4ea7e296165be7081db0c8"
+    },
+    {
+      "path": "workspace/PARP_Prediction_Contract_Study_20261119/results/source_archives/4388b865/controller/test_prepeak_timing.py",
+      "bytes": 9564,
+      "sha256": "b5dfc8373c6fe8e024e8f78712353029ee36c15d50389dcce157cc2e68960401"
+    },
+    {
+      "path": "workspace/PARP_Prediction_Contract_Study_20261119/results/source_archives/4388b865/controller/test_sequence_policy.py",
+      "bytes": 9281,
+      "sha256": "39bd076c04ca6a0be04feb5a93cbb45a0724595995878e66db99ced1161f364f"
+    },
+    {
+      "path": "workspace/PARP_Prediction_Contract_Study_20261119/results/source_archives/4388b865/controller/workflow.py",
+      "bytes": 1813,
+      "sha256": "140743fd24b469a8d54e0fd76dacc565a7a13e924adc00c8bae07bf528337c6a"
+    },
+    {
+      "path": "workspace/PARP_Prediction_Contract_Study_20261119/results/source_archives/4388b865/memory_worker.py",
+      "bytes": 5002,
+      "sha256": "222b48f1d23161993345263ec3c1cb71e709830cdc7d48f75c1816f5b7674490"
+    },
+    {
+      "path": "workspace/PARP_Prediction_Contract_Study_20261119/results/source_archives/4388b865/native_support.py",
+      "bytes": 8898,
+      "sha256": "3901f1c0aee124cf24fccbd01610c4672468262f7ccf7134c02beac4b9b962e6"
+    },
+    {
+      "path": "workspace/PARP_Prediction_Contract_Study_20261119/results/source_archives/4388b865/oracle_scenarios.py",
+      "bytes": 2551,
+      "sha256": "0bab2382ed8adfd393cd13b143bac5ce5570e14c123a874c76528b30da0957af"
+    },
+    {
+      "path": "workspace/PARP_Prediction_Contract_Study_20261119/results/source_archives/4388b865/prediction_contract.py",
+      "bytes": 5463,
+      "sha256": "2dc4684eccbdfdc3d6e97058c99f2121d41e234b43daafcd3ce83688196af989"
+    },
+    {
+      "path": "workspace/PARP_Prediction_Contract_Study_20261119/results/source_archives/4388b865/prepare_cgroup.py",
+      "bytes": 3347,
+      "sha256": "d5f95231ebe95ec2f30eac2c77275dd50ab2edccf2861d54395c7eb6043cdb53"
+    },
+    {
+      "path": "workspace/PARP_Prediction_Contract_Study_20261119/results/source_archives/4388b865/run_native.py",
+      "bytes": 11997,
+      "sha256": "960c2ff41fedc3f427808607c2f701de0138dfba666017927784d622f4d966e8"
+    },
+    {
+      "path": "workspace/PARP_Prediction_Contract_Study_20261119/results/source_archives/4388b865/run_simulation.py",
+      "bytes": 5340,
+      "sha256": "e6ca128dbd8eac7adefb17eb4f69eb6737fb90c59a2ef95df0104394f54ae93b"
+    },
+    {
+      "path": "workspace/PARP_Prediction_Contract_Study_20261119/results/source_archives/4388b865/scheduler_fix.py",
+      "bytes": 787,
+      "sha256": "9d67991667474162f78bd5cd3a50f62b8618998c23ba2bf82b20d0106a479a04"
+    },
+    {
+      "path": "workspace/PARP_Prediction_Contract_Study_20261119/results/source_archives/4388b865/selection.json",
+      "bytes": 216,
+      "sha256": "f8da864749a79bd9f88569d04dc4e257531d7c56fa66ed525084eb18c5e535f7"
+    },
+    {
+      "path": "workspace/PARP_Prediction_Contract_Study_20261119/results/source_archives/4388b865/source_baseline.json",
+      "bytes": 1524,
+      "sha256": "b02b652a6b56e1baa78e9cb9bcca47e2e26fe6a6c611ef3151b2253afdd1f866"
+    },
+    {
+      "path": "workspace/PARP_Prediction_Contract_Study_20261119/results/source_archives/4388b865/stage_native.py",
+      "bytes": 2407,
+      "sha256": "d0c0c3bcff439b2c0a2080cdd6de8d8b0dfa47ceba43b34aa5512899c828479c"
+    },
+    {
+      "path": "workspace/PARP_Prediction_Contract_Study_20261119/results/source_archives/4388b865/study_pipeline.py",
+      "bytes": 11223,
+      "sha256": "ed8501322c2f581e9e86e1af645666e295dc1443fdd398955d5777fb011e7c97"
+    },
+    {
+      "path": "workspace/PARP_Prediction_Contract_Study_20261119/results/source_archives/4388b865/test_contract.py",
+      "bytes": 3576,
+      "sha256": "78cce689affb9ad9f6894447dd5980edd51c783c3317def592929088101b19a2"
+    },
+    {
+      "path": "workspace/PARP_Prediction_Contract_Study_20261119/results/source_archives/4388b865/verify_source.py",
+      "bytes": 604,
+      "sha256": "528134afa61611075a0cd8497695ec155f2c3cc80c5f5577e47f697ccdaefa3d"
+    },
+    {
+      "path": "workspace/PARP_Prediction_Contract_Study_20261119/results/source_archives/4388b865/vm_service.py",
+      "bytes": 2437,
+      "sha256": "5676f4f582ceb3d409a00db994d2e47f76b00b7ac798658f9d1f41d282d4e677"
+    },
+    {
+      "path": "workspace/PARP_Prediction_Contract_Study_20261119/results/source_archives/43924efa/controller/adapters.py",
+      "bytes": 2521,
+      "sha256": "3b4e30a47c55053cacc24fa58c8757eaf552b5ac10625752e566472648d65629"
+    },
+    {
+      "path": "workspace/PARP_Prediction_Contract_Study_20261119/results/source_archives/43924efa/controller/coordinator.py",
+      "bytes": 8177,
+      "sha256": "2c5891d24addae9878cb510a5fb419f54cb2167cf46691ee9e9a1b38f6b586f1"
+    },
+    {
+      "path": "workspace/PARP_Prediction_Contract_Study_20261119/results/source_archives/43924efa/controller/executor.py",
+      "bytes": 19766,
+      "sha256": "2d71beea94628242b91aa57606bea8d2496c5f1a68ea350b6380be4449ca9c6f"
+    },
+    {
+      "path": "workspace/PARP_Prediction_Contract_Study_20261119/results/source_archives/43924efa/controller/faults.py",
+      "bytes": 1259,
+      "sha256": "3e7ff27aac2cf75059254088807a1768c811771f0a78ad73d94c56a753c375c7"
+    },
+    {
+      "path": "workspace/PARP_Prediction_Contract_Study_20261119/results/source_archives/43924efa/controller/native.py",
+      "bytes": 4262,
+      "sha256": "9b14655b61edb0d6ae7e0ad375b396730264cf8ef815bc7c1dae49886af3c7d4"
+    },
+    {
+      "path": "workspace/PARP_Prediction_Contract_Study_20261119/results/source_archives/43924efa/controller/plan.py",
+      "bytes": 16853,
+      "sha256": "1908cc9fc2ad31a73edac3c21193e027445b5aa2a4be8a95c42321734b8a5c2c"
+    },
+    {
+      "path": "workspace/PARP_Prediction_Contract_Study_20261119/results/source_archives/43924efa/controller/prepeak_timing.py",
+      "bytes": 7183,
+      "sha256": "a5bcfe9e8f947ec874b6896bf1a2dead5dfbe32cb565aa99ac0775e9a9cfddc1"
+    },
+    {
+      "path": "workspace/PARP_Prediction_Contract_Study_20261119/results/source_archives/43924efa/controller/replay_forecast.py",
+      "bytes": 2814,
+      "sha256": "9b30a0a25526a8f0ad850d4048d4058bdb3683d843c4c28ba5a1b8fd7a270245"
+    },
+    {
+      "path": "workspace/PARP_Prediction_Contract_Study_20261119/results/source_archives/43924efa/controller/safety_store.py",
+      "bytes": 2153,
+      "sha256": "4c6f9948d84b620e72519d7a1d346c812c92c3089982c0cdc9d4117d1fb6cdaa"
+    },
+    {
+      "path": "workspace/PARP_Prediction_Contract_Study_20261119/results/source_archives/43924efa/controller/sequence_policy.py",
+      "bytes": 2452,
+      "sha256": "616ad43caf518b8f040626ded1480d09431ed9a23f6678d0ed89c5b367566b71"
+    },
+    {
+      "path": "workspace/PARP_Prediction_Contract_Study_20261119/results/source_archives/43924efa/controller/signals.py",
+      "bytes": 2409,
+      "sha256": "52fdc181b8605af31683aa92240290073d36e9d08e0d976f84c1efc796f0e7f3"
+    },
+    {
+      "path": "workspace/PARP_Prediction_Contract_Study_20261119/results/source_archives/43924efa/controller/test_measured.py",
+      "bytes": 8994,
+      "sha256": "8ca86005d3b840f713b0720129c60e31ceecb9b76c4ea7e296165be7081db0c8"
+    },
+    {
+      "path": "workspace/PARP_Prediction_Contract_Study_20261119/results/source_archives/43924efa/controller/test_prepeak_timing.py",
+      "bytes": 9564,
+      "sha256": "b5dfc8373c6fe8e024e8f78712353029ee36c15d50389dcce157cc2e68960401"
+    },
+    {
+      "path": "workspace/PARP_Prediction_Contract_Study_20261119/results/source_archives/43924efa/controller/test_sequence_policy.py",
+      "bytes": 9281,
+      "sha256": "39bd076c04ca6a0be04feb5a93cbb45a0724595995878e66db99ced1161f364f"
+    },
+    {
+      "path": "workspace/PARP_Prediction_Contract_Study_20261119/results/source_archives/43924efa/controller/workflow.py",
+      "bytes": 1813,
+      "sha256": "140743fd24b469a8d54e0fd76dacc565a7a13e924adc00c8bae07bf528337c6a"
+    },
+    {
+      "path": "workspace/PARP_Prediction_Contract_Study_20261119/results/source_archives/43924efa/input_probe.py",
+      "bytes": 1989,
+      "sha256": "93f2374c3981b095fb715fc799594a9daa79f0dc40c5b9a42dfe60926249bd68"
+    },
+    {
+      "path": "workspace/PARP_Prediction_Contract_Study_20261119/results/source_archives/43924efa/memory_worker.py",
+      "bytes": 5002,
+      "sha256": "222b48f1d23161993345263ec3c1cb71e709830cdc7d48f75c1816f5b7674490"
+    },
+    {
+      "path": "workspace/PARP_Prediction_Contract_Study_20261119/results/source_archives/43924efa/native_support.py",
+      "bytes": 8898,
+      "sha256": "3901f1c0aee124cf24fccbd01610c4672468262f7ccf7134c02beac4b9b962e6"
+    },
+    {
+      "path": "workspace/PARP_Prediction_Contract_Study_20261119/results/source_archives/43924efa/oracle_scenarios.py",
+      "bytes": 2551,
+      "sha256": "0bab2382ed8adfd393cd13b143bac5ce5570e14c123a874c76528b30da0957af"
+    },
+    {
+      "path": "workspace/PARP_Prediction_Contract_Study_20261119/results/source_archives/43924efa/prediction_contract.py",
+      "bytes": 5971,
+      "sha256": "3ac29c4456cc745d501e64297c4b3c05a338ec598e6b61bcac025082d34e339e"
+    },
+    {
+      "path": "workspace/PARP_Prediction_Contract_Study_20261119/results/source_archives/43924efa/prepare_cgroup.py",
+      "bytes": 3347,
+      "sha256": "d5f95231ebe95ec2f30eac2c77275dd50ab2edccf2861d54395c7eb6043cdb53"
+    },
+    {
+      "path": "workspace/PARP_Prediction_Contract_Study_20261119/results/source_archives/43924efa/run_native.py",
+      "bytes": 12136,
+      "sha256": "b97a41c16fe9adc0dda50400e1c636358bb99d3acc6e7b9604cbab08928e3fd1"
+    },
+    {
+      "path": "workspace/PARP_Prediction_Contract_Study_20261119/results/source_archives/43924efa/run_simulation.py",
+      "bytes": 5340,
+      "sha256": "e6ca128dbd8eac7adefb17eb4f69eb6737fb90c59a2ef95df0104394f54ae93b"
+    },
+    {
+      "path": "workspace/PARP_Prediction_Contract_Study_20261119/results/source_archives/43924efa/scheduler_fix.py",
+      "bytes": 787,
+      "sha256": "9d67991667474162f78bd5cd3a50f62b8618998c23ba2bf82b20d0106a479a04"
+    },
+    {
+      "path": "workspace/PARP_Prediction_Contract_Study_20261119/results/source_archives/43924efa/selection.json",
+      "bytes": 88,
+      "sha256": "85576266ec428f738f0eb2f124dc7003d78bb0bb5df140470e98eb0b0fbf3ff3"
+    },
+    {
+      "path": "workspace/PARP_Prediction_Contract_Study_20261119/results/source_archives/43924efa/source_baseline.json",
+      "bytes": 1524,
+      "sha256": "b02b652a6b56e1baa78e9cb9bcca47e2e26fe6a6c611ef3151b2253afdd1f866"
+    },
+    {
+      "path": "workspace/PARP_Prediction_Contract_Study_20261119/results/source_archives/43924efa/stage_native.py",
+      "bytes": 2407,
+      "sha256": "d0c0c3bcff439b2c0a2080cdd6de8d8b0dfa47ceba43b34aa5512899c828479c"
+    },
+    {
+      "path": "workspace/PARP_Prediction_Contract_Study_20261119/results/source_archives/43924efa/study_pipeline.py",
+      "bytes": 11223,
+      "sha256": "ed8501322c2f581e9e86e1af645666e295dc1443fdd398955d5777fb011e7c97"
+    },
+    {
+      "path": "workspace/PARP_Prediction_Contract_Study_20261119/results/source_archives/43924efa/test_contract.py",
+      "bytes": 4157,
+      "sha256": "40c987e8707a52eeaec8f80fd513739a6d06a3346ec6aeb190eb0b850443a8c6"
+    },
+    {
+      "path": "workspace/PARP_Prediction_Contract_Study_20261119/results/source_archives/43924efa/verify_source.py",
+      "bytes": 604,
+      "sha256": "528134afa61611075a0cd8497695ec155f2c3cc80c5f5577e47f697ccdaefa3d"
+    },
+    {
+      "path": "workspace/PARP_Prediction_Contract_Study_20261119/results/source_archives/43924efa/vm_service.py",
+      "bytes": 2437,
+      "sha256": "5676f4f582ceb3d409a00db994d2e47f76b00b7ac798658f9d1f41d282d4e677"
+    },
+    {
+      "path": "workspace/PARP_Prediction_Contract_Study_20261119/results/source_archives/b104cde2/controller/adapters.py",
+      "bytes": 2521,
+      "sha256": "3b4e30a47c55053cacc24fa58c8757eaf552b5ac10625752e566472648d65629"
+    },
+    {
+      "path": "workspace/PARP_Prediction_Contract_Study_20261119/results/source_archives/b104cde2/controller/coordinator.py",
+      "bytes": 8177,
+      "sha256": "2c5891d24addae9878cb510a5fb419f54cb2167cf46691ee9e9a1b38f6b586f1"
+    },
+    {
+      "path": "workspace/PARP_Prediction_Contract_Study_20261119/results/source_archives/b104cde2/controller/executor.py",
+      "bytes": 19766,
+      "sha256": "2d71beea94628242b91aa57606bea8d2496c5f1a68ea350b6380be4449ca9c6f"
+    },
+    {
+      "path": "workspace/PARP_Prediction_Contract_Study_20261119/results/source_archives/b104cde2/controller/faults.py",
+      "bytes": 1259,
+      "sha256": "3e7ff27aac2cf75059254088807a1768c811771f0a78ad73d94c56a753c375c7"
+    },
+    {
+      "path": "workspace/PARP_Prediction_Contract_Study_20261119/results/source_archives/b104cde2/controller/native.py",
+      "bytes": 4262,
+      "sha256": "9b14655b61edb0d6ae7e0ad375b396730264cf8ef815bc7c1dae49886af3c7d4"
+    },
+    {
+      "path": "workspace/PARP_Prediction_Contract_Study_20261119/results/source_archives/b104cde2/controller/plan.py",
+      "bytes": 16853,
+      "sha256": "1908cc9fc2ad31a73edac3c21193e027445b5aa2a4be8a95c42321734b8a5c2c"
+    },
+    {
+      "path": "workspace/PARP_Prediction_Contract_Study_20261119/results/source_archives/b104cde2/controller/prepeak_timing.py",
+      "bytes": 7183,
+      "sha256": "a5bcfe9e8f947ec874b6896bf1a2dead5dfbe32cb565aa99ac0775e9a9cfddc1"
+    },
+    {
+      "path": "workspace/PARP_Prediction_Contract_Study_20261119/results/source_archives/b104cde2/controller/replay_forecast.py",
+      "bytes": 2814,
+      "sha256": "9b30a0a25526a8f0ad850d4048d4058bdb3683d843c4c28ba5a1b8fd7a270245"
+    },
+    {
+      "path": "workspace/PARP_Prediction_Contract_Study_20261119/results/source_archives/b104cde2/controller/safety_store.py",
+      "bytes": 2153,
+      "sha256": "4c6f9948d84b620e72519d7a1d346c812c92c3089982c0cdc9d4117d1fb6cdaa"
+    },
+    {
+      "path": "workspace/PARP_Prediction_Contract_Study_20261119/results/source_archives/b104cde2/controller/sequence_policy.py",
+      "bytes": 2452,
+      "sha256": "616ad43caf518b8f040626ded1480d09431ed9a23f6678d0ed89c5b367566b71"
+    },
+    {
+      "path": "workspace/PARP_Prediction_Contract_Study_20261119/results/source_archives/b104cde2/controller/signals.py",
+      "bytes": 2409,
+      "sha256": "52fdc181b8605af31683aa92240290073d36e9d08e0d976f84c1efc796f0e7f3"
+    },
+    {
+      "path": "workspace/PARP_Prediction_Contract_Study_20261119/results/source_archives/b104cde2/controller/test_measured.py",
+      "bytes": 8994,
+      "sha256": "8ca86005d3b840f713b0720129c60e31ceecb9b76c4ea7e296165be7081db0c8"
+    },
+    {
+      "path": "workspace/PARP_Prediction_Contract_Study_20261119/results/source_archives/b104cde2/controller/test_prepeak_timing.py",
+      "bytes": 9564,
+      "sha256": "b5dfc8373c6fe8e024e8f78712353029ee36c15d50389dcce157cc2e68960401"
+    },
+    {
+      "path": "workspace/PARP_Prediction_Contract_Study_20261119/results/source_archives/b104cde2/controller/test_sequence_policy.py",
+      "bytes": 9281,
+      "sha256": "39bd076c04ca6a0be04feb5a93cbb45a0724595995878e66db99ced1161f364f"
+    },
+    {
+      "path": "workspace/PARP_Prediction_Contract_Study_20261119/results/source_archives/b104cde2/controller/workflow.py",
+      "bytes": 1813,
+      "sha256": "140743fd24b469a8d54e0fd76dacc565a7a13e924adc00c8bae07bf528337c6a"
+    },
+    {
+      "path": "workspace/PARP_Prediction_Contract_Study_20261119/results/source_archives/b104cde2/input_probe.py",
+      "bytes": 1989,
+      "sha256": "93f2374c3981b095fb715fc799594a9daa79f0dc40c5b9a42dfe60926249bd68"
+    },
+    {
+      "path": "workspace/PARP_Prediction_Contract_Study_20261119/results/source_archives/b104cde2/memory_worker.py",
+      "bytes": 5002,
+      "sha256": "222b48f1d23161993345263ec3c1cb71e709830cdc7d48f75c1816f5b7674490"
+    },
+    {
+      "path": "workspace/PARP_Prediction_Contract_Study_20261119/results/source_archives/b104cde2/native_support.py",
+      "bytes": 8898,
+      "sha256": "3901f1c0aee124cf24fccbd01610c4672468262f7ccf7134c02beac4b9b962e6"
+    },
+    {
+      "path": "workspace/PARP_Prediction_Contract_Study_20261119/results/source_archives/b104cde2/oracle_scenarios.py",
+      "bytes": 2551,
+      "sha256": "0bab2382ed8adfd393cd13b143bac5ce5570e14c123a874c76528b30da0957af"
+    },
+    {
+      "path": "workspace/PARP_Prediction_Contract_Study_20261119/results/source_archives/b104cde2/prediction_contract.py",
+      "bytes": 5463,
+      "sha256": "2dc4684eccbdfdc3d6e97058c99f2121d41e234b43daafcd3ce83688196af989"
+    },
+    {
+      "path": "workspace/PARP_Prediction_Contract_Study_20261119/results/source_archives/b104cde2/prepare_cgroup.py",
+      "bytes": 3347,
+      "sha256": "d5f95231ebe95ec2f30eac2c77275dd50ab2edccf2861d54395c7eb6043cdb53"
+    },
+    {
+      "path": "workspace/PARP_Prediction_Contract_Study_20261119/results/source_archives/b104cde2/run_native.py",
+      "bytes": 12115,
+      "sha256": "084747982f6a1043c6b26c7dcb934f1f17862e23f082c79e0f47c593d2524bbe"
+    },
+    {
+      "path": "workspace/PARP_Prediction_Contract_Study_20261119/results/source_archives/b104cde2/run_simulation.py",
+      "bytes": 5340,
+      "sha256": "e6ca128dbd8eac7adefb17eb4f69eb6737fb90c59a2ef95df0104394f54ae93b"
+    },
+    {
+      "path": "workspace/PARP_Prediction_Contract_Study_20261119/results/source_archives/b104cde2/scheduler_fix.py",
+      "bytes": 787,
+      "sha256": "9d67991667474162f78bd5cd3a50f62b8618998c23ba2bf82b20d0106a479a04"
+    },
+    {
+      "path": "workspace/PARP_Prediction_Contract_Study_20261119/results/source_archives/b104cde2/selection.json",
+      "bytes": 216,
+      "sha256": "f8da864749a79bd9f88569d04dc4e257531d7c56fa66ed525084eb18c5e535f7"
+    },
+    {
+      "path": "workspace/PARP_Prediction_Contract_Study_20261119/results/source_archives/b104cde2/source_baseline.json",
+      "bytes": 1524,
+      "sha256": "b02b652a6b56e1baa78e9cb9bcca47e2e26fe6a6c611ef3151b2253afdd1f866"
+    },
+    {
+      "path": "workspace/PARP_Prediction_Contract_Study_20261119/results/source_archives/b104cde2/stage_native.py",
+      "bytes": 2407,
+      "sha256": "d0c0c3bcff439b2c0a2080cdd6de8d8b0dfa47ceba43b34aa5512899c828479c"
+    },
+    {
+      "path": "workspace/PARP_Prediction_Contract_Study_20261119/results/source_archives/b104cde2/study_pipeline.py",
+      "bytes": 11223,
+      "sha256": "ed8501322c2f581e9e86e1af645666e295dc1443fdd398955d5777fb011e7c97"
+    },
+    {
+      "path": "workspace/PARP_Prediction_Contract_Study_20261119/results/source_archives/b104cde2/test_contract.py",
+      "bytes": 3576,
+      "sha256": "78cce689affb9ad9f6894447dd5980edd51c783c3317def592929088101b19a2"
+    },
+    {
+      "path": "workspace/PARP_Prediction_Contract_Study_20261119/results/source_archives/b104cde2/verify_source.py",
+      "bytes": 604,
+      "sha256": "528134afa61611075a0cd8497695ec155f2c3cc80c5f5577e47f697ccdaefa3d"
+    },
+    {
+      "path": "workspace/PARP_Prediction_Contract_Study_20261119/results/source_archives/b104cde2/vm_service.py",
+      "bytes": 2437,
+      "sha256": "5676f4f582ceb3d409a00db994d2e47f76b00b7ac798658f9d1f41d282d4e677"
+    },
+    {
+      "path": "workspace/PARP_Prediction_Contract_Study_20261119/results/source_archives/initial/controller/adapters.py",
+      "bytes": 2521,
+      "sha256": "3b4e30a47c55053cacc24fa58c8757eaf552b5ac10625752e566472648d65629"
+    },
+    {
+      "path": "workspace/PARP_Prediction_Contract_Study_20261119/results/source_archives/initial/controller/coordinator.py",
+      "bytes": 8177,
+      "sha256": "2c5891d24addae9878cb510a5fb419f54cb2167cf46691ee9e9a1b38f6b586f1"
+    },
+    {
+      "path": "workspace/PARP_Prediction_Contract_Study_20261119/results/source_archives/initial/controller/executor.py",
+      "bytes": 19766,
+      "sha256": "2d71beea94628242b91aa57606bea8d2496c5f1a68ea350b6380be4449ca9c6f"
+    },
+    {
+      "path": "workspace/PARP_Prediction_Contract_Study_20261119/results/source_archives/initial/controller/faults.py",
+      "bytes": 1259,
+      "sha256": "3e7ff27aac2cf75059254088807a1768c811771f0a78ad73d94c56a753c375c7"
+    },
+    {
+      "path": "workspace/PARP_Prediction_Contract_Study_20261119/results/source_archives/initial/controller/native.py",
+      "bytes": 4262,
+      "sha256": "9b14655b61edb0d6ae7e0ad375b396730264cf8ef815bc7c1dae49886af3c7d4"
+    },
+    {
+      "path": "workspace/PARP_Prediction_Contract_Study_20261119/results/source_archives/initial/controller/plan.py",
+      "bytes": 16853,
+      "sha256": "1908cc9fc2ad31a73edac3c21193e027445b5aa2a4be8a95c42321734b8a5c2c"
+    },
+    {
+      "path": "workspace/PARP_Prediction_Contract_Study_20261119/results/source_archives/initial/controller/prepeak_timing.py",
+      "bytes": 7183,
+      "sha256": "a5bcfe9e8f947ec874b6896bf1a2dead5dfbe32cb565aa99ac0775e9a9cfddc1"
+    },
+    {
+      "path": "workspace/PARP_Prediction_Contract_Study_20261119/results/source_archives/initial/controller/replay_forecast.py",
+      "bytes": 2814,
+      "sha256": "9b30a0a25526a8f0ad850d4048d4058bdb3683d843c4c28ba5a1b8fd7a270245"
+    },
+    {
+      "path": "workspace/PARP_Prediction_Contract_Study_20261119/results/source_archives/initial/controller/safety_store.py",
+      "bytes": 2153,
+      "sha256": "4c6f9948d84b620e72519d7a1d346c812c92c3089982c0cdc9d4117d1fb6cdaa"
+    },
+    {
+      "path": "workspace/PARP_Prediction_Contract_Study_20261119/results/source_archives/initial/controller/sequence_policy.py",
+      "bytes": 2452,
+      "sha256": "616ad43caf518b8f040626ded1480d09431ed9a23f6678d0ed89c5b367566b71"
+    },
+    {
+      "path": "workspace/PARP_Prediction_Contract_Study_20261119/results/source_archives/initial/controller/signals.py",
+      "bytes": 2409,
+      "sha256": "52fdc181b8605af31683aa92240290073d36e9d08e0d976f84c1efc796f0e7f3"
+    },
+    {
+      "path": "workspace/PARP_Prediction_Contract_Study_20261119/results/source_archives/initial/controller/test_measured.py",
+      "bytes": 8994,
+      "sha256": "8ca86005d3b840f713b0720129c60e31ceecb9b76c4ea7e296165be7081db0c8"
+    },
+    {
+      "path": "workspace/PARP_Prediction_Contract_Study_20261119/results/source_archives/initial/controller/test_prepeak_timing.py",
+      "bytes": 9564,
+      "sha256": "b5dfc8373c6fe8e024e8f78712353029ee36c15d50389dcce157cc2e68960401"
+    },
+    {
+      "path": "workspace/PARP_Prediction_Contract_Study_20261119/results/source_archives/initial/controller/test_sequence_policy.py",
+      "bytes": 9281,
+      "sha256": "39bd076c04ca6a0be04feb5a93cbb45a0724595995878e66db99ced1161f364f"
+    },
+    {
+      "path": "workspace/PARP_Prediction_Contract_Study_20261119/results/source_archives/initial/controller/workflow.py",
+      "bytes": 1813,
+      "sha256": "140743fd24b469a8d54e0fd76dacc565a7a13e924adc00c8bae07bf528337c6a"
+    },
+    {
+      "path": "workspace/PARP_Prediction_Contract_Study_20261119/results/source_archives/initial/memory_worker.py",
+      "bytes": 5002,
+      "sha256": "222b48f1d23161993345263ec3c1cb71e709830cdc7d48f75c1816f5b7674490"
+    },
+    {
+      "path": "workspace/PARP_Prediction_Contract_Study_20261119/results/source_archives/initial/native_support.py",
+      "bytes": 8898,
+      "sha256": "3901f1c0aee124cf24fccbd01610c4672468262f7ccf7134c02beac4b9b962e6"
+    },
+    {
+      "path": "workspace/PARP_Prediction_Contract_Study_20261119/results/source_archives/initial/oracle_scenarios.py",
+      "bytes": 2551,
+      "sha256": "0bab2382ed8adfd393cd13b143bac5ce5570e14c123a874c76528b30da0957af"
+    },
+    {
+      "path": "workspace/PARP_Prediction_Contract_Study_20261119/results/source_archives/initial/prediction_contract.py",
+      "bytes": 5451,
+      "sha256": "70c184042b7beab8fb5c65ac75d6016009fb84f27bee61ef1e70412a81a17b00"
+    },
+    {
+      "path": "workspace/PARP_Prediction_Contract_Study_20261119/results/source_archives/initial/prepare_cgroup.py",
+      "bytes": 3347,
+      "sha256": "d5f95231ebe95ec2f30eac2c77275dd50ab2edccf2861d54395c7eb6043cdb53"
+    },
+    {
+      "path": "workspace/PARP_Prediction_Contract_Study_20261119/results/source_archives/initial/run_native.py",
+      "bytes": 11397,
+      "sha256": "a47b7484e451a9209cdd05f7c0527c4b58a194abf63bcc1cbf00c88c04708af8"
+    },
+    {
+      "path": "workspace/PARP_Prediction_Contract_Study_20261119/results/source_archives/initial/run_simulation.py",
+      "bytes": 5340,
+      "sha256": "e6ca128dbd8eac7adefb17eb4f69eb6737fb90c59a2ef95df0104394f54ae93b"
+    },
+    {
+      "path": "workspace/PARP_Prediction_Contract_Study_20261119/results/source_archives/initial/scheduler_fix.py",
+      "bytes": 787,
+      "sha256": "9d67991667474162f78bd5cd3a50f62b8618998c23ba2bf82b20d0106a479a04"
+    },
+    {
+      "path": "workspace/PARP_Prediction_Contract_Study_20261119/results/source_archives/initial/source_baseline.json",
+      "bytes": 1524,
+      "sha256": "b02b652a6b56e1baa78e9cb9bcca47e2e26fe6a6c611ef3151b2253afdd1f866"
+    },
+    {
+      "path": "workspace/PARP_Prediction_Contract_Study_20261119/results/source_archives/initial/stage_native.py",
+      "bytes": 2407,
+      "sha256": "d0c0c3bcff439b2c0a2080cdd6de8d8b0dfa47ceba43b34aa5512899c828479c"
+    },
+    {
+      "path": "workspace/PARP_Prediction_Contract_Study_20261119/results/source_archives/initial/study_pipeline.py",
+      "bytes": 10067,
+      "sha256": "ed58280b0c5f81732e33c574d915b73a67047be1a84783b9d1507bc8910d37c3"
+    },
+    {
+      "path": "workspace/PARP_Prediction_Contract_Study_20261119/results/source_archives/initial/test_contract.py",
+      "bytes": 2341,
+      "sha256": "73a87e49713c7b752c222e9dee30ece6664c79440395d2b3660811c8df0db10e"
+    },
+    {
+      "path": "workspace/PARP_Prediction_Contract_Study_20261119/results/source_archives/initial/verify_source.py",
+      "bytes": 604,
+      "sha256": "528134afa61611075a0cd8497695ec155f2c3cc80c5f5577e47f697ccdaefa3d"
+    },
+    {
+      "path": "workspace/PARP_Prediction_Contract_Study_20261119/results/source_archives/initial/vm_service.py",
+      "bytes": 2437,
+      "sha256": "5676f4f582ceb3d409a00db994d2e47f76b00b7ac798658f9d1f41d282d4e677"
+    },
+    {
+      "path": "workspace/PARP_Prediction_Contract_Study_20261119/results/STAGING.json",
+      "bytes": 170,
+      "sha256": "f00079c474e87ff349ec06a6a84caadc26c89e5d1f998268625f8a640f4d29d3"
+    },
+    {
+      "path": "workspace/PARP_Prediction_Contract_Study_20261119/results/VERIFIED.json",
+      "bytes": 20698,
+      "sha256": "fe6e71aeccda2fc4f37e35d6f0770027fd364f0ad958f0fb67da8270f22797f8"
+    },
+    {
+      "path": "workspace/PARP_Prediction_Contract_Study_20261119/run_native.py",
+      "bytes": 12136,
+      "sha256": "b97a41c16fe9adc0dda50400e1c636358bb99d3acc6e7b9604cbab08928e3fd1"
+    },
+    {
+      "path": "workspace/PARP_Prediction_Contract_Study_20261119/run_simulation.py",
+      "bytes": 5340,
+      "sha256": "e6ca128dbd8eac7adefb17eb4f69eb6737fb90c59a2ef95df0104394f54ae93b"
+    },
+    {
+      "path": "workspace/PARP_Prediction_Contract_Study_20261119/scheduler_fix.py",
+      "bytes": 787,
+      "sha256": "9d67991667474162f78bd5cd3a50f62b8618998c23ba2bf82b20d0106a479a04"
+    },
+    {
+      "path": "workspace/PARP_Prediction_Contract_Study_20261119/source_baseline.json",
+      "bytes": 1524,
+      "sha256": "b02b652a6b56e1baa78e9cb9bcca47e2e26fe6a6c611ef3151b2253afdd1f866"
+    },
+    {
+      "path": "workspace/PARP_Prediction_Contract_Study_20261119/stage_native.py",
+      "bytes": 2407,
+      "sha256": "d0c0c3bcff439b2c0a2080cdd6de8d8b0dfa47ceba43b34aa5512899c828479c"
+    },
+    {
+      "path": "workspace/PARP_Prediction_Contract_Study_20261119/start_contract_study.sh",
+      "bytes": 246,
+      "sha256": "d82a3dbd633e48bad18da194b2ce75dddd7b9a91aa3a86e66219e00d0b6bddd3"
+    },
+    {
+      "path": "workspace/PARP_Prediction_Contract_Study_20261119/study_pipeline.py",
+      "bytes": 11223,
+      "sha256": "ed8501322c2f581e9e86e1af645666e295dc1443fdd398955d5777fb011e7c97"
+    },
+    {
+      "path": "workspace/PARP_Prediction_Contract_Study_20261119/test_contract.py",
+      "bytes": 4157,
+      "sha256": "40c987e8707a52eeaec8f80fd513739a6d06a3346ec6aeb190eb0b850443a8c6"
+    },
+    {
+      "path": "workspace/PARP_Prediction_Contract_Study_20261119/verify_source.py",
+      "bytes": 604,
+      "sha256": "528134afa61611075a0cd8497695ec155f2c3cc80c5f5577e47f697ccdaefa3d"
+    },
+    {
+      "path": "workspace/PARP_Prediction_Contract_Study_20261119/vm_service.py",
+      "bytes": 2437,
+      "sha256": "5676f4f582ceb3d409a00db994d2e47f76b00b7ac798658f9d1f41d282d4e677"
+    },
+    {
+      "path": "workspace/PARP_Prediction_Contract_Study_20261119/交给采集人员的字段与步骤.md",
+      "bytes": 7426,
+      "sha256": "191c7e18d94fb1c5122c7a9b02e2a044071edf3d97cee04af3081fba9fe9ca06"
+    },
+    {
+      "path": "workspace/PARP_Prediction_Contract_Study_20261119/实验结果.md",
+      "bytes": 4275,
+      "sha256": "b1ad033f66cdd85862ea02a9f8364ae9d69817ece9a024d5b669eb7131bb5bd1"
+    },
+    {
+      "path": "workspace/PARP_Prediction_Contract_Study_20261119/预测接口与代码改动.md",
+      "bytes": 5147,
+      "sha256": "26f670481a59302be7dbf13c283bfdfbada101f70dfc8b7559a01d133307bfa1"
     }
   ],
   "manifest_self_excluded": true
